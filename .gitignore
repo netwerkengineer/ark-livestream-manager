@@ -19,9 +19,12 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
+._*
+.apple
 *.pem
 
 # debug
@@ -32,6 +35,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+
+# App Specific Sensitive Data
+settings.json
+tokens.json
+.deploy_config.json
+/data/
+/public/thumbnails/
+deploy.tar.gz
 
 # vercel
 .vercel
