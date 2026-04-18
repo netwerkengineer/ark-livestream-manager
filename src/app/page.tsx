@@ -58,6 +58,12 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
+  const [tags, setTags] = useState("");
+
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -107,8 +113,30 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
             if (data.pages.length > 0 && !selectedPageId) setSelectedPageId(data.pages[0].id);
           }
         });
+
+      fetch("/api/youtube/categories")
+        .then(res => res.json())
+        .then(data => {
+          if (data.categories) {
+            setCategories(data.categories);
+            if (!selectedCategoryId) setSelectedCategoryId(settings?.defaultCategoryId || "29");
+          }
+        });
+
+      fetch("/api/youtube/playlists")
+        .then(res => res.json())
+        .then(data => {
+          if (data.playlists) setPlaylists(data.playlists);
+        });
     }
-  }, [session]);
+  }, [session, settings?.defaultCategoryId]);
+
+  useEffect(() => {
+    if (settings) {
+      setTags(settings.defaultTags || "");
+      setSelectedCategoryId(settings.defaultCategoryId || "29");
+    }
+  }, [settings]);
 
   const isConnectedYoutube = !!(session as any)?.youtubeToken;
   const isConnectedFacebook = !!(session as any)?.facebookToken;
@@ -133,7 +161,10 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           scheduleTime: dateTime,
           thumbnailUrl,
           privacyStatus,
-          facebookPageId: selectedPageId
+          facebookPageId: selectedPageId,
+          categoryId: selectedCategoryId,
+          playlistId: selectedPlaylistId,
+          tags
         })
       });
 
@@ -304,6 +335,32 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 {facebookPages.length === 0 && <option value="">Geen pagina gevonden</option>}
               </select>
             </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+            <div className="input-group">
+              <label className="input-label">YouTube Categorie</label>
+              <select className="input-field" value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}>
+                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
+              </select>
+            </div>
+            <div className="input-group">
+              <label className="input-label">YouTube Playlist</label>
+              <select className="input-field" value={selectedPlaylistId} onChange={(e) => setSelectedPlaylistId(e.target.value)}>
+                <option value="">Geen Playlist</option>
+                {playlists.map(pl => <option key={pl.id} value={pl.id}>{pl.title}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '20px' }}>
+            <label className="input-label">YouTube Tags (comma gescheiden)</label>
+            <input 
+              className="input-field" 
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="tag1, tag2, tag3"
+            />
           </div>
 
           <button className="btn-primary" style={{ width: '100%', marginTop: '16px' }} onClick={handleSchedule} disabled={loading}>
@@ -517,6 +574,27 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       <option value="unlisted">Verborgen</option>
                       <option value="private">Privé</option>
                     </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="input-group">
+                    <label className="input-label">Standaard YouTube Categorie</label>
+                    <select 
+                      className="input-field" 
+                      value={settings.defaultCategoryId}
+                      onChange={(e) => setSettings({...settings, defaultCategoryId: e.target.value})}
+                    >
+                      {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Standaard Tags</label>
+                    <input 
+                      className="input-field" 
+                      value={settings.defaultTags}
+                      onChange={(e) => setSettings({...settings, defaultTags: e.target.value})}
+                    />
                   </div>
                 </div>
               </div>

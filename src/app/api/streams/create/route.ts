@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd bij YouTube of Facebook" }, { status: 401 });
   }
 
-  const { title, description, scheduleTime, thumbnailUrl, privacyStatus, facebookPageId } = await req.json();
+  const { title, description, scheduleTime, thumbnailUrl, privacyStatus, facebookPageId, categoryId, playlistId, tags } = await req.json();
 
   try {
     // 1. YouTube Integratie
@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
           title: title,
           description: description,
           scheduledStartTime: scheduleTime,
-          categoryId: "29"
+          categoryId: categoryId || "29",
+          tags: tags ? tags.split(",").map((t: string) => t.trim()) : []
         },
         status: {
           privacyStatus: privacyStatus || "public",
@@ -67,6 +68,26 @@ export async function POST(req: NextRequest) {
       headers: { Authorization: `Bearer ${session.youtubeToken}` }
     });
 
+    // Stap 1.3b: Voeg toe aan playlist indien opgegeven
+    if (playlistId) {
+      fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${session.youtubeToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          snippet: {
+            playlistId: playlistId,
+            resourceId: {
+              kind: "youtube#video",
+              videoId: broadcastId
+            }
+          }
+        })
+      }).catch(err => console.error("YouTube Playlist Insert Fout:", err));
+    }
+
     // Stap 1.4: Thumbnail & Lokale Opslag
     if (thumbnailUrl && thumbnailUrl.startsWith("data:image")) {
       const base64Data = thumbnailUrl.split(",")[1];
@@ -83,8 +104,6 @@ export async function POST(req: NextRequest) {
       }).catch(err => console.error("YouTube Thumbnail Upload Fout:", err));
 
       // Sla lokaal op (Voor OBS op de NAS)
-      // We gebruiken hier het INTERNE pad van de Docker container (/app/public/thumbnails)
-      // Dit is via docker-compose gemapped naar /volume1/Beamer/FreeShow/Media op de host.
       try {
         const internalPath = "/app/public/thumbnails";
         if (!fs.existsSync(internalPath)) {

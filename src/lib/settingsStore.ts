@@ -12,6 +12,8 @@ export interface AppSettings {
   defaultDescription: string;
   defaultFacebookPageId: string;
   defaultPrivacy: "public" | "unlisted" | "private";
+  defaultCategoryId: string;
+  defaultTags: string;
 
   // Auth Configuration (NAS-Pro)
   googleClientId: string;
@@ -43,6 +45,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 #arkchurch #ark #Amersfoort  #kerkdienst #Jezus #worship #churchonline #God #church`,
   defaultFacebookPageId: "",
   defaultPrivacy: "public",
+  defaultCategoryId: "29", // Nonprofits & Activism
+  defaultTags: "egdeark,Amersfoort,Nanny Benjamins,Ark,livestream,worship,De Ark,Kerk,evangelie,praise,Fabian Benjamins,Arkchurch",
   
   googleClientId: "",
   googleClientSecret: "",
