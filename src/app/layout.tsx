@@ -5,6 +5,9 @@ import { SessionProvider } from "next-auth/react";
 export const metadata: Metadata = {
   title: "Ark Church | Livestream Manager",
   description: "Beheer en plan de livestreams van Ark Church",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
