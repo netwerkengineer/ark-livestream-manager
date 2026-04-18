@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Ark Church | Livestream Manager",
   description: "Beheer en plan de livestreams van Ark Church",
   icons: {
-    icon: "/logo.png",
+    icon: "/logo.png?v=2",
   },
 };
 
