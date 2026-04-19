@@ -25,6 +25,11 @@ export interface AppSettings {
   
   // Setup flag
   isSetupComplete: boolean;
+
+  // OBS Configuration
+  obsHost: string;
+  obsPort: number;
+  obsPassword: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -54,7 +59,12 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   facebookClientSecret: "",
   nextAuthUrl: "http://192.168.2.250:3000",
   nextAuthSecret: crypto.randomBytes(32).toString("hex"),
-  isSetupComplete: false
+  isSetupComplete: false,
+
+  // OBS Defaults
+  obsHost: "localhost",
+  obsPort: 4455,
+  obsPassword: ""
 };
 
 // Ensure data directory exists

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { signIn, signOut, useSession } from "next-auth/react";
 import ThumbnailEditor from "@/components/ThumbnailEditor";
+import StreamMonitor from "@/components/StreamMonitor";
 import { 
   LayoutDashboard, 
   Video, 
@@ -27,7 +28,8 @@ import {
   Link,
   Clock,
   RefreshCcw,
-  Trash2
+  Trash2,
+  Activity
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -63,6 +65,9 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
   const [tags, setTags] = useState("");
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor">("planner");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
@@ -276,18 +281,44 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           </button>
         </div>
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}>
-        {/* Left Column */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card"
+      
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
+        <button 
+          onClick={() => setActiveTab("planner")} 
+          className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-            <LayoutDashboard size={24} color="var(--primary)" />
-            <h2>Stream Inplannen</h2>
-          </div>
+          <LayoutDashboard size={18} /> Dashboard
+        </button>
+        <button 
+          onClick={() => setActiveTab("monitor")} 
+          className={activeTab === "monitor" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px' }}
+        >
+          <Activity size={18} /> Live Monitor
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === "planner" ? (
+          <motion.div 
+            key="planner"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}
+          >
+            {/* Left Column */}
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-card"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+                <LayoutDashboard size={24} color="var(--primary)" />
+                <h2>Stream Inplannen</h2>
+              </div>
 
           <div className="input-group">
             <label className="input-label">Uitzending Titel</label>
@@ -487,9 +518,20 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 </span>
               </div>
             </div>
-          </motion.section>
-        </div>
-      </div>
+            </motion.section>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="monitor"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+        >
+          <StreamMonitor settings={settings} scheduledStreams={scheduledStreams} />
+        </motion.div>
+      )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showEditor && (
@@ -596,6 +638,43 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       onChange={(e) => setSettings({...settings, defaultTags: e.target.value})}
                     />
                   </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--card-border)', margin: '12px 0 8px' }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                  <MonitorPlay size={20} color="var(--primary)" />
+                  <h3 style={{ fontSize: '1rem' }}>OBS WebSocket Instellingen</h3>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                  <div className="input-group">
+                    <label className="input-label">OBS Host</label>
+                    <input 
+                      className="input-field" 
+                      value={settings.obsHost}
+                      onChange={(e) => setSettings({...settings, obsHost: e.target.value})}
+                      placeholder="192.168.x.x"
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Poort</label>
+                    <input 
+                      className="input-field" 
+                      type="number"
+                      value={settings.obsPort}
+                      onChange={(e) => setSettings({...settings, obsPort: parseInt(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label className="input-label">OBS Wachtwoord</label>
+                  <input 
+                    className="input-field" 
+                    type="password"
+                    value={settings.obsPassword}
+                    onChange={(e) => setSettings({...settings, obsPassword: e.target.value})}
+                    placeholder="Leeg laten indien geen wachtwoord"
+                  />
                 </div>
               </div>
 
