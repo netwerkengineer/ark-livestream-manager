@@ -3,7 +3,7 @@ FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat build-base alsa-lib-dev python3
 WORKDIR /app
 
 # Install dependencies
@@ -25,6 +25,7 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
+RUN apk add --no-cache alsa-lib
 WORKDIR /app
 
 ENV NODE_ENV production

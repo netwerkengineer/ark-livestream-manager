@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
+import { getSettings } from '@/lib/settingsStore';
 
 export async function POST(request: Request) {
   try {
     const { page, row, col } = await request.json();
+    const settings = getSettings();
     
     // De URL voor de Companion API (v3/v4) om een knop 'in te drukken'
-    // Formaat: http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press
-    const companionUrl = `http://127.0.0.1:8000/api/location/${page}/${row}/${col}/press`;
+    const companionUrl = `http://${settings.companionHost}:${settings.companionPort}/api/location/${page}/${row}/${col}/press`;
 
-    console.log(`[Broadcast API] Triggering Companion button: ${page}/${row}/${col}`);
+    console.log(`[Broadcast API] Triggering Companion button: ${page}/${row}/${col} on ${settings.companionHost}`);
 
     const response = await fetch(companionUrl, {
       method: 'POST',

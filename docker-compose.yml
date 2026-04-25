@@ -5,11 +5,18 @@ services:
       dockerfile: Dockerfile
     container_name: livestream-manager
     restart: always
-    ports:
-      - "3000:3000"
+    network_mode: host
     volumes:
       - ./data:/app/data
       - /volume1/Beamer/FreeShow/Media:/app/public/thumbnails
     environment:
       - NODE_ENV=production
-      # De rest van de instellingen gaan via de Setup Wizard in de browser!
+      - PORT=3000
+
+  companion:
+    image: companion-nas-v3-final:latest
+    container_name: companion
+    restart: always
+    network_mode: host
+    volumes:
+      - ./companion-data:/companion

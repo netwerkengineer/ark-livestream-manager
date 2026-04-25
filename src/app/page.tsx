@@ -646,6 +646,60 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                   </div>
                 </div>
               </section>
+              
+              {/* Sectie 2.5: MIDI Bridge */}
+              <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>🎹 MIDI Bridge (rtpMIDI)</h3>
+                
+                <div className="glass-card" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ background: settings.midiEnabled ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                        <Database size={24} color={settings.midiEnabled ? '#4ade80' : '#f87171'} />
+                      </div>
+                      <div>
+                        <p style={{ fontWeight: 600 }}>rtpMIDI Sessie Status</p>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                          {settings.midiEnabled ? "Actief en zichtbaar op netwerk" : "Uitgeschakeld"}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={settings.midiEnabled} 
+                        onChange={(e) => setSettings({...settings, midiEnabled: e.target.checked})}
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span style={{ 
+                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, 
+                        backgroundColor: settings.midiEnabled ? 'var(--primary)' : '#444', 
+                        transition: '.4s', borderRadius: '34px' 
+                      }}>
+                        <span style={{ 
+                          position: 'absolute', content: '""', height: '18px', width: '18px', left: settings.midiEnabled ? '28px' : '4px', bottom: '4px', 
+                          backgroundColor: 'white', transition: '.4s', borderRadius: '50%' 
+                        }}></span>
+                      </span>
+                    </label>
+                  </div>
+
+                  {settings.midiEnabled && (
+                    <div className="input-group" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
+                      <label className="input-label">Sessie Naam (Apple MIDI)</label>
+                      <input 
+                        className="input-field" 
+                        value={settings.midiSessionName} 
+                        onChange={(e) => setSettings({...settings, midiSessionName: e.target.value})} 
+                        placeholder="Ark-Church-App" 
+                      />
+                      <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>
+                        Dit is de naam die verschijnt in de "Audio MIDI Setup" op je Playback Mac.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
 
               {/* Sectie 3: Dashboard Knoppen */}
               <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -714,20 +768,25 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
                       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Companion Adres (API)</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
                           <div className="input-group"><label className="input-label">Page</label><input type="number" className="input-field" value={btn.page} onChange={(e) => {
                             const newBtns = [...settings.broadcastButtons];
                             newBtns[idx].page = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
-                          <div className="input-group"><label className="input-label">Row (0-indexed)</label><input type="number" className="input-field" value={btn.row} onChange={(e) => {
+                          <div className="input-group"><label className="input-label">Row</label><input type="number" className="input-field" value={btn.row} onChange={(e) => {
                             const newBtns = [...settings.broadcastButtons];
                             newBtns[idx].row = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
-                          <div className="input-group"><label className="input-label">Col (0-indexed)</label><input type="number" className="input-field" value={btn.col} onChange={(e) => {
+                          <div className="input-group"><label className="input-label">Col</label><input type="number" className="input-field" value={btn.col} onChange={(e) => {
                             const newBtns = [...settings.broadcastButtons];
                             newBtns[idx].col = parseInt(e.target.value);
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} /></div>
+                          <div className="input-group"><label className="input-label">MIDI Note</label><input type="number" className="input-field" value={btn.midiNote || 60} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].midiNote = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
                         </div>

@@ -30,6 +30,35 @@ export interface AppSettings {
   obsHost: string;
   obsPort: number;
   obsPassword: string;
+
+  // Broadcast Infrastructure
+  companionHost: string;
+  companionPort: number;
+  x32Host: string;
+  x32Port: number;
+  qlcHost: string;
+  qlcPort: number;
+  freeShowHost: string;
+  freeShowPort: number;
+  
+  // Custom Buttons
+  broadcastButtons: BroadcastButton[];
+
+  // MIDI Configuration
+  midiEnabled: boolean;
+  midiSessionName: string;
+}
+
+export interface BroadcastButton {
+  id: string;
+  name: string;
+  sub: string;
+  icon: 'play' | 'square' | 'volume-x' | 'monitor-off' | 'refresh-cw' | 'zap' | 'alert-octagon';
+  color: string;
+  page: number;
+  row: number;
+  col: number;
+  midiNote?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -64,7 +93,29 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   // OBS Defaults
   obsHost: "localhost",
   obsPort: 4455,
-  obsPassword: ""
+  obsPassword: "",
+
+  // Broadcast Defaults
+  companionHost: "127.0.0.1",
+  companionPort: 8000,
+  x32Host: "127.0.0.1",
+  x32Port: 10023,
+  qlcHost: "127.0.0.1",
+  qlcPort: 7700,
+  freeShowHost: "127.0.0.1",
+  freeShowPort: 3030,
+
+  // MIDI Defaults
+  midiEnabled: true,
+  midiSessionName: "Ark-Church-App",
+
+  // Default Buttons
+  broadcastButtons: [
+    { id: '1', name: 'START SERVICE', sub: 'Worship Leader Start', icon: 'play', color: 'green', page: 1, row: 0, col: 0, midiNote: 60 },
+    { id: '2', name: 'STOP SERVICE', sub: 'Einde uitzending', icon: 'square', color: 'red', page: 1, row: 0, col: 1, midiNote: 61 },
+    { id: '3', name: 'CLEAR AUDIO', sub: 'Mute alle kanalen', icon: 'volume-x', color: 'amber', page: 2, row: 0, col: 0, midiNote: 62 },
+    { id: '4', name: 'BLACKOUT', sub: 'Alles op zwart', icon: 'monitor-off', color: 'slate', page: 2, row: 0, col: 3, midiNote: 63 }
+  ]
 };
 
 // Ensure data directory exists

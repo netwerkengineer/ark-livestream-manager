@@ -18,8 +18,8 @@ def osc_string(s):
 def start_x32_mock():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.bind(('127.0.0.1', PORT))
-        print(f"--- X32 Mock Server v2 active on 127.0.0.1:{PORT} ---")
+        sock.bind(('0.0.0.0', PORT))
+        print(f"--- X32 Mock Server v2 active on 0.0.0.0:{PORT} ---")
         
         while True:
             data, addr = sock.recvfrom(BUFFER_SIZE)

@@ -139,15 +139,43 @@ def deploy():
 
     # 3. NAS MAP VOORBEREIDEN
     ssh_p = f"ssh -S {global_ssh_mux_socket}"
-    # We maken zowel de app-map, de data-map als de Media-map aan
+    # We maken zowel de app-map, de data-map, companion-data als de Media-map aan
     media_path = "/volume1/Beamer/FreeShow/Media"
-    prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {media_path} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {media_path}\""
+    prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/companion-data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {media_path} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {media_path}\""
     run_with_pty(prep_cmd, "Mappen checken en aanmaken op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
     # 4. OVERZETTEN NAAR NAS
     inject_cmd = f"cat {config['LOCAL_TEMP_ARCHIVE']} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {config['REMOTE_TEMP_ARCHIVE']}\""
     subprocess.check_call(inject_cmd, shell=True)
     print("✓ Project succesvol overgebracht naar de NAS.")
+
+    # 4.5 COMPANION IMAGE CHECK & UPLOAD (Eénmalig)
+    print(f"\n>>> NAS: Controleren of Companion image aanwezig is ...")
+    D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    check_img_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker images -q companion-nas-v3-final:latest\""
+    img_exists = subprocess.check_output(check_img_cmd, shell=True).decode().strip()
+    
+    if not img_exists:
+        print("⚠️ Companion image niet gevonden op NAS. Bezig met voorbereiden en versturen (dit kan 5-10 minuten duren)...")
+        local_tar = os.path.join(BASE_DIR, "companion_nas.tar")
+        remote_tar = f"{config['REMOTE_APP_PATH']}/companion_nas.tar"
+        
+        # Opslaan op Mac
+        subprocess.check_call(["docker", "save", "companion-nas-v3-final:latest", "-o", local_tar])
+        
+        # Versturen naar NAS
+        send_img_cmd = f"cat {local_tar} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_tar}\""
+        subprocess.check_call(send_img_cmd, shell=True)
+        
+        # Inladen op NAS
+        load_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker load -i {remote_tar} && rm {remote_tar}\""
+        run_with_pty(load_cmd, "Companion image inladen op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+        
+        # Opruimen lokaal
+        os.remove(local_tar)
+        print("✓ Companion image succesvol geïnstalleerd op de NAS.")
+    else:
+        print("✓ Companion image is al aanwezig op de NAS.")
 
     # 5. UITPAKKEN & DOCKER START
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -160,7 +188,8 @@ def deploy():
         f"{sudo_p} rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
         f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
-        f"({sudo_p} docker compose up -d --build || {sudo_p} docker-compose up -d --build)"
+        f"({sudo_p} docker compose up -d --build || {sudo_p} docker-compose up -d --build) && "
+        f"{sudo_p} docker image prune -f"
     )
     
     final_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"{deploy_cmd}\""
