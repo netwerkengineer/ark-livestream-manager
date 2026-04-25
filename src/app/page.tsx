@@ -29,8 +29,10 @@ import {
   Clock,
   RefreshCcw,
   Trash2,
-  Activity
+  Activity,
+  ShieldAlert
 } from "lucide-react";
+import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 
 export default function Dashboard() {
   const { data: session } = useSession();
@@ -67,7 +69,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [tags, setTags] = useState("");
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"planner" | "monitor">("planner");
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control">("planner");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
@@ -298,6 +300,13 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         >
           <Activity size={18} /> Live Monitor
         </button>
+        <button 
+          onClick={() => setActiveTab("control")} 
+          className={activeTab === "control" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
+        >
+          <ShieldAlert size={18} /> Control Center
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -521,7 +530,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
             </motion.section>
           </div>
         </motion.div>
-      ) : (
+      ) : activeTab === "monitor" ? (
         <motion.div
           key="monitor"
           initial={{ opacity: 0, x: 20 }}
@@ -530,7 +539,226 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         >
           <StreamMonitor settings={settings} scheduledStreams={scheduledStreams} />
         </motion.div>
+      ) : (
+        <motion.div
+          key="control"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+        >
+          <BroadcastControlCenter settings={settings} />
+        </motion.div>
       )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSettings && settings && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(2, 6, 23, 0.98)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          >
+            <div className="glass-card" style={{ width: '100%', maxWidth: '1000px', padding: '40px', position: 'relative', height: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '40px' }}>
+              <button onClick={() => setShowSettings(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ background: 'rgba(248, 113, 113, 0.15)', padding: '12px', borderRadius: '16px' }}>
+                  <Settings size={32} color="var(--primary)" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '2rem', marginBottom: '4px' }}>Systeem Configuratie</h2>
+                  <p style={{ color: 'var(--muted)' }}>Beheer alle hardware verbindingen en dashboard instellingen.</p>
+                </div>
+              </div>
+
+              {/* Sectie 1: Algemeen */}
+              <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>📝 Algemene Instellingen</h3>
+                
+                <div className="input-group">
+                  <label className="input-label">Thumbnail Opslag Pad (NAS)</label>
+                  <input className="input-field" value={settings.thumbnailSavePath} onChange={(e) => setSettings({...settings, thumbnailSavePath: e.target.value})} placeholder="/volume1/Beamer/FreeShow/Media" />
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>Dit is de map op de NAS waar OBS de thumbnails ophaalt.</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="input-group">
+                    <label className="input-label">Standaard Stream Titel</label>
+                    <input className="input-field" value={settings.defaultTitle} onChange={(e) => setSettings({...settings, defaultTitle: e.target.value})} />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Standaard YouTube Tags</label>
+                    <input className="input-field" value={settings.defaultTags} onChange={(e) => setSettings({...settings, defaultTags: e.target.value})} placeholder="Ark Church, Kerkdienst, Live" />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Standaard Beschrijving</label>
+                  <textarea className="input-field" style={{ minHeight: '150px', lineHeight: '1.6' }} value={settings.defaultDescription} onChange={(e) => setSettings({...settings, defaultDescription: e.target.value})} />
+                </div>
+              </section>
+
+              {/* Sectie 2: Hardware & Netwerk */}
+              <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>🌐 Hardware Verbindingen (IP's)</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><MonitorPlay size={18} color="var(--primary)" /> <strong>OBS WebSocket</strong></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                      <input className="input-field" placeholder="IP Adres" value={settings.obsHost} onChange={(e) => setSettings({...settings, obsHost: e.target.value})} />
+                      <input className="input-field" type="number" placeholder="Poort" value={settings.obsPort} onChange={(e) => setSettings({...settings, obsPort: parseInt(e.target.value)})} />
+                    </div>
+                    <input className="input-field" type="password" style={{ marginTop: '12px' }} placeholder="Wachtwoord (optioneel)" value={settings.obsPassword} onChange={(e) => setSettings({...settings, obsPassword: e.target.value})} />
+                  </div>
+
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Activity size={18} color="var(--primary)" /> <strong>Bitfocus Companion</strong></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                      <input className="input-field" placeholder="IP Adres" value={settings.companionHost} onChange={(e) => setSettings({...settings, companionHost: e.target.value})} />
+                      <input className="input-field" type="number" placeholder="Poort" value={settings.companionPort} onChange={(e) => setSettings({...settings, companionPort: parseInt(e.target.value)})} />
+                    </div>
+                  </div>
+
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><ShieldAlert size={18} color="var(--primary)" /> <strong>Behringer X32 (OSC)</strong></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                      <input className="input-field" placeholder="IP Adres" value={settings.x32Host} onChange={(e) => setSettings({...settings, x32Host: e.target.value})} />
+                      <input className="input-field" type="number" placeholder="Poort" value={settings.x32Port} onChange={(e) => setSettings({...settings, x32Port: parseInt(e.target.value)})} />
+                    </div>
+                  </div>
+
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><LayoutDashboard size={18} color="var(--primary)" /> <strong>QLC+ & FreeShow</strong></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                        <input className="input-field" placeholder="QLC+ IP" value={settings.qlcHost} onChange={(e) => setSettings({...settings, qlcHost: e.target.value})} />
+                        <input className="input-field" type="number" value={settings.qlcPort} onChange={(e) => setSettings({...settings, qlcPort: parseInt(e.target.value)})} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                        <input className="input-field" placeholder="FreeShow IP" value={settings.freeShowHost} onChange={(e) => setSettings({...settings, freeShowHost: e.target.value})} />
+                        <input className="input-field" type="number" value={settings.freeShowPort} onChange={(e) => setSettings({...settings, freeShowPort: parseInt(e.target.value)})} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Sectie 3: Dashboard Knoppen */}
+              <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                  <h3 style={{ fontSize: '1.25rem' }}>🔘 Dashboard Knoppen (Control Center)</h3>
+                  <button 
+                    onClick={() => {
+                      const newButton = { id: Math.random().toString(36).substr(2, 9), name: 'NIEUWE KNOP', sub: 'Beschrijving', icon: 'zap', color: 'blue', page: 1, row: 0, col: 0 };
+                      setSettings({...settings, broadcastButtons: [...(settings.broadcastButtons || []), newButton]});
+                    }}
+                    className="btn-primary" 
+                    style={{ padding: '8px 20px', fontSize: '0.9rem' }}
+                  >
+                    + Nieuwe Knop Toevoegen
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))', gap: '16px' }}>
+                  {(settings.broadcastButtons || []).map((btn: any, idx: number) => (
+                    <div key={btn.id} className="glass-card" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label className="input-label" style={{ fontSize: '0.7rem' }}>KNOP TITEL</label>
+                          <input className="input-field" style={{ fontWeight: 'bold', fontSize: '1.1rem' }} value={btn.name} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].name = e.target.value;
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} />
+                        </div>
+                        <button onClick={() => {
+                          const newBtns = settings.broadcastButtons.filter((_: any, i: number) => i !== idx);
+                          setSettings({...settings, broadcastButtons: newBtns});
+                        }} style={{ color: '#f87171', background: 'rgba(248, 113, 113, 0.1)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', height: 'fit-content', marginTop: '20px' }}><X size={20} /></button>
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                        <div className="input-group">
+                          <label className="input-label">Subtekst</label>
+                          <input className="input-field" value={btn.sub} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].sub = e.target.value;
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} />
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Icoon</label>
+                          <select className="input-field" value={btn.icon} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].icon = e.target.value;
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }}>
+                            <option value="play">Play</option><option value="square">Stop</option><option value="volume-x">Mute</option><option value="monitor-off">Off</option><option value="zap">Zap</option><option value="refresh-cw">Sync</option>
+                          </select>
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Kleur</label>
+                          <select className="input-field" value={btn.color} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].color = e.target.value;
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }}>
+                            <option value="green">Groen</option><option value="red">Rood</option><option value="amber">Oranje</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="slate">Grijs</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Companion Adres (API)</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                          <div className="input-group"><label className="input-label">Page</label><input type="number" className="input-field" value={btn.page} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].page = parseInt(e.target.value);
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} /></div>
+                          <div className="input-group"><label className="input-label">Row (0-indexed)</label><input type="number" className="input-field" value={btn.row} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].row = parseInt(e.target.value);
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} /></div>
+                          <div className="input-group"><label className="input-label">Col (0-indexed)</label><input type="number" className="input-field" value={btn.col} onChange={(e) => {
+                            const newBtns = [...settings.broadcastButtons];
+                            newBtns[idx].col = parseInt(e.target.value);
+                            setSettings({...settings, broadcastButtons: newBtns});
+                          }} /></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px', paddingBottom: '20px' }}>
+                <button 
+                  className="btn-primary" 
+                  style={{ width: '100%', padding: '20px', fontSize: '1.25rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(248, 113, 113, 0.2)' }}
+                  onClick={async () => {
+                    const res = await fetch("/api/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(settings)
+                    });
+                    if (res.ok) {
+                      setShowSettings(false);
+                      setStatus({ type: 'success', message: "Alle instellingen zijn succesvol bijgewerkt!" });
+                    }
+                  }}
+                >
+                  <Save size={24} /> Wijzigingen Opslaan
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -545,164 +773,6 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           </motion.div>
         )}
 
-        {showSettings && settings && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          >
-            <div className="glass-card" style={{ width: '100%', maxWidth: '600px', padding: '32px', position: 'relative' }}>
-              <button onClick={() => setShowSettings(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-                <Settings size={24} color="var(--primary)" />
-                <h2>Instellingen</h2>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '12px' }}>
-                <div className="input-group">
-                  <label className="input-label">Thumbnail Opslag Pad (NAS)</label>
-                  <input 
-                    className="input-field" 
-                    value={settings.thumbnailSavePath}
-                    onChange={(e) => setSettings({...settings, thumbnailSavePath: e.target.value})}
-                    placeholder="./public/obs"
-                  />
-                  <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '4px' }}>Path op de server waar 'thema.jpg' wordt opgeslagen voor OBS.</p>
-                </div>
-
-                <div className="input-group">
-                  <label className="input-label">Standaard Titel</label>
-                  <input 
-                    className="input-field" 
-                    value={settings.defaultTitle}
-                    onChange={(e) => setSettings({...settings, defaultTitle: e.target.value})}
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label className="input-label">Standaard Beschrijving</label>
-                  <textarea 
-                    className="input-field" 
-                    style={{ minHeight: '120px' }}
-                    value={settings.defaultDescription}
-                    onChange={(e) => setSettings({...settings, defaultDescription: e.target.value})}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="input-group">
-                    <label className="input-label">Standaard FB Pagina</label>
-                    <select 
-                      className="input-field" 
-                      value={settings.defaultFacebookPageId}
-                      onChange={(e) => setSettings({...settings, defaultFacebookPageId: e.target.value})}
-                    >
-                      <option value="">Geen (Onthoud selectie)</option>
-                      {facebookPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Standaard Privacy</label>
-                    <select 
-                      className="input-field" 
-                      value={settings.defaultPrivacy}
-                      onChange={(e) => setSettings({...settings, defaultPrivacy: e.target.value})}
-                    >
-                      <option value="public">Openbaar</option>
-                      <option value="unlisted">Verborgen</option>
-                      <option value="private">Privé</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="input-group">
-                    <label className="input-label">Standaard YouTube Categorie</label>
-                    <select 
-                      className="input-field" 
-                      value={settings.defaultCategoryId}
-                      onChange={(e) => setSettings({...settings, defaultCategoryId: e.target.value})}
-                    >
-                      {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Standaard Tags</label>
-                    <input 
-                      className="input-field" 
-                      value={settings.defaultTags}
-                      onChange={(e) => setSettings({...settings, defaultTags: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--card-border)', margin: '12px 0 8px' }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                  <MonitorPlay size={20} color="var(--primary)" />
-                  <h3 style={{ fontSize: '1rem' }}>OBS WebSocket Instellingen</h3>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                  <div className="input-group">
-                    <label className="input-label">OBS Host</label>
-                    <input 
-                      className="input-field" 
-                      value={settings.obsHost}
-                      onChange={(e) => setSettings({...settings, obsHost: e.target.value})}
-                      placeholder="192.168.x.x"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Poort</label>
-                    <input 
-                      className="input-field" 
-                      type="number"
-                      value={settings.obsPort}
-                      onChange={(e) => setSettings({...settings, obsPort: parseInt(e.target.value)})}
-                    />
-                  </div>
-                </div>
-                <div className="input-group">
-                  <label className="input-label">OBS Wachtwoord</label>
-                  <input 
-                    className="input-field" 
-                    type="password"
-                    value={settings.obsPassword}
-                    onChange={(e) => setSettings({...settings, obsPassword: e.target.value})}
-                    placeholder="Leeg laten indien geen wachtwoord"
-                  />
-                </div>
-              </div>
-
-              <button 
-                className="btn-primary" 
-                style={{ width: '100%', marginTop: '32px' }}
-                onClick={async () => {
-                  const res = await fetch("/api/settings", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(settings)
-                  });
-                  if (res.ok) {
-                    setShowSettings(false);
-                    setStatus({ type: 'success', message: "Instellingen opgeslagen!" });
-                    // Update current values if empty or using defaults
-                    setTitle(settings.defaultTitle);
-                    setDescription(settings.defaultDescription);
-                    setPrivacyStatus(settings.defaultPrivacy);
-                    if (settings.defaultFacebookPageId) setSelectedPageId(settings.defaultFacebookPageId);
-                  }
-                }}
-              >
-                <Save size={18} /> Instellingen Opslaan
-              </button>
-            </div>
-          </motion.div>
-        )}
 
         {showHelp && (
           <motion.div 

@@ -1,0 +1,75 @@
+{
+  "version": 3,
+  "triggers": {
+    "trigger_start": {
+      "name": "Dienst Start (C1)",
+      "enabled": true,
+      "events": [
+        {
+          "type": "midi:noteon",
+          "options": {
+            "channel": 1,
+            "note": 24, 
+            "velocity": 100
+          }
+        }
+      ],
+      "action_playback": "run",
+      "actions": [
+        {
+          "instance": "obs",
+          "action": "stream_start",
+          "options": {}
+        },
+        {
+          "instance": "x32",
+          "action": "mute",
+          "options": {
+            "type": "channel",
+            "no": 32,
+            "mute": 0
+          }
+        },
+        {
+          "instance": "qlcplus",
+          "action": "osc_send",
+          "options": {
+            "path": "/Dienst_Start",
+            "args": []
+          }
+        }
+      ]
+    },
+    "trigger_stop": {
+      "name": "Dienst Stop (E1)",
+      "enabled": true,
+      "events": [
+        {
+          "type": "midi:noteon",
+          "options": {
+            "channel": 1,
+            "note": 28,
+            "velocity": 100
+          }
+        }
+      ],
+      "action_playback": "run",
+      "actions": [
+        {
+          "instance": "obs",
+          "action": "stream_stop",
+          "options": {}
+        },
+        {
+          "instance": "x32",
+          "action": "mute",
+          "options": {
+            "type": "channel",
+            "no": 32,
+            "mute": 1
+          }
+        }
+      ]
+    }
+  }
+}
