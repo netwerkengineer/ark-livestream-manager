@@ -58,11 +58,11 @@
   <Function ID="10" Type="Scene" Name="Color: Red"><FixtureVal ID="4">0,255,1,0,2,0,3,0,4,0,5,0</FixtureVal></Function>
   <Function ID="11" Type="Scene" Name="Color: Green"><FixtureVal ID="4">0,0,1,255,2,0,3,0,4,0,5,0</FixtureVal></Function>
   <Function ID="12" Type="Scene" Name="Color: Blue"><FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,0</FixtureVal></Function>
-  <Function ID="13" Type="Scene" Name="Color: Amber"><FixtureVal ID="4">0,255,1,100,2,0,3,255,4,0,5,0</FixtureVal></Function>
-  <Function ID="14" Type="Scene" Name="Color: Magenta"><FixtureVal ID="4">0,255,1,0,2,255,3,0,4,255,5,0</FixtureVal></Function>
-  <Function ID="15" Type="Scene" Name="Color: Cyan"><FixtureVal ID="4">0,0,1,255,2,255,3,0,4,255,5,0</FixtureVal></Function>
+  <Function ID="13" Type="Scene" Name="Color: Amber"><FixtureVal ID="4">0,255,1,100,2,0,3,0,4,255,5,0</FixtureVal></Function>
+  <Function ID="14" Type="Scene" Name="Color: Magenta"><FixtureVal ID="4">0,255,1,0,2,255,3,0,4,0,5,0</FixtureVal></Function>
+  <Function ID="15" Type="Scene" Name="Color: Cyan"><FixtureVal ID="4">0,0,1,255,2,255,3,0,4,0,5,0</FixtureVal></Function>
   <Function ID="16" Type="Scene" Name="Color: UV"><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,255</FixtureVal></Function>
-  <Function ID="17" Type="Scene" Name="Color: White"><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,255,5,0</FixtureVal></Function>
+  <Function ID="17" Type="Scene" Name="Color: White"><FixtureVal ID="4">0,0,1,0,2,0,3,255,4,0,5,0</FixtureVal></Function>
 
  </Engine>
  <VirtualConsole>
