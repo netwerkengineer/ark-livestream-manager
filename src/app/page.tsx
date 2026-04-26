@@ -30,7 +30,9 @@ import {
   RefreshCcw,
   Trash2,
   Activity,
-  ShieldAlert
+  ShieldAlert,
+  Sun,
+  Monitor
 } from "lucide-react";
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 
@@ -631,17 +633,38 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                     </div>
                   </div>
 
+                  {/* QLC+ Configuration */}
                   <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><LayoutDashboard size={18} color="var(--primary)" /> <strong>QLC+ & FreeShow</strong></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Sun size={18} color="#f97316" /> <strong>Lichtregie (QLC+)</strong></div>
+                      <label className="switch" style={{ scale: '0.8' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={settings.qlcEnabled} 
+                          onChange={(e) => setSettings({...settings, qlcEnabled: e.target.checked})}
+                        />
+                        <span className="slider round"></span>
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: settings.qlcEnabled ? 1 : 0.5, pointerEvents: settings.qlcEnabled ? 'auto' : 'none' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                         <input className="input-field" placeholder="QLC+ IP" value={settings.qlcHost} onChange={(e) => setSettings({...settings, qlcHost: e.target.value})} />
-                        <input className="input-field" type="number" value={settings.qlcPort} onChange={(e) => setSettings({...settings, qlcPort: parseInt(e.target.value)})} />
+                        <input className="input-field" type="number" placeholder="Poort" value={settings.qlcPort} onChange={(e) => setSettings({...settings, qlcPort: parseInt(e.target.value) || 7700})} />
                       </div>
+                      <p className="text-[10px] text-muted">Standaard OSC poort voor QLC+ is 7700.</p>
+                    </div>
+                  </div>
+
+                  {/* FreeShow Configuration */}
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Monitor size={18} color="#3b82f6" /> <strong>Presentatie (FreeShow)</strong></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                         <input className="input-field" placeholder="FreeShow IP" value={settings.freeShowHost} onChange={(e) => setSettings({...settings, freeShowHost: e.target.value})} />
-                        <input className="input-field" type="number" value={settings.freeShowPort} onChange={(e) => setSettings({...settings, freeShowPort: parseInt(e.target.value)})} />
+                        <input className="input-field" type="number" placeholder="Poort" value={settings.freeShowPort} onChange={(e) => setSettings({...settings, freeShowPort: parseInt(e.target.value) || 3005})} />
                       </div>
+                      <input className="input-field" placeholder="Media Pad op NAS (bijv. /volume1/Media)" value={settings.mediaPath} onChange={(e) => setSettings({...settings, mediaPath: e.target.value})} />
+                      <p className="text-[10px] text-muted">Dit pad wordt gebruikt om thumbnails van je beamer-presentaties te tonen.</p>
                     </div>
                   </div>
                 </div>

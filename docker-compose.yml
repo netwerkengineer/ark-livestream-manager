@@ -5,18 +5,31 @@ services:
       dockerfile: Dockerfile
     container_name: livestream-manager
     restart: always
-    network_mode: host
+    ports:
+      - "3005:3005"
+      - "5006:5006/udp"
+      - "5004-5005:5004-5005/udp"
     volumes:
       - ./data:/app/data
       - /volume1/Beamer/FreeShow/Media:/app/public/thumbnails
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=3005
+    networks:
+      - ark-net
 
   companion:
     image: companion-nas-v3-final:latest
     container_name: companion
     restart: always
-    network_mode: host
+    ports:
+      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./companion-data:/companion
+    networks:
+      - ark-net
+
+networks:
+  ark-net:
+    driver: bridge

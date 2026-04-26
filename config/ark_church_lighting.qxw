@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Workspace>
+<Workspace xmlns="http://www.qlcplus.org/Workspace" CurrentWindow="VirtualConsole">
+ <Creator>
+  <Name>Q Light Controller Plus</Name>
+  <Version>4.12.7</Version>
+  <Author>Ark Church Manager</Author>
+ </Creator>
+ <Engine>
+  <InputOutputMap>
+   <Universe Name="Universe 1" ID="0">
+    <Input Plugin="OSC" Line="0"/>
+    <Output Plugin="ArtNet" Line="0"/>
+   </Universe>
+  </InputOutputMap>
+  
+  <!-- FIXTURES -->
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>0</ID><Name>Fresnel 1</Name><Universe>0</Universe><Address>12</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>1</ID><Name>Fresnel 2</Name><Universe>0</Universe><Address>13</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>2</ID><Name>Fresnel 3</Name><Universe>0</Universe><Address>14</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>3</ID><Name>Fresnel 4</Name><Universe>0</Universe><Address>15</Address><Channels>1</Channels></Fixture>
+  
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>4</ID><Name>Bar L1</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>5</ID><Name>Bar L2</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>6</ID><Name>Bar L3</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>7</ID><Name>Bar B1</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>8</ID><Name>Bar B2</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>9</ID><Name>Bar B3</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>10</ID><Name>Bar B4</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>11</ID><Name>Bar R1</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>12</ID><Name>Bar R2</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
+
+  <Monitor DisplayMode="0" ShowLabels="1">
+   <FxItem ID="4" X="100" Y="400"/><FxItem ID="5" X="100" Y="300"/><FxItem ID="6" X="100" Y="200"/>
+   <FxItem ID="7" X="200" Y="100"/><FxItem ID="8" X="350" Y="100"/><FxItem ID="9" X="500" Y="100"/><FxItem ID="10" X="650" Y="100"/>
+   <FxItem ID="11" X="750" Y="200"/><FxItem ID="12" X="750" Y="300"/>
+   <FxItem ID="0" X="200" Y="550"/><FxItem ID="1" X="350" Y="550"/><FxItem ID="2" X="500" Y="550"/><FxItem ID="3" X="650" Y="550"/>
+  </Monitor>
+
+  <!-- FUNCTIONS -->
+  <Function ID="0" Type="Scene" Name="Warm Stage">
+   <FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal>
+   <FixtureVal ID="0">0,200</FixtureVal><FixtureVal ID="1">0,200</FixtureVal><FixtureVal ID="2">0,200</FixtureVal><FixtureVal ID="3">0,200</FixtureVal>
+  </Function>
+  <Function ID="1" Type="Scene" Name="Worship Blue">
+   <FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,200</FixtureVal>
+   <FixtureVal ID="0">0,80</FixtureVal><FixtureVal ID="1">0,80</FixtureVal><FixtureVal ID="2">0,80</FixtureVal><FixtureVal ID="3">0,80</FixtureVal>
+  </Function>
+  <Function ID="2" Type="Scene" Name="Pre-Service Amber">
+   <FixtureVal ID="4">0,255,1,100,2,0,3,255,4,0,5,0</FixtureVal>
+   <FixtureVal ID="0">0,0</FixtureVal><FixtureVal ID="1">0,0</FixtureVal><FixtureVal ID="2">0,0</FixtureVal><FixtureVal ID="3">0,0</FixtureVal>
+  </Function>
+  <Function ID="3" Type="Scene" Name="Full House White">
+   <FixtureVal ID="4">0,255,1,255,2,255,3,255,4,255,5,0</FixtureVal>
+   <FixtureVal ID="0">0,255</FixtureVal><FixtureVal ID="1">0,255</FixtureVal><FixtureVal ID="2">0,255</FixtureVal><FixtureVal ID="3">0,255</FixtureVal>
+  </Function>
+
+  <Function ID="10" Type="Scene" Name="Color: Red"><FixtureVal ID="4">0,255,1,0,2,0,3,0,4,0,5,0</FixtureVal></Function>
+  <Function ID="11" Type="Scene" Name="Color: Green"><FixtureVal ID="4">0,0,1,255,2,0,3,0,4,0,5,0</FixtureVal></Function>
+  <Function ID="12" Type="Scene" Name="Color: Blue"><FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,0</FixtureVal></Function>
+  <Function ID="13" Type="Scene" Name="Color: Amber"><FixtureVal ID="4">0,255,1,100,2,0,3,255,4,0,5,0</FixtureVal></Function>
+  <Function ID="14" Type="Scene" Name="Color: Magenta"><FixtureVal ID="4">0,255,1,0,2,255,3,0,4,255,5,0</FixtureVal></Function>
+  <Function ID="15" Type="Scene" Name="Color: Cyan"><FixtureVal ID="4">0,0,1,255,2,255,3,0,4,255,5,0</FixtureVal></Function>
+  <Function ID="16" Type="Scene" Name="Color: UV"><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,255</FixtureVal></Function>
+  <Function ID="17" Type="Scene" Name="Color: White"><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,255,5,0</FixtureVal></Function>
+
+ </Engine>
+ <VirtualConsole>
+  <Frame Caption="Ark Church Lighting">
+   <SoloFrame ID="0" Caption="Scenes">
+    <WindowState Visible="True" X="10" Y="10" Width="300" Height="400"/>
+    <Button ID="1" Caption="WARM STAGE"><WindowState X="10" Y="40" Width="280" Height="80"/><Function ID="0"/></Button>
+    <Button ID="2" Caption="WORSHIP BLUE"><WindowState X="10" Y="130" Width="280" Height="80"/><Function ID="1"/></Button>
+    <Button ID="3" Caption="PRE-SERVICE AMBER"><WindowState X="10" Y="220" Width="280" Height="80"/><Function ID="2"/></Button>
+    <Button ID="4" Caption="FULL HOUSE WHITE"><WindowState X="10" Y="310" Width="280" Height="80"/><Function ID="3"/></Button>
+   </SoloFrame>
+   <Frame ID="10" Caption="Color Picker (LED Bars)">
+    <WindowState Visible="True" X="320" Y="10" Width="400" Height="400"/>
+    <Button ID="11" Caption="RED"><WindowState X="10" Y="40" Width="80" Height="80"/><Function ID="10"/></Button>
+    <Button ID="12" Caption="GREEN"><WindowState X="100" Y="40" Width="80" Height="80"/><Function ID="11"/></Button>
+    <Button ID="13" Caption="BLUE"><WindowState X="190" Y="40" Width="80" Height="80"/><Function ID="12"/></Button>
+    <Button ID="14" Caption="AMBER"><WindowState X="280" Y="40" Width="80" Height="80"/><Function ID="13"/></Button>
+    <Button ID="15" Caption="MAGENTA"><WindowState X="10" Y="130" Width="80" Height="80"/><Function ID="14"/></Button>
+    <Button ID="16" Caption="CYAN"><WindowState X="100" Y="130" Width="80" Height="80"/><Function ID="15"/></Button>
+    <Button ID="17" Caption="UV"><WindowState X="190" Y="130" Width="80" Height="80"/><Function ID="16"/></Button>
+    <Button ID="18" Caption="WHITE"><WindowState X="280" Y="130" Width="80" Height="80"/><Function ID="17"/></Button>
+   </Frame>
+  </Frame>
+ </VirtualConsole>
+</Workspace>

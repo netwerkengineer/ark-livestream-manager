@@ -24,17 +24,22 @@ async function checkTcp(port: number, host: string): Promise<boolean> {
 }
 
 async function checkUdp(port: number, host: string): Promise<boolean> {
+  // In een Docker Bridge omgeving zal 'localhost' of '127.0.0.1' NOOIT werken naar de host.
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return false;
+  }
+
   return new Promise((resolve) => {
     const client = dgram.createSocket('udp4');
+    // UDP is connectionless, dus we kunnen alleen checken of het verzenden lukt.
+    // Voor een echte check zouden we een specifiek protocol-antwoord moeten verwachten.
     client.send('ping', port, host, (err) => {
+      client.close();
       if (err) {
-        client.close();
         resolve(false);
       } else {
-        setTimeout(() => {
-          client.close();
-          resolve(true); 
-        }, 100);
+        // We gaan ervan uit dat de route naar de host ok is
+        resolve(true); 
       }
     });
   });
@@ -56,9 +61,13 @@ export async function GET() {
       const isUp = service.type === 'tcp' 
         ? await checkTcp(service.port, service.host)
         : await checkUdp(service.port, service.host);
+        
+      let statusLabel = isUp ? 'UP' : 'DOWN';
+      if (isUp && service.type === 'udp') statusLabel = 'READY';
+
       return { 
         name: service.name, 
-        status: isUp ? 'UP' : 'DOWN',
+        status: statusLabel,
         port: service.port,
         host: service.host
       };

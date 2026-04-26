@@ -11,13 +11,17 @@ import {
   Clock,
   ShieldAlert,
   Play,
-  Square
+  Square,
+  Sun,
+  Sparkles,
+  Sunrise,
+  Flame
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ServiceStatus {
   name: string;
-  status: 'UP' | 'DOWN';
+  status: 'UP' | 'DOWN' | 'READY';
   port: number;
 }
 
@@ -51,6 +55,19 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
       clearInterval(clockInterval);
     };
   }, []);
+
+  const handleLichtAction = async (sceneId: number, name: string) => {
+    try {
+      await fetch('/api/qlc/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId }),
+      });
+      console.log(`Triggered Light Scene: ${name}`);
+    } catch (error) {
+      console.error('Failed to trigger light action:', error);
+    }
+  };
 
   const handleEmergencyAction = async (action: string, page: number, row: number, col: number) => {
     try {
@@ -143,7 +160,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
                     <span className="text-[10px] text-muted uppercase tracking-tight">Port {service.port}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${service.status === 'UP' ? 'bg-green-500 shadow-[0_0_8px_#4ade80]' : 'bg-red-500 shadow-[0_0_8px_#f87171]'} transition-colors duration-500`} />
+                    <span className={`h-2 w-2 rounded-full ${service.status === 'UP' ? 'bg-green-500 shadow-[0_0_8px_#4ade80]' : service.status === 'READY' ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]' : 'bg-red-500 shadow-[0_0_8px_#f87171]'} transition-colors duration-500`} />
                     <span className="text-[10px] font-bold uppercase">{service.status}</span>
                   </div>
                 </div>
@@ -159,16 +176,83 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
                 <ShieldAlert className="text-blue-400" size={24} />
               </div>
               <p className="text-sm leading-relaxed text-muted">
-                Dit dashboard fungeert als de <strong>Fail-Safe</strong> laag. Bij haperingen in Companion of Playback kunnen vrijwilligers hier direct ingrijpen.
+                Dit dashboard is het centrale zenuwstelsel van de uitzending. Beheer hier de livestream, audio, presentatie en verlichting op één plek.
               </p>
             </div>
             <div className="mt-auto pt-4 border-t border-white/5">
                 <p className="text-[11px] text-muted flex items-center gap-1">
-                    <Activity size={12} /> Real-time monitoring via 127.0.0.1
+                    <Activity size={12} /> Real-time monitoring via Docker Network (Ark-Net)
                 </p>
             </div>
         </section>
       </div>
+
+      {/* Lighting Controls Section (Only if enabled) */}
+      {settings.qlcEnabled && (
+        <section className="glass-card">
+          <h3 className="font-semibold flex items-center gap-2 mb-6">
+            <Sun size={18} className="text-orange-400" /> Lichtregie (QLC+)
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <button 
+              onClick={() => handleLichtAction(1, "Warm Stage")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-orange-600/10 border border-orange-500/20 text-orange-400 hover:bg-orange-600/20 transition-all"
+            >
+              <Sun size={20} /> <span className="font-bold text-xs">WARM STAGE</span>
+            </button>
+            <button 
+              onClick={() => handleLichtAction(2, "Worship Blue")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 transition-all"
+            >
+              <Sparkles size={20} /> <span className="font-bold text-xs">WORSHIP BLUE</span>
+            </button>
+            <button 
+              onClick={() => handleLichtAction(3, "Pre-Service")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-purple-600/10 border border-purple-500/20 text-purple-400 hover:bg-purple-600/20 transition-all"
+            >
+              <Sunrise size={20} /> <span className="font-bold text-xs">PRE-SERVICE</span>
+            </button>
+            <button 
+              onClick={() => handleLichtAction(4, "Full House")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+            >
+              <Zap size={20} /> <span className="font-bold text-xs">FULL HOUSE</span>
+            </button>
+          </div>
+
+          <div className="border-t border-white/5 pt-6">
+            <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-4">LED Bar Kleuren</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {[
+                { id: 10, name: 'Red', color: '#ef4444' },
+                { id: 11, name: 'Green', color: '#22c55e' },
+                { id: 12, name: 'Blue', color: '#3b82f6' },
+                { id: 13, name: 'Amber', color: '#f59e0b' },
+                { id: 14, name: 'Magenta', color: '#d946ef' },
+                { id: 15, name: 'Cyan', color: '#06b6d4' },
+                { id: 16, name: 'UV', color: '#8b5cf6' },
+                { id: 17, name: 'White', color: '#ffffff' }
+              ].map(c => (
+                <button 
+                  key={c.id}
+                  onClick={() => handleLichtAction(c.id, c.name)}
+                  title={c.name}
+                  style={{ 
+                    width: '36px', 
+                    height: '36px', 
+                    borderRadius: '50%', 
+                    backgroundColor: c.color, 
+                    border: '3px solid rgba(0,0,0,0.3)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    cursor: 'pointer'
+                  }}
+                  className="hover:scale-110 active:scale-95 transition-transform"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Emergency Buttons Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>

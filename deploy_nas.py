@@ -197,7 +197,7 @@ def deploy():
         print("\n❌ Fout tijdens deployment op de NAS.")
     else:
         print("\n✅ ARK CHURCH LIVESTREAM MANAGER IS LIVE OP JE NAS!")
-        print(f"Bezoek: http://{config['NAS_IP']}:3000")
+        print(f"Bezoek: http://{config['NAS_IP']}:3005")
         save_config(config)
 
     cleanup_ssh_mux()

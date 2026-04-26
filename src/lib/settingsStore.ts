@@ -47,6 +47,9 @@ export interface AppSettings {
   // MIDI Configuration
   midiEnabled: boolean;
   midiSessionName: string;
+
+  // QLC+ Configuration
+  qlcEnabled: boolean;
 }
 
 export interface BroadcastButton {
@@ -108,6 +111,9 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   // MIDI Defaults
   midiEnabled: true,
   midiSessionName: "Ark-Church-App",
+
+  // QLC+ Defaults
+  qlcEnabled: false,
 
   // Default Buttons
   broadcastButtons: [
