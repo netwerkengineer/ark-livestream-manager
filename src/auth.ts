@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import Facebook from "next-auth/providers/facebook";
 import { saveToken, getTokens } from "./lib/tokenStore";
 import { getSettings } from "./lib/settingsStore";
 
@@ -26,15 +25,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
       },
     }),
-    Facebook({
-      clientId: settings.facebookClientId || process.env.FACEBOOK_CLIENT_ID,
-      clientSecret: settings.facebookClientSecret || process.env.FACEBOOK_CLIENT_SECRET,
-      authorization: {
-        params: {
-          scope: "email,public_profile,publish_video,pages_manage_posts,pages_read_engagement,pages_show_list",
-        },
-      },
-    }),
   ],
   secret: settings.nextAuthSecret || process.env.NEXTAUTH_SECRET,
   session: {
@@ -48,10 +38,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.youtubeToken = account.access_token;
           saveToken("google", account.access_token!);
         }
-        if (account.provider === "facebook") {
-          token.facebookToken = account.access_token;
-          saveToken("facebook", account.access_token!);
-        }
       }
       return token;
     },
@@ -60,10 +46,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       
       // Merge tokens into session
       session.youtubeToken = token.youtubeToken || storedTokens.google;
-      session.facebookToken = token.facebookToken || storedTokens.facebook;
       
       return session;
     },
   },
   trustHost: true,
 });
+

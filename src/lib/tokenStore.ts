@@ -3,7 +3,7 @@ import path from "path";
 
 const TOKEN_FILE = path.join(process.cwd(), "data", "tokens.json");
 
-export function saveToken(provider: "google" | "facebook", token: string) {
+export function saveToken(provider: "google", token: string) {
   let tokens: any = {};
   if (fs.existsSync(TOKEN_FILE)) {
     tokens = JSON.parse(fs.readFileSync(TOKEN_FILE, "utf-8"));

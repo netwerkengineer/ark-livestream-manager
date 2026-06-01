@@ -146,7 +146,7 @@ export function saveSettings(settings: Partial<AppSettings>) {
   const updated = { ...current, ...settings };
   
   // When keys are provided, we consider setup potentially complete
-  if (updated.googleClientId && updated.googleClientSecret && updated.facebookClientId && updated.facebookClientSecret) {
+  if (updated.googleClientId && updated.googleClientSecret) {
     updated.isSetupComplete = true;
   }
 

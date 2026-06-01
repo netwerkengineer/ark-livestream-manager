@@ -47,34 +47,7 @@ export async function GET() {
       }
     }
 
-    // 2. Haal Facebook Streams op
-    if (session.facebookToken) {
-      console.log("Ophalen Facebook streams...");
-      const pagesRes = await fetch(`https://graph.facebook.com/me/accounts?access_token=${session.facebookToken}`);
-      const pagesData = await pagesRes.json();
-      
-      if (pagesData.data) {
-        for (const page of pagesData.data) {
-          const fbRes = await fetch(`https://graph.facebook.com/${page.id}/live_videos?fields=id,title,planned_start_time,status,permalink_url&access_token=${page.access_token}`);
-          const fbData = await fbRes.json();
-          
-          if (fbData.data) {
-            fbData.data.forEach((item: any) => {
-              if (item.status === "SCHEDULED_UNPUBLISHED" || item.status === "SCHEDULED_LIVE" || item.status === "LIVE") {
-                streams.push({
-                  id: item.id,
-                  title: item.title || `Facebook Live (${page.name})`,
-                  startTime: item.planned_start_time ? new Date(item.planned_start_time * 1000).toISOString() : new Date().toISOString(),
-                  provider: "facebook",
-                  status: item.status,
-                  embedUrl: item.permalink_url
-                });
-              }
-            });
-          }
-        }
-      }
-    }
+    // 2. Haal Facebook Streams op - VERWIJDERD
 
     console.log(`Totaal ${streams.length} streams gevonden.`);
 
@@ -109,19 +82,8 @@ export async function DELETE(req: NextRequest) {
         const data = await res.json();
         throw new Error(data.error?.message || "YouTube verwijderen mislukt");
       }
-    } else if (provider === "facebook") {
-      // Page token nodig
-      const pagesRes = await fetch(`https://graph.facebook.com/me/accounts?access_token=${session.facebookToken}`);
-      const pagesData = await pagesRes.json();
-      const page = pagesData.data?.find((p: any) => p.id === settings.defaultFacebookPageId);
-      
-      if (!page?.access_token) throw new Error("Fout bij ophalen Facebook Page Token");
-
-      const res = await fetch(`https://graph.facebook.com/${id}?access_token=${page.access_token}`, {
-        method: "DELETE"
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error("Facebook verwijderen mislukt");
+    } else {
+      throw new Error("Onbekende of niet-ondersteunde provider");
     }
 
     return NextResponse.json({ success: true });

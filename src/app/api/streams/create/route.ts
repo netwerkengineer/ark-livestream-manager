@@ -6,11 +6,11 @@ import path from "path";
 export async function POST(req: NextRequest) {
   const session: any = await auth();
   
-  if (!session || (!session.youtubeToken && !session.facebookToken)) {
-    return NextResponse.json({ error: "Niet ingelogd bij YouTube of Facebook" }, { status: 401 });
+  if (!session || !session.youtubeToken) {
+    return NextResponse.json({ error: "Niet ingelogd bij YouTube" }, { status: 401 });
   }
 
-  const { title, description, scheduleTime, thumbnailUrl, privacyStatus, facebookPageId, categoryId, playlistId, tags } = await req.json();
+  const { title, description, scheduleTime, thumbnailUrl, privacyStatus, categoryId, playlistId, tags } = await req.json();
 
   try {
     // 1. YouTube Integratie
@@ -114,46 +114,6 @@ export async function POST(req: NextRequest) {
         console.log(`Thumbnail succesvol opgeslagen op NAS: ${filePath}`);
       } catch (err) {
         console.error("Lokaal opslaan thumbnail mislukt:", err);
-      }
-    }
-
-    // 2. Facebook Integratie
-    if (facebookPageId && session.facebookToken) {
-      const pagesRes = await fetch(`https://graph.facebook.com/me/accounts?access_token=${session.facebookToken}`);
-      const pagesData = await pagesRes.json();
-      const page = pagesData.data?.find((p: any) => p.id === facebookPageId);
-      
-      if (page?.access_token) {
-        const unixTime = Math.floor(new Date(scheduleTime).getTime() / 1000);
-        const fbRes = await fetch(`https://graph.facebook.com/${facebookPageId}/live_videos`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            description,
-            status: "SCHEDULED_UNPUBLISHED",
-            planned_start_time: unixTime,
-            access_token: page.access_token
-          })
-        });
-        
-        const fbData = await fbRes.json();
-        
-        // Stap 2.2: Upload Thumbnail naar Facebook (Indien aanwezig)
-        if (fbData.id && thumbnailUrl && thumbnailUrl.startsWith("data:image")) {
-          const base64Data = thumbnailUrl.split(",")[1];
-          const imageBlob = new Blob([Buffer.from(base64Data, 'base64')], { type: 'image/png' });
-          
-          const formData = new FormData();
-          formData.append('source', imageBlob, 'thumbnail.png');
-          formData.append('is_preferred', 'true');
-          formData.append('access_token', page.access_token);
-
-          fetch(`https://graph.facebook.com/${fbData.id}/thumbnails`, {
-            method: "POST",
-            body: formData
-          }).catch(err => console.error("Facebook Thumbnail Upload Fout:", err));
-        }
       }
     }
 

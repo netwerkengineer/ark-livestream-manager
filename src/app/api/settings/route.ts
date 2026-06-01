@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const updated = saveSettings(newSettings);
     
     // Trigger a restart if API keys were updated, to reload NextAuth config
-    if (newSettings.googleClientId || newSettings.facebookClientId) {
+    if (newSettings.googleClientId) {
       console.log("API keys updated. Triggering server restart in 1s...");
       setTimeout(() => {
         process.exit(0);

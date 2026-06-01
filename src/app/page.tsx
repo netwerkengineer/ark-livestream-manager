@@ -58,8 +58,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [showEditor, setShowEditor] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   
-  const [facebookPages, setFacebookPages] = useState<any[]>([]);
-  const [selectedPageId, setSelectedPageId] = useState("");
+  // Facebook states removed
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -87,7 +86,12 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     setErrorStreams(null);
     try {
       const res = await fetch(`/api/streams?t=${Date.now()}`);
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error(`Server status ${res.status}: Kan antwoord van de server niet verwerken.`);
+      }
       if (data.error) throw new Error(data.error);
       if (data.streams) setScheduledStreams(data.streams);
     } catch (err: any) {
@@ -107,21 +111,11 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           setTitle(data.defaultTitle);
           setDescription(data.defaultDescription);
           setPrivacyStatus(data.defaultPrivacy);
-          if (data.defaultFacebookPageId) setSelectedPageId(data.defaultFacebookPageId);
         }
       });
 
     if (session) {
       fetchScheduledStreams();
-      
-      fetch("/api/facebook/pages")
-        .then(res => res.json())
-        .then(data => {
-          if (data.pages) {
-            setFacebookPages(data.pages);
-            if (data.pages.length > 0 && !selectedPageId) setSelectedPageId(data.pages[0].id);
-          }
-        });
 
       fetch("/api/youtube/categories")
         .then(res => res.json())
@@ -148,7 +142,6 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   }, [settings]);
 
   const isConnectedYoutube = !!(session as any)?.youtubeToken;
-  const isConnectedFacebook = !!(session as any)?.facebookToken;
 
   const handleSchedule = async () => {
     if (!title || !description || !scheduleDate || !scheduleTime) {
@@ -170,17 +163,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           scheduleTime: dateTime,
           thumbnailUrl,
           privacyStatus,
-          facebookPageId: selectedPageId,
           categoryId: selectedCategoryId,
           playlistId: selectedPlaylistId,
           tags
         })
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error(`Server status ${res.status}: Kan antwoord van de server niet verwerken.`);
+      }
       if (data.error) throw new Error(data.error);
 
-      setStatus({ type: 'success', message: "Succes! Thumbnail opgeslagen en stream ingepland." });
+      setStatus({ type: 'success', message: "Succes! YouTube is succesvol ingepland en thumbnail is opgeslagen op de NAS. Vergeet niet de livestream ook handmatig in te plannen op Facebook Live Producer!" });
       fetchScheduledStreams(); // Update de lijst
     } catch (err: any) {
       setStatus({ type: 'error', message: `Fout: ${err.message}` });
@@ -205,6 +202,48 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     }
   };
 
+  const handleDeleteGroup = async (platforms: { id: string, provider: string }[]) => {
+    if (!confirm("Weet je zeker dat je deze uitzending wilt verwijderen van alle geplande platformen?")) return;
+    
+    try {
+      let success = true;
+      for (const p of platforms) {
+        const res = await fetch(`/api/streams?id=${p.id}&provider=${p.provider}`, { method: 'DELETE' });
+        if (!res.ok) {
+          success = false;
+          const data = await res.json();
+          alert(`Fout bij verwijderen van ${p.provider}: ${data.error}`);
+        }
+      }
+      if (success) {
+        fetchScheduledStreams(); // Update de lijst
+      }
+    } catch (err) {
+      alert("Netwerkfout bij verwijderen.");
+    }
+  };
+
+  const getGroupedStreams = () => {
+    const groups: any[] = [];
+    scheduledStreams.forEach((stream: any) => {
+      const timeStr = new Date(stream.startTime).toISOString().slice(0, 16);
+      const key = `${stream.title}_${timeStr}`;
+      const existing = groups.find((g: any) => g.key === key);
+      
+      if (existing) {
+        existing.platforms.push(stream);
+      } else {
+        groups.push({
+          key,
+          title: stream.title,
+          startTime: stream.startTime,
+          platforms: [stream]
+        });
+      }
+    });
+    return groups;
+  };
+
   const handleSaveThumbnail = (dataUrl: string) => {
     setThumbnailUrl(dataUrl);
     setShowEditor(false);
@@ -220,8 +259,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     );
   }
 
-  // 2. Show login screen if not connected
-  if (!isConnectedYoutube || !isConnectedFacebook) {
+  // 2. Show login screen if not connected (Only YouTube is strictly required!)
+  if (!isConnectedYoutube) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
         <div className="logo-container">
@@ -229,34 +268,22 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           <h1 className="gradient-text">Livestream Manager</h1>
         </div>
         <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', width: '450px' }}>
-          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Verbind beide accounts om streams te kunnen inplannen</p>
+          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Verbind je YouTube account om streams in te plannen</p>
           
           <button 
-            className={isConnectedYoutube ? "btn-outline" : "btn-primary"} 
-            style={{ width: '100%', opacity: isConnectedYoutube ? 0.6 : 1 }} 
+            className="btn-primary" 
+            style={{ width: '100%' }} 
             onClick={() => signIn("google")}
-            disabled={isConnectedYoutube}
           >
             <MonitorPlay size={20} />
-            {isConnectedYoutube ? "YouTube Verbonden ✓" : "Verbind YouTube"}
-          </button>
-
-          <button 
-            className={isConnectedFacebook ? "btn-outline" : "btn-primary"} 
-            style={{ width: '100%', opacity: isConnectedFacebook ? 0.6 : 1 }} 
-            onClick={() => signIn("facebook")}
-            disabled={isConnectedFacebook}
-          >
-            <Globe size={20} />
-            {isConnectedFacebook ? "Facebook Verbonden ✓" : "Verbind Facebook"}
+            Verbind YouTube
           </button>
         </div>
       </div>
     );
   }
 
-  // Find the selected page name for display
-  const selectedPage = facebookPages.find(p => p.id === selectedPageId);
+  // Selected page lookup removed
 
   return (
     <div className="dashboard-container">
@@ -371,11 +398,11 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
               </select>
             </div>
             <div className="input-group">
-              <label className="input-label">Facebook Pagina</label>
-              <select className="input-field" value={selectedPageId} onChange={(e) => setSelectedPageId(e.target.value)}>
-                {facebookPages.map(page => <option key={page.id} value={page.id}>{page.name}</option>)}
-                {facebookPages.length === 0 && <option value="">Geen pagina gevonden</option>}
-              </select>
+              <label className="input-label">Facebook Live</label>
+              <div className="input-field" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.02)', fontSize: '0.85rem', height: '42px', padding: '0 12px' }}>
+                <Globe size={16} color="#3b82f6" />
+                <span>Handmatig inplannen op Live Producer</span>
+              </div>
             </div>
           </div>
 
@@ -446,31 +473,45 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <p style={{ color: 'var(--muted)', fontSize: '0.9rem', textAlign: 'center', padding: '20px' }}>Geen geplande uitzendingen gevonden.</p>
               )}
 
-              {scheduledStreams.map((item) => (
-                <div key={item.id} className="glass-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ padding: '8px', borderRadius: '8px', background: item.provider === 'youtube' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)' }}>
-                      {item.provider === 'youtube' ? <MonitorPlay size={20} color="#ef4444" /> : <Globe size={20} color="#3b82f6" />}
+              {getGroupedStreams().map((group: any) => {
+                const hasYoutube = group.platforms.some((p: any) => p.provider === 'youtube');
+                const ytStream = group.platforms.find((p: any) => p.provider === 'youtube');
+                
+                return (
+                  <div key={group.key} className="glass-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {hasYoutube && (
+                          <div style={{ padding: '6px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center' }} title="YouTube">
+                            <MonitorPlay size={16} color="#ef4444" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.9rem', fontWeight: 600, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.title}</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                          {new Date(group.startTime).toLocaleString('nl-NL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p style={{ fontSize: '0.9rem', fontWeight: 600, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                        {new Date(item.startTime).toLocaleString('nl-NL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      {ytStream?.embedUrl && (
+                        <a href={ytStream.embedUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px', borderRadius: '6px', color: 'rgba(239, 68, 68, 0.7)' }} className="hover-white" title="Bekijk op YouTube">
+                          <Link size={16} />
+                        </a>
+                      )}
+                      <button 
+                        onClick={() => handleDeleteGroup(group.platforms)} 
+                        style={{ padding: '6px', borderRadius: '6px', background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', transition: 'background 0.2s', marginLeft: '4px' }} 
+                        className="hover-red"
+                        title="Verwijder uitzending van alle platformen"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {item.embedUrl && (
-                      <a href={item.embedUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '8px', borderRadius: '8px', color: 'var(--muted)' }} className="hover-white">
-                        <Link size={18} />
-                      </a>
-                    )}
-                    <button onClick={() => handleDeleteStream(item.id, item.provider)} style={{ padding: '8px', borderRadius: '8px', background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', transition: 'background 0.2s' }} className="hover-red">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.section>
 
@@ -522,10 +563,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>YouTube Kanaal</span>
                 <span style={{ color: '#4ade80', fontSize: '0.9rem' }}>Gekoppeld ✓</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Geselecteerde FB Pagina</span>
-                <span style={{ color: selectedPage ? '#4ade80' : 'var(--muted)', fontSize: '0.9rem' }}>
-                  {selectedPage ? selectedPage.name : "Geen geselecteerd"}
+              <div style={{ 
+                background: 'rgba(59, 130, 246, 0.08)', 
+                border: '1px solid rgba(59, 130, 246, 0.2)', 
+                borderRadius: '8px', 
+                padding: '12px', 
+                marginTop: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <span style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Globe size={14} /> Facebook Info
+                </span>
+                <span style={{ color: 'var(--muted)', fontSize: '0.75rem', lineHeight: '1.4' }}>
+                  Livestream dient handmatig te worden ingepland via de Facebook Live Producer pagina.
                 </span>
               </div>
             </div>
@@ -878,7 +930,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>1</div>
                   <div>
                     <h3 style={{ color: 'white', marginBottom: '4px' }}>Inloggen</h3>
-                    <p>Zorg dat zowel YouTube als Facebook verbonden zijn. Je ziet een groen vinkje als de verbinding actief is.</p>
+                    <p>Log in met je YouTube account. Je ziet een groen vinkje als de verbinding actief is.</p>
                   </div>
                 </div>
 
@@ -902,7 +954,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>4</div>
                   <div>
                     <h3 style={{ color: 'white', marginBottom: '4px' }}>Inplannen</h3>
-                    <p>Klik op "Plan Alles In". De manager maakt nu een evenement aan op YouTube en een geplande video op de Facebook-pagina van de kerk.</p>
+                    <p>Klik op "Plan Alles In". De manager maakt nu een evenement aan op YouTube. Vergeet niet om de stream handmatig op Facebook Live Producer in te plannen.</p>
                   </div>
                 </div>
               </div>
@@ -969,7 +1021,7 @@ function SetupWizard({ settings: initialSettings, onComplete }: { settings: any,
 
         {/* Steps Progress */}
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          {[1,2,3,4].map(s => (
+          {[1,2,3].map(s => (
             <div key={s} style={{ width: '40px', height: '4px', borderRadius: '2px', background: step >= s ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }}></div>
           ))}
         </div>
@@ -996,24 +1048,6 @@ function SetupWizard({ settings: initialSettings, onComplete }: { settings: any,
           {step === 2 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Key size={24} color="var(--primary)" />
-                <h2 style={{ fontSize: '1.25rem' }}>Facebook API Instellingen</h2>
-              </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Voer de Facebook App ID en App Secret in van het Meta Developer portaal.</p>
-              <div className="input-group">
-                <label className="input-label">Facebook App ID</label>
-                <input className="input-field" value={settings.facebookClientId} onChange={e => setSettings({...settings, facebookClientId: e.target.value})} placeholder="1234567890" />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Facebook App Secret</label>
-                <input className="input-field" type="password" value={settings.facebookClientSecret} onChange={e => setSettings({...settings, facebookClientSecret: e.target.value})} placeholder="a1b2c3d4..." />
-              </div>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Database size={24} color="var(--primary)" />
                 <h2 style={{ fontSize: '1.25rem' }}>NAS Bestandsopslag</h2>
               </div>
@@ -1026,7 +1060,7 @@ function SetupWizard({ settings: initialSettings, onComplete }: { settings: any,
             </motion.div>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Link size={24} color="var(--primary)" />
@@ -1049,7 +1083,7 @@ function SetupWizard({ settings: initialSettings, onComplete }: { settings: any,
             </button>
           ) : <div></div>}
           
-          {step < 4 ? (
+          {step < 3 ? (
             <button onClick={handleNext} className="btn-primary">
               Volgende <ChevronRight size={18} />
             </button>

@@ -43,36 +43,6 @@ export async function GET(req: NextRequest) {
         healthDescription: streamItem.status?.healthStatus?.lastError
       });
 
-    } else if (provider === "facebook") {
-      // Get Facebook live video details including secure_stream_url
-      const fbRes = await fetch(`https://graph.facebook.com/${id}?fields=id,status,secure_stream_url,stream_url&access_token=${session.facebookToken}`);
-      const fbData = await fbRes.json();
-
-      if (fbData.error) {
-        throw new Error(fbData.error.message);
-      }
-
-      // Extract stream key from URL if needed, but OBS usually takes the full URL or Server+Key
-      // Facebook secure_stream_url format: rtmps://rtmp-api.facebook.com:443/rtmp/[STREAM_KEY]
-      const secureUrl = fbData.secure_stream_url || fbData.stream_url;
-      let streamKey = "";
-      let serverUrl = "";
-
-      if (secureUrl) {
-        const parts = secureUrl.split("/rtmp/");
-        if (parts.length === 2) {
-          serverUrl = parts[0] + "/rtmp/";
-          streamKey = parts[1];
-        }
-      }
-
-      return NextResponse.json({
-        provider: "facebook",
-        streamKey: streamKey,
-        serverUrl: serverUrl,
-        fullUrl: secureUrl,
-        status: fbData.status
-      });
     }
 
     return NextResponse.json({ error: "Onbekende provider" }, { status: 400 });
