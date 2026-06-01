@@ -496,9 +496,48 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                     </div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       {ytStream?.embedUrl && (
-                        <a href={ytStream.embedUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px', borderRadius: '6px', color: 'rgba(239, 68, 68, 0.7)' }} className="hover-white" title="Bekijk op YouTube">
-                          <Link size={16} />
-                        </a>
+                        <>
+                          <a href={ytStream.embedUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '6px', borderRadius: '6px', color: 'rgba(239, 68, 68, 0.7)' }} className="hover-white" title="Bekijk op YouTube">
+                            <Link size={16} />
+                          </a>
+                          <button
+                            onClick={() => {
+                              const link = ytStream.embedUrl;
+                              const titleStr = group.title;
+                              const dateStr = new Date(group.startTime).toLocaleDateString('nl-NL', { day: '2-digit', month: 'long', year: 'numeric' });
+                              const timeStr = new Date(group.startTime).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+                              
+                              let text = settings?.whatsappTemplate || "Hallo allemaal! Komende zondag zenden we weer live uit. U kunt de dienst volgen via deze link: {link}. Tot dan!";
+                              text = text
+                                .replace(/{link}/g, link)
+                                .replace(/{titel}/g, titleStr)
+                                .replace(/{datum}/g, dateStr)
+                                .replace(/{tijd}/g, timeStr);
+                              
+                              const encodedText = encodeURIComponent(text);
+                              window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+                            }}
+                            style={{ 
+                              padding: '6px', 
+                              borderRadius: '6px', 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#25d366', 
+                              cursor: 'pointer', 
+                              transition: 'background 0.2s, transform 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginLeft: '2px'
+                            }} 
+                            className="hover-white"
+                            title="Deel via WhatsApp"
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.717-1.456L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.403.002 9.803-4.392 9.806-9.799.002-2.618-1.018-5.08-2.873-6.937C16.297 2.012 13.834 1 11.237 1 5.83 1 1.432 5.396 1.429 10.803c0 1.555.42 3.086 1.215 4.437l-.991 3.613 3.702-.97.001-.001-.001-.001zM17.5 15.65c-.29-.145-1.71-.845-1.975-.94-.266-.096-.46-.145-.652.145-.19.29-.74.94-.905 1.13-.167.19-.334.21-.624.066-1.053-.527-1.84-1.022-2.583-2.29-.196-.334.196-.31.56-.1.328.19.426.24.623.636.196.398.1.745-.05 1.036-.148.29-.652 1.566-.893 2.147-.234.568-.47.49-.652.482-.162-.008-.348-.01-.533-.01-.186 0-.49.07-.746.347-.256.278-.977.955-.977 2.33 0 1.374 1.002 2.7 1.14 2.885.14.185 1.97 3.01 4.777 4.223.667.29 1.19.462 1.6.59.67.213 1.28.183 1.76.11.536-.08 1.71-.7 1.954-1.377.243-.678.243-1.26.17-1.377-.07-.117-.26-.213-.556-.358z"/>
+                            </svg>
+                          </button>
+                        </>
                       )}
                       <button 
                         onClick={() => handleDeleteGroup(group.platforms)} 
@@ -652,6 +691,25 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <div className="input-group">
                   <label className="input-label">Standaard Beschrijving</label>
                   <textarea className="input-field" style={{ minHeight: '150px', lineHeight: '1.6' }} value={settings.defaultDescription} onChange={(e) => setSettings({...settings, defaultDescription: e.target.value})} />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">WhatsApp Uitnodiging Template</label>
+                  <textarea 
+                    className="input-field" 
+                    style={{ minHeight: '100px', lineHeight: '1.6' }} 
+                    value={settings.whatsappTemplate || ""} 
+                    onChange={(e) => setSettings({...settings, whatsappTemplate: e.target.value})} 
+                    placeholder="Hallo allemaal! Komende zondag zenden we weer live uit. U kunt de dienst volgen via deze link: {link}. Tot dan!"
+                  />
+                  <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.5' }}>
+                    Pas hier het standaard WhatsApp-bericht aan. Je kunt de volgende variabelen gebruiken:
+                    <br />
+                    <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 4px', borderRadius: '4px', marginRight: '6px', fontSize: '0.8rem' }}>{"{link}"}</code> (YouTube Link)
+                    <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 4px', borderRadius: '4px', marginRight: '6px', fontSize: '0.8rem' }}>{"{titel}"}</code> (Uitzending Titel)
+                    <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 4px', borderRadius: '4px', marginRight: '6px', fontSize: '0.8rem' }}>{"{datum}"}</code> (Bijv. 05 juni 2026)
+                    <code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 4px', borderRadius: '4px', fontSize: '0.8rem' }}>{"{tijd}"}</code> (Bijv. 10:00)
+                  </p>
                 </div>
               </section>
 

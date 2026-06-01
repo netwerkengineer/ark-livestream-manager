@@ -14,6 +14,7 @@ export interface AppSettings {
   defaultPrivacy: "public" | "unlisted" | "private";
   defaultCategoryId: string;
   defaultTags: string;
+  whatsappTemplate: string;
 
   // Auth Configuration (NAS-Pro)
   googleClientId: string;
@@ -84,6 +85,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   defaultPrivacy: "public",
   defaultCategoryId: "29", // Nonprofits & Activism
   defaultTags: "egdeark,Amersfoort,Nanny Benjamins,Ark,livestream,worship,De Ark,Kerk,evangelie,praise,Fabian Benjamins,Arkchurch",
+  whatsappTemplate: "Hallo allemaal! Komende zondag zenden we weer live uit. U kunt de dienst volgen via deze link: {link}. Tot dan!",
   
   googleClientId: "",
   googleClientSecret: "",
