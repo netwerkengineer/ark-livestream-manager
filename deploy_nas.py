@@ -150,32 +150,32 @@ def deploy():
     print("✓ Project succesvol overgebracht naar de NAS.")
 
     # 4.5 COMPANION IMAGE CHECK & SYNC (Stage 1: Pull, Stage 2: Transfer)
-    print(f"\n>>> NAS: Controleren of Companion image (v4.3.1) aanwezig is ...")
+    print(f"\n>>> NAS: Controleren of Companion image (v4.3.4) aanwezig is ...")
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    check_img_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker images -q companion-nas-v4:latest\""
+    check_img_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker images -q companion-nas-v4-3-4:latest\""
     img_exists = subprocess.check_output(check_img_cmd, shell=True).decode().strip()
     
     if not img_exists:
-        print("⚠️ Companion v4 image niet gevonden op NAS.")
+        print("⚠️ Companion v4.3.4 image niet gevonden op NAS.")
         
         # POGING 1: Direct pull op de NAS (Snelste)
         print(">>> NAS: Poging om image direct te downloaden van GitHub (Stage 1)...")
-        pull_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker pull ghcr.io/bitfocus/companion/companion:v4.3.1 && sudo -S docker tag ghcr.io/bitfocus/companion/companion:v4.3.1 companion-nas-v4:latest\""
+        pull_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker pull ghcr.io/bitfocus/companion/companion:v4.3.4 && sudo -S docker tag ghcr.io/bitfocus/companion/companion:v4.3.4 companion-nas-v4-3-4:latest\""
         try:
             run_with_pty(pull_cmd, "Direct pull op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
-            print("✓ Companion v4 image succesvol gedownload op de NAS.")
+            print("✓ Companion v4.3.4 image succesvol gedownload op de NAS.")
         except Exception as e:
             print(f"❌ Direct pull mislukt (mogelijk geen internet op NAS).")
             
             # POGING 2: Transfer vanaf Mac (Backup)
             print(">>> Lokaal: Bezig met voorbereiden en versturen vanaf Mac (Stage 2 - dit duurt even)...")
-            local_tar = os.path.join(BASE_DIR, "companion_nas_v4.tar")
-            remote_tar = f"{config['REMOTE_APP_PATH']}/companion_nas_v4.tar"
+            local_tar = os.path.join(BASE_DIR, "companion_nas_v4_3_4.tar")
+            remote_tar = f"{config['REMOTE_APP_PATH']}/companion_nas_v4_3_4.tar"
             
             # Wrapper build op Mac om Docker Save bug te omzeilen
-            build_cmd = "echo 'FROM ghcr.io/bitfocus/companion/companion:v4.3.1' | docker build --platform linux/amd64 -t companion-nas-v4:latest -"
+            build_cmd = "echo 'FROM ghcr.io/bitfocus/companion/companion:v4.3.4' | docker build --platform linux/amd64 -t companion-nas-v4-3-4:latest -"
             subprocess.check_call(build_cmd, shell=True)
-            subprocess.check_call(["docker", "save", "companion-nas-v4:latest", "-o", local_tar])
+            subprocess.check_call(["docker", "save", "companion-nas-v4-3-4:latest", "-o", local_tar])
             
             # Versturen naar NAS
             send_img_cmd = f"cat {local_tar} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_tar}\""
@@ -183,13 +183,13 @@ def deploy():
             
             # Inladen op NAS
             load_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker load -i {remote_tar} && rm {remote_tar}\""
-            run_with_pty(load_cmd, "Companion v4 image inladen op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+            run_with_pty(load_cmd, "Companion v4.3.4 image inladen op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
             
             # Opruimen lokaal
             if os.path.exists(local_tar): os.remove(local_tar)
-            print("✓ Companion v4 image succesvol overgebracht vanaf Mac.")
+            print("✓ Companion v4.3.4 image succesvol overgebracht vanaf Mac.")
     else:
-        print("✓ Companion v4 image is al aanwezig op de NAS.")
+        print("✓ Companion v4.3.4 image is al aanwezig op de NAS.")
 
     # 5. UITPAKKEN & DOCKER START
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"

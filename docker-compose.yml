@@ -19,7 +19,7 @@ services:
       - ark-net
 
   companion:
-    image: companion-nas-v4:latest
+    image: companion-nas-v4-3-4:latest
     container_name: companion
     restart: always
     ports:
