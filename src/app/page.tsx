@@ -771,7 +771,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                         <input className="input-field" placeholder="FreeShow IP" value={settings.freeShowHost} onChange={(e) => setSettings({...settings, freeShowHost: e.target.value})} />
-                        <input className="input-field" type="number" placeholder="Poort" value={settings.freeShowPort} onChange={(e) => setSettings({...settings, freeShowPort: parseInt(e.target.value) || 3005})} />
+                        <input className="input-field" type="number" placeholder="Poort" value={settings.freeShowPort} onChange={(e) => setSettings({...settings, freeShowPort: parseInt(e.target.value) || 5505})} />
                       </div>
                       <input className="input-field" placeholder="Media Pad op NAS (bijv. /volume1/Media)" value={settings.mediaPath} onChange={(e) => setSettings({...settings, mediaPath: e.target.value})} />
                       <p className="text-[10px] text-muted">Dit pad wordt gebruikt om thumbnails van je beamer-presentaties te tonen.</p>

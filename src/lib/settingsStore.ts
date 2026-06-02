@@ -108,7 +108,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   qlcHost: "127.0.0.1",
   qlcPort: 7700,
   freeShowHost: "127.0.0.1",
-  freeShowPort: 3030,
+  freeShowPort: 5505,
 
   // MIDI Defaults
   midiEnabled: true,
