@@ -11,11 +11,7 @@ import {
   Clock,
   ShieldAlert,
   Play,
-  Square,
-  Sun,
-  Sparkles,
-  Sunrise,
-  Flame
+  Square
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -56,18 +52,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
     };
   }, []);
 
-  const handleLichtAction = async (sceneId: number, name: string) => {
-    try {
-      await fetch('/api/qlc/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneId }),
-      });
-      console.log(`Triggered Light Scene: ${name}`);
-    } catch (error) {
-      console.error('Failed to trigger light action:', error);
-    }
-  };
+
 
   const handleEmergencyAction = async (action: string, page: number, row: number, col: number) => {
     try {
@@ -186,101 +171,6 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
             </div>
         </section>
       </div>
-
-      {/* Lighting Controls Section (Only if enabled) */}
-      {settings.qlcEnabled && (
-        <section className="glass-card">
-          <h3 className="font-semibold flex items-center gap-2 mb-6">
-            <Sun size={18} className="text-orange-400" /> Lichtregie (QLC+)
-          </h3>
-          
-          <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-3">Hoofdscènes</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-            <button 
-              onClick={() => handleLichtAction(1, "Warm Stage")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-orange-600/10 border border-orange-500/20 text-orange-400 hover:bg-orange-600/20 transition-all"
-            >
-              <Sun size={20} /> <span className="font-bold text-xs">WARM STAGE</span>
-            </button>
-            <button 
-              onClick={() => handleLichtAction(2, "Worship Blue")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 transition-all"
-            >
-              <Sparkles size={20} /> <span className="font-bold text-xs">WORSHIP BLUE</span>
-            </button>
-            <button 
-              onClick={() => handleLichtAction(3, "Pre-Service")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-purple-600/10 border border-purple-500/20 text-purple-400 hover:bg-purple-600/20 transition-all"
-            >
-              <Sunrise size={20} /> <span className="font-bold text-xs">PRE-SERVICE</span>
-            </button>
-            <button 
-              onClick={() => handleLichtAction(4, "Full House")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
-            >
-              <Zap size={20} /> <span className="font-bold text-xs">FULL HOUSE</span>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-3">Lichtshows / Chases</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-            <button 
-              onClick={() => handleLichtAction(20, "Color Chase")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600/20 transition-all"
-            >
-              <Flame size={20} /> <span className="font-bold text-xs">COLOR CHASE (ALL)</span>
-            </button>
-            <button 
-              onClick={() => handleLichtAction(24, "Rainbow Wave")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-cyan-600/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-600/20 transition-all"
-            >
-              <Sparkles size={20} /> <span className="font-bold text-xs">RAINBOW WAVE</span>
-            </button>
-          </div>
-
-          <div className="border-t border-white/5 pt-6 flex flex-col gap-6">
-            {[
-              { title: 'Alle Lampen (Master)', startId: 10 },
-              { title: 'ADJ LED Bars', startId: 30 },
-              { title: 'lightmaXX LED Bars', startId: 40 },
-              { title: 'Chauvet SlimPARs', startId: 50 },
-              { title: 'Eurolite KLS-200', startId: 60 }
-            ].map(group => (
-              <div key={group.title}>
-                <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-2">{group.title}</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  {[
-                    { offset: 0, name: 'Red', color: '#ef4444' },
-                    { offset: 1, name: 'Green', color: '#22c55e' },
-                    { offset: 2, name: 'Blue', color: '#3b82f6' },
-                    { offset: 3, name: 'Amber', color: '#f59e0b' },
-                    { offset: 4, name: 'Magenta', color: '#d946ef' },
-                    { offset: 5, name: 'Cyan', color: '#06b6d4' },
-                    { offset: 6, name: 'UV', color: '#8b5cf6' },
-                    { offset: 7, name: 'White', color: '#ffffff' }
-                  ].map(c => (
-                    <button 
-                      key={c.offset}
-                      onClick={() => handleLichtAction(group.startId + c.offset, `${group.title} - ${c.name}`)}
-                      title={`${group.title} - ${c.name}`}
-                      style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '50%', 
-                        backgroundColor: c.color, 
-                        border: '2px solid rgba(0,0,0,0.3)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                        cursor: 'pointer'
-                      }}
-                      className="hover:scale-110 active:scale-95 transition-transform"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Emergency Buttons Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>

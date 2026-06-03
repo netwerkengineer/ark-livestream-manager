@@ -30,6 +30,18 @@ services:
     networks:
       - ark-net
 
+  qlcplus:
+    build:
+      context: .
+      dockerfile: config/qlcplus/Dockerfile
+    container_name: qlcplus
+    restart: always
+    network_mode: host
+    volumes:
+      - ./config/ark_church_lighting.qxw:/QLC/ark_church_lighting.qxw
+      - ./config/qlcplus/config:/root/.config/qlcplus
+
+
 networks:
   ark-net:
     driver: bridge

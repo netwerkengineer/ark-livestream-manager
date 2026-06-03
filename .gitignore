@@ -50,3 +50,6 @@ deploy.tar.gz
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+__pycache__/
+config/qlcplus/config/
+*.pdf

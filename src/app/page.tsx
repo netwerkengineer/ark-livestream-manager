@@ -35,6 +35,8 @@ import {
   Monitor
 } from "lucide-react";
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
+import LightsControl from "@/components/LightsControl";
+
 
 export default function Dashboard() {
   const { data: session } = useSession();
@@ -70,7 +72,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [tags, setTags] = useState("");
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control">("planner");
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights">("planner");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
@@ -335,6 +337,13 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
         >
           <ShieldAlert size={18} /> Control Center
+        </button>
+        <button 
+          onClick={() => setActiveTab("lights")} 
+          className={activeTab === "lights" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "lights" ? 'none' : '1px solid rgba(249, 115, 22, 0.4)' }}
+        >
+          <Sun size={18} /> Lichtregie
         </button>
       </div>
 
@@ -632,7 +641,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         >
           <StreamMonitor settings={settings} scheduledStreams={scheduledStreams} />
         </motion.div>
-      ) : (
+      ) : activeTab === "control" ? (
         <motion.div
           key="control"
           initial={{ opacity: 0, scale: 0.95 }}
@@ -640,6 +649,15 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           exit={{ opacity: 0, scale: 0.95 }}
         >
           <BroadcastControlCenter settings={settings} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="lights"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+        >
+          <LightsControl settings={settings} />
         </motion.div>
       )}
       </AnimatePresence>
