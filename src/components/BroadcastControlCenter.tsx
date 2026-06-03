@@ -193,6 +193,8 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
           <h3 className="font-semibold flex items-center gap-2 mb-6">
             <Sun size={18} className="text-orange-400" /> Lichtregie (QLC+)
           </h3>
+          
+          <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-3">Hoofdscènes</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
             <button 
               onClick={() => handleLichtAction(1, "Warm Stage")}
@@ -220,36 +222,62 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
             </button>
           </div>
 
-          <div className="border-t border-white/5 pt-6">
-            <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-4">LED Bar Kleuren</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {[
-                { id: 10, name: 'Red', color: '#ef4444' },
-                { id: 11, name: 'Green', color: '#22c55e' },
-                { id: 12, name: 'Blue', color: '#3b82f6' },
-                { id: 13, name: 'Amber', color: '#f59e0b' },
-                { id: 14, name: 'Magenta', color: '#d946ef' },
-                { id: 15, name: 'Cyan', color: '#06b6d4' },
-                { id: 16, name: 'UV', color: '#8b5cf6' },
-                { id: 17, name: 'White', color: '#ffffff' }
-              ].map(c => (
-                <button 
-                  key={c.id}
-                  onClick={() => handleLichtAction(c.id, c.name)}
-                  title={c.name}
-                  style={{ 
-                    width: '36px', 
-                    height: '36px', 
-                    borderRadius: '50%', 
-                    backgroundColor: c.color, 
-                    border: '3px solid rgba(0,0,0,0.3)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    cursor: 'pointer'
-                  }}
-                  className="hover:scale-110 active:scale-95 transition-transform"
-                />
-              ))}
-            </div>
+          <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-3">Lichtshows / Chases</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <button 
+              onClick={() => handleLichtAction(20, "Color Chase")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600/20 transition-all"
+            >
+              <Flame size={20} /> <span className="font-bold text-xs">COLOR CHASE (ALL)</span>
+            </button>
+            <button 
+              onClick={() => handleLichtAction(24, "Rainbow Wave")}
+              className="flex items-center gap-3 p-4 rounded-xl bg-cyan-600/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-600/20 transition-all"
+            >
+              <Sparkles size={20} /> <span className="font-bold text-xs">RAINBOW WAVE</span>
+            </button>
+          </div>
+
+          <div className="border-t border-white/5 pt-6 flex flex-col gap-6">
+            {[
+              { title: 'Alle Lampen (Master)', startId: 10 },
+              { title: 'ADJ LED Bars', startId: 30 },
+              { title: 'lightmaXX LED Bars', startId: 40 },
+              { title: 'Chauvet SlimPARs', startId: 50 },
+              { title: 'Eurolite KLS-200', startId: 60 }
+            ].map(group => (
+              <div key={group.title}>
+                <p className="text-[10px] text-muted font-bold uppercase tracking-widest mb-2">{group.title}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  {[
+                    { offset: 0, name: 'Red', color: '#ef4444' },
+                    { offset: 1, name: 'Green', color: '#22c55e' },
+                    { offset: 2, name: 'Blue', color: '#3b82f6' },
+                    { offset: 3, name: 'Amber', color: '#f59e0b' },
+                    { offset: 4, name: 'Magenta', color: '#d946ef' },
+                    { offset: 5, name: 'Cyan', color: '#06b6d4' },
+                    { offset: 6, name: 'UV', color: '#8b5cf6' },
+                    { offset: 7, name: 'White', color: '#ffffff' }
+                  ].map(c => (
+                    <button 
+                      key={c.offset}
+                      onClick={() => handleLichtAction(group.startId + c.offset, `${group.title} - ${c.name}`)}
+                      title={`${group.title} - ${c.name}`}
+                      style={{ 
+                        width: '32px', 
+                        height: '32px', 
+                        borderRadius: '50%', 
+                        backgroundColor: c.color, 
+                        border: '2px solid rgba(0,0,0,0.3)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        cursor: 'pointer'
+                      }}
+                      className="hover:scale-110 active:scale-95 transition-transform"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

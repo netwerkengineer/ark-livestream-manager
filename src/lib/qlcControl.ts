@@ -13,10 +13,10 @@ export function sendQlcScene(sceneId: number) {
       qlcClient = new Client(host, port);
     }
 
-    console.log(`[QLC+] Sending scene ${sceneId} to ${host}:${port}`);
+    console.log(`[QLC+] Sending scene ${sceneId} to ${host}:${port} as /ark/light/scene/${sceneId}`);
     
-    // We sturen een signaal naar /ark/light/scene met het nummer van de scene
-    qlcClient.send('/ark/light/scene', sceneId, (err: any) => {
+    // We sturen een uniek signaal per scene naar /ark/light/scene/<id> met waarde 255 (aan/trigger)
+    qlcClient.send(`/ark/light/scene/${sceneId}`, 255, (err: any) => {
       if (err) console.error('[QLC+] Send Error:', err);
     });
 
