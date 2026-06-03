@@ -309,7 +309,9 @@
   </Function>
   <Function ID="20" Type="Chaser" Name="Color Chase (All)">
    <Speed FadeIn="500" FadeOut="500" Duration="2000"/>
-   <Sequence Copy="False"/>
+   <Direction>Forward</Direction>
+   <RunOrder>Loop</RunOrder>
+   <SpeedModes FadeIn="Default" FadeOut="Default" Duration="Common"/>
    <Step Number="0" FadeIn="500" Hold="1500" FadeOut="500">10</Step>
    <Step Number="1" FadeIn="500" Hold="1500" FadeOut="500">11</Step>
    <Step Number="2" FadeIn="500" Hold="1500" FadeOut="500">12</Step>
@@ -338,8 +340,10 @@
    <FixtureVal ID="18">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal>
   </Function>
   <Function ID="24" Type="Chaser" Name="Rainbow Wave">
-   <Speed FadeIn="800" FadeOut="800" Duration="2550"/>
-   <Sequence Copy="False"/>
+   <Speed FadeIn="800" FadeOut="800" Duration="2500"/>
+   <Direction>Forward</Direction>
+   <RunOrder>Loop</RunOrder>
+   <SpeedModes FadeIn="Default" FadeOut="Default" Duration="Common"/>
    <Step Number="0" FadeIn="800" Hold="1700" FadeOut="800">21</Step>
    <Step Number="1" FadeIn="800" Hold="1700" FadeOut="800">22</Step>
    <Step Number="2" FadeIn="800" Hold="1700" FadeOut="800">23</Step>
