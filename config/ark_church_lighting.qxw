@@ -15,10 +15,10 @@
   </InputOutputMap>
   
   <!-- FIXTURES -->
-  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>0</ID><Name>Fresnel 1</Name><Universe>0</Universe><Address>12</Address><Channels>1</Channels></Fixture>
-  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>1</ID><Name>Fresnel 2</Name><Universe>0</Universe><Address>13</Address><Channels>1</Channels></Fixture>
-  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>2</ID><Name>Fresnel 3</Name><Universe>0</Universe><Address>14</Address><Channels>1</Channels></Fixture>
-  <Fixture><Manufacturer>ADJ</Manufacturer><Model>Encore FR50z</Model><Mode>1 Channel</Mode><ID>3</ID><Name>Fresnel 4</Name><Universe>0</Universe><Address>15</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>American DJ</Manufacturer><Model>ENCOR FR50Z</Model><Mode>1CH</Mode><ID>0</ID><Name>Fresnel 1</Name><Universe>0</Universe><Address>12</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>American DJ</Manufacturer><Model>ENCOR FR50Z</Model><Mode>1CH</Mode><ID>1</ID><Name>Fresnel 2</Name><Universe>0</Universe><Address>13</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>American DJ</Manufacturer><Model>ENCOR FR50Z</Model><Mode>1CH</Mode><ID>2</ID><Name>Fresnel 3</Name><Universe>0</Universe><Address>14</Address><Channels>1</Channels></Fixture>
+  <Fixture><Manufacturer>American DJ</Manufacturer><Model>ENCOR FR50Z</Model><Mode>1CH</Mode><ID>3</ID><Name>Fresnel 4</Name><Universe>0</Universe><Address>15</Address><Channels>1</Channels></Fixture>
   
   <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>4</ID><Name>Bar L1</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
   <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>5</ID><Name>Bar L2</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
@@ -30,16 +30,16 @@
   <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>11</ID><Name>Bar R1</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
   <Fixture><Manufacturer>ADJ</Manufacturer><Model>UB 9H</Model><Mode>6 Channel</Mode><ID>12</ID><Name>Bar R2</Name><Universe>0</Universe><Address>0</Address><Channels>6</Channels></Fixture>
   
-  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3 Channel</Mode><ID>13</ID><Name>SlimPAR 1</Name><Universe>0</Universe><Address>19</Address><Channels>3</Channels></Fixture>
-  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3 Channel</Mode><ID>14</ID><Name>SlimPAR 2</Name><Universe>0</Universe><Address>22</Address><Channels>3</Channels></Fixture>
-  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3 Channel</Mode><ID>15</ID><Name>SlimPAR 3</Name><Universe>0</Universe><Address>25</Address><Channels>3</Channels></Fixture>
+  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3-Ch</Mode><ID>13</ID><Name>SlimPAR 1</Name><Universe>0</Universe><Address>19</Address><Channels>3</Channels></Fixture>
+  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3-Ch</Mode><ID>14</ID><Name>SlimPAR 2</Name><Universe>0</Universe><Address>22</Address><Channels>3</Channels></Fixture>
+  <Fixture><Manufacturer>Chauvet</Manufacturer><Model>SlimPAR 56</Model><Mode>3-Ch</Mode><ID>15</ID><Name>SlimPAR 3</Name><Universe>0</Universe><Address>25</Address><Channels>3</Channels></Fixture>
   
-  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED Color Bar Spot</Model><Mode>3 Channel</Mode><ID>16</ID><Name>Color Bar Spot 1</Name><Universe>0</Universe><Address>28</Address><Channels>3</Channels></Fixture>
-  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED Color Bar Spot</Model><Mode>3 Channel</Mode><ID>17</ID><Name>Color Bar Spot 2</Name><Universe>0</Universe><Address>31</Address><Channels>3</Channels></Fixture>
-  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED Color Bar Spot</Model><Mode>3 Channel</Mode><ID>18</ID><Name>Color Bar Spot 3</Name><Universe>0</Universe><Address>34</Address><Channels>3</Channels></Fixture>
+  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED COLOR BAR ULTRA BRIGHT RGB</Model><Mode>6 Channel</Mode><ID>16</ID><Name>Color Bar Spot 1</Name><Universe>0</Universe><Address>28</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED COLOR BAR ULTRA BRIGHT RGB</Model><Mode>6 Channel</Mode><ID>17</ID><Name>Color Bar Spot 2</Name><Universe>0</Universe><Address>34</Address><Channels>6</Channels></Fixture>
+  <Fixture><Manufacturer>lightmaXX</Manufacturer><Model>LED COLOR BAR ULTRA BRIGHT RGB</Model><Mode>6 Channel</Mode><ID>18</ID><Name>Color Bar Spot 3</Name><Universe>0</Universe><Address>40</Address><Channels>6</Channels></Fixture>
   
-  <Fixture><Manufacturer>Eurolite</Manufacturer><Model>LED KLS-200</Model><Mode>15 Channel</Mode><ID>19</ID><Name>KLS-200 Bar 1</Name><Universe>0</Universe><Address>37</Address><Channels>15</Channels></Fixture>
-  <Fixture><Manufacturer>Eurolite</Manufacturer><Model>LED KLS-200</Model><Mode>15 Channel</Mode><ID>20</ID><Name>KLS-200 Bar 2</Name><Universe>0</Universe><Address>52</Address><Channels>15</Channels></Fixture>
+  <Fixture><Manufacturer>Eurolite</Manufacturer><Model>KLS200</Model><Mode>Mode 1</Mode><ID>19</ID><Name>KLS-200 Bar 1</Name><Universe>0</Universe><Address>46</Address><Channels>15</Channels></Fixture>
+  <Fixture><Manufacturer>Eurolite</Manufacturer><Model>KLS200</Model><Mode>Mode 1</Mode><ID>20</ID><Name>KLS-200 Bar 2</Name><Universe>0</Universe><Address>61</Address><Channels>15</Channels></Fixture>
 
   <Monitor DisplayMode="0" ShowLabels="1">
    <FxItem ID="4" X="100" Y="400"/><FxItem ID="5" X="100" Y="300"/><FxItem ID="6" X="100" Y="200"/>
@@ -56,7 +56,7 @@
    <FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="0">0,200</FixtureVal><FixtureVal ID="1">0,200</FixtureVal><FixtureVal ID="2">0,200</FixtureVal><FixtureVal ID="3">0,200</FixtureVal>
    <FixtureVal ID="13">0,0,1,0,2,0</FixtureVal><FixtureVal ID="14">0,0,1,0,2,0</FixtureVal><FixtureVal ID="15">0,0,1,0,2,0</FixtureVal>
-   <FixtureVal ID="16">0,0,1,0,2,0</FixtureVal><FixtureVal ID="17">0,0,1,0,2,0</FixtureVal><FixtureVal ID="18">0,0,1,0,2,0</FixtureVal>
+   <FixtureVal ID="16">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="17">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="18">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
   </Function>
@@ -64,7 +64,7 @@
    <FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,200</FixtureVal>
    <FixtureVal ID="0">0,80</FixtureVal><FixtureVal ID="1">0,80</FixtureVal><FixtureVal ID="2">0,80</FixtureVal><FixtureVal ID="3">0,80</FixtureVal>
    <FixtureVal ID="13">0,0,1,0,2,255</FixtureVal><FixtureVal ID="14">0,0,1,0,2,255</FixtureVal><FixtureVal ID="15">0,0,1,0,2,255</FixtureVal>
-   <FixtureVal ID="16">0,0,1,0,2,255</FixtureVal><FixtureVal ID="17">0,0,1,0,2,255</FixtureVal><FixtureVal ID="18">0,0,1,0,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal>
   </Function>
@@ -72,7 +72,7 @@
    <FixtureVal ID="4">0,255,1,100,2,0,3,255,4,0,5,0</FixtureVal>
    <FixtureVal ID="0">0,0</FixtureVal><FixtureVal ID="1">0,0</FixtureVal><FixtureVal ID="2">0,0</FixtureVal><FixtureVal ID="3">0,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,100,2,0</FixtureVal><FixtureVal ID="14">0,255,1,100,2,0</FixtureVal><FixtureVal ID="15">0,255,1,100,2,0</FixtureVal>
-   <FixtureVal ID="16">0,255,1,100,2,0</FixtureVal><FixtureVal ID="17">0,255,1,100,2,0</FixtureVal><FixtureVal ID="18">0,255,1,100,2,0</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal>
   </Function>
@@ -80,7 +80,7 @@
    <FixtureVal ID="4">0,255,1,255,2,255,3,255,4,255,5,0</FixtureVal>
    <FixtureVal ID="0">0,255</FixtureVal><FixtureVal ID="1">0,255</FixtureVal><FixtureVal ID="2">0,255</FixtureVal><FixtureVal ID="3">0,255</FixtureVal>
    <FixtureVal ID="13">0,255,1,255,2,255</FixtureVal><FixtureVal ID="14">0,255,1,255,2,255</FixtureVal><FixtureVal ID="15">0,255,1,255,2,255</FixtureVal>
-   <FixtureVal ID="16">0,255,1,255,2,255</FixtureVal><FixtureVal ID="17">0,255,1,255,2,255</FixtureVal><FixtureVal ID="18">0,255,1,255,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</Function>
   </Function>
@@ -88,56 +88,56 @@
   <Function ID="10" Type="Scene" Name="Color: Red">
    <FixtureVal ID="4">0,255,1,0,2,0,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,0,2,0</FixtureVal><FixtureVal ID="14">0,255,1,0,2,0</FixtureVal><FixtureVal ID="15">0,255,1,0,2,0</FixtureVal>
-   <FixtureVal ID="16">0,255,1,0,2,0</FixtureVal><FixtureVal ID="17">0,255,1,0,2,0</FixtureVal><FixtureVal ID="18">0,255,1,0,2,0</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,0,6,255,7,0,8,0,9,255,10,0,11,0,12,255,13,0,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,0,6,255,7,0,8,0,9,255,10,0,11,0,12,255,13,0,14,0</FixtureVal>
   </Function>
   <Function ID="11" Type="Scene" Name="Color: Green">
    <FixtureVal ID="4">0,0,1,255,2,0,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,0,1,255,2,0</FixtureVal><FixtureVal ID="14">0,0,1,255,2,0</FixtureVal><FixtureVal ID="15">0,0,1,255,2,0</FixtureVal>
-   <FixtureVal ID="16">0,0,1,255,2,0</FixtureVal><FixtureVal ID="17">0,0,1,255,2,0</FixtureVal><FixtureVal ID="18">0,0,1,255,2,0</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,255,8,0,9,0,10,255,11,0,12,0,13,255,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,255,8,0,9,0,10,255,11,0,12,0,13,255,14,0</FixtureVal>
   </Function>
   <Function ID="12" Type="Scene" Name="Color: Blue">
    <FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,0,1,0,2,255</FixtureVal><FixtureVal ID="14">0,0,1,0,2,255</FixtureVal><FixtureVal ID="15">0,0,1,0,2,255</FixtureVal>
-   <FixtureVal ID="16">0,0,1,0,2,255</FixtureVal><FixtureVal ID="17">0,0,1,0,2,255</FixtureVal><FixtureVal ID="18">0,0,1,0,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal>
   </Function>
   <Function ID="13" Type="Scene" Name="Color: Amber">
    <FixtureVal ID="4">0,255,1,100,2,0,3,0,4,255,5,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,100,2,0</FixtureVal><FixtureVal ID="14">0,255,1,100,2,0</FixtureVal><FixtureVal ID="15">0,255,1,100,2,0</FixtureVal>
-   <FixtureVal ID="16">0,255,1,100,2,0</FixtureVal><FixtureVal ID="17">0,255,1,100,2,0</FixtureVal><FixtureVal ID="18">0,255,1,100,2,0</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,100,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal>
   </Function>
   <Function ID="14" Type="Scene" Name="Color: Magenta">
    <FixtureVal ID="4">0,255,1,0,2,255,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,0,2,255</FixtureVal><FixtureVal ID="14">0,255,1,0,2,255</FixtureVal><FixtureVal ID="15">0,255,1,0,2,255</FixtureVal>
-   <FixtureVal ID="16">0,255,1,0,2,255</FixtureVal><FixtureVal ID="17">0,255,1,0,2,255</FixtureVal><FixtureVal ID="18">0,255,1,0,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,255,6,255,7,0,8,255,9,255,10,0,11,255,12,255,13,0,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,255,6,255,7,0,8,255,9,255,10,0,11,255,12,255,13,0,14,255</FixtureVal>
   </Function>
   <Function ID="15" Type="Scene" Name="Color: Cyan">
    <FixtureVal ID="4">0,0,1,255,2,255,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,0,1,255,2,255</FixtureVal><FixtureVal ID="14">0,0,1,255,2,255</FixtureVal><FixtureVal ID="15">0,0,1,255,2,255</FixtureVal>
-   <FixtureVal ID="16">0,0,1,255,2,255</FixtureVal><FixtureVal ID="17">0,0,1,255,2,255</FixtureVal><FixtureVal ID="18">0,0,1,255,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,255,8,255,9,0,10,255,11,255,12,0,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,255,8,255,9,0,10,255,11,255,12,0,13,255,14,255</FixtureVal>
   </Function>
   <Function ID="16" Type="Scene" Name="Color: UV">
    <FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,255</FixtureVal>
    <FixtureVal ID="13">0,0,1,0,2,0</FixtureVal><FixtureVal ID="14">0,0,1,0,2,0</FixtureVal><FixtureVal ID="15">0,0,1,0,2,0</FixtureVal>
-   <FixtureVal ID="16">0,0,1,0,2,0</FixtureVal><FixtureVal ID="17">0,0,1,0,2,0</FixtureVal><FixtureVal ID="18">0,0,1,0,2,0</FixtureVal>
+   <FixtureVal ID="16">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="17">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="18">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal>
    <FixtureVal ID="19">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
    <FixtureVal ID="20">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
   </Function>
   <Function ID="17" Type="Scene" Name="Color: White">
    <FixtureVal ID="4">0,0,1,0,2,0,3,255,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,255,2,255</FixtureVal><FixtureVal ID="14">0,255,1,255,2,255</FixtureVal><FixtureVal ID="15">0,255,1,255,2,255</FixtureVal>
-   <FixtureVal ID="16">0,255,1,255,2,255</FixtureVal><FixtureVal ID="17">0,255,1,255,2,255</FixtureVal><FixtureVal ID="18">0,255,1,255,2,255</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
