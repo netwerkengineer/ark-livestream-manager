@@ -7,8 +7,7 @@ services:
     restart: always
     ports:
       - "3005:3005"
-      - "5006:5006/udp"
-      - "5004-5005:5004-5005/udp"
+      - "5004-5007:5004-5007/udp"
     volumes:
       - ./data:/app/data
       - /volume1/Beamer/FreeShow/Media:/app/public/thumbnails
