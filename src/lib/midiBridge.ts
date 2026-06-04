@@ -16,12 +16,13 @@ if (!globalMidi.activeMidiPeers) {
 export function getActiveMidiPeers() {
   if (!globalMidi.midiSession) return [];
   try {
-    return globalMidi.midiSession.getStreams()
+    const names = globalMidi.midiSession.getStreams()
       .filter((s: any) => s.name)
-      .map((s: any) => s.name);
+      .map((s: any) => s.name.replace(/\0/g, '').trim());
+    return Array.from(new Set(names));
   } catch (err) {
     console.error('Fout bij ophalen MIDI streams:', err);
-    return globalMidi.activeMidiPeers || [];
+    return Array.from(new Set(globalMidi.activeMidiPeers || []));
   }
 }
 
@@ -48,17 +49,19 @@ export function initMidiBridge() {
     globalMidi.activeMidiPeers = [];
     globalMidi.midiSession.on('streamAdded', (event: any) => {
       const stream = event.stream;
-      console.log(`[MIDI] Peer verbonden: ${stream.name} (${stream.address})`);
-      if (stream.name && !globalMidi.activeMidiPeers.includes(stream.name)) {
-        globalMidi.activeMidiPeers.push(stream.name);
+      const cleanName = stream.name ? stream.name.replace(/\0/g, '').trim() : '';
+      console.log(`[MIDI] Peer verbonden: ${cleanName} (${stream.address})`);
+      if (cleanName && !globalMidi.activeMidiPeers.includes(cleanName)) {
+        globalMidi.activeMidiPeers.push(cleanName);
       }
     });
 
     globalMidi.midiSession.on('streamRemoved', (event: any) => {
       const stream = event.stream;
-      console.log(`[MIDI] Peer verbroken: ${stream.name}`);
-      if (stream.name) {
-        globalMidi.activeMidiPeers = globalMidi.activeMidiPeers.filter(p => p !== stream.name);
+      const cleanName = stream.name ? stream.name.replace(/\0/g, '').trim() : '';
+      console.log(`[MIDI] Peer verbroken: ${cleanName}`);
+      if (cleanName) {
+        globalMidi.activeMidiPeers = globalMidi.activeMidiPeers.filter(p => p !== cleanName);
       }
     });
 
@@ -106,13 +109,33 @@ function startAutoConnectLoop(ipsString: string) {
   const attemptConnections = () => {
     if (!globalMidi.midiSession) return;
     
+    // Verkrijg de lijst met al verbonden of verbindende stream IP-adressen
+    const activeIps = (globalMidi.midiSession.streams || [])
+      .map((s: any) => {
+        if (s.rinfo1 && s.rinfo1.address) return s.rinfo1.address;
+        return s.targetAddress;
+      })
+      .filter((addr: any) => addr);
+      
     targetIps.forEach(ip => {
+      if (activeIps.includes(ip)) {
+        // Al verbonden of momenteel aan het verbinden, sla deze over
+        return;
+      }
+      
       console.log(`[MIDI Auto-Connect] Proberen te verbinden met ${ip}:5004...`);
       try {
         globalMidi.midiSession.connect({
           address: ip,
           port: 5004
         });
+        
+        // Tag de nieuw aangemaakte stream met het doel IP-adres
+        const streams = globalMidi.midiSession.streams || [];
+        const newStream = streams[streams.length - 1];
+        if (newStream) {
+          (newStream as any).targetAddress = ip;
+        }
       } catch (err) {
         console.error(`[MIDI Auto-Connect] Fout bij verbinden met ${ip}:5004:`, err);
       }
