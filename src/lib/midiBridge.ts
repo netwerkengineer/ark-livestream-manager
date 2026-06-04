@@ -54,7 +54,8 @@ async function handleMidiAction(status: number, d1: number, d2: number) {
       console.log(`[MIDI] Triggering knop: ${buttonToTrigger.name} via noot ${d1}`);
       
       try {
-        await fetch(`http://localhost:${process.env.PORT || 3000}/api/broadcast/action`, {
+        const host = process.env.HOSTNAME || '127.0.0.1';
+        await fetch(`http://${host}:${process.env.PORT || 3000}/api/broadcast/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
