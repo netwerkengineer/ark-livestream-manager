@@ -1,7 +1,12 @@
 import rtpmidi from 'rtpmidi';
 import { getSettings } from './settingsStore';
 
+let activePeers: string[] = [];
 let session: any = null;
+
+export function getActiveMidiPeers() {
+  return activePeers;
+}
 
 export function initMidiBridge() {
   if (session) return session;
@@ -21,6 +26,20 @@ export function initMidiBridge() {
     });
 
     console.log(`--- MIDI Bridge Actief: "${sessionName}" op poort 5006 ---`);
+
+    // Track active peers
+    activePeers = [];
+    session.on('peerAdded', (peer: any) => {
+      console.log(`[MIDI] Peer verbonden: ${peer.name} (${peer.address})`);
+      if (!activePeers.includes(peer.name)) {
+        activePeers.push(peer.name);
+      }
+    });
+
+    session.on('peerRemoved', (peer: any) => {
+      console.log(`[MIDI] Peer verbroken: ${peer.name}`);
+      activePeers = activePeers.filter(p => p !== peer.name);
+    });
 
     session.on('message', (deltaTime: number, message: number[]) => {
       // MIDI Message format: [status, data1, data2]
