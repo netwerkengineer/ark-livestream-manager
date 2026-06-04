@@ -157,7 +157,9 @@ export function sendMidiMessage(status: number, d1: number, d2: number) {
   }
   
   try {
-    globalMidi.midiSession.sendMessage([status, d1, d2]);
+    const session = globalMidi.midiSession;
+    const time = session.startTime || 0;
+    session.sendMessage(time, [status, d1, d2]);
     console.log(`[MIDI] Verzonden naar deelnemers: Status ${status}, D1 ${d1}, D2 ${d2}`);
     return true;
   } catch (err) {
