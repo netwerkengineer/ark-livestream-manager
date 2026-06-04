@@ -40,6 +40,22 @@ export function initMidiBridge() {
   }
 }
 
+export function sendMidiMessage(status: number, d1: number, d2: number) {
+  if (!session) {
+    console.log('--- Kan MIDI niet verzenden: sessie is niet actief of geïnitialiseerd ---');
+    return false;
+  }
+  
+  try {
+    session.sendMessage([status, d1, d2]);
+    console.log(`[MIDI] Verzonden naar deelnemers: Status ${status}, D1 ${d1}, D2 ${d2}`);
+    return true;
+  } catch (err) {
+    console.error('[MIDI] Fout bij verzenden MIDI-bericht:', err);
+    return false;
+  }
+}
+
 async function handleMidiAction(status: number, d1: number, d2: number) {
   const settings = getSettings();
   
