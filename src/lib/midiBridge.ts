@@ -1,15 +1,24 @@
 import rtpmidi from 'rtpmidi';
 import { getSettings } from './settingsStore';
 
-let activePeers: string[] = [];
-let session: any = null;
+// Use the global object to persist the MIDI session and peers array across Next.js re-compilations / worker threads
+interface GlobalMidiContext {
+  midiSession: any;
+  activeMidiPeers: string[];
+}
+
+const globalMidi = global as unknown as GlobalMidiContext;
+
+if (!globalMidi.activeMidiPeers) {
+  globalMidi.activeMidiPeers = [];
+}
 
 export function getActiveMidiPeers() {
-  return activePeers;
+  return globalMidi.activeMidiPeers;
 }
 
 export function initMidiBridge() {
-  if (session) return session;
+  if (globalMidi.midiSession) return globalMidi.midiSession;
 
   const settings = getSettings();
   if (!settings.midiEnabled) {
@@ -20,7 +29,7 @@ export function initMidiBridge() {
   const sessionName = settings.midiSessionName || 'Ark-Church-App';
   
   try {
-    session = rtpmidi.manager.createSession({
+    globalMidi.midiSession = rtpmidi.manager.createSession({
       name: sessionName,
       port: 5006 // Standaard poort voor rtpMIDI
     });
@@ -28,20 +37,20 @@ export function initMidiBridge() {
     console.log(`--- MIDI Bridge Actief: "${sessionName}" op poort 5006 ---`);
 
     // Track active peers
-    activePeers = [];
-    session.on('peerAdded', (peer: any) => {
+    globalMidi.activeMidiPeers = [];
+    globalMidi.midiSession.on('peerAdded', (peer: any) => {
       console.log(`[MIDI] Peer verbonden: ${peer.name} (${peer.address})`);
-      if (!activePeers.includes(peer.name)) {
-        activePeers.push(peer.name);
+      if (!globalMidi.activeMidiPeers.includes(peer.name)) {
+        globalMidi.activeMidiPeers.push(peer.name);
       }
     });
 
-    session.on('peerRemoved', (peer: any) => {
+    globalMidi.midiSession.on('peerRemoved', (peer: any) => {
       console.log(`[MIDI] Peer verbroken: ${peer.name}`);
-      activePeers = activePeers.filter(p => p !== peer.name);
+      globalMidi.activeMidiPeers = globalMidi.activeMidiPeers.filter(p => p !== peer.name);
     });
 
-    session.on('message', (deltaTime: number, message: number[]) => {
+    globalMidi.midiSession.on('message', (deltaTime: number, message: number[]) => {
       // MIDI Message format: [status, data1, data2]
       // Bijv: Note On op kanaal 1: [144, noot, velocity]
       const [status, d1, d2] = message;
@@ -55,7 +64,7 @@ export function initMidiBridge() {
     // Start auto-connect loop for target IPs
     startAutoConnectLoop(settings.midiAutoConnectIps);
 
-    return session;
+    return globalMidi.midiSession;
   } catch (err) {
     console.error('--- MIDI Bridge Error:', err);
     return null;
@@ -83,12 +92,12 @@ function startAutoConnectLoop(ipsString: string) {
   if (targetIps.length === 0) return;
   
   const attemptConnections = () => {
-    if (!session) return;
+    if (!globalMidi.midiSession) return;
     
     targetIps.forEach(ip => {
       console.log(`[MIDI Auto-Connect] Proberen te verbinden met ${ip}:5004...`);
       try {
-        session.connect({
+        globalMidi.midiSession.connect({
           address: ip,
           port: 5004
         });
@@ -106,13 +115,13 @@ function startAutoConnectLoop(ipsString: string) {
 }
 
 export function sendMidiMessage(status: number, d1: number, d2: number) {
-  if (!session) {
+  if (!globalMidi.midiSession) {
     console.log('--- Kan MIDI niet verzenden: sessie is niet actief of geïnitialiseerd ---');
     return false;
   }
   
   try {
-    session.sendMessage([status, d1, d2]);
+    globalMidi.midiSession.sendMessage([status, d1, d2]);
     console.log(`[MIDI] Verzonden naar deelnemers: Status ${status}, D1 ${d1}, D2 ${d2}`);
     return true;
   } catch (err) {
