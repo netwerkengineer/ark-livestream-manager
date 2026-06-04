@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import net from 'net';
 import dgram from 'dgram';
 import { getSettings } from '@/lib/settingsStore';
+import { getActiveMidiPeers } from '@/lib/midiBridge';
 
 async function checkTcp(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -74,5 +75,8 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({ services: status });
+  return NextResponse.json({ 
+    services: status,
+    midiPeers: getActiveMidiPeers()
+  });
 }

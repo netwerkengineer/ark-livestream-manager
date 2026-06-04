@@ -27,6 +27,7 @@ interface BroadcastControlCenterProps {
 
 export default function BroadcastControlCenter({ settings }: BroadcastControlCenterProps) {
   const [services, setServices] = useState<ServiceStatus[]>([]);
+  const [midiPeers, setMidiPeers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState(new Date());
 
@@ -35,6 +36,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
       const res = await fetch('/api/services/status');
       const data = await res.json();
       setServices(data.services);
+      setMidiPeers(data.midiPeers || []);
     } catch (err) {
       console.error("Failed to fetch service status", err);
     } finally {
@@ -154,8 +156,9 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
           </div>
         </section>
 
-        {/* Info Card */}
-        <section className="glass-card flex flex-col justify-center">
+        {/* Info Card / MIDI Connection Status */}
+        <section className="glass-card flex flex-col justify-between">
+          <div>
             <div className="flex items-center gap-4 mb-4">
               <div className="p-3 bg-blue-500/10 rounded-lg">
                 <ShieldAlert className="text-blue-400" size={24} />
@@ -164,11 +167,34 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
                 Dit dashboard is het centrale zenuwstelsel van de uitzending. Beheer hier de livestream, audio, presentatie en verlichting op één plek.
               </p>
             </div>
-            <div className="mt-auto pt-4 border-t border-white/5">
-                <p className="text-[11px] text-muted flex items-center gap-1">
-                    <Activity size={12} /> Real-time monitoring via Docker Network (Ark-Net)
+
+            {/* rtpMIDI Peers list */}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px', color: 'var(--muted)' }}>
+                🎛️ Actieve rtpMIDI Deelnemers ({midiPeers.length})
+              </h4>
+              {midiPeers.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  Geen apparaten verbonden (rtpMIDI)
                 </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {midiPeers.map(peer => (
+                    <div key={peer} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                      <span style={{ height: '6px', width: '6px', borderRadius: '50%', backgroundColor: '#4ade80', boxShadow: '0 0 6px #4ade80' }}></span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>{peer}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+
+          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <p className="text-[11px] text-muted flex items-center gap-1">
+              <Activity size={12} /> Real-time monitoring via Docker Network (Ark-Net)
+            </p>
+          </div>
         </section>
       </div>
 
