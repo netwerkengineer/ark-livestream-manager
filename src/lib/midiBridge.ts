@@ -33,11 +33,57 @@ export function initMidiBridge() {
       handleMidiAction(status, d1, d2);
     });
 
+    // Start auto-connect loop for target IPs
+    startAutoConnectLoop(settings.midiAutoConnectIps);
+
     return session;
   } catch (err) {
     console.error('--- MIDI Bridge Error:', err);
     return null;
   }
+}
+
+let autoConnectInterval: NodeJS.Timeout | null = null;
+
+function startAutoConnectLoop(ipsString: string) {
+  if (autoConnectInterval) {
+    clearInterval(autoConnectInterval);
+    autoConnectInterval = null;
+  }
+  
+  if (!ipsString) return;
+  
+  const parseIps = (str: string) => {
+    return str
+      .split(',')
+      .map(ip => ip.trim())
+      .filter(ip => ip.length > 0);
+  };
+  
+  const targetIps = parseIps(ipsString);
+  if (targetIps.length === 0) return;
+  
+  const attemptConnections = () => {
+    if (!session) return;
+    
+    targetIps.forEach(ip => {
+      console.log(`[MIDI Auto-Connect] Proberen te verbinden met ${ip}:5004...`);
+      try {
+        session.connect({
+          address: ip,
+          port: 5004
+        });
+      } catch (err) {
+        console.error(`[MIDI Auto-Connect] Fout bij verbinden met ${ip}:5004:`, err);
+      }
+    });
+  };
+  
+  // Voer direct uit bij start
+  attemptConnections();
+  
+  // Herhaal elke 15 seconden
+  autoConnectInterval = setInterval(attemptConnections, 15000);
 }
 
 export function sendMidiMessage(status: number, d1: number, d2: number) {

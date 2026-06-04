@@ -836,17 +836,32 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                   </div>
 
                   {settings.midiEnabled && (
-                    <div className="input-group" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
-                      <label className="input-label">Sessie Naam (Apple MIDI)</label>
-                      <input 
-                        className="input-field" 
-                        value={settings.midiSessionName} 
-                        onChange={(e) => setSettings({...settings, midiSessionName: e.target.value})} 
-                        placeholder="Ark-Church-App" 
-                      />
-                      <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>
-                        Dit is de naam die verschijnt in de "Audio MIDI Setup" op je Playback Mac.
-                      </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
+                      <div className="input-group">
+                        <label className="input-label">Sessie Naam (Apple MIDI)</label>
+                        <input 
+                          className="input-field" 
+                          value={settings.midiSessionName} 
+                          onChange={(e) => setSettings({...settings, midiSessionName: e.target.value})} 
+                          placeholder="Ark-Church-App" 
+                        />
+                        <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>
+                          Dit is de naam die verschijnt in de "Audio MIDI Setup" op je Playback Mac.
+                        </p>
+                      </div>
+
+                      <div className="input-group">
+                        <label className="input-label">rtpMIDI Auto-Connect IPs (Kommagescheiden)</label>
+                        <input 
+                          className="input-field" 
+                          value={settings.midiAutoConnectIps || ""} 
+                          onChange={(e) => setSettings({...settings, midiAutoConnectIps: e.target.value})} 
+                          placeholder="Bijv: 192.168.2.109, 192.168.2.223" 
+                        />
+                        <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>
+                          Voer hier de IP-adressen van je Mac of iPad in. De app zal automatisch verbinding zoeken op poort 5004.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

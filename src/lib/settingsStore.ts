@@ -48,6 +48,7 @@ export interface AppSettings {
   // MIDI Configuration
   midiEnabled: boolean;
   midiSessionName: string;
+  midiAutoConnectIps: string;
 
   // QLC+ Configuration
   qlcEnabled: boolean;
@@ -113,6 +114,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   // MIDI Defaults
   midiEnabled: true,
   midiSessionName: "Ark-Church-App",
+  midiAutoConnectIps: "",
 
   // QLC+ Defaults
   qlcEnabled: false,
