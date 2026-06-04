@@ -64,6 +64,8 @@ export interface BroadcastButton {
   row: number;
   col: number;
   midiNote?: number;
+  midiOutNote?: number;
+  midiOutChannel?: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {

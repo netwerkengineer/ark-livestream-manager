@@ -933,7 +933,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       </div>
 
                       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Companion Adres (API)</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Companion Adres & MIDI Input</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
                           <div className="input-group"><label className="input-label">Page</label><input type="number" className="input-field" value={btn.page} onChange={(e) => {
                             const newBtns = [...settings.broadcastButtons];
@@ -950,11 +950,46 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                             newBtns[idx].col = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
-                          <div className="input-group"><label className="input-label">MIDI Note</label><input type="number" className="input-field" value={btn.midiNote || 60} onChange={(e) => {
+                          <div className="input-group"><label className="input-label">MIDI In Note</label><input type="number" className="input-field" value={btn.midiNote || 60} onChange={(e) => {
                             const newBtns = [...settings.broadcastButtons];
                             newBtns[idx].midiNote = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '12px' }}>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>MIDI Output (Sturen bij klik)</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div className="input-group">
+                            <label className="input-label">MIDI Out Note (Leeg = uit)</label>
+                            <input 
+                              type="text" 
+                              className="input-field" 
+                              placeholder="Bijv: 60" 
+                              value={btn.midiOutNote !== undefined ? btn.midiOutNote : ""} 
+                              onChange={(e) => {
+                                const newBtns = [...settings.broadcastButtons];
+                                newBtns[idx].midiOutNote = e.target.value !== "" ? parseInt(e.target.value) : undefined;
+                                setSettings({...settings, broadcastButtons: newBtns});
+                              }} 
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="input-label">MIDI Out Channel</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max="16" 
+                              className="input-field" 
+                              value={btn.midiOutChannel !== undefined ? btn.midiOutChannel : 1} 
+                              onChange={(e) => {
+                                const newBtns = [...settings.broadcastButtons];
+                                newBtns[idx].midiOutChannel = e.target.value !== "" ? parseInt(e.target.value) : 1;
+                                setSettings({...settings, broadcastButtons: newBtns});
+                              }} 
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
