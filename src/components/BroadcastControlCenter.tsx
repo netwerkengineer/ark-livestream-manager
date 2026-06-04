@@ -89,17 +89,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
     }
   };
 
-  const getColorStyle = (color: string) => {
-    switch (color) {
-      case 'green': return { backgroundColor: 'rgba(22, 163, 74, 0.15)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' };
-      case 'red': return { backgroundColor: 'rgba(220, 38, 38, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' };
-      case 'amber': return { backgroundColor: 'rgba(217, 119, 6, 0.15)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24' };
-      case 'slate': return { backgroundColor: 'rgba(75, 85, 99, 0.15)', borderColor: 'rgba(107, 114, 128, 0.3)', color: '#9ca3af' };
-      case 'blue': return { backgroundColor: 'rgba(37, 99, 235, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)', color: '#60a5fa' };
-      case 'purple': return { backgroundColor: 'rgba(147, 51, 234, 0.15)', borderColor: 'rgba(168, 85, 247, 0.3)', color: '#c084fc' };
-      default: return { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' };
-    }
-  };
+
 
   const actions = settings?.broadcastButtons || [];
 
@@ -206,16 +196,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => handleEmergencyAction(action.name, action.page, action.row, action.col)}
-            className="emergency-btn"
-            style={{ 
-              ...getColorStyle(action.color),
-              textAlign: 'left', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px', 
-              padding: '20px',
-              width: '100%' 
-            }}
+            className={`emergency-btn ${action.color || 'default'}`}
           >
             <div style={{ flexShrink: 0 }}>{getIcon(action.icon)}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -225,23 +206,6 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
           </motion.button>
         ))}
       </div>
-
-      <style jsx>{`
-        .emergency-btn {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 20px;
-          border-radius: 16px;
-          border: 1px solid;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-          /* Geen hardcoded background-color of color hier, dat doen we inline */
-        }
-        .emergency-btn:hover {
-          box-shadow: 0 0 20px rgba(0,0,0,0.4);
-        }
-      `}</style>
     </div>
   );
 }

@@ -14,7 +14,15 @@ if (!globalMidi.activeMidiPeers) {
 }
 
 export function getActiveMidiPeers() {
-  return globalMidi.activeMidiPeers;
+  if (!globalMidi.midiSession) return [];
+  try {
+    return globalMidi.midiSession.getStreams()
+      .filter((s: any) => s.name)
+      .map((s: any) => s.name);
+  } catch (err) {
+    console.error('Fout bij ophalen MIDI streams:', err);
+    return globalMidi.activeMidiPeers || [];
+  }
 }
 
 export function initMidiBridge() {
@@ -38,16 +46,20 @@ export function initMidiBridge() {
 
     // Track active peers
     globalMidi.activeMidiPeers = [];
-    globalMidi.midiSession.on('peerAdded', (peer: any) => {
-      console.log(`[MIDI] Peer verbonden: ${peer.name} (${peer.address})`);
-      if (!globalMidi.activeMidiPeers.includes(peer.name)) {
-        globalMidi.activeMidiPeers.push(peer.name);
+    globalMidi.midiSession.on('streamAdded', (event: any) => {
+      const stream = event.stream;
+      console.log(`[MIDI] Peer verbonden: ${stream.name} (${stream.address})`);
+      if (stream.name && !globalMidi.activeMidiPeers.includes(stream.name)) {
+        globalMidi.activeMidiPeers.push(stream.name);
       }
     });
 
-    globalMidi.midiSession.on('peerRemoved', (peer: any) => {
-      console.log(`[MIDI] Peer verbroken: ${peer.name}`);
-      globalMidi.activeMidiPeers = globalMidi.activeMidiPeers.filter(p => p !== peer.name);
+    globalMidi.midiSession.on('streamRemoved', (event: any) => {
+      const stream = event.stream;
+      console.log(`[MIDI] Peer verbroken: ${stream.name}`);
+      if (stream.name) {
+        globalMidi.activeMidiPeers = globalMidi.activeMidiPeers.filter(p => p !== stream.name);
+      }
     });
 
     globalMidi.midiSession.on('message', (deltaTime: number, message: number[]) => {
