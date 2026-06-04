@@ -35,11 +35,12 @@ export function initMidiBridge() {
     return null;
   }
 
-  const sessionName = settings.midiSessionName || 'Ark-Church-App';
+  const sessionName = settings.midiSessionName || 'livestream-Manager';
   
   try {
     globalMidi.midiSession = rtpmidi.manager.createSession({
-      name: sessionName,
+      localName: sessionName,
+      bonjourName: sessionName,
       port: 5006 // Standaard poort voor rtpMIDI
     });
 

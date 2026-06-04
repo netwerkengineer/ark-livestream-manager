@@ -113,7 +113,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // MIDI Defaults
   midiEnabled: true,
-  midiSessionName: "Ark-Church-App",
+  midiSessionName: "livestream-Manager",
   midiAutoConnectIps: "",
 
   // QLC+ Defaults
