@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: livestream-manager
+    hostname: livestream-manager
     restart: always
     ports:
       - "3005:3005"
