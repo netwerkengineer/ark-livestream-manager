@@ -41,6 +41,27 @@ services:
       - ./config/ark_church_lighting.qxw:/QLC/ark_church_lighting.qxw
       - ./config/qlcplus/config:/root/.config/qlcplus
 
+  x32-emulator:
+    build:
+      context: ./config/emulators/x32-emulator
+      dockerfile: Dockerfile
+    container_name: x32-emulator
+    restart: always
+    ports:
+      - "10023:10023/udp"
+    networks:
+      - ark-net
+
+  atem-emulator:
+    build:
+      context: ./config/emulators/atem-emulator
+      dockerfile: Dockerfile
+    container_name: atem-emulator
+    restart: always
+    ports:
+      - "9910:9910/udp"
+    networks:
+      - ark-net
 
 networks:
   ark-net:
