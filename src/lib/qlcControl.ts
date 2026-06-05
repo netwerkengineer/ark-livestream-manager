@@ -25,25 +25,3 @@ export function sendQlcScene(sceneId: number) {
     qlcClient = null;
   }
 }
-
-export function sendQlcValue(path: string, value: number) {
-  const settings = getSettings();
-  const host = settings.qlcHost || '127.0.0.1';
-  const port = settings.qlcPort || 7700;
-
-  try {
-    if (!qlcClient) {
-      qlcClient = new Client(host, port);
-    }
-
-    console.log(`[QLC+] Sending value ${value} to ${host}:${port} as ${path}`);
-    
-    qlcClient.send(path, value, (err: any) => {
-      if (err) console.error('[QLC+] Send Value Error:', err);
-    });
-
-  } catch (err) {
-    console.error('[QLC+] Connection Error:', err);
-    qlcClient = null;
-  }
-}
