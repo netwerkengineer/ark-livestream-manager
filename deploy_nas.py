@@ -67,6 +67,11 @@ def setup_environment():
 
     config['LOCAL_APP_PATH'] = BASE_DIR
     config['REMOTE_APP_PATH'] = get_input("Doelpad op de NAS", last_config.get('REMOTE_APP_PATH', "/volume1/docker/ark-livestream-manager"))
+    
+    default_emulators = "ja" if last_config.get('DEPLOY_EMULATORS', False) else "nee"
+    deploy_emulators_input = get_input("Wil je de X32 & ATEM Emulators ook installeren? (ja/nee)", default_emulators)
+    config['DEPLOY_EMULATORS'] = deploy_emulators_input.lower() in ["ja", "yes", "j", "y", "true"]
+    
     config['LOCAL_TEMP_ARCHIVE'] = os.path.join(BASE_DIR, "deploy.tar.gz")
     config['REMOTE_TEMP_ARCHIVE'] = f"{config['REMOTE_APP_PATH']}/deploy.tar.gz"
     return config
@@ -195,6 +200,7 @@ def deploy():
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     sudo_p = f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH}"
     
+    services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus"
     deploy_cmd = (
         f"export {D_PATH} && "
         f"cd {config['REMOTE_APP_PATH']} && "
@@ -202,7 +208,7 @@ def deploy():
         f"{sudo_p} rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
         f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
-        f"({sudo_p} docker compose up -d --build || {sudo_p} docker-compose up -d --build) && "
+        f"({sudo_p} docker compose up -d --build {services_to_deploy} || {sudo_p} docker-compose up -d --build {services_to_deploy}) && "
         f"{sudo_p} docker image prune -f"
     )
     
