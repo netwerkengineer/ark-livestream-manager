@@ -201,6 +201,7 @@ def deploy():
     sudo_p = f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH}"
     
     services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus"
+    cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else f"({sudo_p} docker stop x32-emulator atem-emulator 2>/dev/null || true) && ({sudo_p} docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
     deploy_cmd = (
         f"export {D_PATH} && "
         f"cd {config['REMOTE_APP_PATH']} && "
@@ -208,6 +209,7 @@ def deploy():
         f"{sudo_p} rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
         f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
+        f"{cleanup_emulators}"
         f"({sudo_p} docker compose up -d --build {services_to_deploy} || {sudo_p} docker-compose up -d --build {services_to_deploy}) && "
         f"{sudo_p} docker image prune -f"
     )
