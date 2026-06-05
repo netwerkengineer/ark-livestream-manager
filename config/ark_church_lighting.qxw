@@ -7,7 +7,7 @@
   <Author>Jeffrey Go</Author>
  </Creator>
  <Engine>
-        <InputOutputMap>
+      <InputOutputMap>
    <BeatGenerator BeatType="Disabled" BPM="0"/>
    <NetworkServer Type="Native" AutoStart="False" Name="" Password=""/>
    <Universe Name="Universe 1" ID="0" Passthrough="True"/>

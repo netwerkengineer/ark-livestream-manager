@@ -60,6 +60,8 @@ services:
     restart: always
     ports:
       - "9910:9910/udp"
+    environment:
+      - PYTHONUNBUFFERED=1
     networks:
       - ark-net
 

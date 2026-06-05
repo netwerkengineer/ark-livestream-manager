@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+*.log
+.DS_Store
+freeshow
+companion
+npm
+websites
+temp_build
+temp_companion
+data

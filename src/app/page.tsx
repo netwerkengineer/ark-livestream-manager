@@ -950,11 +950,20 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                             newBtns[idx].col = parseInt(e.target.value);
                             setSettings({...settings, broadcastButtons: newBtns});
                           }} /></div>
-                          <div className="input-group"><label className="input-label">MIDI In Note</label><input type="number" className="input-field" value={btn.midiNote || 60} onChange={(e) => {
-                            const newBtns = [...settings.broadcastButtons];
-                            newBtns[idx].midiNote = parseInt(e.target.value);
-                            setSettings({...settings, broadcastButtons: newBtns});
-                          }} /></div>
+                          <div className="input-group">
+                            <label className="input-label">MIDI In Note (Leeg = uit)</label>
+                            <input 
+                              type="text" 
+                              className="input-field" 
+                              placeholder="Bijv: 60" 
+                              value={btn.midiNote !== undefined ? btn.midiNote : ""} 
+                              onChange={(e) => {
+                                const newBtns = [...settings.broadcastButtons];
+                                newBtns[idx].midiNote = e.target.value !== "" ? parseInt(e.target.value) : undefined;
+                                setSettings({...settings, broadcastButtons: newBtns});
+                              }} 
+                            />
+                          </div>
                         </div>
                       </div>
 

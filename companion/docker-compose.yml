@@ -1,0 +1,9 @@
+services:
+  companion:
+    image: "companion-v4-latest:latest"
+    container_name: companion
+    ports:
+      - "8000:8000"
+    volumes:
+      - /mnt/data/docker/companion:/root/companion-data
+    restart: always
