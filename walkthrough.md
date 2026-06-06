@@ -457,5 +457,34 @@ We hebben `import_project.py` aangepast zodat het dynamisch de configuratie van 
    - Als er een aangepast pad is (zoals `/Volumes/Projects/Beamer/FreeShow`), wordt dit pad gebruikt als `remote_docs_dir`. De `.show` files worden dan netjes geüpload naar `{dataPath}/Shows/` en de project-JSON naar `{dataPath}/Config/projects.json`.
    - Als er geen aangepast pad is ingesteld (of de download mislukt), valt het script terug op het standaard lokale pad `/Users/{user}/Documents/FreeShow`.
 
+---
+
+## 👥 16. Ark Church Operations Center (ACOC) & Rol-gebaseerd Toegangsbeheer (RBAC) (v16.0)
+
+We hebben de applicatie omgedoopt tot **"Ark Church Operations Center" (ACOC)** en een lokaal inlogsysteem geïntroduceerd met Role-Based Access Control (RBAC). Hierdoor hoeven operators niet langer in te loggen met het YouTube/Google account van de kerk om de controle- en regiepagina's te kunnen bedienen.
+
+### 1. Rolgrenzen & Toegangsrechten
+- **`admin` (Beheerder):** Heeft toegang tot alle onderdelen: Stream Planner, Control Center, Live Monitor, Lichtregie en de volledige instellingen (inclusief het tabblad Gebruikersbeheer).
+- **`operator` (Bediening):** Heeft uitsluitend toegang tot het Control Center, de Live Monitor en de Lichtregie. Het tabblad "Stream Planner" en de knop "Instellingen" zijn verborgen in de UI. Daarnaast weigert de backend API de verzoeken van een operator om instellingen op te slaan of gebruikers te beheren.
+
+### 2. Beveiliging van de API & Credentials
+- **PBKDF2 Hashing met Salt:** Wachtwoorden worden via Node.js native crypto met SHA-512 gehasht met een willekeurige salt van 16 bytes per gebruiker.
+- **AES-256-CBC Sessies:** De lokale inlogsessie wordt versleuteld met een token en opgeslagen in een HTTP-only cookie (`operator_session`), die niet via JavaScript te lezen is vanaf internet.
+- **API Hardening:** Alle controle-API's (`/api/settings`, `/api/broadcast/action`, `/api/qlc/action`, `/api/tuya/status`, `/api/midi/send`, `/api/services/status`) zijn beveiligd met een geautoriseerde check (`isAuthorized`). Als de client niet ingelogd is, retourneert de API status `401` (Niet geautoriseerd).
+- **Secrets Stripping:** Wanneer een operator instellingen opvraagt via `GET /api/settings`, stript de backend automatisch alle gevoelige tokens (zoals Google API secrets, OBS wachtwoord en Tuya local keys).
+
+### 3. Gebruikersbeheer UI & API
+- Admins kunnen via het tabblad **"Gebruikersbeheer"** in het instellingenmenu gebruikers toevoegen, rollen wijzigen, wachtwoorden updaten en accounts verwijderen.
+- Er zijn ingebouwde beveiligingen tegen zelfverwijdering en het verwijderen van de laatste admin om lock-outs te voorkomen.
+
+### 4. YouTube Koppeling in de Planner Tab
+- Het inlogscherm met YouTube (Google OAuth) blokkeert niet langer de gehele app. De app opent standaard in de Control Center tab.
+- Pas wanneer een admin de tab "Stream Planner" bezoekt en er nog geen geldige Google-koppeling is, wordt er in-tab een knop getoond om in te loggen met Google. De rest van het Operations Center blijft volledig bruikbaar en bereikbaar.
+
+### 5. Deployment & Verificatie
+- De nieuwe configuratie is via `deploy_tuya_multi.py` overgezet naar Proxmox LXC 112 en de Docker container is succesvol herbouwd en herstart.
+- Automatische database-migratie bij het opstarten zorgt ervoor dat de standaardaccounts (`admin` / `arkadmin` en `operator` / `arkoperator`) direct worden gegenereerd als er geen gebruikers in de database staan.
+
+
 
 
