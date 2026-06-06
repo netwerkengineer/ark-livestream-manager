@@ -32,6 +32,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
   const [loading, setLoading] = useState(true);
   const [plugsLoading, setPlugsLoading] = useState(true);
   const [time, setTime] = useState(new Date());
+  const [activeButtons, setActiveButtons] = useState<Record<string, boolean>>({});
 
   const fetchStatus = async () => {
     try {
@@ -61,6 +62,17 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
   useEffect(() => {
     fetchStatus();
     fetchPlugsStatus();
+    
+    // Load active buttons state
+    const saved = localStorage.getItem("acoc_active_buttons");
+    if (saved) {
+      try {
+        setActiveButtons(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse saved active buttons", e);
+      }
+    }
+
     const statusInterval = setInterval(fetchStatus, 5000);
     const plugsInterval = setInterval(fetchPlugsStatus, 10000); // Poll every 10s to avoid flooding plugs
     const clockInterval = setInterval(() => setTime(new Date()), 1000);
@@ -74,7 +86,7 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
 
 
 
-  const handleEmergencyAction = async (action: string, page: number, row: number, col: number) => {
+  const handleEmergencyAction = async (actionId: string, actionName: string, page: number, row: number, col: number) => {
     try {
       const response = await fetch('/api/broadcast/action', {
         method: 'POST',
@@ -84,13 +96,18 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
       
       const data = await response.json();
       if (data.success) {
-        console.log(`Successfully triggered ${action}`);
+        console.log(`Successfully triggered ${actionName}`);
+        setActiveButtons(prev => {
+          const updated = { ...prev, [actionId]: !prev[actionId] };
+          localStorage.setItem("acoc_active_buttons", JSON.stringify(updated));
+          return updated;
+        });
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
       console.error('Failed to trigger action:', error);
-      alert(`Fout bij het uitvoeren van ${action}. Is Companion gestart?`);
+      alert(`Fout bij het uitvoeren van ${actionName}. Is Companion gestart?`);
     }
   };
 
@@ -309,21 +326,24 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
 
       {/* Emergency Buttons Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        {actions.map((action: any) => (
-          <motion.button 
-            key={action.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => handleEmergencyAction(action.name, action.page, action.row, action.col)}
-            className={`emergency-btn ${action.color || 'default'}`}
-          >
-            <div style={{ flexShrink: 0 }}>{getIcon(action.icon)}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ display: 'block', fontWeight: '800', fontSize: '1rem', lineHeight: '1.2' }}>{action.name}</span>
-              <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{action.sub}</span>
-            </div>
-          </motion.button>
-        ))}
+        {actions.map((action: any) => {
+          const isActive = !!activeButtons[action.id];
+          return (
+            <motion.button 
+              key={action.id}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleEmergencyAction(action.id, action.name, action.page, action.row, action.col)}
+              className={`emergency-btn ${action.color || 'default'} ${isActive ? 'active' : ''}`}
+            >
+              <div style={{ flexShrink: 0 }}>{getIcon(action.icon)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ display: 'block', fontWeight: '800', fontSize: '1rem', lineHeight: '1.2' }}>{action.name}</span>
+                <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{action.sub}</span>
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
     </div>
   );
