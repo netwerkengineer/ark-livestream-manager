@@ -795,6 +795,25 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       <p className="text-[10px] text-muted">Dit pad wordt gebruikt om thumbnails van je beamer-presentaties te tonen.</p>
                     </div>
                   </div>
+
+                  {/* Tuya Smart Plug Configuration */}
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Sun size={18} color="var(--primary)" /> <strong>Slimme Stekker (Tuya)</strong></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <input className="input-field" placeholder="Stekker IP-adres" value={settings.tuyaDeviceIp || ""} onChange={(e) => setSettings({...settings, tuyaDeviceIp: e.target.value})} />
+                      <input className="input-field" placeholder="Device ID" value={settings.tuyaDeviceId || ""} onChange={(e) => setSettings({...settings, tuyaDeviceId: e.target.value})} />
+                      <input className="input-field" type="password" placeholder="Local Key" value={settings.tuyaLocalKey || ""} onChange={(e) => setSettings({...settings, tuyaLocalKey: e.target.value})} />
+                      <div className="input-group">
+                        <label className="input-label" style={{ fontSize: '0.75rem' }}>Protocol Versie</label>
+                        <select className="input-field" value={settings.tuyaVersion || 3.5} onChange={(e) => setSettings({...settings, tuyaVersion: parseFloat(e.target.value) || 3.5})}>
+                          <option value="3.1">3.1</option>
+                          <option value="3.3">3.3</option>
+                          <option value="3.4">3.4</option>
+                          <option value="3.5">3.5</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
               

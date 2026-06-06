@@ -52,6 +52,12 @@ export interface AppSettings {
 
   // QLC+ Configuration
   qlcEnabled: boolean;
+
+  // Tuya Smart Plug Configuration
+  tuyaDeviceId?: string;
+  tuyaDeviceIp?: string;
+  tuyaLocalKey?: string;
+  tuyaVersion?: number;
 }
 
 export interface BroadcastButton {
@@ -120,6 +126,12 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // QLC+ Defaults
   qlcEnabled: false,
+
+  // Tuya Smart Plug Defaults
+  tuyaDeviceId: "REDACTED_TUYA_DEVICE_ID_1",
+  tuyaDeviceIp: "192.168.40.60",
+  tuyaLocalKey: "REDACTED_TUYA_LOCAL_KEY_1",
+  tuyaVersion: 3.5,
 
   // Default Buttons
   broadcastButtons: [
