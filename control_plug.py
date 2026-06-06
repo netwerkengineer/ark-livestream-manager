@@ -43,7 +43,7 @@ def get_single_plug_status(plug_info):
     try:
         d = tinytuya.OutletDevice(device_id, ip, local_key)
         d.set_version(version)
-        d.set_socket_timeout(0.8)  # Fast timeout for responsive UI
+        d.set_socketTimeout(0.8)  # Fast timeout for responsive UI
         status = d.status()
         if status and "Error" not in status:
             result["is_online"] = True
