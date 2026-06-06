@@ -201,3 +201,51 @@ textarea.input-field {
   border-color: rgba(255, 255, 255, 0.1) !important;
   color: #ffffff !important;
 }
+
+/* Active states for Companion toggle/step buttons */
+.emergency-btn.active {
+  border-width: 2px !important;
+  transform: scale(1.01);
+}
+
+.emergency-btn.green.active {
+  background-color: rgba(22, 163, 74, 0.45) !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.6) !important;
+}
+
+.emergency-btn.red.active {
+  background-color: rgba(220, 38, 38, 0.45) !important;
+  border-color: #ef6868 !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6) !important;
+}
+
+.emergency-btn.amber.active {
+  background-color: rgba(217, 119, 6, 0.45) !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.6) !important;
+}
+
+.emergency-btn.slate.active {
+  background-color: rgba(75, 85, 99, 0.45) !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 0 15px rgba(156, 163, 175, 0.6) !important;
+}
+
+.emergency-btn.blue.active {
+  background-color: rgba(37, 99, 235, 0.45) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.6) !important;
+}
+
+.emergency-btn.purple.active {
+  background-color: rgba(147, 51, 234, 0.45) !important;
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.6) !important;
+}
+
+.emergency-btn.default.active {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.4) !important;
+}
