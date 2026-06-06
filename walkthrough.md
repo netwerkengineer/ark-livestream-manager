@@ -340,5 +340,45 @@ Om de PC's ook op afstand te kunnen bedienen vanaf Companion via LXC 112:
    schtasks /run /tn StartFreeShow
    ```
 
+---
+
+## 🔌 11. Multi-Plug Tuya & PC Aansturing (v11.0)
+
+We hebben de stroom- en opstart/afsluitflow uitgebreid naar **meerdere slimme stekkers**. Hiermee kunnen we de OBS PC, de FreeShow PC (en eventuele toekomstige stekkers zoals schermen of de ATEM switcher) volledig afzonderlijk of gezamenlijk schakelen.
+
+### 1. Dynamische Lijst-Editor in de UI
+In de instellingenpagina van de Live Manager UI is de statische Tuya-configuratiekaart vervangen door een dynamische **Slimme Stekkers (Tuya)** beheerkaart. De gebruiker kan hier:
+- Stekkers toevoegen, bewerken en verwijderen.
+- Per stekker een unieke ID (bijv. `obs_pc`, `freeshow_pc`), weergavenaam, IP-adres, Device ID, Local Key, protocolversie en een optioneel **Gekoppeld Host IP** opgeven.
+
+### 2. Gekoppelde Host IP-functionaliteit
+Door een IP-adres van een computer (Host IP) aan een stekker te koppelen, weet het systeem welke computer fysiek op die stekker is aangesloten. Dit maakt het volgende mogelijk:
+- **Veilig Afsluiten:** Bij het uitschakelen stuurt `shutdown_pcs.py` eerst een SSH-shutdown commando naar de gekoppelde host, wacht 15 seconden tot de computer uit staat, en verbreekt dan pas de stroom.
+- **Gericht Opstarten:** Bij het inschakelen zet `startup_pcs.py` de stekker aan, wacht tot de host via SSH bereikbaar is, en start dan pas de bijbehorende applicaties (zoals OBS of FreeShow).
+- **Zonder Host IP:** Als er geen Host IP gekoppeld is (bijv. voor een scherm of de netwerkswitch), schakelt de stekker direct in of uit zonder delay of SSH commando's.
+
+### 3. Efficiënt Parallel Afsluiten
+Als er meerdere stekkers tegelijk worden uitgeschakeld (bijv. via de `"all"` actie):
+1. Stuurt `shutdown_pcs.py` de SSH-afsluitcommando's naar **alle** gekoppelde computers tegelijk (in parallel).
+2. Wacht het script **eenmalig** 15 seconden (in plaats van 15 seconden per computer).
+3. Schakelt het alle stroomrelais direct na elkaar uit.
+
+### 4. HTTP API Endpoints met Query Parameters (Companion Integratie)
+De HTTP-server (`tuya_http_server.py`) op LXC 112 luistert op poort `8088` en accepteert nu een optionele query parameter `?plug=<plug_id>` om gerichte commando's uit te voeren:
+
+- **Individuele PC's opstarten/afsluiten:**
+  - `GET http://192.168.2.222:8088/on?plug=obs_pc` (Zet OBS PC aan, wacht op SSH, start OBS)
+  - `GET http://192.168.2.222:8088/shutdown?plug=obs_pc` (Sluit OBS PC via SSH af, wacht 15s, zet stroom uit)
+  - `GET http://192.168.2.222:8088/on?plug=freeshow_pc` (Zet FreeShow PC aan, wacht op SSH, importeer project, start FreeShow)
+  - `GET http://192.168.2.222:8088/shutdown?plug=freeshow_pc` (Sluit FreeShow PC via SSH af, wacht 15s, zet stroom uit)
+
+- **Alle stekkers tegelijk bedienen:**
+  - `GET http://192.168.2.222:8088/on?plug=all` (of `/on` zonder parameters) -> Start alle geconfigureerde computers op
+  - `GET http://192.168.2.222:8088/shutdown?plug=all` (of `/shutdown` zonder parameters) -> Sluit alle computers netjes af en haalt de stroom eraf
+
+- **Directe status opvragen:**
+  - `GET http://192.168.2.222:8088/status?plug=obs_pc` -> Vraagt de status op van een specifieke stekker
+
+
 
 
