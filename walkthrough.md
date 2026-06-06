@@ -286,6 +286,12 @@ Omdat Bitfocus Companion in een Docker-sandbox draait en geen directe toegang he
   * `GET http://192.168.2.222:8088/shutdown` -> Start de veilige afsluitsequentie in de achtergrond.
   * `GET http://192.168.2.222:8088/status` -> Geeft de huidige relais- en verbruiksstatus van de stekker terug.
 
+### 4. Dynamische Configuratie via de Live Manager UI
+We hebben de instellingen voor de slimme stekker volledig dynamisch gemaakt in plaats van hardgecodeerd:
+1. **Settings Store Integratie:** De keys `tuyaDeviceIp`, `tuyaDeviceId`, `tuyaLocalKey`, en `tuyaVersion` zijn toegevoegd aan `settings.json` en de typen in `settingsStore.ts`.
+2. **Settings UI:** Er is een nieuwe **Slimme Stekker (Tuya)** configuratiekaart toegevoegd aan het Hardware & Netwerk-gedeelte in de Live Manager UI (`page.tsx`). Hier kan de gebruiker het IP-adres, de Device ID, de Local Key en de protocolversie invoeren en opslaan.
+3. **Dynamic Script:** Het script `control_plug.py` leest nu dynamisch de waarden uit `settings.json` bij uitvoering. Hierdoor kun je eenvoudig wisselen van slimme stekkers (bijv. in de kerk of bij vervanging) zonder code aan te hoeven passen.
+
 ---
 
 ## 🎬 9. Automatisch Sunday Project Laden & OBS/FreeShow Opstarten (v10.0)
