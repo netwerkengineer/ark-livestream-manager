@@ -19,6 +19,30 @@ def get_settings():
                 print(f"Error reading settings from {c}: {e}")
     return {}
 
+def detect_os(user, host_ip):
+    # Returns "windows", "macos", or "linux"
+    try:
+        res = subprocess.run([
+            "ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", 
+            f"{user}@{host_ip}", "cmd.exe /c echo windows"
+        ], capture_output=True, text=True, timeout=3)
+        if "windows" in res.stdout.lower():
+            return "windows"
+    except Exception:
+        pass
+        
+    try:
+        res = subprocess.run([
+            "ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", 
+            f"{user}@{host_ip}", "uname"
+        ], capture_output=True, text=True, timeout=3)
+        if "darwin" in res.stdout.lower():
+            return "macos"
+    except Exception:
+        pass
+        
+    return "linux"
+
 def shutdown_single_plug_sequence(plug, settings):
     # This is a fallback/helper for a single plug sequence
     name = plug.get("name", plug.get("id"))
@@ -29,12 +53,23 @@ def shutdown_single_plug_sequence(plug, settings):
     print(f"=== Starting Shutdown for Plug: {name} (ID: {plug_id}) ===")
     
     if host_ip:
-        print(f"[{name}] Sending remote shutdown command to host ({host_ip})...")
+        print(f"[{name}] Detecting operating system for host ({host_ip})...")
+        os_type = detect_os(user, host_ip)
+        print(f"[{name}] Detected operating system: {os_type}")
+        
+        if os_type == "windows":
+            cmd = "shutdown /s /f /t 0"
+        elif os_type == "macos":
+            cmd = "pmset sleepnow"
+        else:
+            cmd = "sudo /sbin/shutdown -h now"
+            
+        print(f"[{name}] Sending remote shutdown command ({cmd}) to host ({host_ip})...")
         subprocess.run([
             "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
-            f"{user}@{host_ip}", "shutdown /s /f /t 0 || sudo /sbin/shutdown -h now"
+            f"{user}@{host_ip}", cmd
         ])
-        print(f"[{name}] Waiting 15 seconds for host to shut down...")
+        print(f"[{name}] Waiting 15 seconds for host to shut down/sleep...")
         time.sleep(15)
         
     print(f"[{name}] Turning off plug power...")
@@ -96,11 +131,22 @@ def main():
         name = plug.get("name", plug.get("id"))
         if host_ip:
             hosts_shutting_down = True
-            print(f"[{name}] Initiating SSH shutdown for host ({host_ip})...")
+            print(f"[{name}] Detecting operating system for host ({host_ip})...")
+            os_type = detect_os(user, host_ip)
+            print(f"[{name}] Detected operating system: {os_type}")
+            
+            if os_type == "windows":
+                cmd = "shutdown /s /f /t 0"
+            elif os_type == "macos":
+                cmd = "pmset sleepnow"
+            else:
+                cmd = "sudo /sbin/shutdown -h now"
+                
+            print(f"[{name}] Initiating SSH command ({cmd}) for host ({host_ip})...")
             # Run SSH in background
             p = subprocess.Popen([
                 "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
-                f"{user}@{host_ip}", "shutdown /s /f /t 0 || sudo /sbin/shutdown -h now"
+                f"{user}@{host_ip}", cmd
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             running_ssh_processes.append(p)
             
