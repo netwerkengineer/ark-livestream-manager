@@ -1,12 +1,73 @@
 #!/usr/bin/env python3
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import os
+import sys
+import threading
+import time
+import datetime
+import json
 from urllib.parse import urlparse, parse_qs
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+def scheduler_worker():
+    print("[SCHEDULER] Background scheduler thread started.")
+    last_runs = {}  # schedule_id -> "YYYY-MM-DD HH:MM"
+    
+    candidates = [
+        "/mnt/data/docker/ark-livestream-manager/data/settings.json",
+        "/app/data/settings.json"
+    ]
+    
+    while True:
+        try:
+            settings_path = None
+            for c in candidates:
+                if os.path.exists(c):
+                    settings_path = c
+                    break
+            
+            if settings_path:
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                
+                schedules = settings.get("schedules", [])
+                now = datetime.datetime.now()
+                current_time_str = now.strftime("%H:%M")
+                current_minute_str = now.strftime("%Y-%m-%d %H:%M")
+                
+                # Python weekday: 0 = Monday, ..., 6 = Sunday
+                # UI weekday: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                ui_day = (now.weekday() + 1) % 7
+                
+                for sched in schedules:
+                    if not sched.get("enabled", True):
+                        continue
+                    
+                    sched_id = sched.get("id")
+                    sched_time = sched.get("time")
+                    sched_days = sched.get("days", [])
+                    sched_action = sched.get("action")
+                    sched_plug = sched.get("plug", "all")
+                    
+                    if sched_time == current_time_str and ui_day in sched_days:
+                        # Check if already run in this minute to prevent duplicate runs
+                        if last_runs.get(sched_id) != current_minute_str:
+                            last_runs[sched_id] = current_minute_str
+                            print(f"[SCHEDULER] Triggering schedule '{sched.get('name')}' (ID: {sched_id}, Action: {sched_action}, Plug: {sched_plug})")
+                            
+                            # Run target script in background
+                            if sched_action == "on":
+                                subprocess.Popen(["python3", "/app/startup_pcs.py", sched_plug])
+                            elif sched_action == "shutdown":
+                                subprocess.Popen(["python3", "/app/shutdown_pcs.py", sched_plug])
+                            elif sched_action == "off":
+                                subprocess.Popen(["python3", "/app/control_plug.py", "off", sched_plug])
+        except Exception as e:
+            print(f"[SCHEDULER] Error in scheduler loop: {e}", file=sys.stderr)
+        time.sleep(15)
 
 class TuyaHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        # Override to log requests to standard output
         print(f"[HTTP] {self.address_string()} - {format%args}")
 
     def do_GET(self):
@@ -49,12 +110,24 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(res.stdout.encode())
             
+        elif path == '/status_json':
+            res = subprocess.run(["python3", "/app/control_plug.py", "status_json", plug_id], capture_output=True, text=True)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(res.stdout.encode())
+            
         else:
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"Not Found")
 
 def run():
+    # Start background scheduler thread
+    sched_thread = threading.Thread(target=scheduler_worker, daemon=True)
+    sched_thread.start()
+
     server_address = ('0.0.0.0', 8088)
     httpd = HTTPServer(server_address, TuyaHandler)
     print("Starting Tuya Control HTTP Server on port 8088...")

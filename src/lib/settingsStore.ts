@@ -59,6 +59,7 @@ export interface AppSettings {
   tuyaLocalKey?: string;
   tuyaVersion?: number;
   tuyaPlugs?: TuyaPlug[];
+  schedules?: TuyaSchedule[];
 }
 
 export interface TuyaPlug {
@@ -70,6 +71,17 @@ export interface TuyaPlug {
   version: number;
   hostIp?: string;
 }
+
+export interface TuyaSchedule {
+  id: string;
+  name: string;
+  time: string; // "HH:MM"
+  days: number[]; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  action: "on" | "shutdown" | "off";
+  plug: string; // "all" or specific plug ID
+  enabled: boolean;
+}
+
 
 export interface BroadcastButton {
   id: string;
@@ -154,6 +166,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       hostIp: "192.168.2.20"
     }
   ],
+  schedules: [],
 
   // Default Buttons
   broadcastButtons: [

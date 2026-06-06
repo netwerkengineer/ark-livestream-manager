@@ -28,7 +28,9 @@ interface BroadcastControlCenterProps {
 export default function BroadcastControlCenter({ settings }: BroadcastControlCenterProps) {
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const [midiPeers, setMidiPeers] = useState<string[]>([]);
+  const [plugs, setPlugs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [plugsLoading, setPlugsLoading] = useState(true);
   const [time, setTime] = useState(new Date());
 
   const fetchStatus = async () => {
@@ -44,15 +46,31 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
     }
   };
 
+  const fetchPlugsStatus = async () => {
+    try {
+      const res = await fetch('/api/tuya/status');
+      const data = await res.json();
+      setPlugs(data.plugs || []);
+    } catch (err) {
+      console.error("Failed to fetch Tuya status", err);
+    } finally {
+      setPlugsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
+    fetchPlugsStatus();
     const statusInterval = setInterval(fetchStatus, 5000);
+    const plugsInterval = setInterval(fetchPlugsStatus, 10000); // Poll every 10s to avoid flooding plugs
     const clockInterval = setInterval(() => setTime(new Date()), 1000);
     return () => {
       clearInterval(statusInterval);
+      clearInterval(plugsInterval);
       clearInterval(clockInterval);
     };
   }, []);
+
 
 
 
@@ -187,6 +205,107 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
           </div>
         </section>
       </div>
+
+      {/* Tuya Smart Plugs & Power Monitoring */}
+      {((settings?.tuyaPlugs && settings.tuyaPlugs.length > 0) || settings?.tuyaDeviceId) && (
+        <section className="glass-card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ fontWeight: '600', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={18} style={{ color: '#facc15' }} /> Slimme Stekkers & Stroomverbruik
+            </h3>
+            <button 
+              type="button"
+              onClick={fetchPlugsStatus} 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="hover:rotate-180 transition-transform duration-500"
+            >
+              <RefreshCw size={16} style={{ color: 'var(--muted)' }} />
+            </button>
+          </div>
+          
+          {plugsLoading && plugs.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: '16px 0', color: 'var(--muted)', fontSize: '0.85rem' }}>Status laden...</p>
+          ) : plugs.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: '16px 0', color: 'var(--muted)', fontSize: '0.85rem' }}>Geen slimme stekkers gedetecteerd of verbinding mislukt.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+              {plugs.map((plug) => (
+                <div 
+                  key={plug.id} 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '12px', 
+                    padding: '16px', 
+                    borderRadius: '12px', 
+                    backgroundColor: 'rgba(255,255,255,0.02)', 
+                    border: '1px solid rgba(255,255,255,0.05)' 
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{plug.name}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'monospace' }}>{plug.id}</span>
+                    </div>
+                    <div 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        backgroundColor: 'rgba(0,0,0,0.3)', 
+                        padding: '4px 10px', 
+                        borderRadius: '20px', 
+                        border: '1px solid rgba(255,255,255,0.05)' 
+                      }}
+                    >
+                      <span 
+                        style={{ 
+                          height: '6px', 
+                          width: '6px', 
+                          borderRadius: '50%', 
+                          backgroundColor: !plug.is_online ? '#ef4444' : plug.state === 'on' ? '#4ade80' : '#f59e0b',
+                          boxShadow: !plug.is_online ? '0 0 6px #ef4444' : plug.state === 'on' ? '0 0 6px #4ade80' : '0 0 6px #f59e0b'
+                        }} 
+                      />
+                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {!plug.is_online ? 'OFFLINE' : plug.state === 'on' ? 'AAN' : 'UIT'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {plug.is_online && (
+                    <div 
+                      style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gap: '8px', 
+                        backgroundColor: 'rgba(0,0,0,0.2)', 
+                        padding: '8px', 
+                        borderRadius: '8px', 
+                        border: '1px solid rgba(255,255,255,0.03)',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Spanning</div>
+                        <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#60a5fa' }}>{plug.voltage_v} V</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Stroom</div>
+                        <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#c084fc' }}>{plug.current_a} A</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Vermogen</div>
+                        <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#facc15' }}>{plug.power_w} W</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Emergency Buttons Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
