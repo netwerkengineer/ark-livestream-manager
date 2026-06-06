@@ -471,7 +471,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
               required
               value={operatorUsernameInput}
               onChange={(e) => setOperatorUsernameInput(e.target.value)}
-              placeholder="admin of operator"
+              placeholder="Gebruikersnaam"
             />
           </div>
 
