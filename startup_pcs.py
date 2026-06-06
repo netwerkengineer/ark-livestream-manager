@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import time
+import sys
 
 def get_settings():
     candidates = [
@@ -18,16 +19,6 @@ def get_settings():
                 print(f"Error reading settings: {e}")
     return {}
 
-def is_home_environment():
-    try:
-        # Check if the smart plug is online
-        res = subprocess.run(["python3", "/app/control_plug.py", "status"], capture_output=True, text=True, timeout=5)
-        if res.returncode == 0 and "Error" not in res.stdout:
-            return True
-    except Exception:
-        pass
-    return False
-
 def wait_for_ssh(user, host, max_attempts=60):
     print(f"Waiting for remote host {host} to become available via SSH...")
     for i in range(1, max_attempts + 1):
@@ -42,84 +33,125 @@ def wait_for_ssh(user, host, max_attempts=60):
         time.sleep(2)
     return False
 
-def startup_pcs():
-    settings = get_settings()
-    home = is_home_environment()
+def startup_single_plug(plug, settings):
+    name = plug.get("name", plug.get("id"))
+    plug_id = plug.get("id")
+    host_ip = plug.get("hostIp")
     user = settings.get("sshUser", "jeffreygo")
     
-    if home:
-        print("=== Home Environment Detected ===")
-        # 1. Turn on plug
-        print("Enabling smart plug power...")
-        subprocess.run(["python3", "/app/control_plug.py", "on"])
-        
-        # 2. Wait for Mac Mini
-        mac_host = "192.168.2.20"
-        if wait_for_ssh(user, mac_host):
-            print("Waiting 5s for macOS system resources to stabilize...")
+    print(f"=== Starting Plug: {name} (ID: {plug_id}) ===")
+    
+    # 1. Turn on plug
+    print(f"[{name}] Turning ON via control_plug.py...")
+    subprocess.run(["python3", "/app/control_plug.py", "on", plug_id])
+    
+    # 2. If host IP is associated, wait for SSH and launch apps
+    if host_ip:
+        print(f"[{name}] Associated host IP found: {host_ip}")
+        if wait_for_ssh(user, host_ip):
+            print(f"[{name}] Waiting 5s for system resources to stabilize...")
             time.sleep(5)
             
-            # 3. Import project
-            print("Importing project...")
-            subprocess.run(["python3", "/app/import_project.py"])
+            obs_host = settings.get("obsHost")
+            freeshow_host = settings.get("freeShowHost")
             
-            # 4. Start apps
-            print("Launching OBS and FreeShow on Mac Mini...")
-            subprocess.run(["ssh", f"{user}@{mac_host}", "open -a OBS && open -a FreeShow"])
-            print("✅ Success: Home startup sequence completed.")
-        else:
-            print("❌ Error: Mac Mini did not become online.")
-    else:
-        print("=== Church Environment Detected (No Smart Plugs) ===")
-        obs_host = settings.get("obsHost")
-        freeshow_host = settings.get("freeShowHost")
-        
-        print(f"OBS Host: {obs_host}")
-        print(f"FreeShow Host: {freeshow_host}")
-        
-        # 1. Handle FreeShow PC Project Import & App Launch
-        if freeshow_host and freeshow_host not in ["localhost", "127.0.0.1"]:
-            # Check if FreeShow PC is online (wait up to 10 seconds just in case it was booted manually recently)
-            if wait_for_ssh(user, freeshow_host, max_attempts=5):
-                print("Importing Sunday project to FreeShow PC...")
+            # Detect remote OS
+            res = subprocess.run(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", "cmd.exe /c echo windows"], capture_output=True, text=True)
+            is_win = "windows" in res.stdout.lower()
+            
+            # Case A: FreeShow Host (or home environment fallback)
+            if host_ip == freeshow_host or host_ip == "192.168.2.20":
+                print(f"[{name}] FreeShow host detected. Importing Sunday project...")
                 subprocess.run(["python3", "/app/import_project.py"])
                 
-                # Check if Windows or Mac to trigger start
-                res = subprocess.run(["ssh", f"{user}@{freeshow_host}", "cmd.exe /c echo windows"], capture_output=True, text=True)
-                is_win = "windows" in res.stdout.lower()
-                
                 if is_win:
-                    print("Launching FreeShow on Windows via StartFreeShow Scheduled Task...")
-                    subprocess.run(["ssh", f"{user}@{freeshow_host}", "schtasks /run /tn StartFreeShow || powershell -Command \"Start-Process FreeShow\""])
+                    print(f"[{name}] Launching FreeShow on Windows via schtasks...")
+                    subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartFreeShow || powershell -Command \"Start-Process FreeShow\""])
                 else:
-                    print("Launching FreeShow on Mac...")
-                    subprocess.run(["ssh", f"{user}@{freeshow_host}", "open -a FreeShow"])
-                    
+                    print(f"[{name}] Launching FreeShow on Mac...")
+                    subprocess.run(["ssh", f"{user}@{host_ip}", "open -a FreeShow"])
+                
                 # If OBS is on the same machine, launch it too
-                if obs_host == freeshow_host:
+                if obs_host == host_ip or host_ip == "192.168.2.20":
                     if is_win:
-                        print("Launching OBS on Windows via StartOBS Scheduled Task...")
-                        subprocess.run(["ssh", f"{user}@{obs_host}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
+                        print(f"[{name}] Launching OBS on Windows via schtasks...")
+                        subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
                     else:
-                        print("Launching OBS on Mac...")
-                        subprocess.run(["ssh", f"{user}@{obs_host}", "open -a OBS"])
-            else:
-                print(f"⚠️ Warning: FreeShow PC ({freeshow_host}) is offline. Skipping import.")
-                
-        # 2. Handle OBS PC (only if it is a separate host)
-        if obs_host and obs_host not in ["localhost", "127.0.0.1"] and obs_host != freeshow_host:
-            if wait_for_ssh(user, obs_host, max_attempts=5):
-                res = subprocess.run(["ssh", f"{user}@{obs_host}", "cmd.exe /c echo windows"], capture_output=True, text=True)
-                if "windows" in res.stdout.lower():
-                    print("Launching OBS on Windows via StartOBS Scheduled Task...")
-                    subprocess.run(["ssh", f"{user}@{obs_host}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
+                        print(f"[{name}] Launching OBS on Mac...")
+                        subprocess.run(["ssh", f"{user}@{host_ip}", "open -a OBS"])
+            
+            # Case B: OBS Host only
+            elif host_ip == obs_host:
+                if is_win:
+                    print(f"[{name}] Launching OBS on Windows via schtasks...")
+                    subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
                 else:
-                    print("Launching OBS on Mac...")
-                    subprocess.run(["ssh", f"{user}@{obs_host}", "open -a OBS"])
+                    print(f"[{name}] Launching OBS on Mac...")
+                    subprocess.run(["ssh", f"{user}@{host_ip}", "open -a OBS"])
+            
             else:
-                print(f"⚠️ Warning: OBS PC ({obs_host}) is offline. Skipping launch.")
+                # Custom host - just log and try standard apps if applicable
+                print(f"[{name}] Host {host_ip} is online. No specific FreeShow/OBS role mapped, skipping app launch.")
                 
-        print("✅ Success: Church startup sequence completed.")
+            print(f"✅ [{name}] Startup sequence completed successfully.")
+        else:
+            print(f"❌ [{name}] Error: Host {host_ip} did not become online via SSH.")
+            return False
+    else:
+        print(f"✅ [{name}] Plug turned ON (no host IP mapped).")
+    
+    return True
+
+def main():
+    settings = get_settings()
+    plugs = settings.get("tuyaPlugs", [])
+    user = settings.get("sshUser", "jeffreygo")
+    
+    plug_id = sys.argv[1].lower() if len(sys.argv) > 1 else "all"
+    
+    if not plugs:
+        # Fall back to legacy singular plug setup (Home environment)
+        print("Warning: No plugs in tuyaPlugs list. Falling back to legacy settings...")
+        device_id = settings.get("tuyaDeviceId")
+        device_ip = settings.get("tuyaDeviceIp")
+        local_key = settings.get("tuyaLocalKey")
+        
+        if not device_id or not device_ip or not local_key:
+            print("Error: No legacy plug configuration found.")
+            sys.exit(1)
+            
+        legacy_plug = {
+            "id": "legacy",
+            "name": "Legacy Home Plug",
+            "ip": device_ip,
+            "deviceId": device_id,
+            "localKey": local_key,
+            "version": settings.get("tuyaVersion", 3.5),
+            "hostIp": "192.168.2.20" # Home Mac Mini
+        }
+        success = startup_single_plug(legacy_plug, settings)
+        sys.exit(0 if success else 1)
+        
+    if plug_id == "all":
+        print(f"=== Starting all {len(plugs)} plugs ===")
+        overall_success = True
+        for plug in plugs:
+            success = startup_single_plug(plug, settings)
+            if not success:
+                overall_success = False
+        sys.exit(0 if overall_success else 1)
+        
+    # Find specific plug
+    target_plug = next((p for p in plugs if p.get("id", "").lower() == plug_id), None)
+    if not target_plug:
+        target_plug = next((p for p in plugs if p.get("name", "").lower() == plug_id), None)
+        
+    if not target_plug:
+        print(f"Error: Plug '{plug_id}' not found in settings.")
+        sys.exit(1)
+        
+    success = startup_single_plug(target_plug, settings)
+    sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
-    startup_pcs()
+    main()
