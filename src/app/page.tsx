@@ -43,6 +43,7 @@ import LightsControl from "@/components/LightsControl";
 
 export default function Dashboard() {
   const { data: session } = useSession();
+  const isConnectedYoutube = !!(session as any)?.youtubeToken;
   const [title, setTitle] = useState("[Spreker] | [Onderwerp] | Ark Church | [Datum]");
   const [description, setDescription] = useState(`Livestream van de Zondagsdienst van Ark Church.
 
@@ -75,17 +76,35 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [tags, setTags] = useState("");
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights">("planner");
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights">("control");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users">("general");
   const [showHelp, setShowHelp] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [scheduledStreams, setScheduledStreams] = useState<any[]>([]);
   const [loadingStreams, setLoadingStreams] = useState(false);
-
   const [errorStreams, setErrorStreams] = useState<string | null>(null);
+
+  // Local Auth States
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isOperatorAuthenticated, setIsOperatorAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<"admin" | "operator" | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [operatorUsernameInput, setOperatorUsernameInput] = useState("");
+  const [operatorPasswordInput, setOperatorPasswordInput] = useState("");
+  const [authError, setAuthError] = useState("");
+
+  // User Management States
+  const [localUsers, setLocalUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<"admin" | "operator">("operator");
+  const [editingUsername, setEditingUsername] = useState<string | null>(null);
+  const [userManagementError, setUserManagementError] = useState("");
+  const [userManagementSuccess, setUserManagementSuccess] = useState("");
 
   const fetchScheduledStreams = async () => {
     setLoadingStreams(true);
@@ -107,20 +126,72 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     setLoadingStreams(false);
   };
 
-  useEffect(() => {
-    // Always fetch settings to check isSetupComplete
-    fetch("/api/settings")
-      .then(res => res.json())
-      .then(data => {
-        if (!data.error) {
-          setSettings(data);
-          setTitle(data.defaultTitle);
-          setDescription(data.defaultDescription);
-          setPrivacyStatus(data.defaultPrivacy);
-        }
-      });
+  const fetchLocalUsers = async () => {
+    setLoadingUsers(true);
+    setUserManagementError("");
+    try {
+      const res = await fetch("/api/users");
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Kon gebruikers niet laden");
+      }
+      const data = await res.json();
+      setLocalUsers(data.users || []);
+    } catch (err: any) {
+      setUserManagementError(err.message);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
-    if (session) {
+  useEffect(() => {
+    const checkAuthAndLoad = async () => {
+      setIsCheckingAuth(true);
+      try {
+        const res = await fetch("/api/settings");
+        if (res.status === 401) {
+          setIsOperatorAuthenticated(false);
+          setIsCheckingAuth(false);
+          return;
+        }
+        
+        const data = await res.json();
+        if (data.error) {
+          setIsOperatorAuthenticated(false);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        setSettings(data);
+        if (!data.isSetupComplete) {
+          setIsOperatorAuthenticated(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        setIsOperatorAuthenticated(true);
+        setUserRole(data.userRole || "operator");
+        setCurrentUser(data.currentUser || "Operator");
+        
+        setTitle(data.defaultTitle || "");
+        setDescription(data.defaultDescription || "");
+        setPrivacyStatus(data.defaultPrivacy || "public");
+        
+        if (data.userRole === "operator") {
+          setActiveTab("control");
+        }
+      } catch (err) {
+        console.error("Error fetching settings/auth status:", err);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    
+    checkAuthAndLoad();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "planner" && isConnectedYoutube) {
       fetchScheduledStreams();
 
       fetch("/api/youtube/categories")
@@ -138,7 +209,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           if (data.playlists) setPlaylists(data.playlists);
         });
     }
-  }, [session, settings?.defaultCategoryId]);
+  }, [activeTab, isConnectedYoutube, settings?.defaultCategoryId]);
 
   useEffect(() => {
     if (settings) {
@@ -147,7 +218,111 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     }
   }, [settings]);
 
-  const isConnectedYoutube = !!(session as any)?.youtubeToken;
+  useEffect(() => {
+    if (settingsTab === "users" && userRole === "admin" && showSettings) {
+      fetchLocalUsers();
+    }
+  }, [settingsTab, userRole, showSettings]);
+
+  const handleOperatorLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    try {
+      const res = await fetch("/api/auth/operator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: operatorUsernameInput,
+          password: operatorPasswordInput
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || "Aanmelden mislukt");
+        return;
+      }
+      window.location.reload();
+    } catch (err: any) {
+      setAuthError("Netwerkfout tijdens het inloggen");
+    }
+  };
+
+  const handleOperatorLogout = async () => {
+    try {
+      await fetch("/api/auth/operator", { method: "DELETE" });
+      window.location.reload();
+    } catch (err) {
+      console.error("Error logging out:", err);
+    }
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserManagementError("");
+    setUserManagementSuccess("");
+    if (!newUsername) {
+      setUserManagementError("Gebruikersnaam is verplicht");
+      return;
+    }
+    if (!editingUsername && !newPassword) {
+      setUserManagementError("Wachtwoord is verplicht voor nieuwe gebruikers");
+      return;
+    }
+    
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: newUsername,
+          password: newPassword || undefined,
+          role: newRole
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUserManagementError(data.error || "Fout bij opslaan gebruiker");
+        return;
+      }
+      
+      setUserManagementSuccess(editingUsername ? "Gebruiker succesvol bijgewerkt" : "Gebruiker succesvol aangemaakt");
+      setNewUsername("");
+      setNewPassword("");
+      setNewRole("operator");
+      setEditingUsername(null);
+      fetchLocalUsers();
+    } catch (err: any) {
+      setUserManagementError("Netwerkfout bij opslaan gebruiker");
+    }
+  };
+
+  const handleDeleteUser = async (usernameToDelete: string) => {
+    if (usernameToDelete.toLowerCase() === currentUser?.toLowerCase()) {
+      alert("Je kunt je eigen account niet verwijderen.");
+      return;
+    }
+    if (!confirm(`Weet je zeker dat je gebruiker '${usernameToDelete}' wilt verwijderen?`)) {
+      return;
+    }
+    
+    setUserManagementError("");
+    setUserManagementSuccess("");
+    try {
+      const res = await fetch(`/api/users?username=${encodeURIComponent(usernameToDelete)}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUserManagementError(data.error || "Fout bij verwijderen gebruiker");
+        return;
+      }
+      
+      setUserManagementSuccess("Gebruiker succesvol verwijderd");
+      fetchLocalUsers();
+    } catch (err) {
+      setUserManagementError("Netwerkfout bij verwijderen gebruiker");
+    }
+  };
 
   const handleSchedule = async () => {
     if (!title || !description || !scheduleDate || !scheduleTime) {
@@ -265,31 +440,70 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     );
   }
 
-  // 2. Show login screen if not connected (Only YouTube is strictly required!)
-  if (!isConnectedYoutube) {
+  // 2. Show authentication checking loader
+  if (isCheckingAuth) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
-        <div className="logo-container">
-          <img src="/logo.png" alt="Ark Church Logo" />
-          <h1 className="gradient-text">Livestream Manager</h1>
-        </div>
-        <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', width: '450px' }}>
-          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Verbind je YouTube account om streams in te plannen</p>
-          
-          <button 
-            className="btn-primary" 
-            style={{ width: '100%' }} 
-            onClick={() => signIn("google")}
-          >
-            <MonitorPlay size={20} />
-            Verbind YouTube
-          </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div className="glass-card" style={{ padding: '40px', textAlign: 'center' }}>
+          <RefreshCcw size={48} className="spin" color="var(--primary)" style={{ margin: '0 auto 20px' }} />
+          <p style={{ color: 'var(--muted)' }}>Controleeren van autorisatie...</p>
         </div>
       </div>
     );
   }
 
-  // Selected page lookup removed
+  // 3. Show local operator login screen if not authenticated
+  if (!isOperatorAuthenticated) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
+        <div className="logo-container">
+          <img src="/logo.png" alt="Ark Church Logo" />
+          <h1 className="gradient-text">Ark Church Operations Center</h1>
+        </div>
+        <form onSubmit={handleOperatorLogin} className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', width: '450px' }}>
+          <h2 style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '10px' }}>Aanmelden</h2>
+          
+          <div className="input-group">
+            <label className="input-label">Gebruikersnaam</label>
+            <input 
+              type="text"
+              className="input-field" 
+              required
+              value={operatorUsernameInput}
+              onChange={(e) => setOperatorUsernameInput(e.target.value)}
+              placeholder="admin of operator"
+            />
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Wachtwoord</label>
+            <input 
+              type="password"
+              className="input-field" 
+              required
+              value={operatorPasswordInput}
+              onChange={(e) => setOperatorPasswordInput(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+          {authError && (
+            <p style={{ color: '#f87171', fontSize: '0.85rem', textAlign: 'center' }}>
+              {authError}
+            </p>
+          )}
+
+          <button 
+            type="submit"
+            className="btn-primary" 
+            style={{ width: '100%', marginTop: '10px' }}
+          >
+            Aanmelden
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
@@ -298,22 +512,26 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           <img src="/logo.png" alt="Ark Church Logo" />
           <div>
             <h1 style={{ fontSize: '1.5rem', lineHeight: '1' }}>Ark Church</h1>
-            <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Livestream Manager</p>
+            <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Operations Center</p>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button onClick={() => setShowHelp(true)} className="btn-outline" style={{ padding: '10px' }} title="Help">
             <HelpCircle size={20} />
           </button>
-          <button onClick={() => setShowSettings(true)} className="btn-outline" style={{ padding: '10px' }} title="Instellingen">
-            <Settings size={20} />
-          </button>
+          {userRole === "admin" && (
+            <button onClick={() => setShowSettings(true)} className="btn-outline" style={{ padding: '10px' }} title="Instellingen">
+              <Settings size={20} />
+            </button>
+          )}
           <div style={{ borderLeft: '1px solid var(--card-border)', height: '24px', margin: '0 8px' }}></div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600 }}>OPERATOR</p>
-            <p style={{ fontSize: '0.9rem' }}>{session?.user?.name}</p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600 }}>
+              {userRole === "admin" ? "ADMINISTRATOR" : "OPERATOR"}
+            </p>
+            <p style={{ fontSize: '0.9rem' }}>{currentUser}</p>
           </div>
-          <button onClick={() => signOut()} className="btn-outline" style={{ padding: '10px' }} title="Uitloggen">
+          <button onClick={handleOperatorLogout} className="btn-outline" style={{ padding: '10px' }} title="Afmelden Operator">
             <User size={20} />
           </button>
         </div>
@@ -321,12 +539,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
+        {userRole === "admin" && (
+          <button 
+            onClick={() => setActiveTab("planner")} 
+            className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
+            style={{ padding: '8px 20px', borderRadius: '12px' }}
+          >
+            <Calendar size={18} /> Stream Planner
+          </button>
+        )}
         <button 
-          onClick={() => setActiveTab("planner")} 
-          className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px' }}
+          onClick={() => setActiveTab("control")} 
+          className={activeTab === "control" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
         >
-          <LayoutDashboard size={18} /> Dashboard
+          <ShieldAlert size={18} /> Control Center
         </button>
         <button 
           onClick={() => setActiveTab("monitor")} 
@@ -334,13 +561,6 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           style={{ padding: '8px 20px', borderRadius: '12px' }}
         >
           <Activity size={18} /> Live Monitor
-        </button>
-        <button 
-          onClick={() => setActiveTab("control")} 
-          className={activeTab === "control" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
-        >
-          <ShieldAlert size={18} /> Control Center
         </button>
         <button 
           onClick={() => setActiveTab("lights")} 
@@ -353,13 +573,38 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
       <AnimatePresence mode="wait">
         {activeTab === "planner" ? (
-          <motion.div 
-            key="planner"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}
-          >
+          !isConnectedYoutube ? (
+            <motion.div 
+              key="youtube-connect-prompt"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="glass-card" 
+              style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center', maxWidth: '500px', margin: '40px auto' }}
+            >
+              <MonitorPlay size={48} color="var(--primary)" />
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Koppel YouTube Account</h2>
+              <p style={{ color: 'var(--muted)', textAlign: 'center', fontSize: '0.95rem' }}>
+                Om livestreams in te plannen en te beheren, moet deze app gekoppeld zijn met het Google/YouTube account van de kerk.
+              </p>
+              
+              <button 
+                className="btn-primary" 
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }} 
+                onClick={() => signIn("google")}
+              >
+                <MonitorPlay size={20} />
+                Inloggen met Google
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="planner"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}
+            >
             {/* Left Column */}
             <motion.section 
               initial={{ opacity: 0, y: 20 }}
@@ -635,8 +880,9 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
             </div>
             </motion.section>
           </div>
-        </motion.div>
-      ) : activeTab === "monitor" ? (
+            </motion.div>
+          )
+        ) : activeTab === "monitor" ? (
         <motion.div
           key="monitor"
           initial={{ opacity: 0, x: 20 }}
@@ -822,6 +1068,30 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                     <Sliders size={18} />
                     <span>Dashboard Knoppen</span>
                   </button>
+
+                  {userRole === "admin" && (
+                    <button 
+                      type="button"
+                      onClick={() => setSettingsTab("users")}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: settingsTab === "users" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                        color: settingsTab === "users" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                        fontWeight: settingsTab === "users" ? 600 : 500,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <User size={18} />
+                      <span>Gebruikersbeheer</span>
+                    </button>
+                  )}
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1529,6 +1799,149 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       </div>
                     </section>
                   )}
+
+                  {settingsTab === "users" && userRole === "admin" && (
+                    <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>👥 Gebruikersbeheer (RBAC)</h3>
+                      
+                      {/* Form to create/edit user */}
+                      <form onSubmit={handleSaveUser} className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 600 }}>{editingUsername ? `Gebruiker bewerken: ${editingUsername}` : "Nieuwe Gebruiker Toevoegen"}</h4>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                          <div className="input-group">
+                            <label className="input-label">Gebruikersnaam</label>
+                            <input 
+                              type="text" 
+                              className="input-field" 
+                              value={newUsername} 
+                              disabled={!!editingUsername}
+                              onChange={e => setNewUsername(e.target.value)} 
+                              placeholder="bijv. karel123" 
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="input-label">Wachtwoord {editingUsername && "(Leeglaten om niet te wijzigen)"}</label>
+                            <input 
+                              type="password" 
+                              className="input-field" 
+                              value={newPassword} 
+                              onChange={e => setNewPassword(e.target.value)} 
+                              placeholder={editingUsername ? "••••••••" : "Minimaal 6 tekens"} 
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="input-label">Rol</label>
+                            <select 
+                              className="input-field" 
+                              value={newRole} 
+                              onChange={e => setNewRole(e.target.value as "admin" | "operator")}
+                            >
+                              <option value="operator">Operator (Alleen bediening)</option>
+                              <option value="admin">Administrator (Volledige toegang)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {userManagementError && <p style={{ color: '#f87171', fontSize: '0.85rem' }}>{userManagementError}</p>}
+                        {userManagementSuccess && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>{userManagementSuccess}</p>}
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                          <button type="submit" className="btn-primary" style={{ padding: '8px 20px', fontSize: '0.9rem' }}>
+                            {editingUsername ? "Bijwerken" : "Gebruiker Toevoegen"}
+                          </button>
+                          {editingUsername && (
+                            <button 
+                              type="button" 
+                              className="btn-outline" 
+                              style={{ padding: '8px 20px', fontSize: '0.9rem' }}
+                              onClick={() => {
+                                setEditingUsername(null);
+                                setNewUsername("");
+                                setNewPassword("");
+                                setNewRole("operator");
+                              }}
+                            >
+                              Annuleren
+                            </button>
+                          )}
+                        </div>
+                      </form>
+
+                      {/* List of existing users */}
+                      <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>Bestaande Gebruikers</h4>
+                        
+                        {loadingUsers ? (
+                          <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Gebruikers laden...</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {localUsers.map((u: any) => (
+                              <div 
+                                key={u.username} 
+                                style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  padding: '12px 16px', 
+                                  background: 'rgba(255,255,255,0.01)', 
+                                  border: '1px solid rgba(255,255,255,0.05)',
+                                  borderRadius: '8px' 
+                                }}
+                              >
+                                <div>
+                                  <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{u.username}</span>
+                                  <span style={{ 
+                                    marginLeft: '12px', 
+                                    padding: '2px 8px', 
+                                    borderRadius: '12px', 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 600,
+                                    background: u.role === "admin" ? 'rgba(248, 113, 113, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                    color: u.role === "admin" ? 'var(--primary)' : '#60a5fa'
+                                  }}>
+                                    {u.role === "admin" ? "Admin" : "Operator"}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button 
+                                    type="button" 
+                                    className="btn-outline" 
+                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                    onClick={() => {
+                                      setEditingUsername(u.username);
+                                      setNewUsername(u.username);
+                                      setNewPassword("");
+                                      setNewRole(u.role);
+                                    }}
+                                  >
+                                    Bewerken
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    className="btn-danger" 
+                                    disabled={u.username.toLowerCase() === currentUser?.toLowerCase()}
+                                    style={{ 
+                                      padding: '6px 12px', 
+                                      fontSize: '0.8rem',
+                                      background: 'rgba(239, 68, 68, 0.15)',
+                                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                                      color: '#ef4444',
+                                      cursor: u.username.toLowerCase() === currentUser?.toLowerCase() ? 'not-allowed' : 'pointer',
+                                      opacity: u.username.toLowerCase() === currentUser?.toLowerCase() ? 0.5 : 1
+                                    }}
+                                    onClick={() => handleDeleteUser(u.username)}
+                                  >
+                                    Verwijderen
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  )}
                   
                 </div>
               </div>
@@ -1678,7 +2091,7 @@ function SetupWizard({ settings: initialSettings, onComplete }: { settings: any,
         <div style={{ textAlign: 'center' }}>
           <img src="/logo.png" alt="Logo" style={{ width: '64px', margin: '0 auto 24px' }} />
           <h1 className="gradient-text" style={{ fontSize: '2rem' }}>Welkom bij Ark Church</h1>
-          <p style={{ color: 'var(--muted)', marginTop: '8px' }}>Laten we de Livestream Manager configureren voor je NAS.</p>
+          <p style={{ color: 'var(--muted)', marginTop: '8px' }}>Laten we het Operations Center configureren voor je NAS.</p>
         </div>
 
         {/* Steps Progress */}

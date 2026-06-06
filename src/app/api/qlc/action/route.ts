@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendQlcScene } from "@/lib/qlcControl";
+import { isAuthorized } from "@/lib/authHelper";
 
 export async function POST(req: NextRequest) {
+  const authSession = await isAuthorized(req);
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+
   try {
     const { sceneId } = await req.json();
     

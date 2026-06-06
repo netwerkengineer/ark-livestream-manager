@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
 import { sendMidiMessage } from '@/lib/midiBridge';
+import { isAuthorized } from "@/lib/authHelper";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authSession = await isAuthorized(request);
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+
   try {
     const { page, row, col } = await request.json();
     const settings = getSettings();

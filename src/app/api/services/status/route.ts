@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import net from 'net';
 import dgram from 'dgram';
 import { getSettings } from '@/lib/settingsStore';
 import { getActiveMidiPeers } from '@/lib/midiBridge';
+import { isAuthorized } from "@/lib/authHelper";
 
 async function checkTcp(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -46,7 +47,12 @@ async function checkUdp(port: number, host: string): Promise<boolean> {
   });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authSession = await isAuthorized(req);
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+
   const settings = getSettings();
 
   const servicesToCheck = [
