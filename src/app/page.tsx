@@ -79,7 +79,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "midi" | "buttons">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons">("general");
   const [showHelp, setShowHelp] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [scheduledStreams, setScheduledStreams] = useState<any[]>([]);
@@ -759,6 +759,28 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
                   <button 
                     type="button"
+                    onClick={() => setSettingsTab("scheduler")}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: settingsTab === "scheduler" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                      color: settingsTab === "scheduler" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                      fontWeight: settingsTab === "scheduler" ? 600 : 500,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Clock size={18} />
+                    <span>Schema's (Scheduler)</span>
+                  </button>
+
+                  <button 
+                    type="button"
                     onClick={() => setSettingsTab("midi")}
                     style={{
                       display: 'flex',
@@ -1086,6 +1108,201 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {settingsTab === "scheduler" && (
+                    <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                        <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Clock size={20} /> Automatische Schema's (Scheduler)
+                        </h3>
+                        <button 
+                          type="button"
+                          className="btn-primary" 
+                          style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: '8px' }}
+                          onClick={() => {
+                            const schedules = settings.schedules || [];
+                            const newSched = {
+                              id: `sched_${Date.now()}`,
+                              name: "Nieuwe Taak",
+                              time: "09:00",
+                              days: [0], // Zondag standaard
+                              action: "on",
+                              plug: "all",
+                              enabled: true
+                            };
+                            setSettings({ ...settings, schedules: [...schedules, newSched] });
+                          }}
+                        >
+                          + Schema Toevoegen
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {(!settings.schedules || settings.schedules.length === 0) && (
+                          <p style={{ color: 'var(--muted)', fontSize: '0.85rem', fontStyle: 'italic', textAlign: 'center', padding: '20px 10px', background: 'rgba(255,255,255,0.01)', borderRadius: '12px' }}>
+                            Geen automatische schema's geconfigureerd. Voeg een schema toe om taken in te plannen.
+                          </p>
+                        )}
+                        
+                        {(settings.schedules || []).map((sched: any, idx: number) => {
+                          const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
+                          return (
+                            <div 
+                              key={sched.id || idx} 
+                              className="glass-card" 
+                              style={{ 
+                                padding: '16px', 
+                                background: 'rgba(255,255,255,0.01)', 
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '16px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: 1, minWidth: '280px' }}>
+                                  <input 
+                                    className="input-field" 
+                                    style={{ fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'transparent', padding: '4px 8px', flex: 2 }}
+                                    placeholder="Naam (bijv. Zondag Opstart)" 
+                                    value={sched.name || ""} 
+                                    onChange={(e) => {
+                                      const updated = [...settings.schedules];
+                                      updated[idx] = { ...sched, name: e.target.value };
+                                      setSettings({ ...settings, schedules: updated });
+                                    }}
+                                  />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      id={`sched_enable_${sched.id}`}
+                                      checked={sched.enabled !== false} 
+                                      onChange={(e) => {
+                                        const updated = [...settings.schedules];
+                                        updated[idx] = { ...sched, enabled: e.target.checked };
+                                        setSettings({ ...settings, schedules: updated });
+                                      }}
+                                    />
+                                    <label htmlFor={`sched_enable_${sched.id}`} style={{ fontSize: '0.8rem', color: sched.enabled !== false ? '#4ade80' : 'var(--muted)', cursor: 'pointer' }}>
+                                      {sched.enabled !== false ? "Actief" : "Uit"}
+                                    </label>
+                                  </div>
+                                </div>
+                                <button 
+                                  type="button"
+                                  className="btn-danger" 
+                                  style={{ 
+                                    padding: '6px 12px', 
+                                    fontSize: '0.8rem', 
+                                    borderRadius: '8px', 
+                                    background: 'rgba(239, 68, 68, 0.15)', 
+                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => {
+                                    const updated = settings.schedules.filter((_: any, i: number) => i !== idx);
+                                    setSettings({ ...settings, schedules: updated });
+                                  }}
+                                >
+                                  Verwijderen
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                                <div>
+                                  <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Tijd (HH:MM)</label>
+                                  <input 
+                                    className="input-field" 
+                                    type="time"
+                                    value={sched.time || "09:00"} 
+                                    onChange={(e) => {
+                                      const updated = [...settings.schedules];
+                                      updated[idx] = { ...sched, time: e.target.value };
+                                      setSettings({ ...settings, schedules: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Actie</label>
+                                  <select 
+                                    className="input-field" 
+                                    value={sched.action || "on"} 
+                                    onChange={(e) => {
+                                      const updated = [...settings.schedules];
+                                      updated[idx] = { ...sched, action: e.target.value };
+                                      setSettings({ ...settings, schedules: updated });
+                                    }}
+                                  >
+                                    <option value="on">Opstarten (AAN)</option>
+                                    <option value="shutdown">Netjes Afsluiten</option>
+                                    <option value="off">Stroom Verbreken (UIT)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Slimme Stekker</label>
+                                  <select 
+                                    className="input-field" 
+                                    value={sched.plug || "all"} 
+                                    onChange={(e) => {
+                                      const updated = [...settings.schedules];
+                                      updated[idx] = { ...sched, plug: e.target.value };
+                                      setSettings({ ...settings, schedules: updated });
+                                    }}
+                                  >
+                                    <option value="all">Alle slimme stekkers</option>
+                                    {(settings.tuyaPlugs || []).map((p: any) => (
+                                      <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Herhalen op dagen</label>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  {weekdays.map((dayName, dayIdx) => {
+                                    const isSelected = sched.days.includes(dayIdx);
+                                    return (
+                                      <button
+                                        key={dayIdx}
+                                        type="button"
+                                        onClick={() => {
+                                          const currentDays = [...sched.days];
+                                          let updatedDays;
+                                          if (isSelected) {
+                                            updatedDays = currentDays.filter(d => d !== dayIdx);
+                                          } else {
+                                            updatedDays = [...currentDays, dayIdx].sort();
+                                          }
+                                          const updated = [...settings.schedules];
+                                          updated[idx] = { ...sched, days: updatedDays };
+                                          setSettings({ ...settings, schedules: updated });
+                                        }}
+                                        style={{
+                                          padding: '6px 12px',
+                                          fontSize: '0.75rem',
+                                          borderRadius: '8px',
+                                          border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.08)',
+                                          background: isSelected ? 'rgba(248, 113, 113, 0.15)' : 'rgba(255,255,255,0.02)',
+                                          color: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                                          cursor: 'pointer',
+                                          fontWeight: isSelected ? 'bold' : 'normal',
+                                          transition: 'all 0.15s'
+                                        }}
+                                      >
+                                        {dayName}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </section>
                   )}
