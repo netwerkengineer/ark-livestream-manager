@@ -60,6 +60,14 @@ export interface AppSettings {
   tuyaVersion?: number;
   tuyaPlugs?: TuyaPlug[];
   schedules?: TuyaSchedule[];
+  users?: LocalUser[];
+}
+
+export interface LocalUser {
+  username: string;
+  passwordHash: string;
+  salt: string;
+  role: "admin" | "operator";
 }
 
 export interface TuyaPlug {
@@ -174,12 +182,17 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     { id: '2', name: 'STOP SERVICE', sub: 'Einde uitzending', icon: 'square', color: 'red', page: 1, row: 0, col: 1, midiNote: 61 },
     { id: '3', name: 'CLEAR AUDIO', sub: 'Mute alle kanalen', icon: 'volume-x', color: 'amber', page: 2, row: 0, col: 0, midiNote: 62 },
     { id: '4', name: 'BLACKOUT', sub: 'Alles op zwart', icon: 'monitor-off', color: 'slate', page: 2, row: 0, col: 3, midiNote: 63 }
-  ]
+  ],
+  users: []
 };
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
 }
 
 export function getSettings(): AppSettings {
@@ -194,7 +207,30 @@ export function getSettings(): AppSettings {
       // Self-healing: if the saved settings on disk are missing the new multi-plug array 
       // or scheduler properties, force write them back so they are persistent and visible 
       // to host python scripts.
-      if (!saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules) {
+      let needsWrite = !saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules;
+      
+      // Initialize default users if empty
+      if (!settings.users || settings.users.length === 0) {
+        const adminSalt = crypto.randomBytes(16).toString("hex");
+        const operatorSalt = crypto.randomBytes(16).toString("hex");
+        settings.users = [
+          {
+            username: "admin",
+            salt: adminSalt,
+            passwordHash: hashPassword("arkadmin", adminSalt),
+            role: "admin"
+          },
+          {
+            username: "operator",
+            salt: operatorSalt,
+            passwordHash: hashPassword("arkoperator", operatorSalt),
+            role: "operator"
+          }
+        ];
+        needsWrite = true;
+      }
+      
+      if (needsWrite) {
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
       }
     } catch (e) {
@@ -203,7 +239,24 @@ export function getSettings(): AppSettings {
   } else {
     // Write defaults to disk initially
     try {
+      const adminSalt = crypto.randomBytes(16).toString("hex");
+      const operatorSalt = crypto.randomBytes(16).toString("hex");
+      DEFAULT_SETTINGS.users = [
+        {
+          username: "admin",
+          salt: adminSalt,
+          passwordHash: hashPassword("arkadmin", adminSalt),
+          role: "admin"
+        },
+        {
+          username: "operator",
+          salt: operatorSalt,
+          passwordHash: hashPassword("arkoperator", operatorSalt),
+          role: "operator"
+        }
+      ];
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+      settings = DEFAULT_SETTINGS;
     } catch (e) {}
   }
   return settings;

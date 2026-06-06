@@ -1,7 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
+import { isAuthorized } from "@/lib/authHelper";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authSession = await isAuthorized(req);
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+
   const settings = getSettings();
   
   // Try to reach the Tuya HTTP server on multiple network interfaces

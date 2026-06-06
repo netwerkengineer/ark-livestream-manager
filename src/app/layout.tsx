@@ -3,8 +3,8 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
-  title: "Ark Church | Livestream Manager",
-  description: "Beheer en plan de livestreams van Ark Church",
+  title: "Ark Church | Operations Center",
+  description: "Beheer, regie en automatisering voor Ark Church",
   icons: {
     icon: "/logo.png?v=2",
   },
