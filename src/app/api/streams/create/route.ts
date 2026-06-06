@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { isAuthorized } from "@/lib/authHelper";
+import { youtubeFetch } from "@/lib/tokenStore";
 import fs from "fs";
 import path from "path";
 
 export async function POST(req: NextRequest) {
-  const session: any = await auth();
-  
-  if (!session || !session.youtubeToken) {
-    return NextResponse.json({ error: "Niet ingelogd bij YouTube" }, { status: 401 });
+  const authSession = await isAuthorized(req, "admin");
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
 
   const { title, description, scheduleTime, thumbnailUrl, privacyStatus, categoryId, playlistId, tags } = await req.json();
 
   try {
-    // 1. YouTube Integratie
-    const streamsRes = await fetch("https://www.googleapis.com/youtube/v3/liveStreams?mine=true&part=id,cdn", {
-      headers: { Authorization: `Bearer ${session.youtubeToken}` }
-    });
+    // 1. YouTube Integratie: Haal de eerste liveStream key op
+    const streamsRes = await youtubeFetch("https://www.googleapis.com/youtube/v3/liveStreams?mine=true&part=id,cdn");
     const streamsData = await streamsRes.json();
     
     if (streamsData.error) {
@@ -30,10 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Stap 1.2: Maak broadcast aan
-    const broadcastRes = await fetch("https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails", {
+    const broadcastRes = await youtubeFetch("https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails", {
       method: "POST",
       headers: { 
-        Authorization: `Bearer ${session.youtubeToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -63,17 +60,19 @@ export async function POST(req: NextRequest) {
     const broadcastId = broadcastData.id;
 
     // Stap 1.3: Bind broadcast
-    await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${broadcastId}&streamId=${streamId}&part=id`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.youtubeToken}` }
+    const bindRes = await youtubeFetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${broadcastId}&streamId=${streamId}&part=id`, {
+      method: "POST"
     });
+    if (!bindRes.ok) {
+      const bindErr = await bindRes.json();
+      throw new Error(`YouTube Bind Fout: ${bindErr.error?.message || bindRes.statusText}`);
+    }
 
     // Stap 1.3b: Voeg toe aan playlist indien opgegeven
     if (playlistId) {
-      fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+      youtubeFetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
         method: "POST",
         headers: { 
-          Authorization: `Bearer ${session.youtubeToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -94,10 +93,9 @@ export async function POST(req: NextRequest) {
       const imageBuffer = Buffer.from(base64Data, 'base64');
       
       // Upload naar YouTube (Achtergrond, blokkeert de rest niet)
-      fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${broadcastId}&uploadType=media`, {
+      youtubeFetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${broadcastId}&uploadType=media`, {
         method: "POST",
         headers: { 
-          Authorization: `Bearer ${session.youtubeToken}`,
           "Content-Type": "image/png"
         },
         body: imageBuffer

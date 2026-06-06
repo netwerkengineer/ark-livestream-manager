@@ -37,6 +37,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (account.provider === "google") {
           token.youtubeToken = account.access_token;
           saveToken("google", account.access_token!);
+          if (account.refresh_token) {
+            saveToken("google_refresh", account.refresh_token);
+          }
         }
       }
       return token;
