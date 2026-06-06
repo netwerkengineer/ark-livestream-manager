@@ -112,18 +112,44 @@ def import_project():
         remote_os = detect_remote_os(mac_user, mac_host)
         
         if remote_os == "windows":
-            remote_docs_dir = f"C:/Users/{mac_user}/Documents/FreeShow"
             remote_app_data_dir = f"C:/Users/{mac_user}/AppData/Roaming/FreeShow"
+            default_docs_dir = f"C:/Users/{mac_user}/Documents/FreeShow"
             # Stop FreeShow on Windows
             print("Stopping FreeShow on Windows PC if running...")
             subprocess.run(["ssh", "-o", "ConnectTimeout=3", f"{mac_user}@{mac_host}", "taskkill /f /im FreeShow.exe 2>NUL || exit 0"])
         else:
-            remote_docs_dir = f"/Users/{mac_user}/Documents/FreeShow"
             remote_app_data_dir = f"/Users/{mac_user}/Library/Application Support/freeshow"
+            default_docs_dir = f"/Users/{mac_user}/Documents/FreeShow"
             # Stop FreeShow on macOS
             print("Stopping FreeShow on Mac if running...")
             subprocess.run(["ssh", "-o", "ConnectTimeout=3", f"{mac_user}@{mac_host}", "killall FreeShow 2>/dev/null || true"])
             
+        # Download settings.json first to resolve the dataPath
+        local_settings_json = os.path.join(temp_dir, "settings.json")
+        print("Downloading settings.json from remote host to check for custom dataPath...")
+        res_settings = subprocess.run(["scp", f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json", local_settings_json], capture_output=True)
+        
+        remote_docs_dir = default_docs_dir
+        settings_data = {}
+        
+        if res_settings.returncode == 0:
+            try:
+                with open(local_settings_json, 'r', encoding='utf-8') as f:
+                    settings_data = json.load(f)
+                if settings_data.get("dataPath"):
+                    remote_docs_dir = settings_data["dataPath"]
+                    print(f"Detected custom FreeShow dataPath from settings.json: {remote_docs_dir}")
+            except Exception as e:
+                print(f"Failed to parse settings.json: {e}")
+        else:
+            print("Could not download settings.json. Initializing default settings data.")
+            settings_data = {
+                "initialized": True,
+                "dataPath": default_docs_dir,
+                "showsPath": f"{default_docs_dir}/Shows",
+                "activeProject": None
+            }
+
         # Download existing config files from remote host
         # projects.json
         local_projects_json = os.path.join(temp_dir, "projects.json")
@@ -160,30 +186,6 @@ def import_project():
             except Exception as e:
                 print(f"Failed to parse shows.json: {e}. Reinitializing.")
                 shows_data = {}
-                
-        # settings.json
-        local_settings_json = os.path.join(temp_dir, "settings.json")
-        res = subprocess.run(["scp", f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json", local_settings_json], capture_output=True)
-        if res.returncode != 0:
-            print("Could not download settings.json. Initializing default.")
-            settings_data = {
-                "initialized": True,
-                "dataPath": remote_docs_dir,
-                "showsPath": f"{remote_docs_dir}/Shows",
-                "activeProject": None
-            }
-        else:
-            try:
-                with open(local_settings_json, 'r', encoding='utf-8') as f:
-                    settings_data = json.load(f)
-            except Exception as e:
-                print(f"Failed to parse settings.json: {e}. Reinitializing.")
-                settings_data = {
-                    "initialized": True,
-                    "dataPath": remote_docs_dir,
-                    "showsPath": f"{remote_docs_dir}/Shows",
-                    "activeProject": None
-                }
                 
         # 1. Update projects.json
         projects_data.setdefault("projects", {})[project_id] = project_obj
