@@ -58,6 +58,17 @@ export interface AppSettings {
   tuyaDeviceIp?: string;
   tuyaLocalKey?: string;
   tuyaVersion?: number;
+  tuyaPlugs?: TuyaPlug[];
+}
+
+export interface TuyaPlug {
+  id: string;
+  name: string;
+  ip: string;
+  deviceId: string;
+  localKey: string;
+  version: number;
+  hostIp?: string;
 }
 
 export interface BroadcastButton {
@@ -132,6 +143,17 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   tuyaDeviceIp: "192.168.40.60",
   tuyaLocalKey: "REDACTED_TUYA_LOCAL_KEY_1",
   tuyaVersion: 3.5,
+  tuyaPlugs: [
+    {
+      id: "home_mac",
+      name: "Thuis Mac Mini Plug",
+      ip: "192.168.40.60",
+      deviceId: "REDACTED_TUYA_DEVICE_ID_1",
+      localKey: "REDACTED_TUYA_LOCAL_KEY_1",
+      version: 3.5,
+      hostIp: "192.168.2.20"
+    }
+  ],
 
   // Default Buttons
   broadcastButtons: [

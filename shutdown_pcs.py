@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import time
+import sys
 
 def get_settings():
     candidates = [
@@ -18,55 +19,116 @@ def get_settings():
                 print(f"Error reading settings from {c}: {e}")
     return {}
 
-def is_home_environment():
-    try:
-        # Check if the smart plug is online/responsive (Home environment)
-        res = subprocess.run(["python3", "/app/control_plug.py", "status"], capture_output=True, text=True, timeout=5)
-        if res.returncode == 0 and "Error" not in res.stdout:
-            return True
-    except Exception:
-        pass
-    return False
-
-def shutdown_pcs():
-    settings = get_settings()
-    home = is_home_environment()
+def shutdown_single_plug_sequence(plug, settings):
+    # This is a fallback/helper for a single plug sequence
+    name = plug.get("name", plug.get("id"))
+    plug_id = plug.get("id")
+    host_ip = plug.get("hostIp")
+    user = settings.get("sshUser", "jeffreygo")
     
-    if home:
-        print("=== Home Environment Detected ===")
-        mac_host = "192.168.2.20"
-        mac_user = settings.get("sshUser", "jeffreygo")
-        
-        print(f"1. Sending remote shutdown command to Mac Mini ({mac_host})...")
-        subprocess.run(["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", f"{mac_user}@{mac_host}", "sudo /sbin/shutdown -h now"])
-        
-        print("2. Waiting 15 seconds for Mac Mini to shut down...")
+    print(f"=== Starting Shutdown for Plug: {name} (ID: {plug_id}) ===")
+    
+    if host_ip:
+        print(f"[{name}] Sending remote shutdown command to host ({host_ip})...")
+        subprocess.run([
+            "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
+            f"{user}@{host_ip}", "shutdown /s /f /t 0 || sudo /sbin/shutdown -h now"
+        ])
+        print(f"[{name}] Waiting 15 seconds for host to shut down...")
         time.sleep(15)
         
-        print("3. Turning off the smart plug power...")
-        subprocess.run(["python3", "/app/control_plug.py", "off"])
-        print("✅ Success: Home shutdown sequence completed.")
-    else:
-        print("=== Church Environment Detected (No Smart Plugs) ===")
-        obs_host = settings.get("obsHost")
-        freeshow_host = settings.get("freeShowHost")
-        user = settings.get("sshUser", "jeffreygo")
+    print(f"[{name}] Turning off plug power...")
+    subprocess.run(["python3", "/app/control_plug.py", "off", plug_id])
+    print(f"✅ [{name}] Shutdown sequence completed.")
+
+def main():
+    settings = get_settings()
+    plugs = settings.get("tuyaPlugs", [])
+    user = settings.get("sshUser", "jeffreygo")
+    
+    plug_id = sys.argv[1].lower() if len(sys.argv) > 1 else "all"
+    
+    if not plugs:
+        # Fall back to legacy home Mac Mini setup
+        print("Warning: No plugs in tuyaPlugs list. Falling back to legacy settings...")
+        device_id = settings.get("tuyaDeviceId")
+        device_ip = settings.get("tuyaDeviceIp")
+        local_key = settings.get("tuyaLocalKey")
         
-        hosts_to_shutdown = []
-        if obs_host and obs_host not in ["localhost", "127.0.0.1"]:
-            hosts_to_shutdown.append(obs_host)
-        if freeshow_host and freeshow_host not in ["localhost", "127.0.0.1"] and freeshow_host not in hosts_to_shutdown:
-            hosts_to_shutdown.append(freeshow_host)
+        if not device_id or not device_ip or not local_key:
+            print("Error: No legacy plug configuration found.")
+            sys.exit(1)
             
-        for host in hosts_to_shutdown:
-            print(f"Sending shutdown to remote host ({host})...")
-            # Try Windows shutdown first, then fall back to Unix shutdown
-            subprocess.run([
+        legacy_plug = {
+            "id": "legacy",
+            "name": "Legacy Home Plug",
+            "ip": device_ip,
+            "deviceId": device_id,
+            "localKey": local_key,
+            "version": settings.get("tuyaVersion", 3.5),
+            "hostIp": "192.168.2.20" # Home Mac Mini
+        }
+        shutdown_single_plug_sequence(legacy_plug, settings)
+        sys.exit(0)
+
+    # Determine target plugs to process
+    targets = []
+    if plug_id == "all":
+        targets = plugs
+    else:
+        target_plug = next((p for p in plugs if p.get("id", "").lower() == plug_id), None)
+        if not target_plug:
+            target_plug = next((p for p in plugs if p.get("name", "").lower() == plug_id), None)
+            
+        if not target_plug:
+            print(f"Error: Plug '{plug_id}' not found in settings.")
+            sys.exit(1)
+        targets = [target_plug]
+        
+    print(f"=== Triggering shutdown for {len(targets)} target plug(s) ===")
+    
+    # 1. Trigger SSH shutdown for all target hosts in parallel (non-blocking Popen)
+    running_ssh_processes = []
+    hosts_shutting_down = False
+    
+    for plug in targets:
+        host_ip = plug.get("hostIp")
+        name = plug.get("name", plug.get("id"))
+        if host_ip:
+            hosts_shutting_down = True
+            print(f"[{name}] Initiating SSH shutdown for host ({host_ip})...")
+            # Run SSH in background
+            p = subprocess.Popen([
                 "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
-                f"{user}@{host}", "shutdown /s /f /t 0 || sudo shutdown -h now"
-            ])
+                f"{user}@{host_ip}", "shutdown /s /f /t 0 || sudo /sbin/shutdown -h now"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            running_ssh_processes.append(p)
             
-        print("✅ Success: Church shutdown commands sent.")
+    # Wait for SSH commands to initiate
+    for p in running_ssh_processes:
+        p.wait()
+        
+    # 2. Wait 15 seconds if we triggered any PC shutdowns
+    if hosts_shutting_down:
+        print("Waiting 15 seconds for remote hosts to shut down gracefully...")
+        time.sleep(15)
+        
+    # 3. Power off all plugs
+    overall_success = True
+    for plug in targets:
+        p_id = plug.get("id")
+        name = plug.get("name", plug.get("id"))
+        print(f"[{name}] Turning off plug power...")
+        res = subprocess.run(["python3", "/app/control_plug.py", "off", p_id])
+        if res.returncode != 0:
+            overall_success = False
+            
+    if overall_success:
+        print("✅ Success: All shutdown sequences completed.")
+        sys.exit(0)
+    else:
+        print("❌ Error: Some plugs failed to turn off.")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    shutdown_pcs()
+    main()

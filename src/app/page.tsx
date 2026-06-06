@@ -797,21 +797,174 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                   </div>
 
                   {/* Tuya Smart Plug Configuration */}
-                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Sun size={18} color="var(--primary)" /> <strong>Slimme Stekker (Tuya)</strong></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <input className="input-field" placeholder="Stekker IP-adres" value={settings.tuyaDeviceIp || ""} onChange={(e) => setSettings({...settings, tuyaDeviceIp: e.target.value})} />
-                      <input className="input-field" placeholder="Device ID" value={settings.tuyaDeviceId || ""} onChange={(e) => setSettings({...settings, tuyaDeviceId: e.target.value})} />
-                      <input className="input-field" type="password" placeholder="Local Key" value={settings.tuyaLocalKey || ""} onChange={(e) => setSettings({...settings, tuyaLocalKey: e.target.value})} />
-                      <div className="input-group">
-                        <label className="input-label" style={{ fontSize: '0.75rem' }}>Protocol Versie</label>
-                        <select className="input-field" value={settings.tuyaVersion || 3.5} onChange={(e) => setSettings({...settings, tuyaVersion: parseFloat(e.target.value) || 3.5})}>
-                          <option value="3.1">3.1</option>
-                          <option value="3.3">3.3</option>
-                          <option value="3.4">3.4</option>
-                          <option value="3.5">3.5</option>
-                        </select>
+                  <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Sun size={18} color="var(--primary)" /> 
+                        <strong>Slimme Stekkers (Tuya)</strong>
                       </div>
+                      <button 
+                        type="button"
+                        className="btn-primary" 
+                        style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: '8px' }}
+                        onClick={() => {
+                          const plugs = settings.tuyaPlugs || [];
+                          const newPlug = {
+                            id: `plug_${Date.now()}`,
+                            name: "Nieuwe Stekker",
+                            ip: "",
+                            deviceId: "",
+                            localKey: "",
+                            version: 3.5,
+                            hostIp: ""
+                          };
+                          setSettings({ ...settings, tuyaPlugs: [...plugs, newPlug] });
+                        }}
+                      >
+                        + Stekker Toevoegen
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {(!settings.tuyaPlugs || settings.tuyaPlugs.length === 0) && (
+                        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', fontStyle: 'italic', textAlign: 'center', padding: '20px 10px', background: 'rgba(255,255,255,0.01)', borderRadius: '12px' }}>
+                          Geen slimme stekkers geconfigureerd. Voeg er een toe om te beginnen.
+                        </p>
+                      )}
+                      
+                      {(settings.tuyaPlugs || []).map((plug: any, idx: number) => (
+                        <div 
+                          key={plug.id || idx} 
+                          className="glass-card" 
+                          style={{ 
+                            padding: '16px', 
+                            background: 'rgba(255,255,255,0.01)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: 1, minWidth: '280px' }}>
+                              <input 
+                                className="input-field" 
+                                style={{ fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'transparent', padding: '4px 8px', flex: 2 }}
+                                placeholder="Stekker Naam (bijv. OBS PC)" 
+                                value={plug.name || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, name: e.target.value };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                              <input 
+                                className="input-field" 
+                                style={{ fontSize: '0.8rem', flex: 1, fontFamily: 'monospace' }}
+                                placeholder="Unieke ID (bijv. obs_pc)" 
+                                value={plug.id || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, id: e.target.value.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                            </div>
+                            <button 
+                              type="button"
+                              className="btn-danger" 
+                              style={{ 
+                                padding: '6px 12px', 
+                                fontSize: '0.8rem', 
+                                borderRadius: '8px', 
+                                background: 'rgba(239, 68, 68, 0.15)', 
+                                border: '1px solid rgba(239, 68, 68, 0.35)',
+                                color: '#ef4444',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                const updatedPlugs = settings.tuyaPlugs.filter((_: any, i: number) => i !== idx);
+                                setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                              }}
+                            >
+                              Verwijderen
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>IP-adres</label>
+                              <input 
+                                className="input-field" 
+                                placeholder="Bijv. 192.168.40.60" 
+                                value={plug.ip || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, ip: e.target.value.trim() };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Device ID</label>
+                              <input 
+                                className="input-field" 
+                                placeholder="Tuya Device ID" 
+                                value={plug.deviceId || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, deviceId: e.target.value.trim() };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Local Key</label>
+                              <input 
+                                className="input-field" 
+                                type="password" 
+                                placeholder="Tuya Local Key" 
+                                value={plug.localKey || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, localKey: e.target.value.trim() };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Gekoppelde Host IP (Optioneel)</label>
+                              <input 
+                                className="input-field" 
+                                placeholder="Bijv. 192.168.2.20" 
+                                value={plug.hostIp || ""} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, hostIp: e.target.value.trim() };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Protocol Versie</label>
+                              <select 
+                                className="input-field" 
+                                value={plug.version || 3.5} 
+                                onChange={(e) => {
+                                  const updatedPlugs = [...settings.tuyaPlugs];
+                                  updatedPlugs[idx] = { ...plug, version: parseFloat(e.target.value) || 3.5 };
+                                  setSettings({ ...settings, tuyaPlugs: updatedPlugs });
+                                }}
+                              >
+                                <option value="3.1">3.1</option>
+                                <option value="3.3">3.3</option>
+                                <option value="3.4">3.4</option>
+                                <option value="3.5">3.5</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
