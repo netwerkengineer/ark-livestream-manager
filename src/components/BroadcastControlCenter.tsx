@@ -87,6 +87,13 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
 
 
   const handleEmergencyAction = async (actionId: string, actionName: string, page: number, row: number, col: number) => {
+    // Toggle de visuele status direct bij klikken (niet wachten op Companion response)
+    setActiveButtons(prev => {
+      const updated = { ...prev, [actionId]: !prev[actionId] };
+      localStorage.setItem("acoc_active_buttons", JSON.stringify(updated));
+      return updated;
+    });
+
     try {
       const response = await fetch('/api/broadcast/action', {
         method: 'POST',
@@ -97,19 +104,16 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
       const data = await response.json();
       if (data.success) {
         console.log(`Successfully triggered ${actionName}`);
-        setActiveButtons(prev => {
-          const updated = { ...prev, [actionId]: !prev[actionId] };
-          localStorage.setItem("acoc_active_buttons", JSON.stringify(updated));
-          return updated;
-        });
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
       console.error('Failed to trigger action:', error);
-      alert(`Fout bij het uitvoeren van ${actionName}. Is Companion gestart?`);
+      // Toon een melding maar laat de toggle-staat intact
+      console.warn(`Companion niet bereikbaar voor ${actionName}. Knopstatus wel bijgewerkt.`);
     }
   };
+
 
   const getIcon = (iconName: string) => {
     switch (iconName) {
