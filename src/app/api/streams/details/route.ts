@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { isAuthorized } from "@/lib/authHelper";
+import { youtubeFetch } from "@/lib/tokenStore";
 
 export async function GET(req: NextRequest) {
-  const session: any = await auth();
+  const authSession = await isAuthorized(req, "admin");
+  if (!authSession) {
+    return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   const provider = searchParams.get("provider");
 
-  if (!session || !id || !provider) {
+  if (!id || !provider) {
     return NextResponse.json({ error: "Ongeldige aanvraag" }, { status: 400 });
   }
 
   try {
     if (provider === "youtube") {
       // 1. Get Broadcast details to find the bound Stream ID
-      const broadcastRes = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=contentDetails&id=${id}`, {
-        headers: { Authorization: `Bearer ${session.youtubeToken}` }
-      });
+      const broadcastRes = await youtubeFetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=contentDetails&id=${id}`);
       const broadcastData = await broadcastRes.json();
+      
+      if (broadcastData.error) {
+        throw new Error(`YouTube API Fout: ${broadcastData.error.message}`);
+      }
+      
       const streamId = broadcastData.items?.[0]?.contentDetails?.boundStreamId;
 
       if (!streamId) {
@@ -25,10 +33,13 @@ export async function GET(req: NextRequest) {
       }
 
       // 2. Get Stream details for the stream key
-      const streamRes = await fetch(`https://www.googleapis.com/youtube/v3/liveStreams?part=cdn,status&id=${streamId}`, {
-        headers: { Authorization: `Bearer ${session.youtubeToken}` }
-      });
+      const streamRes = await youtubeFetch(`https://www.googleapis.com/youtube/v3/liveStreams?part=cdn,status&id=${streamId}`);
       const streamData = await streamRes.json();
+      
+      if (streamData.error) {
+        throw new Error(`YouTube Stream API Fout: ${streamData.error.message}`);
+      }
+      
       const streamItem = streamData.items?.[0];
 
       if (!streamItem) {
@@ -42,7 +53,6 @@ export async function GET(req: NextRequest) {
         health: streamItem.status?.healthStatus?.status,
         healthDescription: streamItem.status?.healthStatus?.lastError
       });
-
     }
 
     return NextResponse.json({ error: "Onbekende provider" }, { status: 400 });
