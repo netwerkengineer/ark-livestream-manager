@@ -43,7 +43,9 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
       }
       
       const obs = new OBSWebSocket();
-      const url = `ws://${settings.obsHost}:${settings.obsPort}`;
+      const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      const wsProtocol = isSecure ? 'wss' : 'ws';
+      const url = `${wsProtocol}://${settings.obsHost}:${settings.obsPort}`;
       
       console.log(`Connecting to OBS at ${url}...`);
       await obs.connect(url, settings.obsPassword || undefined);
