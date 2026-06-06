@@ -250,10 +250,10 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const handleOperatorLogout = async () => {
     try {
       await fetch("/api/auth/operator", { method: "DELETE" });
-      window.location.reload();
     } catch (err) {
       console.error("Error logging out:", err);
     }
+    signOut({ callbackUrl: "/" });
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {

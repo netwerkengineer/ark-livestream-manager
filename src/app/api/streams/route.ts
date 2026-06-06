@@ -1,6 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
 import { youtubeFetch } from "@/lib/tokenStore";
+import fs from "fs";
+import path from "path";
+
+let lastSyncedUrl = "";
+
+async function syncThumbnailFromUrl(url: string) {
+  if (url === lastSyncedUrl) {
+    return;
+  }
+  
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const arrayBuffer = await res.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+
+    const internalPath = "/app/public/thumbnails";
+    if (!fs.existsSync(internalPath)) {
+      fs.mkdirSync(internalPath, { recursive: true });
+    }
+    const filePath = path.join(internalPath, "thema.jpg");
+    fs.writeFileSync(filePath, imageBuffer);
+    
+    lastSyncedUrl = url;
+    console.log(`[Thumbnail Sync] Successfully synced new thumbnail to NAS: ${filePath}`);
+  } catch (err) {
+    console.error("[Thumbnail Sync] Error syncing thumbnail:", err);
+  }
+}
 
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req, "admin");
@@ -16,7 +45,6 @@ export async function GET(req: NextRequest) {
       cache: 'no-store'
     });
     
-    // Check if the response was unauthorized even after refresh
     if (ytRes.status === 401) {
       return NextResponse.json({ error: "YouTube verbinding is verlopen of ongeldig. Koppel opnieuw." }, { status: 401 });
     }
@@ -40,6 +68,25 @@ export async function GET(req: NextRequest) {
           });
         }
       });
+
+      // Achtergrond thumbnail sync voor de eerstvolgende stream
+      if (ytData.items.length > 0) {
+        // Filter op actieve geplande streams en sorteer op starttijd
+        const upcomingStreams = ytData.items
+          .filter((item: any) => item.status.lifeCycleStatus !== "complete" && item.status.lifeCycleStatus !== "revoked")
+          .sort((a: any, b: any) => new Date(a.snippet.scheduledStartTime).getTime() - new Date(b.snippet.scheduledStartTime).getTime());
+
+        if (upcomingStreams.length > 0) {
+          const nextStream = upcomingStreams[0];
+          const thumbnails = nextStream.snippet?.thumbnails;
+          const thumbUrl = thumbnails?.maxres?.url || thumbnails?.standard?.url || thumbnails?.high?.url || thumbnails?.medium?.url || thumbnails?.default?.url;
+          
+          if (thumbUrl) {
+            // Trigger download asynchronously in background
+            syncThumbnailFromUrl(thumbUrl).catch(err => console.error("Thumbnail Sync Trigger error:", err));
+          }
+        }
+      }
     }
 
     // Sorteer op tijd
