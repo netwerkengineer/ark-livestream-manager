@@ -442,4 +442,20 @@ We hebben de afsluitsequentie in `shutdown_pcs.py` gewijzigd om de Mac Mini in s
    * Wanneer de stroom weer wordt ingeschakeld (bijv. via de "Start Mac Mini" knop of een schema), zorgt `pmset autorestart 1` ervoor dat de Mac Mini direct vanzelf opstart.
 4. **Windows & Linux behouden:** Windows (`shutdown /s /f /t 0`) en Linux (`sudo /sbin/shutdown -h now`) behouden hun oorspronkelijke afsluitgedrag.
 
+---
+
+## 🔌 15. Dynamische Detectie van FreeShow Database-Locatie (dataPath) (v15.0)
+
+### Probleem:
+Het project-importscript `import_project.py` schreef alle `.show` bestanden en `projects.json` altijd hardgecodeerd naar de standaard lokale Documents-map (`/Users/jeffreygo/Documents/FreeShow`). Als de gebruiker in de FreeShow instellingen een aangepast netwerkpad (`dataPath`) had ingesteld (zoals `/Volumes/Projects/Beamer/FreeShow`), werd dit overschreven door het script. Dit verstoorde de verbinding met de NAS.
+
+### Oplossing:
+We hebben `import_project.py` aangepast zodat het dynamisch de configuratie van de doel-PC inleest:
+1. **Settings Eerst Inlezen:** Het script downloadt nu eerst `settings.json` uit de `AppData`/`Library Application Support` map van de remote host.
+2. **DataPath Detectie:** Het script checkt of er een waarde is ingevuld bij de `"dataPath"` key in `settings.json`.
+3. **Dynamische Map-toewijzing:** 
+   - Als er een aangepast pad is (zoals `/Volumes/Projects/Beamer/FreeShow`), wordt dit pad gebruikt als `remote_docs_dir`. De `.show` files worden dan netjes geüpload naar `{dataPath}/Shows/` en de project-JSON naar `{dataPath}/Config/projects.json`.
+   - Als er geen aangepast pad is ingesteld (of de download mislukt), valt het script terug op het standaard lokale pad `/Users/{user}/Documents/FreeShow`.
+
+
 
