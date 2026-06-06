@@ -183,15 +183,30 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 export function getSettings(): AppSettings {
-  if (fs.existsSync(SETTINGS_FILE)) {
+  let settings = DEFAULT_SETTINGS;
+  const fileExists = fs.existsSync(SETTINGS_FILE);
+  
+  if (fileExists) {
     try {
       const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
-      return { ...DEFAULT_SETTINGS, ...saved };
+      settings = { ...DEFAULT_SETTINGS, ...saved };
+      
+      // Self-healing: if the saved settings on disk are missing the new multi-plug array 
+      // or scheduler properties, force write them back so they are persistent and visible 
+      // to host python scripts.
+      if (!saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules) {
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+      }
     } catch (e) {
-      return DEFAULT_SETTINGS;
+      settings = DEFAULT_SETTINGS;
     }
+  } else {
+    // Write defaults to disk initially
+    try {
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+    } catch (e) {}
   }
-  return DEFAULT_SETTINGS;
+  return settings;
 }
 
 export function saveSettings(settings: Partial<AppSettings>) {
