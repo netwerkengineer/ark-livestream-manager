@@ -7,8 +7,8 @@ import sys
 
 def get_settings():
     candidates = [
-        "/mnt/data/docker/ark-livestream-manager/data/settings.json",
-        "/app/data/settings.json"
+        "/app/data/settings.json",
+        "/mnt/data/docker/ark-livestream-manager/data/settings.json"
     ]
     for c in candidates:
         if os.path.exists(c):

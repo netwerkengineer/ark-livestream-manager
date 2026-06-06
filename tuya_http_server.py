@@ -14,8 +14,8 @@ def scheduler_worker():
     last_runs = {}  # schedule_id -> "YYYY-MM-DD HH:MM"
     
     candidates = [
-        "/mnt/data/docker/ark-livestream-manager/data/settings.json",
-        "/app/data/settings.json"
+        "/app/data/settings.json",
+        "/mnt/data/docker/ark-livestream-manager/data/settings.json"
     ]
     
     while True:
