@@ -379,6 +379,67 @@ De HTTP-server (`tuya_http_server.py`) op LXC 112 luistert op poort `8088` en ac
 - **Directe status opvragen:**
   - `GET http://192.168.2.222:8088/status?plug=obs_pc` -> Vraagt de status op van een specifieke stekker
 
+---
 
+## 🗂️ 12. Overzichtelijk Instellingenmenu met Tabbladen (v12.0)
+
+Om te voorkomen dat de instellingenpagina een onoverzichtelijke, lange verticale lijst wordt, hebben we de configuratie-interface in [page.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/page.tsx) volledig gereorganiseerd in een moderne, tabbed split-panel layout:
+
+### 1. Tab Navigation & State
+We hebben een nieuwe React state `settingsTab` geïntroduceerd waarmee de gebruiker kan navigeren tussen de volgende categorieën:
+*   **Algemeen (General):** Instellingen voor streams, fallback-afbeeldingen, en paden voor Sunday Project.
+*   **Verbindingen (Connections & Hardware):** Host IP's en poorten voor OBS en FreeShow.
+*   **Slimme Stekkers (Tuya):** Beheerderslijst voor het toevoegen, bewerken en verwijderen van Tuya smart plugs.
+*   **MIDI Bridge (rtpMIDI):** Instellingen voor MIDI-in en MIDI-out poorten, Bonjour sessienaam en rtpMIDI active peers.
+*   **Dashboard Knoppen (Custom Buttons):** Configuratie van knoppen voor het Companion Broadcast Center (kleur, actie, MIDI-note).
+
+### 2. Modern Split-Layout UI
+De layout in de settings modal is als volgt opgebouwd:
+*   **Linker Sidebar Menu:** Een vaste lijst met navigatietabs, voorzien van bijpassende iconen (`FileText`, `Cpu`, `Sliders`, `Settings`) en dynamische actieve/inactieve visual highlighting.
+*   **Rechter Content Paneel:** Een onafhankelijk scrollbare sectie die de configuratieformulieren van de actieve tab laadt. Door de container-css aan te passen (`overflowY: 'hidden'` op de hoofdmodal en `overflowY: 'auto'` op het rechterpaneel), hebben we dubbele scrollbars voorkomen.
+
+### 3. Build & Deployment
+*   De code is opnieuw gecompileerd tot een Next.js productie-build en live gezet op Proxmox LXC 112 met behulp van de deployment-scripts.
+*   Alle wijzigingen zijn succesvol gepusht naar de `main` branch van de GitHub repository `ark-livestream-manager`.
+
+---
+
+## 🔌 13. Tuya Dashboard Status/Verbruik & Automatische Scheduler (v13.0)
+
+We hebben stroomverbruiksmonitoring en een klok-gestuurde planner toegevoegd aan de livestream manager om het beheer van de hardware volledig te automatiseren.
+
+### 1. Live Verbruik & Status Dashboard
+*   **Parallelle Statusopvraging (`control_plug.py`):** We hebben de actie `status_json` toegevoegd. Deze haalt met een `ThreadPoolExecutor` parallel en razendsnel de switch-state, stroom (A), vermogen (W) en spanning (V) op van alle geconfigureerde Tuya-stekkers via hun respectievelijke DPS-keys (`1`, `18`, `19`, `20`).
+*   **Status API (`route.ts`):** Er is een Next.js API route `/api/tuya/status` aangemaakt die communiceert met het lokale Python HTTP-server endpoint (`/status_json` op poort 8088). Deze API probeert opeenvolgend de interfaces `127.0.0.1`, het ingestelde Companion-IP en de Docker-gateway te bereiken om maximale netwerktolerantie te garanderen.
+*   **UI Statuskaart (`BroadcastControlCenter.tsx`):** Onder het reguliere statusoverzicht op het dashboard is een kaart toegevoegd die live de status (Aan = groen, Uit = oranje, Offline = rood) en de stroomgegevens per stekker toont met een automatische poll-interval van 10 seconden.
+
+### 2. Automatische Scheduler
+*   **Scheduler Settings UI (`page.tsx`):** We hebben een dedicated sidebar-tabblad **"Schema's (Scheduler)"** toegevoegd aan het instellingenmenu. Hier kan de gebruiker onbeperkt schema's aanmaken en beheren:
+    *   *Naam* (bijv. "Zondag Ochtend Opstart")
+    *   *Tijd* (tijdselector, bijv. `09:00`)
+    *   *Herhalingsdagen* (knoppenselector voor Zondag t/m Zaterdag)
+    *   *Actie* (Opstarten `on`, Netjes Afsluiten `shutdown`, Stroom Uit `off`)
+    *   *Doelstekker* (Selectie uit alle stekkers of *Alle slimme stekkers*)
+    *   *Status* (Aan/Uit schakelaar)
+*   **Achtergrond Daemon Thread (`tuya_http_server.py`):** De HTTP-server start nu een achtergrond-thread op LXC 112 die elke 15 seconden de actieve schema's in `settings.json` vergelijkt met de actuele dag en tijd. Indien er een match is, start de daemon de bijbehorende scripts (`startup_pcs.py`, `shutdown_pcs.py` of `control_plug.py`) in de achtergrond.
+*   **Unbuffered Logging:** De systemd-service `tuya-control.service` is aangepast om Python uit te voeren met de `-u` flag, zodat alle logs en scheduler-triggers direct in `journalctl -u tuya-control` verschijnen.
+
+---
+
+## 🔌 14. Fix Mac Mini Auto-Restart na Stroomherstel (v14.0)
+
+### Probleem:
+Wanneer de Mac Mini werd uitgeschakeld via de "Stop Mac Mini" knop (of via een gepland schema), stuurde `shutdown_pcs.py` het SSH-afsluitcommando `sudo /sbin/shutdown -h now` naar macOS. Dit triggerde een schone, geplande uitschakeling. Omdat de uitschakeling opzettelijk was, activeerde de SMC (System Management Controller) van macOS de auto-restart functie (`pmset autorestart 1`) niet wanneer de stroom na de stroomonderbreking weer werd ingeschakeld. De Mac Mini bleef hierdoor uitstaan.
+
+### Oplossing:
+We hebben de afsluitsequentie in `shutdown_pcs.py` gewijzigd om de Mac Mini in slaapstand te zetten in plaats van volledig af te sluiten:
+1. **OS-detectie:** We hebben een helper `detect_os(user, host_ip)` toegevoegd die via SSH test of het doel-OS Windows is (met `cmd.exe /c echo windows`), macOS is (met `uname` -> `Darwin`), of Linux is.
+2. **Mac-specifiek afsluiten:** Als het doel-OS macOS is, sturen we het commando `pmset sleepnow` via SSH naar de Mac Mini in plaats van `shutdown -h now`.
+3. **Slaap-en-Stroomonderbreking Flow:**
+   * De Mac Mini gaat veilig in de slaapstand (de schijven worden netjes gesynchroniseerd).
+   * Na de ingestelde wachttijd (15 seconden) onderbreekt de slimme stekker de stroomtoevoer.
+   * Omdat de stroom wegvalt terwijl de Mac Mini in de slaapstand staat, registreert de SMC dit als een onverwacht stroomverlies (een stroomstoring).
+   * Wanneer de stroom weer wordt ingeschakeld (bijv. via de "Start Mac Mini" knop of een schema), zorgt `pmset autorestart 1` ervoor dat de Mac Mini direct vanzelf opstart.
+4. **Windows & Linux behouden:** Windows (`shutdown /s /f /t 0`) en Linux (`sudo /sbin/shutdown -h now`) behouden hun oorspronkelijke afsluitgedrag.
 
 
