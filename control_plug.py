@@ -5,7 +5,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 def get_settings():
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     candidates = [
+        os.path.join(SCRIPT_DIR, "data", "settings.json"),
         "/app/data/settings.json",
         "/mnt/data/docker/ark-livestream-manager/data/settings.json"
     ]
@@ -40,10 +42,20 @@ def get_single_plug_status(plug_info):
     if not ip or not device_id or not local_key:
         return result
 
+    # Quick TCP port check to avoid tinytuya blocking on offline plugs
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.4)
+        s.connect((ip, 6668))
+        s.close()
+    except Exception:
+        return result
+
     try:
         d = tinytuya.OutletDevice(device_id, ip, local_key)
         d.set_version(version)
-        d.set_socketTimeout(0.8)  # Fast timeout for responsive UI
+        d.set_socketTimeout(0.6)  # Fast timeout for responsive UI
         status = d.status()
         if status and "Error" not in status:
             result["is_online"] = True

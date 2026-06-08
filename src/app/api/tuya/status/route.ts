@@ -11,11 +11,15 @@ export async function GET(req: NextRequest) {
   const settings = getSettings();
   
   // Try to reach the Tuya HTTP server on multiple network interfaces
-  const hostsToTry = [
-    '127.0.0.1',            // Host networking fallback
-    settings.companionHost,  // Proxmox LXC 112 LAN IP (192.168.2.222)
-    '172.17.0.1',           // Docker default bridge gateway
-  ];
+  const hostsToTry = [];
+  if (settings.tuyaApiHost) {
+    hostsToTry.push(settings.tuyaApiHost);
+  }
+  hostsToTry.push('127.0.0.1');            // Host networking fallback
+  if (settings.companionHost) {
+    hostsToTry.push(settings.companionHost);  // Proxmox LXC 112 LAN IP (192.168.2.222)
+  }
+  hostsToTry.push('172.17.0.1');           // Docker default bridge gateway
 
   let statusData = [];
   let success = false;

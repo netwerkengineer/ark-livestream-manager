@@ -58,6 +58,7 @@ export interface AppSettings {
   tuyaDeviceIp?: string;
   tuyaLocalKey?: string;
   tuyaVersion?: number;
+  tuyaApiHost?: string;
   tuyaPlugs?: TuyaPlug[];
   schedules?: TuyaSchedule[];
   users?: LocalUser[];
@@ -163,6 +164,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   tuyaDeviceIp: "192.168.40.60",
   tuyaLocalKey: "#y;FkR5y7YRaq$y>",
   tuyaVersion: 3.5,
+  tuyaApiHost: "",
   tuyaPlugs: [
     {
       id: "home_mac",
