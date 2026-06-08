@@ -9,11 +9,14 @@ import json
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def scheduler_worker():
     print("[SCHEDULER] Background scheduler thread started.")
     last_runs = {}  # schedule_id -> "YYYY-MM-DD HH:MM"
     
     candidates = [
+        os.path.join(SCRIPT_DIR, "data", "settings.json"),
         "/app/data/settings.json",
         "/mnt/data/docker/ark-livestream-manager/data/settings.json"
     ]
@@ -57,11 +60,11 @@ def scheduler_worker():
                             
                             # Run target script in background
                             if sched_action == "on":
-                                subprocess.Popen(["python3", "/app/startup_pcs.py", sched_plug])
+                                subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "startup_pcs.py"), sched_plug])
                             elif sched_action == "shutdown":
-                                subprocess.Popen(["python3", "/app/shutdown_pcs.py", sched_plug])
+                                subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "shutdown_pcs.py"), sched_plug])
                             elif sched_action == "off":
-                                subprocess.Popen(["python3", "/app/control_plug.py", "off", sched_plug])
+                                subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", sched_plug])
         except Exception as e:
             print(f"[SCHEDULER] Error in scheduler loop: {e}", file=sys.stderr)
         time.sleep(15)
@@ -80,7 +83,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
 
         if path == '/on':
             print(f"Received HTTP request: Turn ON for plug: {plug_id} (starting startup sequence in background)")
-            subprocess.Popen(["python3", "/app/startup_pcs.py", plug_id])
+            subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "startup_pcs.py"), plug_id])
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
@@ -88,7 +91,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
         elif path == '/off':
             print(f"Received HTTP request: Turn OFF for plug: {plug_id}")
-            res = subprocess.run(["python3", "/app/control_plug.py", "off", plug_id], capture_output=True, text=True)
+            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id], capture_output=True, text=True)
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
@@ -97,21 +100,21 @@ class TuyaHandler(BaseHTTPRequestHandler):
         elif path == '/shutdown':
             print(f"Received HTTP request: Shutdown sequence for plug: {plug_id}")
             # Run the shutdown sequence in the background so the HTTP response is sent immediately
-            subprocess.Popen(["python3", "/app/shutdown_pcs.py", plug_id])
+            subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "shutdown_pcs.py"), plug_id])
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
             self.wfile.write(f"OK: Shutdown sequence started in background for plug '{plug_id}'".encode())
             
         elif path == '/status':
-            res = subprocess.run(["python3", "/app/control_plug.py", "status", plug_id], capture_output=True, text=True)
+            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status", plug_id], capture_output=True, text=True)
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
             self.wfile.write(res.stdout.encode())
             
         elif path == '/status_json':
-            res = subprocess.run(["python3", "/app/control_plug.py", "status_json", plug_id], capture_output=True, text=True)
+            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status_json", plug_id], capture_output=True, text=True)
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')

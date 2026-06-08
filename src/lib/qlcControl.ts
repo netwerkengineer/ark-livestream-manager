@@ -25,3 +25,26 @@ export function sendQlcScene(sceneId: number) {
     qlcClient = null;
   }
 }
+
+export function sendQlcOsc(path: string, value: number) {
+  const settings = getSettings();
+  const host = settings.qlcHost || '127.0.0.1';
+  const port = settings.qlcPort || 7700;
+
+  try {
+    if (!qlcClient) {
+      qlcClient = new Client(host, port);
+    }
+
+    console.log(`[QLC+] Sending OSC ${path} = ${value} to ${host}:${port}`);
+    
+    qlcClient.send(path, value, (err: any) => {
+      if (err) console.error('[QLC+] Send Error:', err);
+    });
+
+  } catch (err) {
+    console.error('[QLC+] Connection Error:', err);
+    qlcClient = null;
+  }
+}
+

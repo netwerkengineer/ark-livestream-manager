@@ -9,7 +9,9 @@ import tempfile
 import time
 
 def get_settings():
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     candidates = [
+        os.path.join(SCRIPT_DIR, "data", "settings.json"),
         "/mnt/data/docker/ark-livestream-manager/data/settings.json",
         "/app/data/settings.json"
     ]

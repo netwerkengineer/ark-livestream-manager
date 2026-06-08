@@ -1238,6 +1238,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                         </button>
                       </div>
 
+                      <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}><Cpu size={18} color="#3b82f6" /> <strong>Tuya Control API Host</strong></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input 
+                            className="input-field" 
+                            placeholder="Tuya API Host IP (bijv. 10.8.0.1 of 192.168.2.250)" 
+                            value={settings.tuyaApiHost || ""} 
+                            onChange={(e) => setSettings({...settings, tuyaApiHost: e.target.value.trim()})} 
+                          />
+                          <p className="text-[10px] text-muted">
+                            Het IP-adres van de host waar de Tuya HTTP server (poort 8088) op draait. Laat dit leeg om lokaal via localhost/Docker gateway te verbinden.
+                          </p>
+                        </div>
+                      </div>
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {(!settings.tuyaPlugs || settings.tuyaPlugs.length === 0) && (
                           <p style={{ color: 'var(--muted)', fontSize: '0.85rem', fontStyle: 'italic', textAlign: 'center', padding: '20px 10px', background: 'rgba(255,255,255,0.01)', borderRadius: '12px' }}>
