@@ -29,6 +29,22 @@ export default function LightsControl({ settings }: LightsControlProps) {
   const [activeColors, setActiveColors] = useState<{[groupTitle: string]: number | null}>({});
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
+  const [activeFade, setActiveFade] = useState<number>(0);
+
+  const handleFadeChange = async (value: number) => {
+    setActiveFade(value);
+    try {
+      await fetch("/api/qlc/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: "/ark/light/speed/fade", value }),
+      });
+      showStatus("success", `Overgangstijd aangepast.`);
+    } catch (err) {
+      console.error("Failed to set fade speed:", err);
+      showStatus("error", "Fout bij instellen overgangstijd");
+    }
+  };
 
   // Ref to hold pending timeouts for debouncing OSC requests
   const debounceTimers = useRef<{ [path: string]: NodeJS.Timeout }>({});
@@ -348,13 +364,48 @@ export default function LightsControl({ settings }: LightsControlProps) {
           <section className="glass-card">
             <h3 className="section-title"><Palette size={18} className="text-cyan" /> Kleurgroepen</h3>
             
+            {/* Fade Speed Presets selector */}
+            <div style={{ marginBottom: "24px", padding: "16px", background: "rgba(0,0,0,0.15)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.03)" }}>
+              <p className="group-label" style={{ marginBottom: "12px", color: "var(--muted)" }}>Overgangstijd (Fade)</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {[
+                  { label: "Direct (0s)", value: 0 },
+                  { label: "0.5s", value: 13 },
+                  { label: "1s", value: 25 },
+                  { label: "2s", value: 51 },
+                  { label: "3s", value: 76 },
+                  { label: "5s", value: 127 }
+                ].map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => handleFadeChange(p.value)}
+                    className="btn-group-action"
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: "0.75rem",
+                      borderColor: activeFade === p.value ? "var(--primary)" : "rgba(255,255,255,0.05)",
+                      color: activeFade === p.value ? "#fff" : "var(--muted)",
+                      background: activeFade === p.value ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                      fontWeight: activeFade === p.value ? "bold" : "normal"
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="color-groups-grid">
               {[
                 { title: "Alle Lampen (Master)", startId: 10 },
                 { title: "ADJ LED Bars", startId: 30 },
                 { title: "lightmaXX LED Bars", startId: 40 },
                 { title: "Chauvet SlimPARs", startId: 50 },
-                { title: "Eurolite KLS-200", startId: 60 }
+                { title: "Eurolite KLS-200 (All)", startId: 60 },
+                { title: "KLS-200 - Spot 1", startId: 100 },
+                { title: "KLS-200 - Spot 2", startId: 110 },
+                { title: "KLS-200 - Spot 3", startId: 120 },
+                { title: "KLS-200 - Spot 4", startId: 130 }
               ].map(group => (
                 <div key={group.title} className="color-group-box">
                   <div className="color-group-header">
