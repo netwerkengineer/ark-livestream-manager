@@ -141,6 +141,18 @@ export default function LightsControl({ settings }: LightsControlProps) {
     }
   };
 
+  const sendOscValueImmediate = async (path: string, value: number) => {
+    try {
+      await fetch("/api/qlc/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, value }),
+      });
+    } catch (err) {
+      console.error(`Failed to send QLC OSC immediate value for ${path}:`, err);
+    }
+  };
+
   const handleBlackout = async () => {
     // 1. Turn off active scene if any
     if (activeScene !== null) {
@@ -169,17 +181,25 @@ export default function LightsControl({ settings }: LightsControlProps) {
         });
       }
     }
-    // 4. Reset Fresnel faders to 0
+    // 4. Reset Fresnel faders to 0 sequentially with delay to prevent UDP drops in QLC+
     setFresnel1(0);
-    sendOscValue("/ark/light/fresnel/1", 0);
     setFresnel2(0);
-    sendOscValue("/ark/light/fresnel/2", 0);
     setFresnel3(0);
-    sendOscValue("/ark/light/fresnel/3", 0);
     setFresnel4(0);
-    sendOscValue("/ark/light/fresnel/4", 0);
     setFresnelMaster(0);
-    sendOscValue("/ark/light/fresnel/master", 0);
+
+    const paths = [
+      "/ark/light/fresnel/1",
+      "/ark/light/fresnel/2",
+      "/ark/light/fresnel/3",
+      "/ark/light/fresnel/4",
+      "/ark/light/fresnel/master"
+    ];
+
+    for (const path of paths) {
+      await sendOscValueImmediate(path, 0);
+      await new Promise(resolve => setTimeout(resolve, 30)); // 30ms spacing between OSC packets
+    }
 
     // 5. Reset all states in UI
     setActiveScene(null);
