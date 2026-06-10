@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { signIn, signOut, useSession } from "next-auth/react";
 import ThumbnailEditor from "@/components/ThumbnailEditor";
 import StreamMonitor from "@/components/StreamMonitor";
+import FreeshowGenerator from "@/components/FreeshowGenerator";
 import { 
   LayoutDashboard, 
   Video, 
@@ -76,11 +77,12 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [tags, setTags] = useState("");
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights">("control");
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights" | "freeshow">("control");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow">("general");
+  const [availableTemplates, setAvailableTemplates] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [scheduledStreams, setScheduledStreams] = useState<any[]>([]);
@@ -223,6 +225,19 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       fetchLocalUsers();
     }
   }, [settingsTab, userRole, showSettings]);
+
+  useEffect(() => {
+    if (showSettings && settingsTab === "freeshow") {
+      fetch("/api/projects")
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.projects) {
+            setAvailableTemplates(data.projects);
+          }
+        })
+        .catch(err => console.error("Error fetching projects for template list:", err));
+    }
+  }, [showSettings, settingsTab]);
 
   const handleOperatorLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -569,6 +584,13 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         >
           <Sun size={18} /> Lichtregie
         </button>
+        <button 
+          onClick={() => setActiveTab("freeshow")} 
+          className={activeTab === "freeshow" ? "btn-primary" : "btn-outline"}
+          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "freeshow" ? 'none' : '1px solid rgba(56, 189, 248, 0.4)' }}
+        >
+          <Layers size={18} /> FreeShow Projecten
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -900,7 +922,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         >
           <BroadcastControlCenter settings={settings} />
         </motion.div>
-      ) : (
+      ) : activeTab === "lights" ? (
         <motion.div
           key="lights"
           initial={{ opacity: 0, scale: 0.95 }}
@@ -908,6 +930,15 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           exit={{ opacity: 0, scale: 0.95 }}
         >
           <LightsControl settings={settings} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="freeshow"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+        >
+          <FreeshowGenerator />
         </motion.div>
       )}
       </AnimatePresence>
@@ -1092,6 +1123,27 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                       <span>Gebruikersbeheer</span>
                     </button>
                   )}
+                  <button 
+                    type="button"
+                    onClick={() => setSettingsTab("freeshow")}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: settingsTab === "freeshow" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                      color: settingsTab === "freeshow" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                      fontWeight: settingsTab === "freeshow" ? 600 : 500,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Layers size={18} />
+                    <span>FreeShow</span>
+                  </button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1955,6 +2007,147 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                           </div>
                         )}
                       </div>
+                    </section>
+                  )}
+
+                  {settingsTab === "freeshow" && (
+                    <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>⛪ FreeShow Instellingen</h3>
+                      
+                      <div className="input-group">
+                        <label className="input-label">FreeShow Hoofdmap</label>
+                        <input 
+                          type="text" 
+                          className="input-field" 
+                          value={settings.freeshowPath || ""} 
+                          onChange={(e) => setSettings({ ...settings, freeshowPath: e.target.value })} 
+                          placeholder="/volume1/Beamer/FreeShow"
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="input-group">
+                          <label className="input-label">Projecten Map</label>
+                          <input 
+                            type="text" 
+                            className="input-field" 
+                            value={settings.freeshowProjectPath || ""} 
+                            onChange={(e) => setSettings({ ...settings, freeshowProjectPath: e.target.value })} 
+                            placeholder="/volume1/Beamer/FreeShow/projects"
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Media Map</label>
+                          <input 
+                            type="text" 
+                            className="input-field" 
+                            value={settings.freeshowMediaPath || ""} 
+                            onChange={(e) => setSettings({ ...settings, freeshowMediaPath: e.target.value })} 
+                            placeholder="/volume1/Beamer/FreeShow/media"
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="input-group">
+                          <label className="input-label">Prullenbak Map (.trash)</label>
+                          <input 
+                            type="text" 
+                            className="input-field" 
+                            value={settings.freeshowTrashPath || ""} 
+                            onChange={(e) => setSettings({ ...settings, freeshowTrashPath: e.target.value })} 
+                            placeholder="/volume1/Beamer/FreeShow/.trash"
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Standaard Sjabloon (Template)</label>
+                          <select 
+                            className="input-field" 
+                            style={{ width: '100%' }}
+                            value={settings.defaultTemplate || ""} 
+                            onChange={(e) => setSettings({ ...settings, defaultTemplate: e.target.value })}
+                          >
+                            <option value="">-- Geen template (Leeg project) --</option>
+                            <option value="template.project">template.project (Ingebouwde Fallback)</option>
+                            {availableTemplates.map((tmpl) => (
+                              tmpl !== 'template.project' && (
+                                <option key={tmpl} value={tmpl}>{tmpl}</option>
+                              )
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="input-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <input 
+                          type="checkbox" 
+                          id="autoSaveToNas"
+                          checked={!!settings.autoSaveToNas} 
+                          onChange={(e) => setSettings({ ...settings, autoSaveToNas: e.target.checked })} 
+                          style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="autoSaveToNas" className="input-label" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>
+                          Gegenereerde projecten automatisch opslaan op de NAS
+                        </label>
+                      </div>
+
+                      <h4 style={{ fontSize: '1rem', fontWeight: 600, marginTop: '12px', color: 'var(--primary)' }}>💾 Externe Back-up Bestemming</h4>
+                      <div className="input-group">
+                        <label className="input-label">Back-up Methode</label>
+                        <select 
+                          className="input-field" 
+                          value={settings.backupTarget || "none"} 
+                          onChange={(e) => setSettings({ ...settings, backupTarget: e.target.value })}
+                        >
+                          <option value="none">Geen (Alleen lokaal opslaan)</option>
+                          <option value="ftp">FTP Server</option>
+                          <option value="webdav">WebDAV Cloud Server</option>
+                        </select>
+                      </div>
+
+                      {settings.backupTarget === "ftp" && (
+                        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                            <div className="input-group">
+                              <label className="input-label">FTP Host</label>
+                              <input type="text" className="input-field" value={settings.ftpHost || ""} onChange={e => setSettings({...settings, ftpHost: e.target.value})} placeholder="ftp.voorbeeld.nl" />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">FTP Poort</label>
+                              <input type="number" className="input-field" value={settings.ftpPort || 21} onChange={e => setSettings({...settings, ftpPort: parseInt(e.target.value) || 21})} placeholder="21" />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div className="input-group">
+                              <label className="input-label">FTP Gebruiker</label>
+                              <input type="text" className="input-field" value={settings.ftpUser || ""} onChange={e => setSettings({...settings, ftpUser: e.target.value})} placeholder="User" />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">FTP Wachtwoord</label>
+                              <input type="password" className="input-field" value={settings.ftpPass || ""} onChange={e => setSettings({...settings, ftpPass: e.target.value})} placeholder="••••••••" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {settings.backupTarget === "webdav" && (
+                        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                          <div className="input-group">
+                            <label className="input-label">WebDAV URL</label>
+                            <input type="text" className="input-field" value={settings.webdavUrl || ""} onChange={e => setSettings({...settings, webdavUrl: e.target.value})} placeholder="https://wolk.voorbeeld.nl/remote.php/dav" />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div className="input-group">
+                              <label className="input-label">WebDAV Gebruiker</label>
+                              <input type="text" className="input-field" value={settings.webdavUser || ""} onChange={e => setSettings({...settings, webdavUser: e.target.value})} placeholder="User" />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">WebDAV Wachtwoord</label>
+                              <input type="password" className="input-field" value={settings.webdavPass || ""} onChange={e => setSettings({...settings, webdavPass: e.target.value})} placeholder="••••••••" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </section>
                   )}
                   
