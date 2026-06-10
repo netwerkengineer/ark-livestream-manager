@@ -11,12 +11,17 @@ services:
       - "5004-5007:5004-5007/udp"
     volumes:
       - ./data:/app/data
-      - /volume1/Beamer/FreeShow/Media:/app/public/thumbnails
+      - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
+      - /mnt/data/Projects/Beamer/FreeShow/Media:/app/public/thumbnails
     environment:
       - NODE_ENV=production
       - PORT=3005
+      - HOSTNAME=0.0.0.0
     networks:
       - ark-net
+    extra_hosts:
+      - "livestream-manager:127.0.0.1"
+
 
   companion:
     image: companion-nas-v4-3-4:latest

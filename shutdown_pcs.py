@@ -5,8 +5,9 @@ import subprocess
 import time
 import sys
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def get_settings():
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(SCRIPT_DIR, "data", "settings.json"),
         "/app/data/settings.json",
@@ -20,6 +21,13 @@ def get_settings():
             except Exception as e:
                 print(f"Error reading settings from {c}: {e}")
     return {}
+
+def get_ssh_user(host_ip):
+    if host_ip == "192.168.2.100":
+        return "beamer"
+    elif host_ip == "192.168.2.101":
+        return "admin"
+    return "jeffreygo"
 
 def detect_os(user, host_ip):
     # Returns "windows", "macos", or "linux"
@@ -50,12 +58,20 @@ def shutdown_single_plug_sequence(plug, settings):
     name = plug.get("name", plug.get("id"))
     plug_id = plug.get("id")
     host_ip = plug.get("hostIp")
-    user = settings.get("sshUser", "jeffreygo")
+    
+    # Fallback to settings hosts if empty
+    if not host_ip or host_ip == "":
+        if plug_id == "plug_obs":
+            host_ip = settings.get("obsHost")
+        elif plug_id == "plug_beamer":
+            host_ip = settings.get("freeShowHost")
+            
+    user = get_ssh_user(host_ip)
     
     print(f"=== Starting Shutdown for Plug: {name} (ID: {plug_id}) ===")
     
-    if host_ip:
-        print(f"[{name}] Detecting operating system for host ({host_ip})...")
+    if host_ip and host_ip != "":
+        print(f"[{name}] Detecting operating system for host ({host_ip}) as user {user}...")
         os_type = detect_os(user, host_ip)
         print(f"[{name}] Detected operating system: {os_type}")
         
@@ -75,7 +91,7 @@ def shutdown_single_plug_sequence(plug, settings):
         time.sleep(15)
         
     print(f"[{name}] Turning off plug power...")
-    subprocess.run(["python3", "/app/control_plug.py", "off", plug_id])
+    subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id])
     print(f"✅ [{name}] Shutdown sequence completed.")
 
 def main():
@@ -130,10 +146,21 @@ def main():
     
     for plug in targets:
         host_ip = plug.get("hostIp")
+        p_id = plug.get("id")
         name = plug.get("name", plug.get("id"))
-        if host_ip:
+        
+        # Fallback to settings hosts if empty
+        if not host_ip or host_ip == "":
+            if p_id == "plug_obs":
+                host_ip = settings.get("obsHost")
+            elif p_id == "plug_beamer":
+                host_ip = settings.get("freeShowHost")
+                
+        user = get_ssh_user(host_ip)
+        
+        if host_ip and host_ip != "":
             hosts_shutting_down = True
-            print(f"[{name}] Detecting operating system for host ({host_ip})...")
+            print(f"[{name}] Detecting operating system for host ({host_ip}) as user {user}...")
             os_type = detect_os(user, host_ip)
             print(f"[{name}] Detected operating system: {os_type}")
             
@@ -167,7 +194,7 @@ def main():
         p_id = plug.get("id")
         name = plug.get("name", plug.get("id"))
         print(f"[{name}] Turning off plug power...")
-        res = subprocess.run(["python3", "/app/control_plug.py", "off", p_id])
+        res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", p_id])
         if res.returncode != 0:
             overall_success = False
             

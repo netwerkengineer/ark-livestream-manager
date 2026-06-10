@@ -5,8 +5,9 @@ import subprocess
 import time
 import sys
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def get_settings():
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(SCRIPT_DIR, "data", "settings.json"),
         "/app/data/settings.json",
@@ -21,8 +22,15 @@ def get_settings():
                 print(f"Error reading settings: {e}")
     return {}
 
+def get_ssh_user(host_ip):
+    if host_ip == "192.168.2.100":
+        return "beamer"
+    elif host_ip == "192.168.2.101":
+        return "admin"
+    return "jeffreygo"
+
 def wait_for_ssh(user, host, max_attempts=60):
-    print(f"Waiting for remote host {host} to become available via SSH...")
+    print(f"Waiting for remote host {host} to become available via SSH as user {user}...")
     for i in range(1, max_attempts + 1):
         res = subprocess.run(
             ["ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"],
@@ -39,16 +47,24 @@ def startup_single_plug(plug, settings):
     name = plug.get("name", plug.get("id"))
     plug_id = plug.get("id")
     host_ip = plug.get("hostIp")
-    user = settings.get("sshUser", "jeffreygo")
+    
+    # Fallback to settings hosts if empty
+    if not host_ip or host_ip == "":
+        if plug_id == "plug_obs":
+            host_ip = settings.get("obsHost")
+        elif plug_id == "plug_beamer":
+            host_ip = settings.get("freeShowHost")
+            
+    user = get_ssh_user(host_ip)
     
     print(f"=== Starting Plug: {name} (ID: {plug_id}) ===")
     
     # 1. Turn on plug
     print(f"[{name}] Turning ON via control_plug.py...")
-    subprocess.run(["python3", "/app/control_plug.py", "on", plug_id])
+    subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", plug_id])
     
     # 2. If host IP is associated, wait for SSH and launch apps
-    if host_ip:
+    if host_ip and host_ip != "":
         print(f"[{name}] Associated host IP found: {host_ip}")
         if wait_for_ssh(user, host_ip):
             print(f"[{name}] Waiting 5s for system resources to stabilize...")
@@ -64,7 +80,7 @@ def startup_single_plug(plug, settings):
             # Case A: FreeShow Host (or home environment fallback)
             if host_ip == freeshow_host or host_ip == "192.168.2.20":
                 print(f"[{name}] FreeShow host detected. Importing Sunday project...")
-                subprocess.run(["python3", "/app/import_project.py"])
+                subprocess.run(["python3", os.path.join(SCRIPT_DIR, "import_project.py")])
                 
                 if is_win:
                     print(f"[{name}] Launching FreeShow on Windows via schtasks...")

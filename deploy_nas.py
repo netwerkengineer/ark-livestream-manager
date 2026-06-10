@@ -207,6 +207,7 @@ def deploy():
         f"cd {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} tar -xzf {config['REMOTE_TEMP_ARCHIVE']} -C {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
+        f"{sudo_p} sed -i 's|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g' docker-compose.yml && "
         f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
         f"{cleanup_emulators}"

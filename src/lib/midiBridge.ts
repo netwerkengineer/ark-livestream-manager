@@ -182,7 +182,7 @@ async function handleMidiAction(status: number, d1: number, d2: number) {
       console.log(`[MIDI] Triggering knop: ${buttonToTrigger.name} via noot ${d1}`);
       
       try {
-        const host = process.env.HOSTNAME || '127.0.0.1';
+        const host = '127.0.0.1';
         await fetch(`http://${host}:${process.env.PORT || 3000}/api/broadcast/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

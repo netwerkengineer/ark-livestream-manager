@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Set cookie for 30 days
     response.cookies.set("operator_session", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       path: "/",
       sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60, // 30 days

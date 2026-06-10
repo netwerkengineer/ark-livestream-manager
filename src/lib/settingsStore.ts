@@ -62,6 +62,26 @@ export interface AppSettings {
   tuyaPlugs?: TuyaPlug[];
   schedules?: TuyaSchedule[];
   users?: LocalUser[];
+
+  // Freeshow Configuration
+  freeshowPath?: string;
+  freeshowProjectPath?: string;
+  freeshowMediaPath?: string;
+  freeshowTrashPath?: string;
+  autoSaveToNas?: boolean;
+  defaultTemplate?: string;
+  backupTarget?: string;
+  ftpHost?: string;
+  ftpUser?: string;
+  ftpPass?: string;
+  ftpPort?: number;
+  webdavUrl?: string;
+  webdavUser?: string;
+  webdavPass?: string;
+  imapUser?: string;
+  imapPass?: string;
+  imapHost?: string;
+  imapPort?: number;
 }
 
 export interface LocalUser {
@@ -185,7 +205,27 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     { id: '3', name: 'CLEAR AUDIO', sub: 'Mute alle kanalen', icon: 'volume-x', color: 'amber', page: 2, row: 0, col: 0, midiNote: 62 },
     { id: '4', name: 'BLACKOUT', sub: 'Alles op zwart', icon: 'monitor-off', color: 'slate', page: 2, row: 0, col: 3, midiNote: 63 }
   ],
-  users: []
+  users: [],
+
+  // Freeshow Defaults
+  freeshowPath: "/volume1/Beamer/FreeShow",
+  freeshowProjectPath: "/volume1/Beamer/FreeShow/projects",
+  freeshowMediaPath: "/volume1/Beamer/FreeShow/media",
+  freeshowTrashPath: "/volume1/Beamer/FreeShow/.trash",
+  autoSaveToNas: false,
+  defaultTemplate: "template.project",
+  backupTarget: "none",
+  ftpHost: "",
+  ftpUser: "",
+  ftpPass: "",
+  ftpPort: 21,
+  webdavUrl: "",
+  webdavUser: "",
+  webdavPass: "",
+  imapUser: "",
+  imapPass: "",
+  imapHost: "imap.gmail.com",
+  imapPort: 993
 };
 
 // Ensure data directory exists
