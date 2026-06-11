@@ -181,7 +181,7 @@
   </Function>
   <Function ID="2" Type="Scene" Name="Pre-Service Amber">
    <Speed FadeIn="0" FadeOut="0" Duration="0"/>
-   <FixtureVal ID="4">0,255,1,100,2,0,3,255,4,0,5,0</FixtureVal>
+   <FixtureVal ID="4">0,255,1,100,2,0,3,0,4,255,5,0</FixtureVal>
    <FixtureVal ID="0">0,0</FixtureVal>
    <FixtureVal ID="1">0,0</FixtureVal>
    <FixtureVal ID="2">0,0</FixtureVal>
