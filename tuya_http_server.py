@@ -152,14 +152,11 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
         elif path == '/status_json':
             cache_key = ("status_json", plug_id)
-            now = time.time()
             cached_data = None
             
             with cache_lock:
                 if cache_key in status_cache:
-                    entry = status_cache[cache_key]
-                    if now - entry["timestamp"] < CACHE_TTL:
-                        cached_data = entry["data"]
+                    cached_data = status_cache[cache_key]["data"]
             
             if cached_data is None:
                 res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status_json", plug_id], capture_output=True, text=True)
@@ -170,6 +167,9 @@ class TuyaHandler(BaseHTTPRequestHandler):
                             "timestamp": time.time(),
                             "data": cached_data
                         }
+            
+            if cached_data is None:
+                cached_data = "[]"
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -185,10 +185,39 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Not Found")
 
+def status_poller_worker():
+    print("[STATUS POLLER] Background status poller thread started.")
+    global status_cache
+    
+    # Wait a moment for server initialization
+    time.sleep(2)
+    
+    while True:
+        try:
+            # Query status_json for all plugs
+            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status_json", "all"], capture_output=True, text=True)
+            if res.returncode == 0 and res.stdout.strip():
+                with cache_lock:
+                    status_cache[("status_json", "all")] = {
+                        "timestamp": time.time(),
+                        "data": res.stdout
+                    }
+            else:
+                print(f"[STATUS POLLER] Error querying status: returncode {res.returncode}, stderr: {res.stderr}")
+        except Exception as e:
+            print(f"[STATUS POLLER] Exception in status poller loop: {e}", file=sys.stderr)
+        
+        # Poll every 8 seconds
+        time.sleep(8)
+
 def run():
     # Start background scheduler thread
     sched_thread = threading.Thread(target=scheduler_worker, daemon=True)
     sched_thread.start()
+
+    # Start background status poller thread
+    poller_thread = threading.Thread(target=status_poller_worker, daemon=True)
+    poller_thread.start()
 
     server_address = ('0.0.0.0', 8088)
     httpd = ThreadingHTTPServer(server_address, TuyaHandler)

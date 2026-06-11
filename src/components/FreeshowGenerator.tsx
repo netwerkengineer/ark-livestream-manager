@@ -1116,17 +1116,19 @@ export default function FreeshowGenerator() {
                       database: t('tab_database')
                     };
                     return (
-                      <button key={tab} className="button" 
-                        title={labels[tab]}
-                        style={{ 
-                          flex: '1 0 auto', fontSize: '0.7rem', padding: '0.5rem', 
-                          background: inputType === tab ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                          border: tab === 'database' && builderSlides.length > 0 ? '1px solid var(--primary)' : 'none'
-                        }} 
-                        onClick={() => setInputType(tab as any)}
-                      >
-                        {tab === 'database' && builderSlides.length > 0 ? `🗃️ (${builderSlides.length})` : icons[tab]}
-                      </button>
+                      <div key={tab} className="tooltip-container" style={{ flex: '1 0 auto', display: 'flex' }}>
+                        <button className="button" 
+                          style={{ 
+                            width: '100%', fontSize: '0.7rem', padding: '0.5rem', 
+                            background: inputType === tab ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                            border: tab === 'database' && builderSlides.length > 0 ? '1px solid var(--primary)' : 'none'
+                          }} 
+                          onClick={() => setInputType(tab as any)}
+                        >
+                          {tab === 'database' && builderSlides.length > 0 ? `🗃️ (${builderSlides.length})` : icons[tab]}
+                        </button>
+                        <span className="tooltip-text">{labels[tab]}</span>
+                      </div>
                     );
                   })}
                 </div>
@@ -1163,6 +1165,7 @@ export default function FreeshowGenerator() {
                             .map((song, i) => (
                               <div 
                                 key={i} 
+                                title={song.name}
                                 style={{ 
                                   padding: '8px 12px', 
                                   background: 'rgba(255,255,255,0.02)', 
@@ -1230,6 +1233,7 @@ export default function FreeshowGenerator() {
                             .map((song, i) => (
                               <div 
                                 key={i} 
+                                title={song.name}
                                 style={{ 
                                   padding: '8px 12px', 
                                   background: 'rgba(255,255,255,0.02)', 
@@ -1389,7 +1393,7 @@ export default function FreeshowGenerator() {
 
                 {inputType === 'youtube' && (
                   <div>
-                    <input type="text" className="input" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder={t('search_placeholder')} />
+                    <input type="text" className="input" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder={t('youtube_placeholder')} />
                     <button className="button" style={{ width: '100%', marginTop: '0.5rem' }} onClick={adHocAddYoutube} disabled={isDownloading}>
                       {isDownloading ? t('downloading') : `⬇️ ${t('download_add')}`}
                     </button>
@@ -1496,7 +1500,7 @@ export default function FreeshowGenerator() {
                   ) : (
                     <>
                       <span style={{ opacity: 0.6, fontSize: '0.75rem', minWidth: '20px' }}>{idx + 1}.</span>
-                      <span style={{ fontWeight: 500 }}>
+                      <span style={{ fontWeight: 500 }} title={item.type === 'song' ? item.title : item.type === 'bible' ? item.ref : t(item.title)}>
                         {item.type === 'song' ? item.title : item.type === 'bible' ? item.ref : t(item.title)}
                       </span>
                       {item.source === 'template' && <span style={{ fontSize: '0.6rem', opacity: 0.4 }}>(T)</span>}

@@ -46,7 +46,7 @@ def get_single_plug_status(plug_info):
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.4)
+        s.settimeout(1.0)
         s.connect((ip, 6668))
         s.close()
     except Exception:
@@ -55,7 +55,7 @@ def get_single_plug_status(plug_info):
     try:
         d = tinytuya.OutletDevice(device_id, ip, local_key)
         d.set_version(version)
-        d.set_socketTimeout(0.6)  # Fast timeout for responsive UI
+        d.set_socketTimeout(1.2)  # Fast timeout for responsive UI but robust enough for network latency
         status = d.status()
         if status and "Error" not in status:
             result["is_online"] = True
