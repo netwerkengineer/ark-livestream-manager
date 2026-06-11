@@ -294,3 +294,36 @@ textarea.input-field {
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* Custom Tooltips */
+.tooltip-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip-container .tooltip-text {
+  visibility: hidden;
+  background-color: rgba(15, 23, 42, 0.95);
+  color: #fff;
+  text-align: center;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  position: absolute;
+  z-index: 100;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s, visibility 0.2s;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+

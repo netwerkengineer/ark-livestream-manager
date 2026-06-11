@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       console.log(`[TUYA API] Querying host: ${url}`);
       const res = await fetch(url, { 
         cache: 'no-store',
-        signal: AbortSignal.timeout(1200) 
+        signal: AbortSignal.timeout(3000) 
       });
       if (res.ok) {
         statusData = await res.json();

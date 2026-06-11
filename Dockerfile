@@ -25,7 +25,9 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
-RUN apk add --no-cache alsa-lib ffmpeg
+RUN apk add --no-cache alsa-lib ffmpeg python3 curl && \
+    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 WORKDIR /app
 
 ENV NODE_ENV production
