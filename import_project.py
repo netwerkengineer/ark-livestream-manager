@@ -24,6 +24,18 @@ def get_settings():
                 print(f"Error reading settings file {c}: {e}")
     return {}
 
+def patch_paths(obj, old_prefixes, new_prefix):
+    if isinstance(obj, str):
+        for old_prefix in old_prefixes:
+            if obj.startswith(old_prefix):
+                return obj.replace(old_prefix, new_prefix, 1)
+        return obj
+    elif isinstance(obj, dict):
+        return {k: patch_paths(v, old_prefixes, new_prefix) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [patch_paths(v, old_prefixes, new_prefix) for v in obj]
+    return obj
+
 def get_projects_dir(settings):
     default_dir = "/mnt/data/Projects/Beamer/FreeShow/projects"
     thumb_path = settings.get("thumbnailSavePath")
@@ -151,6 +163,19 @@ def import_project():
                 "showsPath": f"{default_docs_dir}/Shows",
                 "activeProject": None
             }
+
+        # Patch generator media paths inside project to match remote client's dataPath/remote_docs_dir
+        generator_path = settings.get("freeshowPath", "/mnt/data/Projects/Beamer/FreeShow").rstrip("/")
+        old_prefixes = [
+            generator_path,
+            "/mnt/data/Projects/Beamer/FreeShow",
+            "/volume1/Projects/Beamer/FreeShow",
+            "/volume1/Beamer/FreeShow"
+        ]
+        
+        print(f"Patching project paths from generator path prefixes to remote dataPath: {remote_docs_dir}")
+        project_obj = patch_paths(project_obj, old_prefixes, remote_docs_dir)
+        shows_dict = patch_paths(shows_dict, old_prefixes, remote_docs_dir)
 
         # Download existing config files from remote host
         # projects.json
