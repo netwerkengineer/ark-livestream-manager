@@ -4,11 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: livestream-manager
-    hostname: livestream-manager
     restart: always
-    ports:
-      - "3005:3005"
-      - "5004-5007:5004-5007/udp"
+    network_mode: host
+    extra_hosts:
+      - "livestream-manager:127.0.0.1"
     volumes:
       - ./data:/app/data
       - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
@@ -17,10 +16,6 @@ services:
       - NODE_ENV=production
       - PORT=3005
       - HOSTNAME=0.0.0.0
-    networks:
-      - ark-net
-    extra_hosts:
-      - "livestream-manager:127.0.0.1"
 
 
   companion:
