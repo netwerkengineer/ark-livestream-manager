@@ -145,8 +145,8 @@ def deploy():
     # 3. NAS MAP VOORBEREIDEN
     ssh_p = f"ssh -S {global_ssh_mux_socket}"
     # We maken zowel de app-map, de data-map, companion-data als de Media-map aan
-    media_path = "/volume1/Beamer/FreeShow/Media"
-    prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/companion-data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {media_path} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {media_path}\""
+    freeshow_path = "/volume1/Beamer/FreeShow"
+    prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/companion-data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Media && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Shows && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Config && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {freeshow_path}\""
     run_with_pty(prep_cmd, "Mappen checken en aanmaken op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
     # 4. OVERZETTEN NAAR NAS
