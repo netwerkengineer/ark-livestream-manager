@@ -45,16 +45,19 @@ export async function GET(req: NextRequest) {
           const content = await fs.readFile(filePath, 'utf-8');
           const json = JSON.parse(content);
           
+          // Support both [id, data] array format and direct object format
+          const showData = Array.isArray(json) && json.length === 2 ? json[1] : json;
+          
           let mediaInfo = null;
-          if (json.media && Object.keys(json.media).length > 0) {
-            const firstMedia: any = Object.values(json.media)[0];
+          if (showData.media && Object.keys(showData.media).length > 0) {
+            const firstMedia: any = Object.values(showData.media)[0];
             mediaInfo = { name: firstMedia.name, type: firstMedia.type };
           }
 
           // Extraheer alle tekst uit de slides voor een 'fingerprint'
           let allText = '';
-          if (json.slides) {
-            Object.values(json.slides).forEach((slide: any) => {
+          if (showData.slides) {
+            Object.values(showData.slides).forEach((slide: any) => {
               if (slide.items) {
                 slide.items.forEach((item: any) => {
                   if (item.type === 'text' && item.lines) {
@@ -73,8 +76,8 @@ export async function GET(req: NextRequest) {
 
           showList.push({
             filename: file,
-            name: json.name || file.replace(/\.show$/i, ''),
-            category: json.category || 'unknown',
+            name: showData.name || file.replace(/\.show$/i, ''),
+            category: showData.category || 'unknown',
             modified: stats.mtimeMs,
             snippet: allText.substring(0, 100).trim(),
             contentHash: allText.trim(),
@@ -122,6 +125,17 @@ export async function GET(req: NextRequest) {
         // 3. Exacte inhoud (slides tekst)
         if (!isDuplicate && current.contentHash && current.contentHash === target.contentHash) {
           isDuplicate = true;
+        }
+
+        // 4. Fuzzy check op show namen (indien ze erg op elkaar lijken, bijv. "Lied 1" en "Lied 1a")
+        if (!isDuplicate && current.name && target.name) {
+          const lFunc = typeof levenshtein === 'function' ? levenshtein : (levenshtein as any).levenshteinEditDistance;
+          if (typeof lFunc === 'function') {
+            const dist = lFunc(current.name.toLowerCase(), target.name.toLowerCase());
+            if (dist <= 2 && current.name.length >= 6) {
+              isDuplicate = true;
+            }
+          }
         }
 
         if (isDuplicate) {
