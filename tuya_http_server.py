@@ -7,7 +7,19 @@ import time
 import datetime
 import json
 from urllib.parse import urlparse, parse_qs
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# Global cache and lock for plug status to prevent flooding and improve performance
+status_cache = {}
+cache_lock = threading.Lock()
+CACHE_TTL = 4.0  # seconds
+
+def invalidate_cache(plug_id):
+    with cache_lock:
+        # Clear specific plug
+        keys_to_remove = [k for k in status_cache.keys() if k[1] == plug_id or plug_id == "all" or k[1] == "all"]
+        for k in keys_to_remove:
+            status_cache.pop(k, None)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -83,6 +95,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
 
         if path == '/on':
             print(f"Received HTTP request: Turn ON for plug: {plug_id} (starting startup sequence in background)")
+            invalidate_cache(plug_id)
             subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "startup_pcs.py"), plug_id])
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
@@ -91,6 +104,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
         elif path == '/off':
             print(f"Received HTTP request: Turn OFF for plug: {plug_id}")
+            invalidate_cache(plug_id)
             res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id], capture_output=True, text=True)
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
@@ -99,6 +113,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
         elif path == '/shutdown':
             print(f"Received HTTP request: Shutdown sequence for plug: {plug_id}")
+            invalidate_cache(plug_id)
             # Run the shutdown sequence in the background so the HTTP response is sent immediately
             subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "shutdown_pcs.py"), plug_id])
             self.send_response(200)
@@ -107,19 +122,63 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.wfile.write(f"OK: Shutdown sequence started in background for plug '{plug_id}'".encode())
             
         elif path == '/status':
-            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status", plug_id], capture_output=True, text=True)
+            cache_key = ("status", plug_id)
+            now = time.time()
+            cached_data = None
+            
+            with cache_lock:
+                if cache_key in status_cache:
+                    entry = status_cache[cache_key]
+                    if now - entry["timestamp"] < CACHE_TTL:
+                        cached_data = entry["data"]
+            
+            if cached_data is None:
+                res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status", plug_id], capture_output=True, text=True)
+                cached_data = res.stdout
+                if res.returncode == 0:
+                    with cache_lock:
+                        status_cache[cache_key] = {
+                            "timestamp": time.time(),
+                            "data": cached_data
+                        }
+            
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(res.stdout.encode())
+            try:
+                self.wfile.write(cached_data.encode())
+            except Exception as e:
+                print(f"[HTTP] Error writing /status response: {e}")
             
         elif path == '/status_json':
-            res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status_json", plug_id], capture_output=True, text=True)
+            cache_key = ("status_json", plug_id)
+            now = time.time()
+            cached_data = None
+            
+            with cache_lock:
+                if cache_key in status_cache:
+                    entry = status_cache[cache_key]
+                    if now - entry["timestamp"] < CACHE_TTL:
+                        cached_data = entry["data"]
+            
+            if cached_data is None:
+                res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "status_json", plug_id], capture_output=True, text=True)
+                cached_data = res.stdout
+                if res.returncode == 0:
+                    with cache_lock:
+                        status_cache[cache_key] = {
+                            "timestamp": time.time(),
+                            "data": cached_data
+                        }
+            
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(res.stdout.encode())
+            try:
+                self.wfile.write(cached_data.encode())
+            except Exception as e:
+                print(f"[HTTP] Error writing /status_json response: {e}")
             
         else:
             self.send_response(404)
@@ -132,7 +191,7 @@ def run():
     sched_thread.start()
 
     server_address = ('0.0.0.0', 8088)
-    httpd = HTTPServer(server_address, TuyaHandler)
+    httpd = ThreadingHTTPServer(server_address, TuyaHandler)
     print("Starting Tuya Control HTTP Server on port 8088...")
     try:
         httpd.serve_forever()
