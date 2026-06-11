@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
 import { isAuthorized } from "@/lib/authHelper";
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req);
@@ -24,6 +25,8 @@ export async function GET(req: NextRequest) {
   // Deduplicate hosts to avoid redundant requests to the single-threaded/caching Tuya daemon
   const hostsToTry = Array.from(new Set(rawHosts.filter(Boolean)));
 
+  console.log(`[TUYA API] Starting status query. Hosts to try:`, hostsToTry);
+
   let statusData = [];
   let success = false;
 
@@ -31,16 +34,25 @@ export async function GET(req: NextRequest) {
     if (!host) continue;
     try {
       const url = `http://${host}:8088/status_json`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(1200) });
+      console.log(`[TUYA API] Querying host: ${url}`);
+      const res = await fetch(url, { 
+        cache: 'no-store',
+        signal: AbortSignal.timeout(1200) 
+      });
       if (res.ok) {
         statusData = await res.json();
         success = true;
+        console.log(`[TUYA API] Successfully got status from host: ${host}, plugs count: ${statusData.length}`);
         break;
+      } else {
+        console.log(`[TUYA API] Host ${host} returned non-ok status: ${res.status}`);
       }
-    } catch (e) {
-      // Continue to next host
+    } catch (e: any) {
+      console.log(`[TUYA API] Failed to query host ${host}:`, e.message || e);
     }
   }
+
+  console.log(`[TUYA API] Query complete. Success: ${success}, plugs count: ${statusData.length}`);
 
   if (!success) {
     // Return empty list and a warning status instead of a hard crash
