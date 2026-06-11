@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
             Object.values(showData.slides).forEach((slide: any) => {
               if (slide.items) {
                 slide.items.forEach((item: any) => {
-                  if (item.type === 'text' && item.lines) {
+                  if (item.lines) {
                     item.lines.forEach((line: any) => {
                       if (line.text) {
                         line.text.forEach((t: any) => {
