@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
 import { isAuthorized } from "@/lib/authHelper";
+import { exec } from 'child_process';
+import path from 'path';
+import fs from 'fs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -28,6 +31,7 @@ export async function POST(req: NextRequest) {
   let success = false;
   let responseText = '';
 
+  // Try Tuya HTTP daemon first
   for (const host of hostsToTry) {
     if (!host) continue;
     try {
@@ -47,6 +51,49 @@ export async function POST(req: NextRequest) {
       }
     } catch (e: any) {
       console.log(`[WIPE SCRIPTURES API] Failed to query host ${host}:`, e.message || e);
+    }
+  }
+
+  // Fallback: execute Python script directly if daemon is unreachable
+  if (!success) {
+    console.log(`[WIPE SCRIPTURES API] Daemon unreachable. Attempting direct script execution...`);
+    
+    // Look for the script in multiple locations
+    const scriptCandidates = [
+      path.join(process.cwd(), 'sync_and_cleanup_freeshow.py'),
+      '/app/sync_and_cleanup_freeshow.py'
+    ];
+    
+    let scriptPath = '';
+    for (const candidate of scriptCandidates) {
+      if (fs.existsSync(candidate)) {
+        scriptPath = candidate;
+        break;
+      }
+    }
+    
+    if (scriptPath) {
+      try {
+        // Ensure data directory exists for log file
+        const dataDir = path.join(path.dirname(scriptPath), 'data');
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        
+        // Execute in background (fire and forget)
+        const logPath = path.join(dataDir, 'sync_cleanup.log');
+        fs.appendFileSync(logPath, `\n--- DIRECT SCRIPTURE DELETION TRIGGERED AT ${new Date().toISOString()} ---\n`);
+        
+        exec(`python3 "${scriptPath}" --delete-all-scriptures >> "${logPath}" 2>&1 &`);
+        
+        success = true;
+        responseText = 'OK: Scripture deletion started via direct execution (no daemon)';
+        console.log(`[WIPE SCRIPTURES API] Direct execution started: ${scriptPath}`);
+      } catch (e: any) {
+        console.log(`[WIPE SCRIPTURES API] Direct execution failed:`, e.message || e);
+      }
+    } else {
+      console.log(`[WIPE SCRIPTURES API] Script not found in any expected location`);
     }
   }
 

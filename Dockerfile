@@ -25,9 +25,10 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
-RUN apk add --no-cache alsa-lib ffmpeg python3 curl && \
+RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl && \
     curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp
+    chmod a+rx /usr/local/bin/yt-dlp && \
+    pip3 install --no-cache-dir --break-system-packages tinytuya
 WORKDIR /app
 
 ENV NODE_ENV production
@@ -47,6 +48,9 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy all Python scripts for direct execution fallback and services
+COPY --from=builder --chown=nextjs:nodejs /app/*.py ./
 
 USER nextjs
 
