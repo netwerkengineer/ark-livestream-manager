@@ -81,6 +81,24 @@ export async function GET(req: NextRequest) {
     })
   );
 
+  // Add Tuya Control daemon status checking candidate IPs
+  const tuyaHosts = [];
+  if (settings.tuyaApiHost) tuyaHosts.push(settings.tuyaApiHost);
+  tuyaHosts.push('127.0.0.1');
+  if (settings.companionHost) tuyaHosts.push(settings.companionHost);
+  tuyaHosts.push('172.17.0.1');
+  const uniqueTuyaHosts = Array.from(new Set(tuyaHosts.filter(Boolean)));
+
+  const tuyaChecks = await Promise.all(uniqueTuyaHosts.map(h => checkTcp(8088, h)));
+  const isTuyaUp = tuyaChecks.some(val => val);
+
+  status.push({
+    name: 'Tuya Control',
+    status: isTuyaUp ? 'UP' : 'DOWN',
+    port: 8088,
+    host: settings.tuyaApiHost || '127.0.0.1'
+  });
+
   return NextResponse.json({ 
     services: status,
     midiPeers: getActiveMidiPeers()
