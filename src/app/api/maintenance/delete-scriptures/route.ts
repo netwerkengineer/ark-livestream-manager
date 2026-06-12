@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         const logPath = path.join(dataDir, 'sync_cleanup.log');
         fs.appendFileSync(logPath, `\n--- DIRECT SCRIPTURE DELETION TRIGGERED AT ${new Date().toISOString()} ---\n`);
         
-        exec(`python3 "${scriptPath}" --delete-all-scriptures >> "${logPath}" 2>&1 &`);
+        exec(`python3 "${scriptPath}" --delete-all-scriptures --local-only >> "${logPath}" 2>&1 &`);
         
         success = true;
         responseText = 'OK: Scripture deletion started via direct execution (no daemon)';
