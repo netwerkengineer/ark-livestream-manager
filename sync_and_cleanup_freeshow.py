@@ -7,6 +7,16 @@ import base64
 import sys
 import glob
 
+def get_show_id_from_file(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]
+    except Exception as e:
+        print(f"Error reading show ID from {file_path}: {e}")
+    return None
+
 def get_settings():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -196,6 +206,20 @@ def main():
         remote_shows_dir = f"{remote_docs_dir}/Shows"
     print(f"Remote Shows directory resolved: {remote_shows_dir}")
     
+    # Load previous sync state
+    state_file = os.path.join(SCRIPT_DIR, "data", "sync_state.json")
+    if not os.path.exists(os.path.dirname(state_file)):
+        os.makedirs(os.path.dirname(state_file), exist_ok=True)
+        
+    sync_state = {}
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, 'r', encoding='utf-8') as f:
+                sync_state = json.load(f)
+            print(f"Vorige sync state geladen. Bestanden in state: {len(sync_state)}")
+        except Exception as e:
+            print(f"Warning: Failed to load sync state ({e}). Starting fresh.")
+            
     # 3. STAP 1: Oude Bijbelteksten (Scriptures) opschonen (> 7 dagen)
     print("\n--- STAP 1: SCRIPTURE OPSCHONING (> 7 dagen oud) ---")
     nas_shows = glob.glob(os.path.join(nas_shows_dir, "*.show"))
@@ -238,6 +262,8 @@ def main():
                             run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
                             
                         deleted_ids.append(show_id)
+                        if show_file in sync_state:
+                            del sync_state[show_file]
         except Exception as e:
             print(f"Fout bij verwerken van show {show_file} voor cleanup: {e}")
             
@@ -327,6 +353,79 @@ def main():
     print(f"Aantal shows op NAS: {len(nas_files)}")
     print(f"Aantal shows op Beamer PC: {len(remote_files)}")
     
+    # Deletion Propagation logic based on previous sync_state
+    deletions_on_remote = []
+    deletions_on_nas = []
+    remote_ids_to_remove = []
+    
+    if sync_state:
+        print("\n--- OPSPOREN VAN HANDMATIGE VERWIJDERINGEN ---")
+        for name, state_info in list(sync_state.items()):
+            # Case A: Deleted from NAS
+            if name not in nas_files:
+                print(f"Show '{name}' handmatig verwijderd van NAS. Propageren naar Beamer PC...")
+                deletions_on_remote.append(name)
+                show_id = state_info.get("id")
+                if show_id:
+                    remote_ids_to_remove.append(show_id)
+                if name in remote_files:
+                    del remote_files[name]
+                
+            # Case B: Deleted from Beamer PC
+            elif name not in remote_files:
+                print(f"Show '{name}' handmatig verwijderd van Beamer PC. Propageren naar NAS...")
+                deletions_on_nas.append(name)
+                show_id = state_info.get("id")
+                if show_id:
+                    remote_ids_to_remove.append(show_id)
+                if name in nas_files:
+                    del nas_files[name]
+                    
+        # Voer verwijderingen op NAS uit
+        for name in deletions_on_nas:
+            dest_path = os.path.join(nas_shows_dir, name)
+            if os.path.exists(dest_path):
+                try:
+                    os.remove(dest_path)
+                    print(f"Verwijderd van NAS: {name}")
+                except Exception as e:
+                    print(f"Fout bij verwijderen van NAS {name}: {e}")
+                    
+        # Voer verwijderingen op Beamer PC uit
+        for name in deletions_on_remote:
+            remote_file_path = f"{remote_shows_dir}/{name}"
+            print(f"Verwijderen van Beamer PC: {name}...")
+            if remote_os == "windows":
+                run_ssh_cmd(mac_user, mac_host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
+            else:
+                run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
+                
+        # Update remote shows.json index voor de handmatige verwijderingen
+        if remote_ids_to_remove:
+            print(f"Bijwerken van remote shows.json voor {len(remote_ids_to_remove)} handmatig verwijderde shows...")
+            local_temp_shows = "/tmp/remote_shows_sync.json"
+            if sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "get"):
+                try:
+                    with open(local_temp_shows, 'r', encoding='utf-8') as f:
+                        shows_json_data = json.load(f)
+                        
+                    modified_index = False
+                    for s_id in remote_ids_to_remove:
+                        if s_id in shows_json_data:
+                            del shows_json_data[s_id]
+                            modified_index = True
+                            
+                    if modified_index:
+                        with open(local_temp_shows, 'w', encoding='utf-8') as f:
+                            json.dump(shows_json_data, f)
+                        sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "put")
+                        print("Remote shows.json succesvol bijgewerkt.")
+                except Exception as e:
+                    print(f"Fout bij bewerken van shows.json: {e}")
+                finally:
+                    if os.path.exists(local_temp_shows):
+                        os.remove(local_temp_shows)
+                        
     # 1. Beamer PC -> NAS (new or newer on remote)
     copied_to_nas = 0
     for name, r_info in remote_files.items():
@@ -373,6 +472,25 @@ def main():
                     copied_to_remote += 1
                     
     print(f"Sync afgerond. Kopieren naar NAS: {copied_to_nas}, Kopieren naar Beamer PC: {copied_to_remote}")
+    
+    # Save the updated sync state
+    new_sync_state = {}
+    current_nas_shows = glob.glob(os.path.join(nas_shows_dir, "*.show"))
+    for show_path in current_nas_shows:
+        name = os.path.basename(show_path)
+        show_id = get_show_id_from_file(show_path)
+        new_sync_state[name] = {
+            "mtime": os.path.getmtime(show_path),
+            "size": os.path.getsize(show_path),
+            "id": show_id
+        }
+        
+    try:
+        with open(state_file, 'w', encoding='utf-8') as f:
+            json.dump(new_sync_state, f, indent=4)
+        print("Synchronisatiestate succesvol bijgewerkt en opgeslagen.")
+    except Exception as e:
+        print(f"ERROR: Failed to save sync state file: {e}")
     
     # 5. Teardown / Shutdown sequence if booted by script
     if turned_on_by_script:
