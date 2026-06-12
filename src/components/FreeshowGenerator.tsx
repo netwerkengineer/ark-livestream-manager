@@ -113,6 +113,8 @@ export default function FreeshowGenerator() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedTrashIds, setSelectedTrashIds] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isDeletingScriptures, setIsDeletingScriptures] = useState(false);
 
   // Shows Database Dashboard geconsolideerde states
   const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'>('catalog');
@@ -2014,6 +2016,74 @@ export default function FreeshowGenerator() {
                      )}
                    </div>
                 </div>
+
+               {/* Fourth Column: System Actions */}
+               <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                 <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>{t('system_actions')}</h3>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
+                   <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                     <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Synchroniseer alle shows tussen de NAS en de Beamer PC. Dit is hetzelfde als de automatische wekelijkse sync, maar handmatig gestart.</p>
+                     <button
+                       className="button"
+                       style={{ width: '100%', background: 'var(--primary)', color: '#020617', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700 }}
+                       disabled={isSyncing}
+                       onClick={async () => {
+                         setIsSyncing(true);
+                         setStatus(t('syncing'));
+                         try {
+                           const res = await fetch('/api/maintenance/sync', { method: 'POST' });
+                           const data = await res.json();
+                           if (res.ok) {
+                             setStatus('✅ Sync gestart: ' + (data.message || 'OK'));
+                             // Refresh catalog and history after a brief delay to allow sync to complete
+                             setTimeout(() => { fetchCatalog(); loadHistory(); scanDuplicates(); }, 3000);
+                           } else {
+                             setStatus('❌ Sync fout: ' + (data.error || 'Onbekende fout'));
+                           }
+                         } catch (e: any) {
+                           setStatus('❌ Sync fout: ' + e.message);
+                         } finally {
+                           setIsSyncing(false);
+                         }
+                       }}
+                     >
+                       {isSyncing ? t('syncing') : t('manual_sync')}
+                     </button>
+                   </div>
+
+                   <div style={{ background: 'rgba(239,68,68,0.05)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.15)' }}>
+                     <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Verwijder alle bijbeltekst-shows (categorie &quot;bible&quot;) van zowel de NAS als de Beamer PC. Dit kan niet ongedaan worden gemaakt.</p>
+                     <button
+                       className="button"
+                       style={{ width: '100%', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700 }}
+                       disabled={isDeletingScriptures}
+                       onClick={async () => {
+                         if (!confirm(t('delete_scriptures_confirm'))) return;
+                         setIsDeletingScriptures(true);
+                         setStatus(t('deleting_scriptures'));
+                         try {
+                           const res = await fetch('/api/maintenance/delete-scriptures', { method: 'POST' });
+                           const data = await res.json();
+                           if (res.ok) {
+                             setStatus('✅ Bijbelteksten verwijderd: ' + (data.message || 'OK'));
+                             fetchCatalog();
+                             loadHistory();
+                             scanDuplicates();
+                           } else {
+                             setStatus('❌ Fout: ' + (data.error || 'Onbekende fout'));
+                           }
+                         } catch (e: any) {
+                           setStatus('❌ Fout: ' + e.message);
+                         } finally {
+                           setIsDeletingScriptures(false);
+                         }
+                       }}
+                     >
+                       {isDeletingScriptures ? t('deleting_scriptures') : t('delete_all_scriptures')}
+                     </button>
+                   </div>
+                 </div>
+               </div>
               </div>
           )}
         </div>

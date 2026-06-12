@@ -1,29 +1,29 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import * as ftp from "basic-ftp";
 import { createClient } from "webdav";
+import { isAuthorized } from '@/lib/authHelper';
+import { getSettings } from '@/lib/settingsStore';
 
-async function readSettings() {
-  const settingsPath = path.join(process.cwd(), 'data', 'settings.json');
-  try {
-    const data = await fs.readFile(settingsPath, 'utf-8');
-    return JSON.parse(data);
-  } catch (e) {
-    return null;
-  }
-}
-
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const secret = searchParams.get('secret');
-    const settings = await readSettings();
+    const settings = getSettings();
 
     // Als er een secret wordt meegegeven (voor scheduler), check die
-    // In een echte productie omgeving zou dit een env var zijn, hier doen we een simpele check op de pincode
-    if (secret && settings && secret !== settings.adminPin) {
-       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (secret) {
+      const expectedPin = (settings as any).adminPin;
+      const expectedSecret = settings.nextAuthSecret;
+      if (secret !== expectedPin && secret !== expectedSecret) {
+         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    } else {
+      const authSession = await isAuthorized(req, undefined, "freeshow");
+      if (!authSession) {
+         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     if (!settings || settings.backupTarget === 'none') {
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       }
     } 
     else if (settings.backupTarget === 'webdav') {
-      const client = createClient(settings.webdavUrl, {
+      const client = createClient(settings.webdavUrl || '', {
         username: settings.webdavUser,
         password: settings.webdavPass,
       });

@@ -89,6 +89,7 @@ export interface LocalUser {
   passwordHash: string;
   salt: string;
   role: "admin" | "operator";
+  permissions?: string[];
 }
 
 export interface TuyaPlug {

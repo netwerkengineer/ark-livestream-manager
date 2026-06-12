@@ -4,7 +4,7 @@ import { sendMidiMessage } from '@/lib/midiBridge';
 import { isAuthorized } from "@/lib/authHelper";
 
 export async function POST(request: NextRequest) {
-  const authSession = await isAuthorized(request);
+  const authSession = await isAuthorized(request, undefined, "control");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }

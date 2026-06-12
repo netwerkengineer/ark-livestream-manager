@@ -6,7 +6,7 @@ import { getSettings } from '@/lib/settingsStore';
 
 export async function GET(req: NextRequest) {
   try {
-    const authSession = await isAuthorized(req);
+    const authSession = await isAuthorized(req, undefined, "freeshow");
     if (!authSession) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authSession = await isAuthorized(req);
+    const authSession = await isAuthorized(req, undefined, "freeshow");
     if (!authSession) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const authSession = await isAuthorized(req);
+    const authSession = await isAuthorized(req, undefined, "freeshow");
     if (!authSession) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }

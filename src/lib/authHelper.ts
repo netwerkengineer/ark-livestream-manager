@@ -49,13 +49,21 @@ export function decryptSession(sessionStr: string): any {
 // Check authorization
 export async function isAuthorized(
   req: NextRequest,
-  requiredRole?: "admin" | "operator"
+  requiredRole?: "admin" | "operator",
+  requiredPermission?: string
 ): Promise<any | null> {
   // 1. Check Google OAuth session (granted full admin status)
   const session = await auth();
   if (session) {
+    const adminUser = {
+      username: session.user?.name || "Google User",
+      role: "admin" as const,
+      permissions: ["planner", "control", "monitor", "lights", "freeshow"]
+    };
     if (!requiredRole || requiredRole === "admin" || requiredRole === "operator") {
-      return { username: session.user?.name || "Google User", role: "admin" };
+      if (!requiredPermission || adminUser.permissions.includes(requiredPermission)) {
+        return adminUser;
+      }
     }
   }
 
@@ -64,13 +72,28 @@ export async function isAuthorized(
   if (cookieVal) {
     const payload = decryptSession(cookieVal);
     if (payload && payload.username && payload.role) {
-      if (!requiredRole) {
-        return payload;
-      }
-      if (requiredRole === "admin" && payload.role !== "admin") {
+      const settings = getSettings();
+      const user = settings.users?.find(u => u.username.toLowerCase() === payload.username.toLowerCase());
+      
+      const userPermissions = user?.role === "admin"
+        ? ["planner", "control", "monitor", "lights", "freeshow"]
+        : (user?.permissions || []);
+
+      const resolvedUser = {
+        username: payload.username,
+        role: user?.role || payload.role,
+        permissions: userPermissions
+      };
+
+      if (requiredRole === "admin" && resolvedUser.role !== "admin") {
         return null; // Operator trying to access Admin-only route
       }
-      return payload; // Valid session matching role requirements
+      
+      if (requiredPermission && !resolvedUser.permissions.includes(requiredPermission)) {
+        return null; // Missing required permission for this theme
+      }
+
+      return resolvedUser; // Valid session matching role/permission requirements
     }
   }
 

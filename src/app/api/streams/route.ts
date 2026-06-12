@@ -32,7 +32,7 @@ async function syncThumbnailFromUrl(url: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const authSession = await isAuthorized(req, "admin");
+  const authSession = await isAuthorized(req, undefined, "planner");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const authSession = await isAuthorized(req, "admin");
+  const authSession = await isAuthorized(req, undefined, "planner");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
