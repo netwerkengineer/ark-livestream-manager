@@ -216,7 +216,7 @@ def deploy():
     deploy_cmd = (
         f"export {D_PATH} && "
         f"cd {config['REMOTE_APP_PATH']} && "
-        f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH} sh -c \""
+        f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH} sh -c \\\""
         f"tar -xzf {config['REMOTE_TEMP_ARCHIVE']} -C {config['REMOTE_APP_PATH']} && "
         f"rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
         f"sed -i 's|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g' docker-compose.yml && "
@@ -226,7 +226,7 @@ def deploy():
         f"{cleanup_emulators}"
         f"(env SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || env SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
         f"docker image prune -f"
-        f"\""
+        f"\\\""
     )
     
     final_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"{deploy_cmd}\""
