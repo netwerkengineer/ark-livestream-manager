@@ -6,5 +6,5 @@ services:
       - "8000:8000"
       - "12321:12321/udp"
     volumes:
-      - /mnt/data/docker/companion:/root/companion-data
+      - /mnt/data/docker/companion:/companion
     restart: always
