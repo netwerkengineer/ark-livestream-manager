@@ -230,6 +230,7 @@ def deploy():
     )
     
     final_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"{deploy_cmd}\""
+    print(f"\n[DEBUG] Running command:\n{final_cmd}\n")
     if not run_with_pty(final_cmd, "Project uitpakken en Docker bouwen/herstarten", config['NAS_PASS'], global_ssh_mux_socket):
         print("\n❌ Fout tijdens deployment op de NAS.")
     else:
