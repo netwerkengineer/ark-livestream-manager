@@ -37,11 +37,19 @@ def patch_paths(obj, old_prefixes, new_prefix):
     return obj
 
 def get_projects_dir(settings):
-    default_dir = "/mnt/data/Projects/Beamer/FreeShow/projects"
+    default_dir = "/volume1/Beamer/FreeShow/projects" if os.path.exists("/volume1/Beamer/FreeShow/projects") else "/mnt/data/Projects/Beamer/FreeShow/projects"
     thumb_path = settings.get("thumbnailSavePath")
     
     if thumb_path:
         print(f"Found thumbnailSavePath in settings: {thumb_path}")
+        
+        # First try direct path without translation
+        base_dir_orig = os.path.dirname(thumb_path.rstrip("/"))
+        projects_dir_orig = os.path.join(base_dir_orig, "projects")
+        if os.path.exists(projects_dir_orig):
+            print(f"Resolved projects directory (direct): {projects_dir_orig}")
+            return projects_dir_orig
+            
         # Translate Synology NAS path to LXC host path if necessary
         translated = thumb_path.rstrip("/")
         if translated.startswith("/volume1/"):
@@ -247,47 +255,91 @@ def import_project():
             
         # 3. Update settings.json to set active project
         settings_data["activeProject"] = project_id
-        settings_data["showsPath"] = f"{remote_docs_dir}/Shows"
+        settings_data["showsPath"] = remote_docs_dir
         settings_data["dataPath"] = remote_docs_dir
         with open(local_settings_json, 'w', encoding='utf-8') as f:
             json.dump(settings_data, f, indent=4)
             
-        # Create remote directories
-        print("Creating target directories on remote host...")
-        if remote_os == "windows":
-            cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{remote_docs_dir}/Shows', '{remote_docs_dir}/Config', '{remote_app_data_dir}'\""
-        else:
-            cmd = f"mkdir -p '{remote_docs_dir}/Shows' '{remote_docs_dir}/Config' '{remote_app_data_dir}'"
+        # Check if remote_docs_dir is mapped to the local generator path (network share)
+        is_network_share = False
+        if remote_os == "windows" and (remote_docs_dir.startswith("Z:") or remote_docs_dir.startswith("\\\\")):
+            is_network_share = True
+            print("Target dataPath is a network share. Copying shows, projects.json, and extra files directly to the local shared directory...")
             
-        subprocess.run(["ssh", f"{mac_user}@{mac_host}", cmd], check=True)
-        
-        # Copy individual .show files
-        print("Uploading .show files...")
-        subprocess.run(f"scp {local_shows_dir}/* {mac_user}@{mac_host}:{remote_docs_dir}/Shows/", shell=True, check=True)
-        
-        # Copy other extracted files (except config/metadata)
-        for root, dirs, files in os.walk(temp_dir):
-            if 'Shows' in dirs:
-                dirs.remove('Shows')
-            for file in files:
-                if file in ["data.json", "projects.json", "shows.json", "settings.json", ".DS_Store"]:
-                    continue
-                abs_path = os.path.join(root, file)
-                rel_path = os.path.relpath(abs_path, temp_dir)
-                dest_dir = os.path.dirname(f"{remote_docs_dir}/{rel_path}")
-                print(f"Uploading extra file: {rel_path}")
-                if remote_os == "windows":
-                    mkdir_cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{dest_dir}'\""
-                else:
-                    mkdir_cmd = f"mkdir -p '{dest_dir}'"
-                subprocess.run(["ssh", f"{mac_user}@{mac_host}", mkdir_cmd], check=True)
-                subprocess.run(["scp", abs_path, f"{mac_user}@{mac_host}:{remote_docs_dir}/{rel_path}"], check=True)
+        if is_network_share:
+            # Create local directories if they don't exist
+            os.makedirs(os.path.join(generator_path, "Shows"), exist_ok=True)
+            os.makedirs(os.path.join(generator_path, "Config"), exist_ok=True)
+            
+            # Create remote app data directory only
+            print("Creating target AppData directory on remote host...")
+            cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{remote_app_data_dir}'\""
+            subprocess.run(["ssh", f"{mac_user}@{mac_host}", cmd], check=True)
+            
+            # Copy individual .show files locally
+            print("Copying .show files locally to the network share...")
+            for f in glob.glob(os.path.join(local_shows_dir, "*")):
+                shutil.copy2(f, os.path.join(generator_path, "Shows"))
                 
-        # Upload updated config files
-        print("Uploading updated configuration files...")
-        subprocess.run(["scp", local_projects_json, f"{mac_user}@{mac_host}:{remote_docs_dir}/Config/projects.json"], check=True)
-        subprocess.run(["scp", local_shows_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/shows.json"], check=True)
-        subprocess.run(["scp", local_settings_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json"], check=True)
+            # Copy other extracted files (except config/metadata) locally to network share
+            for root, dirs, files in os.walk(temp_dir):
+                if 'Shows' in dirs:
+                    dirs.remove('Shows')
+                for file in files:
+                    if file in ["data.json", "projects.json", "shows.json", "settings.json", ".DS_Store"]:
+                        continue
+                    abs_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_path, temp_dir)
+                    dest_file_path = os.path.join(generator_path, rel_path)
+                    os.makedirs(os.path.dirname(dest_file_path), exist_ok=True)
+                    print(f"Copying extra file locally: {rel_path}")
+                    shutil.copy2(abs_path, dest_file_path)
+                    
+            # Copy projects.json locally
+            print("Copying projects.json locally to the network share...")
+            shutil.copy2(local_projects_json, os.path.join(generator_path, "Config", "projects.json"))
+            
+            # Upload shows.json and settings.json via scp to target PC AppData
+            print("Uploading shows.json and settings.json to remote AppData...")
+            subprocess.run(["scp", local_shows_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/shows.json"], check=True)
+            subprocess.run(["scp", local_settings_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json"], check=True)
+        else:
+            # Create remote directories
+            print("Creating target directories on remote host...")
+            if remote_os == "windows":
+                cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{remote_docs_dir}/Shows', '{remote_docs_dir}/Config', '{remote_app_data_dir}'\""
+            else:
+                cmd = f"mkdir -p '{remote_docs_dir}/Shows' '{remote_docs_dir}/Config' '{remote_app_data_dir}'"
+                
+            subprocess.run(["ssh", f"{mac_user}@{mac_host}", cmd], check=True)
+            
+            # Copy individual .show files
+            print("Uploading .show files...")
+            subprocess.run(f"scp {local_shows_dir}/* {mac_user}@{mac_host}:{remote_docs_dir}/Shows/", shell=True, check=True)
+            
+            # Copy other extracted files (except config/metadata)
+            for root, dirs, files in os.walk(temp_dir):
+                if 'Shows' in dirs:
+                    dirs.remove('Shows')
+                for file in files:
+                    if file in ["data.json", "projects.json", "shows.json", "settings.json", ".DS_Store"]:
+                        continue
+                    abs_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_path, temp_dir)
+                    dest_dir = os.path.dirname(f"{remote_docs_dir}/{rel_path}")
+                    print(f"Uploading extra file: {rel_path}")
+                    if remote_os == "windows":
+                        mkdir_cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{dest_dir}'\""
+                    else:
+                        mkdir_cmd = f"mkdir -p '{dest_dir}'"
+                    subprocess.run(["ssh", f"{mac_user}@{mac_host}", mkdir_cmd], check=True)
+                    subprocess.run(["scp", abs_path, f"{mac_user}@{mac_host}:{remote_docs_dir}/{rel_path}"], check=True)
+                    
+            # Upload updated config files
+            print("Uploading updated configuration files...")
+            subprocess.run(["scp", local_projects_json, f"{mac_user}@{mac_host}:{remote_docs_dir}/Config/projects.json"], check=True)
+            subprocess.run(["scp", local_shows_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/shows.json"], check=True)
+            subprocess.run(["scp", local_settings_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json"], check=True)
         
         print(f"Project '{project_name}' successfully imported and set as active!")
         return True
