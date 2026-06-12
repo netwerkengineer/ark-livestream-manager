@@ -209,7 +209,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
             log_file_handle = open(log_path, 'a')
             subprocess.Popen(
-                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py"), "--delete-all-scriptures"],
+                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py"), "--delete-all-scriptures", "--local-only"],
                 stdout=log_file_handle,
                 stderr=subprocess.STDOUT
             )

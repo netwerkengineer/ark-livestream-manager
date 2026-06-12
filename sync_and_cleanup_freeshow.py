@@ -139,6 +139,26 @@ def main():
     print(f"Target PC: {mac_user}@{mac_host}")
     print(f"NAS Shows directory: {nas_shows_dir}")
     
+    local_only = "--local-only" in sys.argv
+    if delete_all_scriptures and local_only:
+        print("\n--- LOCAL WIPE MODE: Deleting scriptures only from NAS ---")
+        deleted_count = 0
+        for show_path in glob.glob(os.path.join(nas_shows_dir, "*.show")):
+            try:
+                with open(show_path, 'r', encoding='utf-8') as f:
+                    show_data = json.load(f)
+                if isinstance(show_data, list) and len(show_data) > 1:
+                    category = show_data[1].get("category")
+                    if category == "scripture":
+                        os.remove(show_path)
+                        print(f"Deleted from NAS: {os.path.basename(show_path)}")
+                        deleted_count += 1
+            except Exception as e:
+                print(f"Error checking {show_path}: {e}")
+        print(f"Local wipe complete. {deleted_count} scriptures removed.")
+        print("Note: These will be deleted from the Beamer PC during the next full sync.")
+        sys.exit(0)
+    
     # 2. Power Management check
     turned_on_by_script = False
     is_pc_online = test_ssh(mac_user, mac_host)

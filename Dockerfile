@@ -25,7 +25,7 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
-RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl && \
+RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl openssh-client && \
     curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp && \
     pip3 install --no-cache-dir --break-system-packages tinytuya
@@ -36,7 +36,8 @@ ENV NODE_ENV production
 # ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN adduser --system --uid 1001 -h /home/nextjs nextjs
+ENV HOME=/home/nextjs
 
 COPY --from=builder /app/public ./public
 
