@@ -200,7 +200,18 @@ def deploy():
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     sudo_p = f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH}"
     
-    services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus"
+    # Detect home directory of NAS user to mount SSH keys
+    print(f"\n>>> NAS: Home directory van {config['NAS_USER']} detecteren ...")
+    ssh_p = f"ssh -S {global_ssh_mux_socket}"
+    detect_home_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo ~\""
+    try:
+        user_home = subprocess.check_output(detect_home_cmd, shell=True).decode().strip()
+        print(f"✓ Gevonden home directory: {user_home}")
+    except Exception as e:
+        user_home = f"/volume1/homes/{config['NAS_USER']}"
+        print(f"⚠️ Kon home directory niet detecteren via SSH, fallback naar: {user_home}")
+
+    services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus tuya-control"
     cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else f"({sudo_p} docker stop x32-emulator atem-emulator 2>/dev/null || true) && ({sudo_p} docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
     deploy_cmd = (
         f"export {D_PATH} && "
@@ -210,8 +221,9 @@ def deploy():
         f"{sudo_p} sed -i 's|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g' docker-compose.yml && "
         f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
         f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
+        f"({sudo_p} pkill -f tuya_http_server.py || true) && "
         f"{cleanup_emulators}"
-        f"({sudo_p} docker compose up -d --build {services_to_deploy} || {sudo_p} docker-compose up -d --build {services_to_deploy}) && "
+        f"({sudo_p} env SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || {sudo_p} env SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
         f"{sudo_p} docker image prune -f"
     )
     

@@ -66,6 +66,20 @@ services:
     networks:
       - ark-net
 
+  tuya-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tuya-control
+    restart: always
+    network_mode: host
+    user: root
+    entrypoint: ["python3", "tuya_http_server.py"]
+    volumes:
+      - ./data:/app/data
+      - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
+      - ${SSH_KEY_DIR:-/root/.ssh}:/root/.ssh:ro
+
 networks:
   ark-net:
     driver: bridge
