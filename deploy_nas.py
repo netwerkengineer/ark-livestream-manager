@@ -212,19 +212,21 @@ def deploy():
         print(f"⚠️ Kon home directory niet detecteren via SSH, fallback naar: {user_home}")
 
     services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus tuya-control"
-    cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else f"({sudo_p} docker stop x32-emulator atem-emulator 2>/dev/null || true) && ({sudo_p} docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
+    cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else "(docker stop x32-emulator atem-emulator 2>/dev/null || true) && (docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
     deploy_cmd = (
         f"export {D_PATH} && "
         f"cd {config['REMOTE_APP_PATH']} && "
-        f"{sudo_p} tar -xzf {config['REMOTE_TEMP_ARCHIVE']} -C {config['REMOTE_APP_PATH']} && "
-        f"{sudo_p} rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
-        f"{sudo_p} sed -i 's|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g' docker-compose.yml && "
-        f"{sudo_p} chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
-        f"{sudo_p} chmod -R 777 {config['REMOTE_APP_PATH']} && "
-        f"({sudo_p} pkill -f tuya_http_server.py || true) && "
+        f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH} sh -c \""
+        f"tar -xzf {config['REMOTE_TEMP_ARCHIVE']} -C {config['REMOTE_APP_PATH']} && "
+        f"rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
+        f"sed -i 's|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g' docker-compose.yml && "
+        f"chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
+        f"chmod -R 777 {config['REMOTE_APP_PATH']} && "
+        f"(pkill -f tuya_http_server.py || true) && "
         f"{cleanup_emulators}"
-        f"({sudo_p} env SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || {sudo_p} env SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
-        f"{sudo_p} docker image prune -f"
+        f"(env SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || env SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
+        f"docker image prune -f"
+        f"\""
     )
     
     final_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"{deploy_cmd}\""
