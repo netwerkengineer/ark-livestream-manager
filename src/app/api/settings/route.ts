@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, saveSettings } from "@/lib/settingsStore";
 import { isAuthorized } from "@/lib/authHelper";
