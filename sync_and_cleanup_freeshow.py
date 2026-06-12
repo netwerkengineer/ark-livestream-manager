@@ -284,6 +284,7 @@ def main():
     remote_files = {}
     if remote_os == "windows":
         ps_script = f"""
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         $path = '{remote_shows_dir}'
         if (Test-Path $path) {{
             Get-ChildItem -Path $path -Filter '*.show' | ForEach-Object {{
