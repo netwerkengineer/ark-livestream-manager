@@ -31,6 +31,15 @@ def get_ssh_user(host_ip):
 
 def detect_os(user, host_ip):
     # Returns "windows", "macos", or "linux"
+    # Quick check for known static hosts to avoid SSH roundtrip & timeouts
+    known_hosts = {
+        "192.168.2.100": "windows",
+        "192.168.2.101": "windows",
+        "192.168.2.20": "macos"
+    }
+    if host_ip in known_hosts:
+        return known_hosts[host_ip]
+
     try:
         res = subprocess.run([
             "ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", 

@@ -51,7 +51,40 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
     try {
       const res = await fetch('/api/tuya/status');
       const data = await res.json();
-      setPlugs(data.plugs || []);
+      const fetchedPlugs = data.plugs || [];
+      setPlugs(fetchedPlugs);
+      
+      // Sync activeButtons state with physical plug states
+      if (fetchedPlugs.length > 0) {
+        setActiveButtons(prev => {
+          const updated = { ...prev };
+          let changed = false;
+          
+          const obsPlug = fetchedPlugs.find((p: any) => p.id === "plug_obs");
+          if (obsPlug && obsPlug.is_online) {
+            const isObsOn = obsPlug.state === "on";
+            if (updated["qww7gkpem"] !== isObsOn) { // "qww7gkpem" is "OBS PC Starten"
+              updated["qww7gkpem"] = isObsOn;
+              changed = true;
+            }
+          }
+          
+          const beamerPlug = fetchedPlugs.find((p: any) => p.id === "plug_beamer");
+          if (beamerPlug && beamerPlug.is_online) {
+            const isBeamerOn = beamerPlug.state === "on";
+            if (updated["qj3e7j7tu"] !== isBeamerOn) { // "qj3e7j7tu" is "Beamer PC starten"
+              updated["qj3e7j7tu"] = isBeamerOn;
+              changed = true;
+            }
+          }
+          
+          if (changed) {
+            localStorage.setItem("acoc_active_buttons", JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
+      }
     } catch (err) {
       console.error("Failed to fetch Tuya status", err);
     } finally {
