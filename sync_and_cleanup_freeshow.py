@@ -57,8 +57,10 @@ def sftp_transfer(user, host, local_path, remote_path, direction):
     Kopieert een bestand via SFTP batch mode.
     direction: 'get' (van remote naar local) of 'put' (van local naar remote).
     """
-    # SFTP batch mode via stdin. Quote paden om spaties te ondersteunen.
-    cmd = f"{direction} \"{local_path}\" \"{remote_path}\"\n"
+    if direction == "get":
+        cmd = f"get \"{remote_path}\" \"{local_path}\"\n"
+    else:
+        cmd = f"put \"{local_path}\" \"{remote_path}\"\n"
     res = subprocess.run(
         ["sftp", "-b", "-", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=no", f"{user}@{host}"],
         input=cmd.encode('utf-8'),
