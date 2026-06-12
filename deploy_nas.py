@@ -115,6 +115,20 @@ def run_with_pty(cmd, description, nas_pass, socket_path):
             break
             
     proc.wait()
+    
+    # Read any remaining data from the PTY
+    try:
+        while True:
+            r, w, e = select.select([master], [], [], 0.1)
+            if not r:
+                break
+            data = os.read(master, 2048).decode(errors='ignore')
+            if not data:
+                break
+            print(data, end="")
+    except:
+        pass
+
     return proc.returncode == 0
 
 def deploy():
