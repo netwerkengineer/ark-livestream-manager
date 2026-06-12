@@ -57,6 +57,12 @@ def sftp_transfer(user, host, local_path, remote_path, direction):
     Kopieert een bestand via SFTP batch mode.
     direction: 'get' (van remote naar local) of 'put' (van local naar remote).
     """
+    # Voor Windows absolute paden in SFTP (bijv. C:/path), voeg een leidende slash toe zodat het niet relatief aan home is
+    if ":" in remote_path and not remote_path.startswith("/"):
+        parts = remote_path.split(":")
+        if len(parts[0]) == 1 and parts[0].isalpha():
+            remote_path = "/" + remote_path
+
     if direction == "get":
         cmd = f"get \"{remote_path}\" \"{local_path}\"\n"
     else:
