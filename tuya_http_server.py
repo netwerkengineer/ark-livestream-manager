@@ -185,9 +185,31 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Not Found")
 
+def set_companion_button_step(host, port, page, row, col, step):
+    import urllib.request
+    url = f"http://{host}:{port}/api/location/{page}/{row}/{col}/step"
+    data = json.dumps({"step": step}).encode("utf-8")
+    req = urllib.request.Request(
+        url, 
+        data=data, 
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=1.0) as r:
+            pass
+    except Exception:
+        pass
+
 def status_poller_worker():
     print("[STATUS POLLER] Background status poller thread started.")
     global status_cache
+    
+    candidates = [
+        os.path.join(SCRIPT_DIR, "data", "settings.json"),
+        "/app/data/settings.json",
+        "/mnt/data/docker/ark-livestream-manager/data/settings.json"
+    ]
     
     # Wait a moment for server initialization
     time.sleep(2)
@@ -202,6 +224,40 @@ def status_poller_worker():
                         "timestamp": time.time(),
                         "data": res.stdout
                     }
+                
+                # Parse plug status and sync with Companion button steps
+                try:
+                    plugs_data = json.loads(res.stdout)
+                    
+                    settings_path = None
+                    for c in candidates:
+                        if os.path.exists(c):
+                            settings_path = c
+                            break
+                    
+                    if settings_path:
+                        with open(settings_path, 'r', encoding='utf-8') as f:
+                            settings = json.load(f)
+                        
+                        comp_host = settings.get("companionHost", "127.0.0.1")
+                        comp_port = settings.get("companionPort", 8000)
+                        
+                        plug_button_mapping = {
+                            "plug_obs": (1, 0, 3),      # Page 1, Row 0, Col 3
+                            "plug_beamer": (1, 0, 4)    # Page 1, Row 0, Col 4
+                        }
+                        
+                        for plug in plugs_data:
+                            p_id = plug.get("id")
+                            if p_id in plug_button_mapping:
+                                page, row, col = plug_button_mapping[p_id]
+                                is_on = plug.get("state") == "on"
+                                is_online = plug.get("is_online", True)
+                                if is_online:
+                                    desired_step = 1 if is_on else 0
+                                    set_companion_button_step(comp_host, comp_port, page, row, col, desired_step)
+                except Exception as sync_err:
+                    print(f"[STATUS POLLER] Sync error: {sync_err}", file=sys.stderr)
             else:
                 print(f"[STATUS POLLER] Error querying status: returncode {res.returncode}, stderr: {res.stderr}")
         except Exception as e:

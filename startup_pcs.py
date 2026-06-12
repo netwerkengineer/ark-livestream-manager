@@ -74,8 +74,12 @@ def startup_single_plug(plug, settings):
             freeshow_host = settings.get("freeShowHost")
             
             # Detect remote OS
-            res = subprocess.run(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", "cmd.exe /c echo windows"], capture_output=True, text=True)
-            is_win = "windows" in res.stdout.lower()
+            known_windows_hosts = ["192.168.2.100", "192.168.2.101"]
+            if host_ip in known_windows_hosts:
+                is_win = True
+            else:
+                res = subprocess.run(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", "cmd.exe /c echo windows"], capture_output=True, text=True)
+                is_win = "windows" in res.stdout.lower()
             
             # Case A: FreeShow Host (or home environment fallback)
             if host_ip == freeshow_host or host_ip == "192.168.2.20":
