@@ -91,3 +91,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const authSession = await isAuthorized(req);
+    if (!authSession) {
+      return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+    }
+
+    const settings = getSettings() as any;
+    const freeshowPath = settings.freeshowPath || '';
+    const freeshowTrashPath = settings.freeshowTrashPath || '';
+
+    const backupDir = freeshowTrashPath || (freeshowPath ? path.join(freeshowPath, '.trash') : path.join(process.cwd(), 'data', 'deleted_history'));
+
+    await fs.mkdir(backupDir, { recursive: true });
+    const files = await fs.readdir(backupDir);
+    
+    let deletedCount = 0;
+    for (const file of files) {
+      if (file !== '.' && file !== '..') {
+        const filePath = path.join(backupDir, file);
+        const stats = await fs.stat(filePath);
+        if (stats.isFile()) {
+          await fs.unlink(filePath);
+          deletedCount++;
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true, message: `${deletedCount} bestanden succesvol definitief verwijderd.` });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

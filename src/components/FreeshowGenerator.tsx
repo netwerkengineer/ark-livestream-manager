@@ -566,7 +566,28 @@ export default function FreeshowGenerator() {
     setStatus(t('items_restored').replace('{count}', successCount.toString()));
     setSelectedTrashIds([]);
     refreshCatalog();
-    setLoadingHistory(false);
+  };
+
+  const emptyTrash = async () => {
+    if (!confirm(t('empty_trash_confirm'))) return;
+    setLoadingHistory(true);
+    try {
+      const res = await fetch('/api/maintenance/history', {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(data.message);
+        setSelectedTrashIds([]);
+        loadHistory();
+      } else {
+        alert(t('error_label') + data.error);
+      }
+    } catch (e: any) {
+      alert(t('network_error_label') + e.message);
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   const fetchShows = async () => {
@@ -1771,16 +1792,25 @@ export default function FreeshowGenerator() {
                             🕒 {new Date(show.lastModified).toLocaleString('nl-NL')}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button className="button" style={{ flex: 2, padding: '0.4rem', fontSize: '0.75rem', background: 'var(--primary)', color: '#020617' }} onClick={() => loadShowDetail(show.filename)}>
-                            📝 Bewerken
-                          </button>
-                          <button className="button" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)' }} onClick={() => duplicateShow(show.filename)} title="Dupliceren">
-                            👯
-                          </button>
-                          <button className="button" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,0,0,0.15)', color: '#ef4444' }} onClick={() => deleteShowDirect(show.filename)} title="Verwijderen naar prullenbak">
-                            🗑️
-                          </button>
+                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                          <div className="tooltip-container" style={{ flex: 2 }}>
+                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'var(--primary)', color: '#020617' }} onClick={() => loadShowDetail(show.filename)}>
+                              📝 Bewerken
+                            </button>
+                            <span className="tooltip-text">Show bewerken</span>
+                          </div>
+                          <div className="tooltip-container" style={{ flex: 1 }}>
+                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)' }} onClick={() => duplicateShow(show.filename)}>
+                              👯
+                            </button>
+                            <span className="tooltip-text">Show dupliceren</span>
+                          </div>
+                          <div className="tooltip-container" style={{ flex: 1 }}>
+                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,0,0,0.15)', color: '#ef4444' }} onClick={() => deleteShowDirect(show.filename)}>
+                              🗑️
+                            </button>
+                            <span className="tooltip-text">Verwijderen naar prullenbak</span>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -1908,15 +1938,26 @@ export default function FreeshowGenerator() {
                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                      裁 {t('trash')}
                    </h3>
-                   {selectedTrashIds.length > 0 && (
-                     <button 
-                       className="button" 
-                       style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', background: 'var(--primary)' }}
-                       onClick={restoreSelectedItems}
-                     >
-                       🔄 {t('restore_selected')} ({selectedTrashIds.length})
-                     </button>
-                   )}
+                   <div style={{ display: 'flex', gap: '0.5rem' }}>
+                     {selectedTrashIds.length > 0 && (
+                       <button 
+                         className="button" 
+                         style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', background: 'var(--primary)' }}
+                         onClick={restoreSelectedItems}
+                       >
+                         🔄 {t('restore_selected')} ({selectedTrashIds.length})
+                       </button>
+                     )}
+                     {historyItems.length > 0 && (
+                       <button 
+                         className="button" 
+                         style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', background: 'rgba(255,0,0,0.15)', color: '#ef4444' }}
+                         onClick={emptyTrash}
+                       >
+                         🗑️ {t('empty_trash')}
+                       </button>
+                     )}
+                   </div>
                  </div>
                  
                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
