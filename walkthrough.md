@@ -459,32 +459,152 @@ We hebben `import_project.py` aangepast zodat het dynamisch de configuratie van 
 
 ---
 
-## 👥 16. Ark Church Operations Center (ACOC) & Rol-gebaseerd Toegangsbeheer (RBAC) (v16.0)
+## 🎛️ 16. Toggle-status en Oplichten Broadcast Control Knoppen (v16.0)
 
-We hebben de applicatie omgedoopt tot **"Ark Church Operations Center" (ACOC)** en een lokaal inlogsysteem geïntroduceerd met Role-Based Access Control (RBAC). Hierdoor hoeven operators niet langer in te loggen met het YouTube/Google account van de kerk om de controle- en regiepagina's te kunnen bedienen.
+### Probleem:
+In Companion zijn verschillende knoppen ingesteld als "2 step" (toggle/aan-uit) knoppen. In de Live Manager / Operations Center webapp was echter niet zichtbaar of deze knoppen aan of uit stonden. De knoppen reageerden wel bij een klik, maar bleven statisch qua uiterlijk.
 
-### 1. Rolgrenzen & Toegangsrechten
-- **`admin` (Beheerder):** Heeft toegang tot alle onderdelen: Stream Planner, Control Center, Live Monitor, Lichtregie en de volledige instellingen (inclusief het tabblad Gebruikersbeheer).
-- **`operator` (Bediening):** Heeft uitsluitend toegang tot het Control Center, de Live Monitor en de Lichtregie. Het tabblad "Stream Planner" en de knop "Instellingen" zijn verborgen in de UI. Daarnaast weigert de backend API de verzoeken van een operator om instellingen op te slaan of gebruikers te beheren.
+### Oplossing:
+We hebben een client-side state management en visuele highlights toegevoegd in [BroadcastControlCenter.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/BroadcastControlCenter.tsx) en [globals.css](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/globals.css):
 
-### 2. Beveiliging van de API & Credentials
-- **PBKDF2 Hashing met Salt:** Wachtwoorden worden via Node.js native crypto met SHA-512 gehasht met een willekeurige salt van 16 bytes per gebruiker.
-- **AES-256-CBC Sessies:** De lokale inlogsessie wordt versleuteld met een token en opgeslagen in een HTTP-only cookie (`operator_session`), die niet via JavaScript te lezen is vanaf internet.
-- **API Hardening:** Alle controle-API's (`/api/settings`, `/api/broadcast/action`, `/api/qlc/action`, `/api/tuya/status`, `/api/midi/send`, `/api/services/status`) zijn beveiligd met een geautoriseerde check (`isAuthorized`). Als de client niet ingelogd is, retourneert de API status `401` (Niet geautoriseerd).
-- **Secrets Stripping:** Wanneer een operator instellingen opvraagt via `GET /api/settings`, stript de backend automatisch alle gevoelige tokens (zoals Google API secrets, OBS wachtwoord en Tuya local keys).
+1. **State Tracking:** In `BroadcastControlCenter.tsx` hebben we een `activeButtons` status toegevoegd (`Record<string, boolean>`) die per actie-id bijhoudt of de knop is ingeschakeld (toggled).
+2. **Local Storage Persistentie:** Bij het laden van de component (`useEffect` bij mount) wordt de opgeslagen status uit `localStorage` geladen (`acoc_active_buttons`). Zodra een knop succesvol wordt geactiveerd, wordt de status in `localStorage` bijgewerkt. Hierdoor blijft de visuele stand van de knoppen bewaard bij het vernieuwen van de pagina.
+3. **Dynamische Highlights:** Als de knop actief is, wordt de `.active` klasse toegepast. In `globals.css` zijn premium oplichting-stijlen gedefinieerd voor elke knopkleur (`green`, `red`, `amber`, `slate`, `blue`, `purple`, `default`):
+   - **Glow / Neon effect:** Een bijpassende oplichtende schaduw (`box-shadow`) rond de knop.
+   - **Sterkere rand:** Een harde, heldere randkleur in plaats van een transparante rand.
+   - **Helderder achtergrond:** De opacity/helderheid van de knop-achtergrond is verhoogd van `0.15` naar `0.45` voor maximale visuele feedback.
 
-### 3. Gebruikersbeheer UI & API
-- Admins kunnen via het tabblad **"Gebruikersbeheer"** in het instellingenmenu gebruikers toevoegen, rollen wijzigen, wachtwoorden updaten en accounts verwijderen.
-- Er zijn ingebouwde beveiligingen tegen zelfverwijdering en het verwijderen van de laatste admin om lock-outs te voorkomen.
+---
 
-### 4. YouTube Koppeling in de Planner Tab
-- Het inlogscherm met YouTube (Google OAuth) blokkeert niet langer de gehele app. De app opent standaard in de Control Center tab.
-- Pas wanneer een admin de tab "Stream Planner" bezoekt en er nog geen geldige Google-koppeling is, wordt er in-tab een knop getoond om in te loggen met Google. De rest van het Operations Center blijft volledig bruikbaar en bereikbaar.
+## 🔌 17. Dynamische Tuya API Host-configuratie voor VPN/Synology NAS (v17.0)
 
-### 5. Deployment & Verificatie
-- De nieuwe configuratie is via `deploy_tuya_multi.py` overgezet naar Proxmox LXC 112 en de Docker container is succesvol herbouwd en herstart.
-- Automatische database-migratie bij het opstarten zorgt ervoor dat de standaardaccounts (`admin` / `arkadmin` en `operator` / `arkoperator`) direct worden gegenereerd als er geen gebruikers in de database staan.
+### Probleem:
+Bij het uitrollen van de container op de kerk-NAS (bereikbaar via VPN op `10.8.0.1` en lokaal op `192.168.2.250`) konden de nieuwe Tuya smart plugs (`192.168.2.126`) niet door de livestream manager worden gedetecteerd. Dit kwam doordat de status API `/api/tuya/status` hardgecodeerd probeerde verbinding te maken met de Tuya HTTP server via `127.0.0.1`, `settings.companionHost` of `172.17.0.1`. In de Synology Docker-omgeving met een VPN-netwerkverbinding waren deze interfaces niet correct gekoppeld aan de Tuya-server op de NAS-host.
+
+### Oplossing:
+We hebben de Tuya API host dynamisch configureerbaar gemaakt:
+1. **Settings Store:** De optionele string `tuyaApiHost` is toegevoegd aan `AppSettings` en de standaardwaarde is ingesteld op `""` (leeg).
+2. **API Status Route (`route.ts`):** De status-API controleert nu of `settings.tuyaApiHost` is ingevuld. Zo ja, dan wordt dit IP-adres als eerste geprobeerd om de Tuya HTTP control server (`tuya_http_server.py` op poort 8088) te bereiken. Zo niet (of bij falen), valt het systeem terug op de standaard adressen (`127.0.0.1`, `companionHost`, `172.17.0.1`).
+3. **Instellingen UI (`page.tsx`):** Er is een nieuwe configuratiekaart "Tuya Control API Host" toegevoegd aan het tabblad "Slimme Stekkers (Tuya)" in de instellingen. Hier kan de gebruiker het IP-adres (bijv. `10.8.0.1` of `192.168.2.250`) invoeren en opslaan.
+
+Hierdoor is de applicatie volledig flexibel en kan dezelfde image zowel thuis (Proxmox host) als in de kerk (Synology host) draaien zonder code-aanpassingen.
+
+---
+
+## 🎭 18. QLC+ Project Auto-Detect & Fresnel Blackout Fixes (v18.0)
+
+### 1. QLC+ Project laadt niet op Proxmox / NAS
+*   **Probleem:** QLC+ startte wel op in de Docker-container op Proxmox, maar de Virtual Console bleef volledig leeg. Dit kwam doordat de auto-detectie logica uit `entrypoint.sh` was weggehaald of omzeild en QLC+ met de `-o /QLC/ark_church_lighting.qxw` parameter werd gestart. Deze command-line parameter negeert het projectbestand stilletjes op diverse kernels (waaronder Synology DSM en nieuwere LXC/Docker hostkernels).
+*   **Oorzaak:** Een eerdere poging met de auto-detect API-upload mislukte omdat deze probeerde te POST'en naar `/loadProject` met het parameter-veld `qlcFile`. QLC+ 4.14.x verwacht hier echter specifiek `qlcprj` als form-parameter. Hierdoor werd de upload stilzwijgend genegeerd.
+*   **Oplossing:**
+    1. We hebben de auto-detecting [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) hersteld.
+    2. De form-parameter in de `curl` POST-aanroep is gecorrigeerd van `qlcFile` naar **`qlcprj`**.
+    3. We hebben extra IP-adres fallbacks toegevoegd om interfaces te detecteren, zelfs als er geen `192.168.` subnet actief is (bijv. localhost fallbacks).
+    4. De container `qlcplus-test` start nu betrouwbaar op Proxmox LXC 112 en laadt automatisch het project met de juiste universe-mappings.
+
+### 2. Fresnel Dimmers blijven branden bij Blackout
+*   **Probleem:** Bij het klikken op de rode **BLACKOUT** knop in de Lights app gingen alle kleur-LED's uit, maar bleven de Fresnels (fysieke dimmers) op hun huidige sterkte branden.
+*   **Oorzaak:** Wanneer Blackout wordt geactiveerd, stuurt de app 5 range fader OSC-commando's (voor Fresnel 1, 2, 3, 4 en de Master) in één keer naar QLC+. Omdat UDP-pakketten gelijktijdig aankomen op de netwerkpoort van QLC+, raakt de single-threaded OSC-receiver van QLC+ overbelast en laat deze willekeurige pakketten (zoals de Fresnel Master of individuele dimmers) vallen.
+*   **Oplossing:**
+    1. We hebben `handleBlackout()` in [LightsControl.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/LightsControl.tsx) aangepast om een directe `sendOscValueImmediate` handler te gebruiken in plaats van de 50ms gedebouncte `sendOscValue`.
+    2. We sturen de 5 Fresnel OSC-commando's nu **sequentieel met een kleine delay van 30ms** per pakket. Dit geeft QLC+ genoeg tijd om elk signaal te verwerken, waardoor de faders gegarandeerd allemaal op 0 worden gezet en de lichten direct uitgaan.
+
+---
+
+## 🔌 19. Multi-threaded Tuya HTTP Server & Status Caching (v19.0)
+
+### Probleem:
+De slimme stekkers (Tuya) leken om de paar seconden weg te vallen uit de monitoring in de livestream-manager UI (ze sprongen naar een rode offline-status / warning).
+
+### Oorzaak:
+1. **Single-threaded Server:** De Python HTTP-server (`tuya_http_server.py`) was single-threaded (`HTTPServer`).
+2. **Next.js API duplicaten & timeouts:** De Next.js status API route (`api/tuya/status/route.ts`) heeft een korte timeout (`1200ms`) en bevatte duplicate host-IP's (`127.0.0.1` tweemaal), waardoor er onder load of bij meerdere open tabbladen parallelle HTTP-verzoeken naar de Python-server werden gestuurd.
+3. **Queue & Broken Pipe:** Omdat de Python-server single-threaded was, werden gelijktijdige verzoeken in de wachtrij geplaatst. Door deze opstopping verliep de timeout in Next.js, sloot de client de socket (leidend tot `BrokenPipeError` in de Python-logs), en gaf de UI de stekker onterecht weer als "offline".
+4. **Stabiele verbinding:** De stekkers zelf waren via het netwerk prima online en reageerden stabiel.
+
+### Oplossing:
+1. **Multi-threading:** De Python HTTP-server is omgebouwd naar `ThreadingHTTPServer` (beschikbaar in Python 3.7+), waardoor verzoeken in aparte threads parallel en zonder blokkades worden afgehandeld.
+2. **Status Caching:** Er is een caching-mechanisme ingebouwd in `tuya_http_server.py`. De status en status_json resultaten van de stekkers worden nu 4 seconden gecached (`CACHE_TTL = 4.0`). Dit zorgt ervoor dat opeenvolgende of gelijktijdige verzoeken binnen 20 ms worden beantwoord, in plaats van telkens 500 ms de stekker fysiek te moeten pollen.
+3. **Auto-Invalidatie:** Bij controle-acties (zoals `/on`, `/off`, `/shutdown`) wordt de cache voor de betreffende stekkers direct geleegd, zodat de status in de UI direct responsief meesprint na een schakel-actie.
+4. **Next.js API Optimalisatie:** In `route.ts` worden de te proberen host-IP's nu gededupliceerd via een `Set`, zodat er geen dubbele verzoeken naar `127.0.0.1` meer worden gestuurd.
+
+---
+
+## 📺 20. YouTube-download fixes, Hover Tooltips & Tuya status poller daemon (v20.0)
+
+### 1. YouTube downloader (`yt-dlp`) ontbreekt
+- **Probleem:** Bij het downloaden van YouTube-video's trad de foutmelding `yt-dlp: not found` op, doordat `yt-dlp` niet geïnstalleerd was in de Alpine production runner.
+- **Oplossing:** In de `Dockerfile` van zowel de standalone `freeshow-generator` als de geïntegreerde `livestream-manager` is de `runner` stage uitgebreid om `python3`, `ffmpeg` en `curl` te installeren, en direct het officiële en meest recente `yt-dlp` binaire bestand te downloaden naar `/usr/local/bin/yt-dlp`.
+
+### 2. Hover tooltips voor tab-knoppen & ingekorte items
+- **Probleem:** De tab-knoppen (🎵 📊 📖 📸 🎥 📁 🗃️) onder **1. Items Toevoegen** hadden geen namen meer bij hoveren na de integratie, en lange itemtitels in de playlist waren afgekapt zonder mogelijkheid om de volledige naam te bekijken.
+- **Oplossing:** 
+  1. We hebben custom CSS-gebaseerde instant tooltips (`.tooltip-container` en `.tooltip-text`) toegevoegd aan `globals.css` in beide projecten.
+  1. We hebben custom CSS-gebaseerde instant tooltips (`.tooltip-container` and `.tooltip-text`) toegevoegd aan `globals.css` in beide projecten.
+  2. De tab-knoppen in `FreeshowGenerator.tsx` en `page.tsx` zijn ingepakt in een `.tooltip-container` en voorzien van een `.tooltip-text` span die de gelokaliseerde naam toont.
+  3. Er zijn `title` attributen toegevoegd aan de zoekcatalogus-resultaten en playlist-items, waardoor de browser automatisch een native tooltip toont met de volledige titel bij hoveren.
+
+### 3. YouTube placeholder tekst aanpassen
+- **Probleem:** De placeholder-tekst in het YouTube-invoerveld was standaard "Zoek in database...", wat verwarrend was voor gebruikers.
+- **Oplossing:** We hebben in `translations.ts` een nieuwe key `youtube_placeholder` gedefinieerd voor alle talen (Nederlands: "Vul YouTube URL in...", Engels: "Enter YouTube URL...", enz.) en het invoerveld in de YouTube-tab aangepast om deze vertaling dynamisch te tonen.
+
+### 4. Tuya Smart Plug Monitoring Dropouts (Daemon Status Poller)
+- **Probleem:** De status van de slimme stekkers viel elke paar seconden weg (werd offline getoond) op live.netwerkengineer.nl.
+- **Oorzaak:** Wanneer meerdere clients/tabbladen open stonden, stuurde Next.js parallelle queries via HTTP naar de Python-server. Omdat TinyTuya-verbindingen met de stekker synchroon zijn en tot 1.2 seconden duren, ontstonden er socket-botsingen en timeouts.
+- **Oplossing:**
+  1. We hebben in `control_plug.py` de socket timeout verhoogd naar 1.0 seconden voor de poortcontrole en 1.2 seconden voor TinyTuya-statusqueries om netwerktolerantie te vergroten.
+  2. In `tuya_http_server.py` is een achtergrond-daemon-thread `status_poller_worker` toegevoegd die elke 8 seconden asynchroon de status van alle stekkers opvraagt en in het geheugen opslaat.
+  3. Het `/status_json` endpoint is aangepast om direct de gecachte data uit het geheugen terug te geven. Hierdoor reageert het endpoint binnen enkele milliseconden, treden er geen Next.js fetch timeouts meer op en is er geen sprake van parallelle verbindingspogingen naar de fysieke stekkers.
+  4. De fetch-timeout in de Next.js API route `/api/tuya/status` is verhoogd van 1.2 seconden naar 3.0 seconden voor betere tolerantie bij herstarts.
+
+### 5. Versienummers in UI toegevoegd
+- **Oplossing:** Om de updates visueel herkenbaar te maken en verwarring over de geïnstalleerde versies te voorkomen, hebben we beide applicaties voorzien van een duidelijke **`v2.0.0`** badge in de header en de `version` in hun `package.json` bijgewerkt naar `2.0.0`.
+
+---
+
+## 📺 21. Versie-correctie naar v2.0.1 (Fuzzy-matching, YouTube project pathing & duplicate song fixes) (v21.0)
+
+Omdat de doorgevoerde wijzigingen na `v2.0.0` uitsluitend bugfixes en patches betreffen, is de versie gecorrigeerd van `v2.1.0` naar **`v2.0.1`** (conform Semantic Versioning):
+
+### 1. YouTube Mismatch Pad-resolutie
+* **Probleem:** Bij het importeren van projecten met YouTube-video's bleef het scherm zwart op de remote FreeShow PC's, omdat de generator lokale Linux-paden genereerde (bijv. `/mnt/data/...`), die niet bestaan op Windows of macOS client PC's.
+* **Oplossing:** We hebben `/Volumes/OWC-DISK/scripts/antigravity/livestream-manager/import_project.py` aangepast om tijdens het uploaden/importeren dynamisch de client `dataPath` te controleren en de pad-prefixes te herschrijven naar het daadwerkelijke pad van de remote cliënt.
+
+### 2. Duplicatenzoeker songtekst weergave
+* **Probleem:** De duplicatenzoeker in `app/api/maintenance/duplicates/route.ts` kon geen songteksten tonen en mislukte soms.
+* **Oorzaak:** FreeShow-shows worden opgeslagen als een array `[id, data]`. De code las rechtstreeks uit de array alsof het het object zelf was.
+* **Oplossing:** De JSON-parser is gecorrigeerd om eigenschappen uit `json[1]` te lezen, waardoor songteksten en exacte fingerprints weer correct worden geanalyseerd.
+
+### 3. Fuzzy Title Matching
+* **Probleem:** Duplicaten met een licht afwijkende titel (bijvoorbeeld "Lied 123" vs "Lied 123a") werden niet gedetecteerd.
+* **Oplossing:** We hebben Levenshtein-distance fuzzy matching geïmplementeerd (maximaal 2 karakters verschil voor titels van 6+ karakters), zodat deze duplicaten ook direct worden gevonden.
+
+### 4. NAS Deployment Permissions
+* **Probleem:** Scanning van de `Shows` directory gaf `EACCES: permission denied` op de Synology NAS.
+* **Oplossing:** Het script `deploy_nas.py` is aangepast om recursively `777` permissies te zetten op de gehele `/volume1/Beamer/FreeShow` directory.
+
+### 5. Versoepeling van de tekstextractie (Slide Item parser)
+* **Probleem:** Sommige liederen (zoals *Goodness Of God*) werden niet als duplicaten gedetecteerd en toonden geen songteksten in de duplicate review, hoewel ze identiek waren.
+* **Oorzaak:** De parser controleerde strikt op `item.type === 'text'` bij het extraheren van tekst uit de slides. Veel slide-items in FreeShow hebben echter geen expliciete `type` property (of hebben andere typen) maar bevatten wel een `lines` array met tekst.
+* **Oplossing:** We hebben de controle versoepeld naar `if (item.lines)`. Hierdoor wordt de tekst correct geëxtraheerd van alle slides die tekst bevatten, ongeacht of de type-tag expliciet aanwezig is. Dit herstelt direct de fuzzy/exacte duplicate detectie op basis van songtekst en toont de songteksten in de visual editor van de duplicatenzoeker.
 
 
 
+---
 
+## 📺 22. Companion OSC UDP-poort mapping (v22.0)
+
+### Probleem:
+FreeShow kon geen acties/chases triggeren in Bitfocus Companion via OSC. FreeShow stuurde correct OSC-commando's naar `192.168.2.222:12321`, maar Companion ontving deze pakketten niet omdat UDP-poort `12321` niet was blootgesteld door de Docker-container op Proxmox LXC 112.
+
+### Oplossing:
+We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de volume-mount gecorrigeerd en de database-configuratie hersteld:
+1. **Docker Compose:** In `/app/companion/docker-compose.yml` (zowel lokaal als op LXC 112) is `- "12321:12321/udp"` toegevoegd aan de `ports` sectie van de `companion` service.
+2. **Volume Mount Fix:** De volume-mount is gecorrigeerd van `/mnt/data/docker/companion:/root/companion-data` naar `/mnt/data/docker/companion:/companion`. Omdat Companion de configuratie wegschrijft naar `/companion` (op basis van `COMPANION_CONFIG_BASEDIR=/companion`), zorgde de oude, foutieve mapping ervoor dat alle instellingen in de tijdelijke container-laag werden opgeslagen en verloren gingen bij hercreatie. Met de nieuwe mapping worden alle instellingen nu permanent op de host opgeslagen.
+3. **Database Herstel:** We hebben de actieve database (`db.sqlite` en backups) van 10 juni 18:33 uur gekopieerd van de Synology NAS (`10.8.0.1`) en via de Proxmox-host in de persistent directory `/mnt/data/docker/companion/v4.3/` gezet met de juiste rechten (`nobody:nogroup`, `777`).
+4. **Docker Image Rebuild & Start:** De Companion-image (`companion-v4-latest:latest` v4.3.4) is opnieuw opgebouwd om de `content digest` fout op te lossen, en de container is opnieuw gestart met de nieuwe volume-mount en database.
+
+### Verificatie:
+- De container logs tonen dat Companion succesvol is opgestart en alle geconfigureerde instances (`x32`, `obs`, `atem`, `freeshow`, `qlcplus`, `http`) direct heeft ingeladen uit de database.
+- Via `ss -ulpn` is geverifieerd dat de `docker-proxy` nu actief luistert op UDP-poort `12321` (zowel IPv4 als IPv6).
+- FreeShow kan nu rechtstreeks via OSC communiceren met Companion, die op zijn beurt de juiste QLC+-lichtpresets triggert. All settings are now fully persistent.
