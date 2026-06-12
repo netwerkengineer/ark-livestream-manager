@@ -327,3 +327,10 @@ textarea.input-field {
   opacity: 1;
 }
 
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(285px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+

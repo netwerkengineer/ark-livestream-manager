@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   // Return users without hashes/salts for security
   const safeUsers = users.map(u => ({
     username: u.username,
-    role: u.role
+    role: u.role,
+    permissions: u.permissions || []
   }));
 
   return NextResponse.json({ users: safeUsers });
@@ -27,9 +28,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { username, password, role } = await req.json();
+    const { username, password, role, permissions } = await req.json();
     if (!username || !role) {
       return NextResponse.json({ error: "Gebruikersnaam en rol zijn verplicht" }, { status: 400 });
+    }
+
+    if (role === "operator" && (!permissions || !Array.isArray(permissions) || permissions.length === 0)) {
+      return NextResponse.json({ error: "Een operator moet minimaal één recht toegewezen krijgen" }, { status: 400 });
     }
 
     const settings = getSettings();
@@ -40,6 +45,7 @@ export async function POST(req: NextRequest) {
       // Update existing user
       const user = users[existingIdx];
       user.role = role;
+      user.permissions = role === "admin" ? ["planner", "control", "monitor", "lights", "freeshow"] : permissions;
       if (password) {
         const salt = generateSalt();
         user.salt = salt;
@@ -56,7 +62,8 @@ export async function POST(req: NextRequest) {
         username,
         role,
         salt,
-        passwordHash: hashPassword(password, salt)
+        passwordHash: hashPassword(password, salt),
+        permissions: role === "admin" ? ["planner", "control", "monitor", "lights", "freeshow"] : permissions
       });
     }
 

@@ -10,7 +10,7 @@ import { isAuthorized } from '@/lib/authHelper';
 
 export async function POST(req: NextRequest) {
   try {
-    const authSession = await isAuthorized(req);
+    const authSession = await isAuthorized(req, undefined, "freeshow");
     if (!authSession) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }

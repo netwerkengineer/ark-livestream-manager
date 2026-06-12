@@ -93,6 +93,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isOperatorAuthenticated, setIsOperatorAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<"admin" | "operator" | null>(null);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [operatorUsernameInput, setOperatorUsernameInput] = useState("");
   const [operatorPasswordInput, setOperatorPasswordInput] = useState("");
@@ -104,6 +105,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "operator">("operator");
+  const [newPermissions, setNewPermissions] = useState<string[]>([]);
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
   const [userManagementError, setUserManagementError] = useState("");
   const [userManagementSuccess, setUserManagementSuccess] = useState("");
@@ -173,6 +175,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
         setIsOperatorAuthenticated(true);
         setUserRole(data.userRole || "operator");
+        const perms = data.userPermissions || [];
+        setUserPermissions(perms);
         setCurrentUser(data.currentUser || "Operator");
         
         setTitle(data.defaultTitle || "");
@@ -180,7 +184,11 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         setPrivacyStatus(data.defaultPrivacy || "public");
         
         if (data.userRole === "operator") {
-          setActiveTab("control");
+          if (perms.includes("control")) setActiveTab("control");
+          else if (perms.includes("planner")) setActiveTab("planner");
+          else if (perms.includes("monitor")) setActiveTab("monitor");
+          else if (perms.includes("lights")) setActiveTab("lights");
+          else if (perms.includes("freeshow")) setActiveTab("freeshow");
         }
       } catch (err) {
         console.error("Error fetching settings/auth status:", err);
@@ -283,6 +291,10 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       setUserManagementError("Wachtwoord is verplicht voor nieuwe gebruikers");
       return;
     }
+    if (newRole === "operator" && newPermissions.length === 0) {
+      setUserManagementError("Een operator moet minimaal één recht toegewezen krijgen");
+      return;
+    }
     
     try {
       const res = await fetch("/api/users", {
@@ -291,7 +303,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         body: JSON.stringify({
           username: newUsername,
           password: newPassword || undefined,
-          role: newRole
+          role: newRole,
+          permissions: newRole === "operator" ? newPermissions : ["planner", "control", "monitor", "lights", "freeshow"]
         })
       });
       const data = await res.json();
@@ -304,6 +317,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       setNewUsername("");
       setNewPassword("");
       setNewRole("operator");
+      setNewPermissions([]);
       setEditingUsername(null);
       fetchLocalUsers();
     } catch (err: any) {
@@ -554,7 +568,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        {userRole === "admin" && (
+        {(userRole === "admin" || userPermissions.includes("planner")) && (
           <button 
             onClick={() => setActiveTab("planner")} 
             className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
@@ -563,34 +577,42 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
             <Calendar size={18} /> Stream Planner
           </button>
         )}
-        <button 
-          onClick={() => setActiveTab("control")} 
-          className={activeTab === "control" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
-        >
-          <ShieldAlert size={18} /> Control Center
-        </button>
-        <button 
-          onClick={() => setActiveTab("monitor")} 
-          className={activeTab === "monitor" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px' }}
-        >
-          <Activity size={18} /> Live Monitor
-        </button>
-        <button 
-          onClick={() => setActiveTab("lights")} 
-          className={activeTab === "lights" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "lights" ? 'none' : '1px solid rgba(249, 115, 22, 0.4)' }}
-        >
-          <Sun size={18} /> Lichtregie
-        </button>
-        <button 
-          onClick={() => setActiveTab("freeshow")} 
-          className={activeTab === "freeshow" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "freeshow" ? 'none' : '1px solid rgba(56, 189, 248, 0.4)' }}
-        >
-          <Layers size={18} /> FreeShow Projecten
-        </button>
+        {(userRole === "admin" || userPermissions.includes("control")) && (
+          <button 
+            onClick={() => setActiveTab("control")} 
+            className={activeTab === "control" ? "btn-primary" : "btn-outline"}
+            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
+          >
+            <ShieldAlert size={18} /> Control Center
+          </button>
+        )}
+        {(userRole === "admin" || userPermissions.includes("monitor")) && (
+          <button 
+            onClick={() => setActiveTab("monitor")} 
+            className={activeTab === "monitor" ? "btn-primary" : "btn-outline"}
+            style={{ padding: '8px 20px', borderRadius: '12px' }}
+          >
+            <Activity size={18} /> Live Monitor
+          </button>
+        )}
+        {(userRole === "admin" || userPermissions.includes("lights")) && (
+          <button 
+            onClick={() => setActiveTab("lights")} 
+            className={activeTab === "lights" ? "btn-primary" : "btn-outline"}
+            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "lights" ? 'none' : '1px solid rgba(249, 115, 22, 0.4)' }}
+          >
+            <Sun size={18} /> Lichtregie
+          </button>
+        )}
+        {(userRole === "admin" || userPermissions.includes("freeshow")) && (
+          <button 
+            onClick={() => setActiveTab("freeshow")} 
+            className={activeTab === "freeshow" ? "btn-primary" : "btn-outline"}
+            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "freeshow" ? 'none' : '1px solid rgba(56, 189, 248, 0.4)' }}
+          >
+            <Layers size={18} /> FreeShow Projecten
+          </button>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -1910,6 +1932,37 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                           </div>
                         </div>
 
+                        {newRole === "operator" && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                            <label className="input-label" style={{ fontWeight: 600 }}>Machtigingen (minimaal één verplicht):</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginTop: '4px' }}>
+                              {[
+                                { id: "planner", name: "Stream Planner" },
+                                { id: "control", name: "Control Center" },
+                                { id: "monitor", name: "Live Monitor" },
+                                { id: "lights", name: "Lichtregie" },
+                                { id: "freeshow", name: "FreeShow Projecten" }
+                              ].map(perm => (
+                                <label key={perm.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={newPermissions.includes(perm.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setNewPermissions([...newPermissions, perm.id]);
+                                      } else {
+                                        setNewPermissions(newPermissions.filter(p => p !== perm.id));
+                                      }
+                                    }}
+                                    style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer' }}
+                                  />
+                                  <span>{perm.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {userManagementError && <p style={{ color: '#f87171', fontSize: '0.85rem' }}>{userManagementError}</p>}
                         {userManagementSuccess && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>{userManagementSuccess}</p>}
 
@@ -1927,6 +1980,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                                 setNewUsername("");
                                 setNewPassword("");
                                 setNewRole("operator");
+                                setNewPermissions([]);
                               }}
                             >
                               Annuleren
@@ -1957,18 +2011,35 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                                 }}
                               >
                                 <div>
-                                  <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{u.username}</span>
-                                  <span style={{ 
-                                    marginLeft: '12px', 
-                                    padding: '2px 8px', 
-                                    borderRadius: '12px', 
-                                    fontSize: '0.75rem', 
-                                    fontWeight: 600,
-                                    background: u.role === "admin" ? 'rgba(248, 113, 113, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                                    color: u.role === "admin" ? 'var(--primary)' : '#60a5fa'
-                                  }}>
-                                    {u.role === "admin" ? "Admin" : "Operator"}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{u.username}</span>
+                                    <span style={{ 
+                                      padding: '2px 8px', 
+                                      borderRadius: '12px', 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 600,
+                                      background: u.role === "admin" ? 'rgba(248, 113, 113, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                      color: u.role === "admin" ? 'var(--primary)' : '#60a5fa'
+                                    }}>
+                                      {u.role === "admin" ? "Admin" : "Operator"}
+                                    </span>
+                                  </div>
+                                  {u.role === "operator" && (
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '6px' }}>
+                                      <strong>Rechten:</strong> {u.permissions && u.permissions.length > 0
+                                        ? u.permissions.map((p: string) => {
+                                            const mapping: Record<string, string> = {
+                                              planner: "Stream Planner",
+                                              control: "Control Center",
+                                              monitor: "Live Monitor",
+                                              lights: "Lichtregie",
+                                              freeshow: "FreeShow Projecten"
+                                            };
+                                            return mapping[p] || p;
+                                          }).join(", ")
+                                        : "Geen"}
+                                    </div>
+                                  )}
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                   <button 
@@ -1980,6 +2051,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                                       setNewUsername(u.username);
                                       setNewPassword("");
                                       setNewRole(u.role);
+                                      setNewPermissions(u.permissions || []);
                                     }}
                                   >
                                     Bewerken

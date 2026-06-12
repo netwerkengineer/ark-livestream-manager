@@ -3,7 +3,7 @@ import { sendQlcScene, sendQlcOsc } from "@/lib/qlcControl";
 import { isAuthorized } from "@/lib/authHelper";
 
 export async function POST(req: NextRequest) {
-  const authSession = await isAuthorized(req);
+  const authSession = await isAuthorized(req, undefined, "lights");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }

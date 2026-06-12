@@ -180,6 +180,45 @@ class TuyaHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"[HTTP] Error writing /status_json response: {e}")
             
+        elif path == '/sync':
+            print("Received HTTP request: Trigger manual FreeShow sync")
+            log_path = os.path.join(SCRIPT_DIR, "data", "sync_cleanup.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, 'a') as log_file:
+                log_file.write(f"\n--- MANUAL SYNC TRIGGERED AT {datetime.datetime.now()} ---\n")
+            
+            # Start process in background, redirecting stdout/stderr to the log file
+            log_file_handle = open(log_path, 'a')
+            subprocess.Popen(
+                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py")],
+                stdout=log_file_handle,
+                stderr=subprocess.STDOUT
+            )
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b"OK: Manual sync started in background")
+            
+        elif path == '/delete_scriptures':
+            print("Received HTTP request: Trigger manual scripture deletion & sync")
+            log_path = os.path.join(SCRIPT_DIR, "data", "sync_cleanup.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, 'a') as log_file:
+                log_file.write(f"\n--- MANUAL SCRIPTURE DELETION TRIGGERED AT {datetime.datetime.now()} ---\n")
+            
+            log_file_handle = open(log_path, 'a')
+            subprocess.Popen(
+                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py"), "--delete-all-scriptures"],
+                stdout=log_file_handle,
+                stderr=subprocess.STDOUT
+            )
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b"OK: Scripture deletion started in background")
+            
         else:
             self.send_response(404)
             self.end_headers()

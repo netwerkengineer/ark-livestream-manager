@@ -4,7 +4,7 @@ import { isAuthorized } from "@/lib/authHelper";
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const authSession = await isAuthorized(req);
+  const authSession = await isAuthorized(req, undefined, "control");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }

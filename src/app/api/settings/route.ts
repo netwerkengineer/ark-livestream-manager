@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ...sanitized,
     currentUser: authSession.username,
-    userRole: authSession.role
+    userRole: authSession.role,
+    userPermissions: authSession.permissions
   });
 }
 

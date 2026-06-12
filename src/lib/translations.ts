@@ -208,7 +208,13 @@ export const translations: Record<string, any> = {
     "swap_media": "Wissel media",
     "add_extra_slide": "Extra slide toevoegen",
     "logout": "Logout",
-    "note": "Let op"
+    "note": "Let op",
+    "system_actions": "⚙️ Systeem Acties",
+    "manual_sync": "Handmatige Sync Starten",
+    "delete_all_scriptures": "Wis Alle Bijbelteksten",
+    "delete_scriptures_confirm": "Weet je zeker dat je ALLE bijbelteksten (shows met categorie 'bible') wilt verwijderen van zowel de NAS als de Beamer PC? Dit kan niet ongedaan worden gemaakt.",
+    "syncing": "Bezig met synchroniseren...",
+    "deleting_scriptures": "Bijbelteksten worden verwijderd..."
   },
   en: {
     app_title: "FreeShow Project Generator",
@@ -419,7 +425,13 @@ export const translations: Record<string, any> = {
     "swap_media": "Swap media",
     "add_extra_slide": "Add extra slide",
     "logout": "Logout",
-    "note": "Note"
+    "note": "Note",
+    "system_actions": "⚙️ System Actions",
+    "manual_sync": "Start Manual Sync",
+    "delete_all_scriptures": "Delete All Scriptures",
+    "delete_scriptures_confirm": "Are you sure you want to delete ALL scriptures (shows with category 'bible') from both the NAS and the Beamer PC? This action cannot be undone.",
+    "syncing": "Syncing in progress...",
+    "deleting_scriptures": "Deleting scriptures..."
   },
   de: {
     app_title: "FreeShow Projekt-Generator",
