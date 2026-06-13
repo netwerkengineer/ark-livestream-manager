@@ -15,6 +15,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
       - /mnt/data/Projects/Beamer/FreeShow:/app/public/thumbnails
+      - ./data/id_ed25519:/home/nextjs/.ssh/id_ed25519:ro
     environment:
       - NODE_ENV=production
       - PORT=3005

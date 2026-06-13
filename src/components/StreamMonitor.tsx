@@ -20,6 +20,16 @@ interface StreamMonitorProps {
   scheduledStreams: any[];
 }
 
+const YoutubeIcon = ({ size = 20, color = "currentColor", style = {} }: { size?: number, color?: string, style?: React.CSSProperties }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    style={{ width: size, height: size, color: color, ...style }}
+  >
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.516 0-9.387.507a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.507 9.388.507 9.388.507s7.517 0 9.388-.507a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
 export default function StreamMonitor({ settings, scheduledStreams }: StreamMonitorProps) {
   const [obsState, setObsState] = useState<{
     connected: boolean;
@@ -34,6 +44,54 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
   const [fixing, setFixing] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [ledTestMsg, setLedTestMsg] = useState<string | null>(null);
+
+  const [ytStats, setYtStats] = useState<{
+    active: boolean;
+    broadcastStatus: string;
+    title: string;
+    concurrentViewers: number;
+    likeCount: number;
+    viewCount: number;
+    videoId: string;
+    error?: string;
+  } | null>(null);
+
+  // Poll YouTube statistics
+  const fetchYoutubeStats = useCallback(async () => {
+    try {
+      const selectedStream = scheduledStreams.find(s => s.id === selectedStreamId);
+      const isYoutube = selectedStream ? selectedStream.provider === 'youtube' : false;
+      const url = isYoutube
+        ? `/api/streams/youtube-stats?videoId=${encodeURIComponent(selectedStreamId)}`
+        : '/api/streams/youtube-stats';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setYtStats(data);
+      } else if (res.status === 401) {
+        setYtStats({
+          active: false,
+          broadcastStatus: "offline",
+          title: "",
+          concurrentViewers: 0,
+          likeCount: 0,
+          viewCount: 0,
+          videoId: "",
+          error: "YouTube verbinding verlopen of niet gekoppeld."
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch YouTube stats:', err);
+    }
+  }, [selectedStreamId, scheduledStreams]);
+
+  useEffect(() => {
+    fetchYoutubeStats();
+    // Poll every 10 seconds
+    const interval = setInterval(fetchYoutubeStats, 10000);
+    return () => clearInterval(interval);
+  }, [fetchYoutubeStats]);
 
   // Poll OBS status via server-side API (avoids browser wss:// mixed content issue)
   const fetchOBSStatus = useCallback(async () => {
@@ -118,6 +176,21 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
       alert("Fout bij bijwerken OBS: " + err.message);
     } finally {
       setFixing(false);
+    }
+  };
+
+  const handleLEDTrigger = async (status: 'active' | 'inactive') => {
+    setLedTestMsg("Signaal verzenden...");
+    try {
+      const res = await fetch(`/api/led/trigger?status=${status}`);
+      const data = await res.json();
+      if (data.success) {
+        setLedTestMsg(data.message);
+      } else {
+        setLedTestMsg(`Fout: ${data.error}`);
+      }
+    } catch (err: any) {
+      setLedTestMsg(`Fout bij verbinding: ${err.message}`);
     }
   };
 
@@ -231,107 +304,216 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
               </div>
             </motion.section>
           )}
+
+          {/* YouTube Stats Card */}
+          <section className="glass-card" style={{ border: '1px solid rgba(239, 68, 68, 0.15)', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ padding: '8px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <YoutubeIcon size={20} color="#ef4444" />
+                </div>
+                <h2 style={{ margin: 0, fontSize: '1.2rem' }}>YouTube Live Uitzending</h2>
+              </div>
+              {ytStats?.active ? (
+                <span className="badge-live" style={{ background: '#ef4444', color: '#fff', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '0.05em' }}>LIVE</span>
+              ) : (
+                <span style={{ color: 'var(--muted)', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', padding: '3px 8px', borderRadius: '6px' }}>STANDBY</span>
+              )}
+            </div>
+
+            {ytStats?.error ? (
+              <div style={{ color: '#f87171', fontSize: '0.85rem', padding: '12px', background: 'rgba(248, 113, 113, 0.05)', borderRadius: '8px', border: '1px solid rgba(248, 113, 113, 0.1)' }}>
+                {ytStats.error}
+              </div>
+            ) : !ytStats ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
+                <RefreshCcw size={20} className="spin" style={{ margin: '0 auto 8px' }} />
+                <span>Statistieken laden...</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {ytStats.title && (
+                  <div style={{ fontSize: '0.9rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>
+                    <span style={{ color: 'var(--muted)', display: 'block', fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '2px', letterSpacing: '0.05em' }}>Titel</span>
+                    <strong style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {ytStats.title}
+                    </strong>
+                  </div>
+                )}
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div className="stat-box" style={{ padding: '12px' }}>
+                    <span className="stat-label" style={{ fontSize: '0.7rem' }}>Kijkers</span>
+                    <span className="stat-value" style={{ fontSize: '1.2rem', color: ytStats.active ? '#ef4444' : 'var(--muted)' }}>
+                      {ytStats.concurrentViewers}
+                    </span>
+                  </div>
+                  <div className="stat-box" style={{ padding: '12px' }}>
+                    <span className="stat-label" style={{ fontSize: '0.7rem' }}>Likes</span>
+                    <span className="stat-value" style={{ fontSize: '1.2rem' }}>
+                      {ytStats.likeCount}
+                    </span>
+                  </div>
+                  <div className="stat-box" style={{ padding: '12px' }}>
+                    <span className="stat-label" style={{ fontSize: '0.7rem' }}>Weergaven</span>
+                    <span className="stat-value" style={{ fontSize: '1.2rem' }}>
+                      {ytStats.viewCount}
+                    </span>
+                  </div>
+                </div>
+
+                {ytStats.videoId && (
+                  <a 
+                    href={`https://youtube.com/watch?v=${ytStats.videoId}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="btn-outline" 
+                    style={{ textAlign: 'center', display: 'block', padding: '10px', fontSize: '0.85rem', borderRadius: '8px', textDecoration: 'none', marginTop: '4px' }}
+                  >
+                    Open YouTube Stream
+                  </a>
+                )}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Config Check Column */}
-        <section className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-            <ShieldCheck size={20} color="var(--primary)" />
-            <h2>Configuratie Check</h2>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <section className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <ShieldCheck size={20} color="var(--primary)" />
+              <h2>Configuratie Check</h2>
+            </div>
 
-          <div className="input-group">
-            <label className="input-label">Selecteer Uitzending om te controleren</label>
-            <select
-              className="input-field"
-              value={selectedStreamId}
-              onChange={(e) => setSelectedStreamId(e.target.value)}
-            >
-              <option value="">-- Kies een geplande stream --</option>
-              {scheduledStreams.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.provider === 'youtube' ? '📺' : '🌐'} {s.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {!selectedStreamId ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)', fontSize: '0.9rem' }}
+            <div className="input-group">
+              <label className="input-label">Selecteer Uitzending om te controleren</label>
+              <select
+                className="input-field"
+                value={selectedStreamId}
+                onChange={(e) => setSelectedStreamId(e.target.value)}
               >
-                Selecteer een stream om de OBS instellingen te valideren.
-              </motion.div>
-            ) : loadingDetails ? (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '24px' }}>
-                <RefreshCcw size={24} className="spin" />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="details"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '12px' }}
-              >
-                <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Stream Key (Ingest)</span>
-                    {isConfigCorrect() === true ? (
-                      <span style={{ color: '#4ade80', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle2 size={14} /> Komt overeen
-                      </span>
-                    ) : isConfigCorrect() === false ? (
-                      <span style={{ color: '#f87171', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <XCircle size={14} /> Mismatch!
-                      </span>
-                    ) : null}
-                  </div>
-                  <code style={{ display: 'block', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>
-                    {streamDetails?.streamKey
-                      ? `${streamDetails.streamKey.substring(0, 8)}****${streamDetails.streamKey.substring(streamDetails.streamKey.length - 4)}`
-                      : 'Onbekend'}
-                  </code>
-                </div>
+                <option value="">-- Kies een geplande stream --</option>
+                {scheduledStreams.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.provider === 'youtube' ? '📺' : '🌐'} {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
-                  <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '12px' }}>Huidige OBS Instelling</span>
-                  <code style={{ display: 'block', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>
-                    {obsState.serviceSettings?.streamServiceSettings?.key
-                      ? (() => {
-                          const k = obsState.serviceSettings.streamServiceSettings.key;
-                          return `${k.substring(0, 8)}****${k.substring(k.length - 4)}`;
-                        })()
-                      : (obsConnected ? 'Geen sleutel ingesteld' : '— OBS niet verbonden —')}
-                  </code>
-                </div>
+            <AnimatePresence mode="wait">
+              {!selectedStreamId ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)', fontSize: '0.9rem' }}
+                >
+                  Selecteer een stream om de OBS instellingen te valideren.
+                </motion.div>
+              ) : loadingDetails ? (
+                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '24px' }}>
+                  <RefreshCcw size={24} className="spin" />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="details"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '12px' }}
+                >
+                  <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                       <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Stream Key (Ingest)</span>
+                       {isConfigCorrect() === true ? (
+                         <span style={{ color: '#4ade80', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                           <CheckCircle2 size={14} /> Komt overeen
+                         </span>
+                       ) : isConfigCorrect() === false ? (
+                         <span style={{ color: '#f87171', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                           <XCircle size={14} /> Mismatch!
+                         </span>
+                       ) : null}
+                     </div>
+                     <code style={{ display: 'block', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>
+                       {streamDetails?.streamKey
+                         ? `${streamDetails.streamKey.substring(0, 8)}****${streamDetails.streamKey.substring(streamDetails.streamKey.length - 4)}`
+                         : 'Onbekend'}
+                     </code>
+                   </div>
 
-                {isConfigCorrect() === false && obsConnected && (
-                  <motion.button
-                    initial={{ scale: 0.95 }}
-                    animate={{ scale: 1 }}
-                    whileHover={{ scale: 1.02 }}
-                    onClick={handleFixConfig}
-                    className="btn-primary"
-                    style={{ width: '100%', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
-                    disabled={fixing}
-                  >
-                    <Zap size={18} /> {fixing ? 'Bijwerken...' : 'Corrigeer OBS Instellingen'}
-                  </motion.button>
-                )}
+                   <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
+                     <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '12px' }}>Huidige OBS Instelling</span>
+                     <code style={{ display: 'block', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>
+                       {obsState.serviceSettings?.streamServiceSettings?.key
+                         ? (() => {
+                             const k = obsState.serviceSettings.streamServiceSettings.key;
+                             return `${k.substring(0, 8)}****${k.substring(k.length - 4)}`;
+                           })()
+                         : (obsConnected ? 'Geen sleutel ingesteld' : '— OBS niet verbonden —')}
+                     </code>
+                   </div>
 
-                {isConfigCorrect() === true && (
-                  <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(74, 222, 128, 0.1)', color: '#4ade80', fontSize: '0.85rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={16} /> Configuratie is perfect in orde!
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+                   {isConfigCorrect() === false && obsConnected && (
+                     <motion.button
+                       initial={{ scale: 0.95 }}
+                       animate={{ scale: 1 }}
+                       whileHover={{ scale: 1.02 }}
+                       onClick={handleFixConfig}
+                       className="btn-primary"
+                       style={{ width: '100%', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
+                       disabled={fixing}
+                     >
+                       <Zap size={18} /> {fixing ? 'Bijwerken...' : 'Corrigeer OBS Instellingen'}
+                     </motion.button>
+                   )}
+
+                   {isConfigCorrect() === true && (
+                     <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(74, 222, 128, 0.1)', color: '#4ade80', fontSize: '0.85rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                       <CheckCircle2 size={16} /> Configuratie is perfect in orde!
+                     </div>
+                   )}
+                 </motion.div>
+               )}
+             </AnimatePresence>
+           </section>
+
+           {settings.ledPanelEnabled && (
+             <section className="glass-card" style={{ border: '1px solid rgba(236, 72, 153, 0.15)', padding: '24px' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                 <div style={{ padding: '8px', borderRadius: '8px', background: 'rgba(236, 72, 153, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                   <Zap size={20} color="#ec4899" />
+                 </div>
+                 <h2 style={{ margin: 0, fontSize: '1.2rem' }}>LED Sign Board Test</h2>
+               </div>
+               <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '16px' }}>
+                 Stuur handmatige signalen naar het LED-scherm via <strong>{settings.freeShowHost || '192.168.2.20'}</strong>.
+               </p>
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                 <button
+                   onClick={() => handleLEDTrigger('active')}
+                   className="btn-primary"
+                   style={{ background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', fontSize: '0.85rem', cursor: 'pointer', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold' }}
+                 >
+                   ON AIR (Rood)
+                 </button>
+                 <button
+                   onClick={() => handleLEDTrigger('inactive')}
+                   className="btn-primary"
+                   style={{ background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', fontSize: '0.85rem', cursor: 'pointer', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold' }}
+                 >
+                   OFFLINE (Groen)
+                 </button>
+               </div>
+               {ledTestMsg && (
+                 <div style={{ marginTop: '12px', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)', fontSize: '0.82rem', textAlign: 'center', color: ledTestMsg.includes('Fout') || ledTestMsg.includes('niet') ? '#f87171' : '#4ade80' }}>
+                   {ledTestMsg}
+                 </div>
+               )}
+             </section>
+           )}
+         </div>
       </div>
 
       <style jsx>{`

@@ -608,3 +608,23 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 - De container logs tonen dat Companion succesvol is opgestart en alle geconfigureerde instances (`x32`, `obs`, `atem`, `freeshow`, `qlcplus`, `http`) direct heeft ingeladen uit de database.
 - Via `ss -ulpn` is geverifieerd dat de `docker-proxy` nu actief luistert op UDP-poort `12321` (zowel IPv4 als IPv6).
 - FreeShow kan nu rechtstreeks via OSC communiceren met Companion, die op zijn beurt de juiste QLC+-lichtpresets triggert. All settings are now fully persistent.
+
+---
+
+## 📺 23. YouTube Live Stats Dropdown Routing & LED Panel macOS Support (v23.0)
+
+### 1. YouTube Stats Dropdown Routing Fix
+* **Probleem:** De YouTube Live Statistieken-kaart toonde altijd de status van de dichtstbijzijnde actieve/geplande stream (wat resulteerde in een oude testuitzending uit 2020), in plaats van te luisteren naar de geselecteerde stream in de dropdown van de **Configuratie Check**-kaart.
+* **Oplossing:**
+  1. We hebben `StreamMonitor.tsx` aangepast zodat het de momenteel geselecteerde stream opzoekt in de lijst met geplande streams (`scheduledStreams`).
+  2. Als de geselecteerde stream van de provider `youtube` is, wordt de polling-url verrijkt met het specifieke video-ID (`/api/streams/youtube-stats?videoId=...`).
+  3. We hebben de `useCallback` en `useEffect` dependencies bijgewerkt (`[selectedStreamId, scheduledStreams]`) zodat de polling-interval direct ververst en een live update triggert zodra de gebruiker een andere stream in de dropdown selecteert.
+
+### 2. Dynamische OS-Detectie voor het LED-paneel (macOS / Windows Support)
+* **Probleem:** Het start/stop-script voor het LED-paneel (`obsManager.ts`) ging er hardgecodeerd vanuit dat de doelmachines Windows 10 PC's waren. Het gebruikte een Windows-temp-pad (`C:/Users/.../AppData/Local/Temp`) en het commando `python` voor de remote uitvoering. Bij verbinding met een macOS client (zoals een MacBook Pro thuis voor testen) mislukte dit stilzwijgend.
+* **Oplossing:**
+  1. We hebben een dynamische OS-detectie via SSH ingebouwd in `obsManager.ts` die `cmd.exe /c echo windows` probeert uit te voeren op het geconfigureerde FreeShow-host IP.
+  2. Als dit commando slaagt en "windows" retourneert, kiest het systeem de Windows-paden en het command `python`.
+  3. Als het commando faalt (macOS/Linux), schakelt het systeem dynamisch over naar het universele temp-pad `/tmp/led_control.py` en het commando `python3`.
+  4. Hierdoor kan het LED-paneel zowel thuis op een macOS-machine (MacBook Pro) als in de kerk op de Windows OBS/FreeShow-pc's naadloos worden getest en ingezet.
+

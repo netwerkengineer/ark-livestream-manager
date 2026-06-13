@@ -83,6 +83,14 @@ export interface AppSettings {
   imapPass?: string;
   imapHost?: string;
   imapPort?: number;
+  ledPanelEnabled: boolean;
+  ledPanelMac?: string;
+  sshUser?: string;
+  ledHost?: string;
+  ledActiveText?: string;
+  ledActiveColor?: string;
+  ledInactiveText?: string;
+  ledInactiveColor?: string;
 }
 
 export interface LocalUser {
@@ -228,7 +236,15 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   imapUser: "",
   imapPass: "",
   imapHost: "imap.gmail.com",
-  imapPort: 993
+  imapPort: 993,
+  ledPanelEnabled: false,
+  ledPanelMac: "",
+  sshUser: "jeffreygo",
+  ledHost: "",
+  ledActiveText: "LIVESTREAM ON AIR",
+  ledActiveColor: "#ff0000",
+  ledInactiveText: "LIVESTREAM OFFLINE",
+  ledInactiveColor: "#00ff00"
 };
 
 // Ensure data directory exists
