@@ -180,6 +180,11 @@ def deploy():
     prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/companion-data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Media && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Shows && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Config && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {freeshow_path}\""
     run_with_pty(prep_cmd, "Mappen checken en aanmaken op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
+    # Remote SSH key genereren indien niet aanwezig om container crash te voorkomen
+    key_path = f"{config['REMOTE_APP_PATH']}/data/id_ed25519"
+    key_gen_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"if [ ! -f {key_path} ]; then echo 'SSH sleutel aanmaken op de NAS...'; ssh-keygen -t ed25519 -f {key_path} -N '' -q && echo '{config['NAS_PASS']}' | sudo -S chown 1001:1001 {key_path}* && echo '{config['NAS_PASS']}' | sudo -S chmod 600 {key_path} && echo '{config['NAS_PASS']}' | sudo -S chmod 644 {key_path}.pub; fi\""
+    run_with_pty(key_gen_cmd, "SSH sleutel controleren/genereren op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+
     # 4. OVERZETTEN NAAR NAS
     inject_cmd = f"cat {config['LOCAL_TEMP_ARCHIVE']} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {config['REMOTE_TEMP_ARCHIVE']}\""
     subprocess.check_call(inject_cmd, shell=True)
