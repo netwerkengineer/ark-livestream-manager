@@ -315,6 +315,7 @@ def run():
     poller_thread.start()
 
     server_address = ('0.0.0.0', 8088)
+    ThreadingHTTPServer.allow_reuse_address = True
     httpd = ThreadingHTTPServer(server_address, TuyaHandler)
     print("Starting Tuya Control HTTP Server on port 8088...")
     try:
