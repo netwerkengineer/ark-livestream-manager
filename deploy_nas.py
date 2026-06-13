@@ -68,10 +68,27 @@ def setup_environment():
     config['LOCAL_APP_PATH'] = BASE_DIR
     config['REMOTE_APP_PATH'] = get_input("Doelpad op de NAS", last_config.get('REMOTE_APP_PATH', "/volume1/docker/ark-livestream-manager"))
     
-    default_emulators = "ja" if last_config.get('DEPLOY_EMULATORS', False) else "nee"
-    deploy_emulators_input = get_input("Wil je de X32 & ATEM Emulators ook installeren? (ja/nee)", default_emulators)
-    config['DEPLOY_EMULATORS'] = deploy_emulators_input.lower() in ["ja", "yes", "j", "y", "true"]
+    print("\nSelecteer de onderdelen die je wilt deployen/updaten op de NAS:")
     
+    default_livestream = "ja" if last_config.get('DEPLOY_LIVESTREAM', True) else "nee"
+    config['DEPLOY_LIVESTREAM'] = get_input("1. Livestream Manager (Main App)? (ja/nee)", default_livestream).lower() in ["ja", "yes", "j", "y", "true"]
+    
+    default_companion = "ja" if last_config.get('DEPLOY_COMPANION', True) else "nee"
+    config['DEPLOY_COMPANION'] = get_input("2. Companion (v4.3.4)? (ja/nee)", default_companion).lower() in ["ja", "yes", "j", "y", "true"]
+    
+    default_qlc = "ja" if last_config.get('DEPLOY_QLC', True) else "nee"
+    config['DEPLOY_QLC'] = get_input("3. QLC+ (Lighting)? (ja/nee)", default_qlc).lower() in ["ja", "yes", "j", "y", "true"]
+    
+    default_tuya = "ja" if last_config.get('DEPLOY_TUYA', True) else "nee"
+    config['DEPLOY_TUYA'] = get_input("4. Tuya Control? (ja/nee)", default_tuya).lower() in ["ja", "yes", "j", "y", "true"]
+    
+    default_emulators = "ja" if last_config.get('DEPLOY_EMULATORS', False) else "nee"
+    config['DEPLOY_EMULATORS'] = get_input("5. X32 & ATEM Emulators? (ja/nee)", default_emulators).lower() in ["ja", "yes", "j", "y", "true"]
+    
+    if not (config['DEPLOY_LIVESTREAM'] or config['DEPLOY_COMPANION'] or config['DEPLOY_QLC'] or config['DEPLOY_TUYA'] or config['DEPLOY_EMULATORS']):
+        print("\n❌ Fout: Je moet ten minste één onderdeel selecteren om te deployen!")
+        sys.exit(1)
+        
     config['LOCAL_TEMP_ARCHIVE'] = os.path.join(BASE_DIR, "deploy.tar.gz")
     config['REMOTE_TEMP_ARCHIVE'] = f"{config['REMOTE_APP_PATH']}/deploy.tar.gz"
     return config
@@ -177,46 +194,49 @@ def deploy():
     print("✓ Fallback template.project succesvol overgebracht naar de NAS.")
 
     # 4.5 COMPANION IMAGE CHECK & SYNC (Stage 1: Pull, Stage 2: Transfer)
-    print(f"\n>>> NAS: Controleren of Companion image (v4.3.1) aanwezig is ...")
-    D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    check_img_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker images -q companion-nas-v4:latest\""
-    img_exists = subprocess.check_output(check_img_cmd, shell=True).decode().strip()
-    
-    if not img_exists:
-        print("⚠️ Companion v4 image niet gevonden op NAS.")
+    if config.get('DEPLOY_COMPANION'):
+        print(f"\n>>> NAS: Controleren of Companion image (v4.3.4) aanwezig is ...")
+        D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        check_img_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker images -q companion-nas-v4-3-4:latest\""
+        img_exists = subprocess.check_output(check_img_cmd, shell=True).decode().strip()
         
-        # POGING 1: Direct pull op de NAS (Snelste)
-        print(">>> NAS: Poging om image direct te downloaden van GitHub (Stage 1)...")
-        pull_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker pull ghcr.io/bitfocus/companion/companion:v4.3.1 && sudo -S docker tag ghcr.io/bitfocus/companion/companion:v4.3.1 companion-nas-v4:latest\""
-        try:
-            run_with_pty(pull_cmd, "Direct pull op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
-            print("✓ Companion v4 image succesvol gedownload op de NAS.")
-        except Exception as e:
-            print(f"❌ Direct pull mislukt (mogelijk geen internet op NAS).")
+        if not img_exists:
+            print("⚠️ Companion v4.3.4 image niet gevonden op NAS.")
             
-            # POGING 2: Transfer vanaf Mac (Backup)
-            print(">>> Lokaal: Bezig met voorbereiden en versturen vanaf Mac (Stage 2 - dit duurt even)...")
-            local_tar = os.path.join(BASE_DIR, "companion_nas_v4.tar")
-            remote_tar = f"{config['REMOTE_APP_PATH']}/companion_nas_v4.tar"
-            
-            # Wrapper build op Mac om Docker Save bug te omzeilen
-            build_cmd = "echo 'FROM ghcr.io/bitfocus/companion/companion:v4.3.1' | docker build --platform linux/amd64 -t companion-nas-v4:latest -"
-            subprocess.check_call(build_cmd, shell=True)
-            subprocess.check_call(["docker", "save", "companion-nas-v4:latest", "-o", local_tar])
-            
-            # Versturen naar NAS
-            send_img_cmd = f"cat {local_tar} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_tar}\""
-            subprocess.check_call(send_img_cmd, shell=True)
-            
-            # Inladen op NAS
-            load_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker load -i {remote_tar} && rm {remote_tar}\""
-            run_with_pty(load_cmd, "Companion v4 image inladen op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
-            
-            # Opruimen lokaal
-            if os.path.exists(local_tar): os.remove(local_tar)
-            print("✓ Companion v4 image succesvol overgebracht vanaf Mac.")
+            # POGING 1: Direct pull op de NAS (Snelste)
+            print(">>> NAS: Poging om image direct te downloaden van GitHub (Stage 1)...")
+            pull_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker pull ghcr.io/bitfocus/companion/companion:v4.3.4 && sudo -S docker tag ghcr.io/bitfocus/companion/companion:v4.3.4 companion-nas-v4-3-4:latest\""
+            try:
+                run_with_pty(pull_cmd, "Direct pull op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+                print("✓ Companion v4.3.4 image succesvol gedownload op de NAS.")
+            except Exception as e:
+                print(f"❌ Direct pull mislukt (mogelijk geen internet op NAS).")
+                
+                # POGING 2: Transfer vanaf Mac (Backup)
+                print(">>> Lokaal: Bezig met voorbereiden en versturen vanaf Mac (Stage 2 - dit duurt even)...")
+                local_tar = os.path.join(BASE_DIR, "companion_nas_v4_3_4.tar")
+                remote_tar = f"{config['REMOTE_APP_PATH']}/companion_nas_v4_3_4.tar"
+                
+                # Wrapper build op Mac om Docker Save bug te omzeilen
+                build_cmd = "echo 'FROM ghcr.io/bitfocus/companion/companion:v4.3.4' | docker build --platform linux/amd64 -t companion-nas-v4-3-4:latest -"
+                subprocess.check_call(build_cmd, shell=True)
+                subprocess.check_call(["docker", "save", "companion-nas-v4-3-4:latest", "-o", local_tar])
+                
+                # Versturen naar NAS
+                send_img_cmd = f"cat {local_tar} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_tar}\""
+                subprocess.check_call(send_img_cmd, shell=True)
+                
+                # Inladen op NAS
+                load_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"export {D_PATH} && echo '{config['NAS_PASS']}' | sudo -S docker load -i {remote_tar} && rm {remote_tar}\""
+                run_with_pty(load_cmd, "Companion v4.3.4 image inladen op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+                
+                # Opruimen lokaal
+                if os.path.exists(local_tar): os.remove(local_tar)
+                print("✓ Companion v4.3.4 image succesvol overgebracht vanaf Mac.")
+        else:
+            print("✓ Companion v4.3.4 image is al aanwezig op de NAS.")
     else:
-        print("✓ Companion v4 image is al aanwezig op de NAS.")
+        print("\n>>> Lokaal/NAS: Companion image sync overgeslagen (niet geselecteerd).")
 
     # 5. UITPAKKEN & DOCKER START
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -233,7 +253,20 @@ def deploy():
         user_home = f"/volume1/homes/{config['NAS_USER']}"
         print(f"⚠️ Kon home directory niet detecteren via SSH, fallback naar: {user_home}")
 
-    services_to_deploy = "" if config.get('DEPLOY_EMULATORS') else "livestream-manager companion qlcplus tuya-control"
+    services_list = []
+    if config.get('DEPLOY_LIVESTREAM'):
+        services_list.append("livestream-manager")
+    if config.get('DEPLOY_COMPANION'):
+        services_list.append("companion")
+    if config.get('DEPLOY_QLC'):
+        services_list.append("qlcplus")
+    if config.get('DEPLOY_TUYA'):
+        services_list.append("tuya-control")
+    if config.get('DEPLOY_EMULATORS'):
+        services_list.append("x32-emulator")
+        services_list.append("atem-emulator")
+        
+    services_to_deploy = " ".join(services_list)
     cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else "(docker stop x32-emulator atem-emulator 2>/dev/null || true) && (docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
     deploy_cmd = (
         f"export {D_PATH} && "
