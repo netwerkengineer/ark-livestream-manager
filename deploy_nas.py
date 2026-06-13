@@ -151,7 +151,7 @@ def deploy():
 
     # 2. LOKAAL INPAKKEN
     print(f"\n>>> Lokaal: Project inpakken (exclusief node_modules en build data) ...")
-    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", ".git", "--exclude", "deploy.tar.gz", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
+    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
     env = os.environ.copy()
     env["COPYFILE_DISABLE"] = "1"
     subprocess.check_call(tar_cmd, env=env)
@@ -167,6 +167,14 @@ def deploy():
     inject_cmd = f"cat {config['LOCAL_TEMP_ARCHIVE']} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {config['REMOTE_TEMP_ARCHIVE']}\""
     subprocess.check_call(inject_cmd, shell=True)
     print("✓ Project succesvol overgebracht naar de NAS.")
+
+    # 4.1 FALLBACK TEMPLATE OVERZETTEN NAAR NAS
+    print(">>> Lokaal: Fallback template.project overbrengen naar de NAS...")
+    local_template = os.path.join(config['LOCAL_APP_PATH'], "data", "template.project")
+    remote_template = f"{config['REMOTE_APP_PATH']}/data/template.project"
+    send_template_cmd = f"cat {local_template} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_template}\""
+    subprocess.check_call(send_template_cmd, shell=True)
+    print("✓ Fallback template.project succesvol overgebracht naar de NAS.")
 
     # 4.5 COMPANION IMAGE CHECK & SYNC (Stage 1: Pull, Stage 2: Transfer)
     print(f"\n>>> NAS: Controleren of Companion image (v4.3.1) aanwezig is ...")

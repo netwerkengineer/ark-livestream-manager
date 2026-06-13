@@ -71,6 +71,7 @@ export interface AppSettings {
   autoSaveToNas?: boolean;
   defaultTemplate?: string;
   backupTarget?: string;
+  backupPrefix?: string;
   ftpHost?: string;
   ftpUser?: string;
   ftpPass?: string;
@@ -216,13 +217,14 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   autoSaveToNas: false,
   defaultTemplate: "template.project",
   backupTarget: "none",
+  backupPrefix: "ARK",
   ftpHost: "",
   ftpUser: "",
   ftpPass: "",
   ftpPort: 21,
-  webdavUrl: "",
-  webdavUser: "",
-  webdavPass: "",
+  webdavUrl: "https://stack.netwerkengineer.nl/webdav/files/jeffreygo",
+  webdavUser: "jeffreygo",
+  webdavPass: "Q01wra7qQnxaqgEkFYPtUt6_2kc",
   imapUser: "",
   imapPass: "",
   imapHost: "imap.gmail.com",
@@ -275,6 +277,7 @@ export function getSettings(): AppSettings {
       
       if (needsWrite) {
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+        try { fs.chmodSync(SETTINGS_FILE, 0o664); } catch(e){}
       }
     } catch (e) {
       settings = DEFAULT_SETTINGS;
@@ -299,6 +302,7 @@ export function getSettings(): AppSettings {
         }
       ];
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+      try { fs.chmodSync(SETTINGS_FILE, 0o664); } catch(e){}
       settings = DEFAULT_SETTINGS;
     } catch (e) {}
   }
@@ -315,5 +319,6 @@ export function saveSettings(settings: Partial<AppSettings>) {
   }
 
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2));
+  try { fs.chmodSync(SETTINGS_FILE, 0o664); } catch(e){}
   return updated;
 }

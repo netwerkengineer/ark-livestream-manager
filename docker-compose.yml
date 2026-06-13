@@ -10,8 +10,11 @@ services:
       - "livestream-manager:127.0.0.1"
     volumes:
       - ./data:/app/data
+      - ./companion-data:/app/companion-data
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
-      - /mnt/data/Projects/Beamer/FreeShow/Media:/app/public/thumbnails
+      - /mnt/data/Projects/Beamer/FreeShow:/app/public/thumbnails
     environment:
       - NODE_ENV=production
       - PORT=3005

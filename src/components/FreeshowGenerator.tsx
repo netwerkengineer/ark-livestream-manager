@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { translations } from '@/lib/translations';
 
 export default function FreeshowGenerator() {
@@ -127,10 +127,334 @@ export default function FreeshowGenerator() {
   const [selectedShow, setSelectedShow] = useState<any>(null); // Full JSON array [id, showObj]
   const [showEditorTitle, setShowEditorTitle] = useState('');
   const [showEditorCategory, setShowEditorCategory] = useState('');
-  const [showEditorSlides, setShowEditorSlides] = useState<Record<string, string>>({}); // { slideId: slideText }
+  const [showEditorSlides, setShowEditorSlides] = useState<any[]>([]); // Array of { id, nextTimer, slideObj }
   const [showEditorRawJson, setShowEditorRawJson] = useState('');
   const [showEditorMode, setShowEditorMode] = useState<'visual'|'raw'>('visual');
   const [isSavingShow, setIsSavingShow] = useState(false);
+
+  // Preview & Template States
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<any>(null);
+  const [previewShow, setPreviewShow] = useState<any>(null);
+  const [currentPreviewSlideIdx, setCurrentPreviewSlideIdx] = useState<number>(0);
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch('/api/templates');
+      const data = await res.json();
+      if (data.success) {
+        setTemplates(data.templates);
+      }
+    } catch (err) {
+      console.error("Fout bij laden templates:", err);
+    }
+  };
+
+  const openPreview = async (filename: string) => {
+    try {
+      setLoadingShows(true);
+      const res = await fetch(`/api/shows/${encodeURIComponent(filename)}`);
+      const data = await res.json();
+      if (data.success) {
+        setPreviewShow(data.show[1]);
+        setCurrentPreviewSlideIdx(0);
+        setSelectedPreviewTemplate(null);
+      } else {
+        alert(data.error || 'Fout bij laden show-details voor preview');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Verbindingsfout bij laden show-details voor preview');
+    } finally {
+      setLoadingShows(false);
+    }
+  };
+
+  const resolveMediaPath = (filePath: string) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return filePath;
+    }
+    let cleanPath = filePath.replace(/\\/g, '/');
+    
+    // Check for FreeShow in the path
+    const freeShowIdx = cleanPath.indexOf('/FreeShow/');
+    if (freeShowIdx !== -1) {
+      return '/thumbnails/' + cleanPath.substring(freeShowIdx + 10);
+    }
+    
+    // Check for relative FreeShow
+    const relFreeShowIdx = cleanPath.indexOf('FreeShow/');
+    if (relFreeShowIdx !== -1) {
+      return '/thumbnails/' + cleanPath.substring(relFreeShowIdx + 9);
+    }
+    
+    // Check for Media in the path (keep 'Media/' in the return value)
+    const mediaIdx = cleanPath.indexOf('/Media/');
+    if (mediaIdx !== -1) {
+      return '/thumbnails/Media/' + cleanPath.substring(mediaIdx + 7);
+    }
+    
+    const relMediaIdx = cleanPath.indexOf('Media/');
+    if (relMediaIdx !== -1) {
+      return '/thumbnails/Media/' + cleanPath.substring(relMediaIdx + 6);
+    }
+    
+    // Default fallback to filename
+    const filename = cleanPath.split('/').pop() || '';
+    return '/thumbnails/' + filename;
+  };
+
+  const getOrderedSlides = (show: any) => {
+    if (!show) return [];
+    const activeLayoutId = show.settings?.activeLayout;
+    if (activeLayoutId && show.layouts?.[activeLayoutId]?.slides) {
+      const flatSlides: any[] = [];
+      const layoutSlides = show.layouts[activeLayoutId].slides;
+      for (const slide of layoutSlides) {
+        const rawSlide = show.slides?.[slide.id];
+        
+        // Push parent slide first
+        flatSlides.push(slide);
+
+        // 1. Layout-level children (object)
+        if (slide.children && Object.keys(slide.children).length > 0) {
+          for (const [childId, childData] of Object.entries(slide.children)) {
+            flatSlides.push({
+              id: childId,
+              parentId: slide.id,
+              parentBackground: slide.background,
+              ...(typeof childData === 'object' ? childData : {})
+            });
+          }
+        }
+        // 2. Root-level children array/list on raw slide (e.g. Alpha and omega)
+        else if (rawSlide && Array.isArray(rawSlide.children) && rawSlide.children.length > 0) {
+          for (const childId of rawSlide.children) {
+            flatSlides.push({
+              id: childId,
+              parentId: slide.id,
+              parentBackground: slide.background || rawSlide.background
+            });
+          }
+        }
+        // 3. Root-level children object on raw slide
+        else if (rawSlide && rawSlide.children && typeof rawSlide.children === 'object' && Object.keys(rawSlide.children).length > 0) {
+          for (const [childId, childData] of Object.entries(rawSlide.children)) {
+            flatSlides.push({
+              id: childId,
+              parentId: slide.id,
+              parentBackground: slide.background || rawSlide.background,
+              ...(typeof childData === 'object' ? childData : {})
+            });
+          }
+        }
+      }
+      return flatSlides;
+    }
+    if (show.slides) {
+      return Object.keys(show.slides).map(id => ({ id }));
+    }
+    return [];
+  };
+
+  const getSlideBackground = (show: any, slideIdx: number) => {
+    if (!show || !show.layouts) return null;
+    const ordered = getOrderedSlides(show);
+    
+    // Check current slide and its parent first
+    const currentSlide = ordered[slideIdx];
+    if (currentSlide) {
+      if (currentSlide.background && show.media?.[currentSlide.background]) {
+        return show.media[currentSlide.background];
+      }
+      if (currentSlide.parentBackground && show.media?.[currentSlide.parentBackground]) {
+        return show.media[currentSlide.parentBackground];
+      }
+    }
+    
+    // Check backwards for active backgrounds
+    for (let i = slideIdx - 1; i >= 0; i--) {
+      const layoutSlide = ordered[i];
+      if (layoutSlide) {
+        if (layoutSlide.background && show.media?.[layoutSlide.background]) {
+          return show.media[layoutSlide.background];
+        }
+        if (layoutSlide.parentBackground && show.media?.[layoutSlide.parentBackground]) {
+          return show.media[layoutSlide.parentBackground];
+        }
+      }
+    }
+    return null;
+  };
+
+  const parseStyleString = (styleStr: string): React.CSSProperties => {
+    if (!styleStr) return {};
+    const styles: Record<string, string> = {};
+    styleStr.split(';').forEach(rule => {
+      const parts = rule.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim().replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+        const value = parts.slice(1).join(':').trim();
+        if (key && value) {
+          let reactKey = key;
+          if (key === 'webkitTextStrokeWidth') reactKey = 'WebkitTextStrokeWidth';
+          if (key === 'webkitTextStrokeColor') reactKey = 'WebkitTextStrokeColor';
+          styles[reactKey] = value;
+        }
+      }
+    });
+    return styles;
+  };
+
+  const getAlignmentStyle = (alignValue: any): React.CSSProperties => {
+    if (!alignValue) {
+      return {
+        justifyContent: 'center',
+        textAlign: 'center',
+        alignItems: 'center'
+      };
+    }
+    const val = String(alignValue).toLowerCase().trim();
+    if (val === 'left') {
+      return {
+        justifyContent: 'flex-start',
+        textAlign: 'left',
+        alignItems: 'flex-start'
+      };
+    }
+    if (val === 'right') {
+      return {
+        justifyContent: 'flex-end',
+        textAlign: 'right',
+        alignItems: 'flex-end'
+      };
+    }
+    if (val === 'center') {
+      return {
+        justifyContent: 'center',
+        textAlign: 'center',
+        alignItems: 'center'
+      };
+    }
+    if (val.includes(':')) {
+      return parseStyleString(alignValue);
+    }
+    return {
+      justifyContent: 'center',
+      textAlign: 'center',
+      alignItems: 'center'
+    };
+  };
+
+  const getContainerStyle = (item: any) => {
+    const styleObj = parseStyleString(item.style);
+    const alignObj = getAlignmentStyle(item.align);
+    return {
+      position: 'absolute' as const,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      ...styleObj,
+      ...alignObj
+    };
+  };
+
+  const getLineStyle = (line: any, itemAlign: any) => {
+    return getAlignmentStyle(line.align || itemAlign);
+  };
+
+  const getSegmentStyle = (seg: any) => {
+    return parseStyleString(seg.style);
+  };
+
+  const applyTemplateToSlideItem = (slideItem: any, templateItem: any) => {
+    if (!templateItem) return slideItem;
+    const newItem = { ...slideItem };
+    newItem.style = templateItem.style;
+    newItem.align = templateItem.align;
+    newItem.specialStyle = templateItem.specialStyle;
+    
+    if (slideItem.lines && templateItem.lines) {
+      newItem.lines = slideItem.lines.map((slideLine: any, lineIdx: number) => {
+        const templateLine = templateItem.lines[lineIdx] || templateItem.lines[templateItem.lines.length - 1];
+        if (!templateLine) return slideLine;
+        
+        const newLine = { ...slideLine };
+        newLine.align = templateLine.align || slideLine.align;
+        
+        if (slideLine.text && templateLine.text) {
+          newLine.text = slideLine.text.map((slideTextSeg: any, segIdx: number) => {
+            const templateTextSeg = templateLine.text[segIdx] || templateLine.text[templateLine.text.length - 1] || {};
+            if (slideTextSeg.customType === 'disableTemplate') {
+              return slideTextSeg;
+            }
+            return {
+              ...slideTextSeg,
+              style: templateTextSeg.style || slideTextSeg.style
+            };
+          });
+        }
+        return newLine;
+      });
+    }
+    return newItem;
+  };
+
+  const applyTemplateToSlide = (slide: any, template: any) => {
+    if (!template || !template.items || template.items.length === 0) return slide;
+    const newSlide = { ...slide };
+    if (slide.items) {
+      newSlide.items = slide.items.map((slideItem: any, itemIdx: number) => {
+        const templateItem = template.items[itemIdx] || template.items[0];
+        if (slideItem.type === 'text' && templateItem && templateItem.type === 'text') {
+          return applyTemplateToSlideItem(slideItem, templateItem);
+        }
+        return slideItem;
+      });
+    }
+    return newSlide;
+  };
+
+  // Resize listener for scaling the slide preview container
+  useEffect(() => {
+    if (!previewShow || !containerRef.current) return;
+    const updateScale = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth;
+        setScaleFactor(width / 1920);
+      }
+    };
+    updateScale();
+    const observer = new ResizeObserver(() => {
+      updateScale();
+    });
+    observer.observe(containerRef.current);
+    window.addEventListener('resize', updateScale);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
+  }, [previewShow]);
+
+  // Keyboard navigation for Slide Preview
+  useEffect(() => {
+    if (!previewShow) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const ordered = getOrderedSlides(previewShow);
+      if (e.key === 'ArrowLeft') {
+        setCurrentPreviewSlideIdx(prev => Math.max(0, prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setCurrentPreviewSlideIdx(prev => Math.min(ordered.length - 1, prev + 1));
+      } else if (e.key === 'Escape') {
+        setPreviewShow(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewShow]);
 
   // Load language from localStorage
   useEffect(() => {
@@ -188,6 +512,7 @@ export default function FreeshowGenerator() {
       }
 
       refreshCatalog();
+      fetchTemplates();
     };
     init();
   }, []);
@@ -620,16 +945,31 @@ export default function FreeshowGenerator() {
         setShowEditorTitle(showObj.name || '');
         setShowEditorCategory(showObj.category || 'song');
         
-        const extractedSlides: Record<string, string> = {};
-        if (showObj.slides) {
-          Object.entries(showObj.slides).forEach(([slideId, slide]: any) => {
-            if (slide.items && slide.items[0] && slide.items[0].type === 'text') {
-              const slideText = slide.items[0].lines?.map((line: any) => line.text?.map((t: any) => t.value).join('') || '').join('\n') || '';
-              extractedSlides[slideId] = slideText;
+        const slidesList: any[] = [];
+        const activeLayoutId = showObj.settings?.activeLayout;
+        if (activeLayoutId && showObj.layouts?.[activeLayoutId]?.slides) {
+          const layoutSlides = showObj.layouts[activeLayoutId].slides;
+          for (const layoutSlide of layoutSlides) {
+            const slideId = layoutSlide.id;
+            const slide = showObj.slides?.[slideId];
+            if (slide) {
+              slidesList.push({
+                id: slideId,
+                nextTimer: layoutSlide.nextTimer || 10,
+                slideObj: JSON.parse(JSON.stringify(slide))
+              });
             }
+          }
+        } else if (showObj.slides) {
+          Object.entries(showObj.slides).forEach(([slideId, slide]: any) => {
+            slidesList.push({
+              id: slideId,
+              nextTimer: 10,
+              slideObj: JSON.parse(JSON.stringify(slide))
+            });
           });
         }
-        setShowEditorSlides(extractedSlides);
+        setShowEditorSlides(slidesList);
         setShowEditorRawJson(JSON.stringify(fullShow, null, 2));
         setShowEditorMode('visual');
       } else {
@@ -649,11 +989,39 @@ export default function FreeshowGenerator() {
       if (showEditorMode === 'raw') {
         body = { rawJson: showEditorRawJson };
       } else {
-        body = {
-          title: showEditorTitle,
-          category: showEditorCategory,
-          slides: showEditorSlides
+        const showId = selectedShow[0];
+        const showObj = JSON.parse(JSON.stringify(selectedShow[1]));
+        
+        showObj.name = showEditorTitle;
+        showObj.category = showEditorCategory;
+        showObj.timestamps = showObj.timestamps || {};
+        showObj.timestamps.modified = Date.now();
+
+        const newSlides: Record<string, any> = {};
+        const activeLayoutId = showObj.settings?.activeLayout || 'default-layout';
+        showObj.settings = showObj.settings || {};
+        showObj.settings.activeLayout = activeLayoutId;
+
+        const layoutSlidesList: any[] = [];
+
+        showEditorSlides.forEach((s) => {
+          newSlides[s.id] = s.slideObj;
+          layoutSlidesList.push({
+            id: s.id,
+            nextTimer: s.nextTimer || 10
+          });
+        });
+
+        showObj.slides = newSlides;
+        showObj.layouts = showObj.layouts || {};
+        showObj.layouts[activeLayoutId] = {
+          name: showObj.layouts[activeLayoutId]?.name || "Default",
+          notes: showObj.layouts[activeLayoutId]?.notes || "",
+          slides: layoutSlidesList
         };
+
+        const updatedShow = [showId, showObj];
+        body = { rawJson: JSON.stringify(updatedShow, null, 2) };
       }
 
       const res = await fetch(`/api/shows/${encodeURIComponent(oldFilename)}`, {
@@ -675,6 +1043,137 @@ export default function FreeshowGenerator() {
     } finally {
       setIsSavingShow(false);
     }
+  };
+
+  const moveSlide = (idx: number, direction: 'up' | 'down') => {
+    const updated = [...showEditorSlides];
+    if (direction === 'up' && idx > 0) {
+      const temp = updated[idx];
+      updated[idx] = updated[idx - 1];
+      updated[idx - 1] = temp;
+    } else if (direction === 'down' && idx < updated.length - 1) {
+      const temp = updated[idx];
+      updated[idx] = updated[idx + 1];
+      updated[idx + 1] = temp;
+    }
+    setShowEditorSlides(updated);
+  };
+
+  const deleteSlide = (idx: number) => {
+    if (!confirm('Weet je zeker dat je deze slide wilt verwijderen?')) return;
+    const updated = showEditorSlides.filter((_, i) => i !== idx);
+    setShowEditorSlides(updated);
+  };
+
+  const addSlide = (type: 'text' | 'media') => {
+    const newId = Math.random().toString(16).substring(2, 13);
+    const newSlideObj: any = {
+      group: String(showEditorSlides.length + 1),
+      color: null,
+      settings: {},
+      notes: "",
+      items: []
+    };
+
+    if (type === 'media') {
+      newSlideObj.items = [
+        {
+          type: "media",
+          style: "top:0px;left:0px;height:1080px;width:1920px;",
+          src: "/volume1/Beamer/FreeShow/thema.jpg",
+          fit: "contain"
+        }
+      ];
+    } else {
+      newSlideObj.items = [
+        {
+          type: "text",
+          style: "top:0px;left:0px;height:1080px;width:1920px;",
+          lines: [
+            {
+              align: "",
+              text: [
+                {
+                  value: "Nieuwe slide",
+                  style: "font-size: 100px; color: white;"
+                }
+              ]
+            }
+          ]
+        }
+      ];
+    }
+
+    setShowEditorSlides([...showEditorSlides, {
+      id: newId,
+      nextTimer: 10,
+      slideObj: newSlideObj
+    }]);
+  };
+
+  const updateSlideText = (idx: number, newText: string) => {
+    const updated = [...showEditorSlides];
+    const s = updated[idx];
+    if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
+      const item = s.slideObj.items[0];
+      if (item.type === 'text') {
+        const existingStyle = item.lines?.[0]?.text?.[0]?.style || "font-size: 100px; color: white;";
+        item.lines = newText.split('\n').map((lineStr: string) => ({
+          align: item.lines?.[0]?.align || "",
+          text: [{ value: lineStr, style: existingStyle }]
+        }));
+      }
+    }
+    setShowEditorSlides(updated);
+  };
+
+  const updateSlideMedia = (idx: number, newSrc: string) => {
+    const updated = [...showEditorSlides];
+    const s = updated[idx];
+    if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
+      const item = s.slideObj.items[0];
+      if (item.type === 'media') {
+        item.src = newSrc;
+      }
+    }
+    setShowEditorSlides(updated);
+  };
+
+  const toggleSlideType = (idx: number) => {
+    const updated = [...showEditorSlides];
+    const s = updated[idx];
+    if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
+      const item = s.slideObj.items[0];
+      if (item.type === 'text') {
+        s.slideObj.items = [
+          {
+            type: "media",
+            style: "top:0px;left:0px;height:1080px;width:1920px;",
+            src: "/volume1/Beamer/FreeShow/thema.jpg",
+            fit: "contain"
+          }
+        ];
+      } else {
+        s.slideObj.items = [
+          {
+            type: "text",
+            style: "top:0px;left:0px;height:1080px;width:1920px;",
+            lines: [
+              {
+                align: "",
+                text: [
+                  {
+                    value: "Nieuwe slide tekst",
+                    style: "font-size: 100px; color: white;"
+                  }
+                ]
+              }
+            ]
+          }
+        ];
+      }
+    }
+    setShowEditorSlides(updated);
   };
 
   const duplicateShow = async (filename: string) => {
@@ -1668,28 +2167,130 @@ export default function FreeshowGenerator() {
             {/* Editor Body */}
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', paddingRight: '0.5rem' }}>
               {showEditorMode === 'visual' ? (
-                Object.keys(showEditorSlides).length === 0 ? (
+                showEditorSlides.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.4 }}>Geen bewerkbare slides gevonden in deze show.</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                    {Object.entries(showEditorSlides).map(([slideId, text], idx) => {
-                      const slideObj = selectedShow[1].slides?.[slideId];
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {showEditorSlides.map((slideItem: any, idx: number) => {
+                      const slideObj = slideItem.slideObj;
+                      const item = slideObj?.items?.[0] || { type: 'text' };
+                      const isText = item.type === 'text';
+                      const isMedia = item.type === 'media';
+                      
                       const groupLabel = slideObj?.group || `Slide ${idx + 1}`;
                       const groupColor = slideObj?.color || 'var(--primary)';
+                      
+                      let textVal = '';
+                      if (isText) {
+                        textVal = item.lines?.map((line: any) => line.text?.map((t: any) => t.value).join('') || '').join('\n') || '';
+                      }
+                      
+                      let mediaSrc = '';
+                      if (isMedia) {
+                        mediaSrc = item.src || '';
+                      }
+
                       return (
-                        <div key={slideId} className="glass-card" style={{ padding: '1rem', borderLeft: `4px solid ${groupColor}`, background: 'rgba(255,255,255,0.01)', borderRadius: '8px' }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '0.6rem', color: groupColor }}>
-                            🏷️ {groupLabel}
+                        <div key={slideItem.id || idx} className="glass-card" style={{ padding: '1.25rem', borderLeft: `4px solid ${groupColor}`, background: 'rgba(255,255,255,0.01)', borderRadius: '8px' }}>
+                          
+                          {/* Slide Header with Index, Type & Controls */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '0.9rem', color: groupColor }}>
+                              <span>Slide {idx + 1}</span>
+                              <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 'normal' }}>
+                                {isText ? 'Tekst' : isMedia ? 'Media' : 'Onbekend'}
+                              </span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <button 
+                                className="button" 
+                                style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', minWidth: 'unset' }}
+                                onClick={() => moveSlide(idx, 'up')}
+                                disabled={idx === 0}
+                                title="Omhoog verplaatsen"
+                              >
+                                ↑
+                              </button>
+                              <button 
+                                className="button" 
+                                style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', minWidth: 'unset' }}
+                                onClick={() => moveSlide(idx, 'down')}
+                                disabled={idx === showEditorSlides.length - 1}
+                                title="Omlaag verplaatsen"
+                              >
+                                ↓
+                              </button>
+                              <button 
+                                className="button" 
+                                style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', minWidth: 'unset', border: '1px solid rgba(239,68,68,0.2)' }}
+                                onClick={() => toggleSlideType(idx)}
+                                title="Wissel tussen Tekst en Media"
+                              >
+                                Wissel type
+                              </button>
+                              <button 
+                                className="button" 
+                                style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', minWidth: 'unset', border: '1px solid rgba(239,68,68,0.3)' }}
+                                onClick={() => deleteSlide(idx)}
+                                title="Slide verwijderen"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
-                          <textarea 
-                            className="input" 
-                            style={{ height: '140px', fontFamily: 'monospace', fontSize: '0.9rem', margin: 0 }}
-                            value={text} 
-                            onChange={e => setShowEditorSlides({ ...showEditorSlides, [slideId]: e.target.value })}
-                          />
+
+                          {/* Slide Fields */}
+                          {isText ? (
+                            <textarea 
+                              className="input" 
+                              style={{ height: '100px', fontFamily: 'monospace', fontSize: '0.9rem', margin: 0 }}
+                              value={textVal} 
+                              onChange={e => updateSlideText(idx, e.target.value)}
+                              placeholder="Typ hier de tekst voor de slide..."
+                            />
+                          ) : isMedia ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', opacity: 0.7, minWidth: '90px' }}>Media Bron:</span>
+                                <input 
+                                  type="text" 
+                                  className="input" 
+                                  style={{ flex: 1, margin: 0, fontFamily: 'monospace', fontSize: '0.85rem' }}
+                                  value={mediaSrc}
+                                  onChange={e => updateSlideMedia(idx, e.target.value)}
+                                  placeholder="Bijv. /volume1/Beamer/FreeShow/thema.jpg of thema.jpg"
+                                />
+                              </div>
+                              <div style={{ fontSize: '0.75rem', opacity: 0.5, paddingLeft: '98px' }}>
+                                Tip: Gebruik <code>/volume1/Beamer/FreeShow/thema.jpg</code> (of <code>/FreeShow/thema.jpg</code>) voor de automatische YouTube thumbnail background.
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ opacity: 0.5, fontSize: '0.85rem' }}>Dit slide type wordt niet direct visueel ondersteund. Gebruik Raw JSON editor voor geavanceerde wijzigingen.</div>
+                          )}
+
                         </div>
                       );
                     })}
+
+                    {/* Add Slide Buttons */}
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1rem', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                      <button 
+                        className="button" 
+                        style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.85rem' }}
+                        onClick={() => addSlide('text')}
+                      >
+                        + Voeg Tekst Slide toe
+                      </button>
+                      <button 
+                        className="button" 
+                        style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.85rem' }}
+                        onClick={() => addSlide('media')}
+                      >
+                        + Voeg Media Slide toe
+                      </button>
+                    </div>
                   </div>
                 )
               ) : (
@@ -1708,6 +2309,192 @@ export default function FreeshowGenerator() {
               <button className="button" style={{ background: 'var(--primary)', minWidth: '120px', color: '#020617' }} onClick={saveShowChanges} disabled={isSavingShow}>
                 {isSavingShow ? 'Opslaan...' : 'Wijzigingen Opslaan'}
               </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Slide Preview Modal */}
+      {previewShow && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '1100px', display: 'flex', flexDirection: 'column', padding: '2rem', gap: '1.5rem' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--primary)' }}>👁️ Show Preview</h2>
+                <div style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '0.2rem' }}>Show: {previewShow.name}</div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {/* Template Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Template:</span>
+                  <select 
+                    className="input" 
+                    style={{ margin: 0, padding: '0.3rem 1.5rem 0.3rem 0.75rem', fontSize: '0.85rem', width: '220px' }}
+                    value={selectedPreviewTemplate ? selectedPreviewTemplate.filename : ''}
+                    onChange={e => {
+                      const templateFile = e.target.value;
+                      if (!templateFile) {
+                        setSelectedPreviewTemplate(null);
+                      } else {
+                        const found = templates.find(t => t.filename === templateFile);
+                        setSelectedPreviewTemplate(found || null);
+                      }
+                    }}
+                  >
+                    <option value="">Standaard (Geen Template)</option>
+                    {templates.map(t => (
+                      <option key={t.filename} value={t.filename}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="button" style={{ background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1rem' }} onClick={() => setPreviewShow(null)}>Sluiten</button>
+              </div>
+            </div>
+
+            {/* Main Carousel Area */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'center' }}>
+              {/* Prev Button */}
+              <button 
+                className="button" 
+                style={{ 
+                  borderRadius: '50%', 
+                  width: '50px', 
+                  height: '50px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: currentPreviewSlideIdx > 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+                  color: currentPreviewSlideIdx > 0 ? '#fff' : 'rgba(255,255,255,0.2)',
+                  cursor: currentPreviewSlideIdx > 0 ? 'pointer' : 'default',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  fontSize: '1.5rem',
+                  padding: 0
+                }}
+                disabled={currentPreviewSlideIdx === 0}
+                onClick={() => setCurrentPreviewSlideIdx(prev => Math.max(0, prev - 1))}
+              >
+                ‹
+              </button>
+
+              {/* Slide Wrapper Container */}
+              <div style={{ flex: 1, maxWidth: '850px' }}>
+                {(() => {
+                  const ordered = getOrderedSlides(previewShow);
+                  const layoutSlide = ordered[currentPreviewSlideIdx];
+                  if (!layoutSlide) {
+                    return <div style={{ aspectRatio: '16/9', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>Geen slides gevonden</div>;
+                  }
+                  
+                  const rawSlide = previewShow.slides[layoutSlide.id];
+                  if (!rawSlide) {
+                    return <div style={{ aspectRatio: '16/9', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>Slide data ontbreekt</div>;
+                  }
+
+                  const slide = applyTemplateToSlide(rawSlide, selectedPreviewTemplate);
+                  const bgMedia = getSlideBackground(previewShow, currentPreviewSlideIdx);
+
+                  return (
+                    <div ref={containerRef} style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', position: 'relative', background: '#000', borderRadius: '12px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{
+                        width: '1920px',
+                        height: '1080px',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        transform: `scale(${scaleFactor})`,
+                        transformOrigin: 'top left',
+                        color: '#fff',
+                        fontFamily: 'sans-serif',
+                        userSelect: 'none'
+                      }}>
+                        {/* Background media */}
+                        {bgMedia && (
+                          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+                            {bgMedia.type === 'video' || bgMedia.path?.toLowerCase().endsWith('.mp4') ? (
+                              <video src={resolveMediaPath(bgMedia.path)} autoPlay muted loop style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src={resolveMediaPath(bgMedia.path)} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Slide items */}
+                        <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+                          {slide.items && slide.items.map((item: any, itemIdx: number) => {
+                            if (item.type === 'media') {
+                              return (
+                                <div key={item.id || itemIdx} style={getContainerStyle(item)}>
+                                  {item.src && (
+                                    item.src.toLowerCase().endsWith('.mp4') || item.src.toLowerCase().endsWith('.mov') ? (
+                                      <video src={resolveMediaPath(item.src)} autoPlay muted loop style={{ width: '100%', height: '100%', objectFit: item.fit || 'contain' }} />
+                                    ) : (
+                                      <img src={resolveMediaPath(item.src)} alt="Media" style={{ width: '100%', height: '100%', objectFit: item.fit || 'contain' }} />
+                                    )
+                                  )}
+                                </div>
+                              );
+                            }
+                            
+                            if (item.type === 'text') {
+                              return (
+                                <div key={item.id || itemIdx} style={getContainerStyle(item)}>
+                                  {item.lines && item.lines.map((line: any, lineIdx: number) => (
+                                    <div key={lineIdx} style={{ display: 'flex', flexWrap: 'wrap', width: '100%', ...getLineStyle(line, item.align) }}>
+                                      {line.text && line.text.map((seg: any, segIdx: number) => (
+                                        <span key={segIdx} style={getSegmentStyle(seg)}>
+                                          {seg.value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            
+                            return null;
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Next Button */}
+              <button 
+                className="button" 
+                style={{ 
+                  borderRadius: '50%', 
+                  width: '50px', 
+                  height: '50px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: currentPreviewSlideIdx < getOrderedSlides(previewShow).length - 1 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+                  color: currentPreviewSlideIdx < getOrderedSlides(previewShow).length - 1 ? '#fff' : 'rgba(255,255,255,0.2)',
+                  cursor: currentPreviewSlideIdx < getOrderedSlides(previewShow).length - 1 ? 'pointer' : 'default',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  fontSize: '1.5rem',
+                  padding: 0
+                }}
+                disabled={currentPreviewSlideIdx === getOrderedSlides(previewShow).length - 1}
+                onClick={() => setCurrentPreviewSlideIdx(prev => Math.min(getOrderedSlides(previewShow).length - 1, prev + 1))}
+              >
+                ›
+              </button>
+            </div>
+
+            {/* Footer / Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem', fontSize: '0.85rem' }}>
+              <div style={{ opacity: 0.5 }}>
+                Gebruik de <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '3px', fontFamily: 'monospace' }}>←</kbd> en <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '3px', fontFamily: 'monospace' }}>→</kbd> toetsen om te bladeren.
+              </div>
+              <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                Slide {currentPreviewSlideIdx + 1} / {getOrderedSlides(previewShow).length}
+              </div>
             </div>
 
           </div>
@@ -1800,6 +2587,12 @@ export default function FreeshowGenerator() {
                               📝 Bewerken
                             </button>
                             <span className="tooltip-text">Show bewerken</span>
+                          </div>
+                          <div className="tooltip-container" style={{ flex: 2 }}>
+                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.15)', color: '#fff' }} onClick={() => openPreview(show.filename)}>
+                              👁️ Preview
+                            </button>
+                            <span className="tooltip-text">Slide preview bekijken</span>
                           </div>
                           <div className="tooltip-container" style={{ flex: 1 }}>
                             <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)' }} onClick={() => duplicateShow(show.filename)}>

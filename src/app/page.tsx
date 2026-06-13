@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 import LightsControl from "@/components/LightsControl";
+import BackupRestoreSettings from "@/components/BackupRestoreSettings";
 
 
 export default function Dashboard() {
@@ -81,7 +82,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup">("general");
   const [availableTemplates, setAvailableTemplates] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [settings, setSettings] = useState<any>(null);
@@ -1166,6 +1167,28 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                     <Layers size={18} />
                     <span>FreeShow</span>
                   </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => setSettingsTab("backup")}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: settingsTab === "backup" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                      color: settingsTab === "backup" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                      fontWeight: settingsTab === "backup" ? 600 : 500,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Save size={18} />
+                    <span>Backup & Herstel</span>
+                  </button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -2162,65 +2185,11 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                           Gegenereerde projecten automatisch opslaan op de NAS
                         </label>
                       </div>
-
-                      <h4 style={{ fontSize: '1rem', fontWeight: 600, marginTop: '12px', color: 'var(--primary)' }}>💾 Externe Back-up Bestemming</h4>
-                      <div className="input-group">
-                        <label className="input-label">Back-up Methode</label>
-                        <select 
-                          className="input-field" 
-                          value={settings.backupTarget || "none"} 
-                          onChange={(e) => setSettings({ ...settings, backupTarget: e.target.value })}
-                        >
-                          <option value="none">Geen (Alleen lokaal opslaan)</option>
-                          <option value="ftp">FTP Server</option>
-                          <option value="webdav">WebDAV Cloud Server</option>
-                        </select>
-                      </div>
-
-                      {settings.backupTarget === "ftp" && (
-                        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                            <div className="input-group">
-                              <label className="input-label">FTP Host</label>
-                              <input type="text" className="input-field" value={settings.ftpHost || ""} onChange={e => setSettings({...settings, ftpHost: e.target.value})} placeholder="ftp.voorbeeld.nl" />
-                            </div>
-                            <div className="input-group">
-                              <label className="input-label">FTP Poort</label>
-                              <input type="number" className="input-field" value={settings.ftpPort || 21} onChange={e => setSettings({...settings, ftpPort: parseInt(e.target.value) || 21})} placeholder="21" />
-                            </div>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div className="input-group">
-                              <label className="input-label">FTP Gebruiker</label>
-                              <input type="text" className="input-field" value={settings.ftpUser || ""} onChange={e => setSettings({...settings, ftpUser: e.target.value})} placeholder="User" />
-                            </div>
-                            <div className="input-group">
-                              <label className="input-label">FTP Wachtwoord</label>
-                              <input type="password" className="input-field" value={settings.ftpPass || ""} onChange={e => setSettings({...settings, ftpPass: e.target.value})} placeholder="••••••••" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {settings.backupTarget === "webdav" && (
-                        <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.01)' }}>
-                          <div className="input-group">
-                            <label className="input-label">WebDAV URL</label>
-                            <input type="text" className="input-field" value={settings.webdavUrl || ""} onChange={e => setSettings({...settings, webdavUrl: e.target.value})} placeholder="https://wolk.voorbeeld.nl/remote.php/dav" />
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div className="input-group">
-                              <label className="input-label">WebDAV Gebruiker</label>
-                              <input type="text" className="input-field" value={settings.webdavUser || ""} onChange={e => setSettings({...settings, webdavUser: e.target.value})} placeholder="User" />
-                            </div>
-                            <div className="input-group">
-                              <label className="input-label">WebDAV Wachtwoord</label>
-                              <input type="password" className="input-field" value={settings.webdavPass || ""} onChange={e => setSettings({...settings, webdavPass: e.target.value})} placeholder="••••••••" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </section>
+                  )}
+
+                  {settingsTab === "backup" && (
+                    <BackupRestoreSettings settings={settings} setSettings={setSettings} />
                   )}
                   
                 </div>
