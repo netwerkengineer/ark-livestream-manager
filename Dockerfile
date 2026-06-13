@@ -45,6 +45,9 @@ COPY --from=builder /app/public ./public
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# Create SSH folder for nextjs user with correct permissions
+RUN mkdir -p /home/nextjs/.ssh && chown -R nextjs:nodejs /home/nextjs/.ssh && chmod 700 /home/nextjs/.ssh
+
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

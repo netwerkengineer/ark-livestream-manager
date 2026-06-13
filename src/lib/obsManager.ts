@@ -8,6 +8,82 @@
 
 import OBSWebSocket from 'obs-websocket-js';
 import { getSettings } from './settingsStore';
+import { exec } from 'child_process';
+import path from 'path';
+
+let lastStreamActiveState: boolean | null = null;
+
+export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null) {
+  const settings = getSettings();
+  if (!settings.ledPanelEnabled) return;
+
+  const remoteHost = settings.ledHost || settings.freeShowHost || '192.168.2.20';
+  const remoteUser = settings.sshUser || 'jeffreygo';
+  const macAddress = settings.ledPanelMac || '';
+  const statusStr = isActive ? 'active' : 'inactive';
+
+  let text = customText;
+  let color = customColor;
+
+  if (!text) {
+    text = isActive
+      ? (settings.ledActiveText || "LIVESTREAM ON AIR")
+      : (settings.ledInactiveText || "LIVESTREAM OFFLINE");
+  }
+
+  if (!color) {
+    color = isActive
+      ? (settings.ledActiveColor || "#ff0000")
+      : (settings.ledInactiveColor || "#00ff00");
+  }
+
+  console.log(`[LED Control] OBS stream state changed to: ${statusStr}. Destination: ${remoteHost}, Text: "${text}", Color: "${color}". Detecting remote OS...`);
+
+  // Detect remote OS
+  const detectCmd = `ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "cmd.exe /c echo windows"`;
+
+  exec(detectCmd, (detectErr, detectStdout) => {
+    const isWindows = !detectErr && detectStdout.includes("windows");
+    console.log(`[LED Control] Remote host OS detected: ${isWindows ? 'Windows' : 'macOS/Linux'}`);
+
+    const remoteScriptPath = isWindows
+      ? `C:/Users/${remoteUser}/AppData/Local/Temp/led_control.py`
+      : `/tmp/led_control.py`;
+    const pythonCmd = isWindows ? 'python' : 'python3';
+    const localScriptPath = path.join(process.cwd(), 'led_control.py');
+
+    // scp command
+    const scpCmd = `scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${localScriptPath}" "${remoteUser}@[${remoteHost}]:${remoteScriptPath}"`;
+    
+    // ssh run command
+    let runCmd = "";
+    let args = `--status ${statusStr}`;
+    if (macAddress) args += ` --mac ${macAddress}`;
+    if (text) args += ` --text \\"${text.replace(/"/g, '\\"')}\\"`;
+    if (color) args += ` --color \\"${color}\\"`;
+    
+    if (isWindows) {
+      runCmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "python \\"${remoteScriptPath}\\" ${args}"`;
+    } else {
+      runCmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "if [ -f /opt/homebrew/bin/python3 ]; then /opt/homebrew/bin/python3 \\"${remoteScriptPath}\\" ${args}; elif [ -f /usr/local/bin/python3 ]; then /usr/local/bin/python3 \\"${remoteScriptPath}\\" ${args}; else python3 \\"${remoteScriptPath}\\" ${args}; fi"`;
+    }
+
+    // Execute remote copy and run
+    exec(scpCmd, (err, stdout, stderr) => {
+      if (err) {
+        console.error(`[LED Control] scp copy failed: ${err.message}. Running remote script anyway...`);
+      }
+      
+      exec(runCmd, (errRun, stdoutRun, stderrRun) => {
+        if (errRun) {
+          console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
+        } else {
+          console.log(`[LED Control] Remote LED panel updated successfully: ${stdoutRun.trim()}`);
+        }
+      });
+    });
+  });
+}
 
 interface OBSState {
   connected: boolean;
@@ -32,6 +108,13 @@ async function pollStats() {
   try {
     const streamStatus = await obs.call('GetStreamStatus');
     const svcSettings = await obs.call('GetStreamServiceSettings');
+    
+    const isActive = streamStatus.outputActive === true;
+    if (lastStreamActiveState !== isActive) {
+      lastStreamActiveState = isActive;
+      handleStreamStateChange(isActive);
+    }
+
     state.obsStats = streamStatus;
     state.serviceSettings = svcSettings;
     state.error = null;

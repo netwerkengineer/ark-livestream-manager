@@ -36,7 +36,8 @@ import {
   Monitor,
   FileText,
   Cpu,
-  Sliders
+  Sliders,
+  Tv
 } from "lucide-react";
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 import LightsControl from "@/components/LightsControl";
@@ -1303,6 +1304,52 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                             </div>
                             <input className="input-field" placeholder="Media Pad op NAS (bijv. /volume1/Media)" value={settings.mediaPath} onChange={(e) => setSettings({...settings, mediaPath: e.target.value})} />
                             <p className="text-[10px] text-muted">Dit pad wordt gebruikt om thumbnails van je beamer-presentaties te tonen.</p>
+                          </div>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Tv size={18} color="#ef4444" /> <strong>LED Paneel (BK-Light)</strong></div>
+                            <label className="switch" style={{ scale: '0.8' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={settings.ledPanelEnabled || false} 
+                                onChange={(e) => setSettings({...settings, ledPanelEnabled: e.target.checked})}
+                              />
+                              <span className="slider round"></span>
+                            </label>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: settings.ledPanelEnabled ? 1 : 0.5, pointerEvents: settings.ledPanelEnabled ? 'auto' : 'none' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                              <input className="input-field" placeholder="Doel PC IP / Host (bijv. OBS PC)" value={settings.ledHost || ""} onChange={(e) => setSettings({...settings, ledHost: e.target.value})} />
+                              <input className="input-field" placeholder="SSH Gebruiker" value={settings.sshUser || ""} onChange={(e) => setSettings({...settings, sshUser: e.target.value})} />
+                            </div>
+                            <p className="text-[10px] text-muted">De PC die het dichtst bij het LED paneel staat en Bluetooth verbinding heeft. Laat leeg om de FreeShow IP te gebruiken.</p>
+
+                            <input className="input-field" placeholder="Bluetooth MAC Adres (optioneel)" value={settings.ledPanelMac || ""} onChange={(e) => setSettings({...settings, ledPanelMac: e.target.value})} />
+                            <p className="text-[10px] text-muted">Laat leeg voor automatische detectie van het LED paneel (advertised als BK_LIGHT, LED_BLE_* of BJ_LED).</p>
+
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', marginTop: '4px' }}>
+                              <label className="text-[11px] text-muted" style={{ display: 'block', marginBottom: '6px' }}>Uitzending Actief (ON AIR):</label>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center' }}>
+                                <input className="input-field" placeholder="Scroll Tekst Actief" value={settings.ledActiveText || ""} onChange={(e) => setSettings({...settings, ledActiveText: e.target.value})} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span className="text-[11px] text-muted">Kleur:</span>
+                                  <input type="color" style={{ width: '40px', height: '32px', border: 'none', borderRadius: '4px', background: 'none', cursor: 'pointer', padding: 0 }} value={settings.ledActiveColor || "#ff0000"} onChange={(e) => setSettings({...settings, ledActiveColor: e.target.value})} />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+                              <label className="text-[11px] text-muted" style={{ display: 'block', marginBottom: '6px' }}>Uitzending Inactief (OFFLINE):</label>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'center' }}>
+                                <input className="input-field" placeholder="Scroll Tekst Inactief" value={settings.ledInactiveText || ""} onChange={(e) => setSettings({...settings, ledInactiveText: e.target.value})} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span className="text-[11px] text-muted">Kleur:</span>
+                                  <input type="color" style={{ width: '40px', height: '32px', border: 'none', borderRadius: '4px', background: 'none', cursor: 'pointer', padding: 0 }} value={settings.ledInactiveColor || "#00ff00"} onChange={(e) => setSettings({...settings, ledInactiveColor: e.target.value})} />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
