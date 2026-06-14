@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
         body: imageBuffer
       }).catch(err => console.error("YouTube Thumbnail Upload Fout:", err));
 
-      // Sla lokaal op (Voor OBS op de NAS)
+      // Sla lokaal op (Voor OBS op de NAS en FreeShow)
       try {
         const internalPath = "/app/public/thumbnails";
         if (!fs.existsSync(internalPath)) {
@@ -109,7 +109,23 @@ export async function POST(req: NextRequest) {
         }
         const filePath = path.join(internalPath, "thema.jpg");
         fs.writeFileSync(filePath, imageBuffer);
-        console.log(`Thumbnail succesvol opgeslagen op NAS: ${filePath}`);
+        console.log(`Thumbnail succesvol opgeslagen in Next.js public: ${filePath}`);
+
+        const { getSettings } = require("@/lib/settingsStore");
+        const settings = getSettings();
+        const savePath = settings.thumbnailSavePath;
+        if (savePath) {
+          try {
+            if (!fs.existsSync(savePath)) {
+              fs.mkdirSync(savePath, { recursive: true });
+            }
+            const customFilePath = path.join(savePath, "thema.jpg");
+            fs.writeFileSync(customFilePath, imageBuffer);
+            console.log(`Thumbnail succesvol opgeslagen op custom pad: ${customFilePath}`);
+          } catch (pathErr) {
+            console.error(`Lokaal opslaan op custom pad ${savePath} mislukt:`, pathErr);
+          }
+        }
       } catch (err) {
         console.error("Lokaal opslaan thumbnail mislukt:", err);
       }

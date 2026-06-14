@@ -1,4 +1,5 @@
 import { youtubeFetch } from "./tokenStore";
+import { getSettings } from "./settingsStore";
 import fs from "fs";
 import path from "path";
 
@@ -18,15 +19,32 @@ async function syncThumbnailFromUrl(url: string) {
     const arrayBuffer = await res.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
+    // 1. Sla lokaal op in de app (voor Next.js public URL / OBS)
     const internalPath = "/app/public/thumbnails";
     if (!fs.existsSync(internalPath)) {
       fs.mkdirSync(internalPath, { recursive: true });
     }
     const filePath = path.join(internalPath, "thema.jpg");
     fs.writeFileSync(filePath, imageBuffer);
+    console.log(`[Thumbnail Sync] Successfully synced new thumbnail to Next.js public folder: ${filePath}`);
+
+    // 2. Sla lokaal op in de geconfigureerde FreeShow Media map op de NAS (voor netwerktoegang)
+    const settings = getSettings();
+    const savePath = settings.thumbnailSavePath;
+    if (savePath) {
+      try {
+        if (!fs.existsSync(savePath)) {
+          fs.mkdirSync(savePath, { recursive: true });
+        }
+        const customFilePath = path.join(savePath, "thema.jpg");
+        fs.writeFileSync(customFilePath, imageBuffer);
+        console.log(`[Thumbnail Sync] Successfully synced new thumbnail to custom path: ${customFilePath}`);
+      } catch (pathErr) {
+        console.error(`[Thumbnail Sync] Failed to write to custom path ${savePath}:`, pathErr);
+      }
+    }
     
     lastSyncedUrl = url;
-    console.log(`[Thumbnail Sync] Successfully synced new thumbnail to NAS: ${filePath}`);
   } catch (err) {
     console.error("[Thumbnail Sync] Error syncing thumbnail:", err);
   }
