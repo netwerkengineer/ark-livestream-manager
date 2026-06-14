@@ -41,6 +41,8 @@ services:
     container_name: qlcplus
     restart: always
     network_mode: host
+    environment:
+      - QLC_OUTPUT_IP=${QLC_OUTPUT_IP:-broadcast}
     volumes:
       - ./config/ark_church_lighting.qxw:/QLC/ark_church_lighting.qxw
       - ./config/qlcplus/config:/root/.config/qlcplus
