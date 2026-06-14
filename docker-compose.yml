@@ -20,6 +20,7 @@ services:
       - NODE_ENV=production
       - PORT=3005
       - HOSTNAME=0.0.0.0
+      - TZ=Europe/Amsterdam
 
 
   companion:
@@ -81,9 +82,11 @@ services:
     network_mode: host
     user: root
     entrypoint: ["python3", "tuya_http_server.py"]
+    environment:
+      - TZ=Europe/Amsterdam
     volumes:
       - ./data:/app/data
-      - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
+      - /volume1/Beamer/FreeShow:/volume1/Beamer/FreeShow
       - ${SSH_KEY_DIR:-/root/.ssh}:/root/.ssh:ro
 
 networks:
