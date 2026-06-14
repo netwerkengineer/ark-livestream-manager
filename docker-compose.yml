@@ -13,8 +13,8 @@ services:
       - ./companion-data:/app/companion-data
       - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock
-      - /mnt/data/Projects/Beamer/FreeShow:/mnt/data/Projects/Beamer/FreeShow
-      - /mnt/data/Projects/Beamer/FreeShow:/app/public/thumbnails
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:${FREESHOW_PATH:-/volume1/Beamer/FreeShow}
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:/app/public/thumbnails
       - ./data/id_ed25519:/home/nextjs/.ssh/id_ed25519:ro
     environment:
       - NODE_ENV=production
@@ -86,7 +86,7 @@ services:
       - TZ=Europe/Amsterdam
     volumes:
       - ./data:/app/data
-      - /volume1/Beamer/FreeShow:/volume1/Beamer/FreeShow
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:${FREESHOW_PATH:-/volume1/Beamer/FreeShow}
       - ${SSH_KEY_DIR:-/root/.ssh}:/root/.ssh:ro
 
 networks:

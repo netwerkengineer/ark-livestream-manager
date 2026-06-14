@@ -303,13 +303,39 @@ def import_project():
             print("Uploading shows.json and settings.json to remote AppData...")
             subprocess.run(["scp", local_shows_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/shows.json"], check=True)
             subprocess.run(["scp", local_settings_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json"], check=True)
+
+            # Copy thema.jpg on network share to ensure it exists in both paths
+            local_thema_src = None
+            thema_candidates = [
+                os.path.join(generator_path, "Media", "thema.jpg"),
+                os.path.join(generator_path, "thema.jpg"),
+                "/volume1/Beamer/FreeShow/Media/thema.jpg",
+                "/volume1/Beamer/FreeShow/thema.jpg",
+                "/app/public/thumbnails/thema.jpg"
+            ]
+            for c in thema_candidates:
+                if os.path.exists(c):
+                    local_thema_src = c
+                    break
+            
+            if local_thema_src:
+                try:
+                    dest_1 = os.path.join(generator_path, "thema.jpg")
+                    dest_2 = os.path.join(generator_path, "Media", "thema.jpg")
+                    if local_thema_src != dest_1:
+                        shutil.copy2(local_thema_src, dest_1)
+                    if local_thema_src != dest_2:
+                        shutil.copy2(local_thema_src, dest_2)
+                    print(f"Copied thema.jpg to network share paths: {dest_1} and {dest_2}")
+                except Exception as e:
+                    print(f"Warning: Failed to copy thema.jpg locally: {e}")
         else:
-            # Create remote directories
+            # Create remote directories (including Media)
             print("Creating target directories on remote host...")
             if remote_os == "windows":
-                cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{remote_docs_dir}/Shows', '{remote_docs_dir}/Config', '{remote_app_data_dir}'\""
+                cmd = f"powershell -Command \"New-Item -ItemType Directory -Force -Path '{remote_docs_dir}/Shows', '{remote_docs_dir}/Config', '{remote_docs_dir}/Media', '{remote_app_data_dir}'\""
             else:
-                cmd = f"mkdir -p '{remote_docs_dir}/Shows' '{remote_docs_dir}/Config' '{remote_app_data_dir}'"
+                cmd = f"mkdir -p '{remote_docs_dir}/Shows' '{remote_docs_dir}/Config' '{remote_docs_dir}/Media' '{remote_app_data_dir}'"
                 
             subprocess.run(["ssh", f"{mac_user}@{mac_host}", cmd], check=True)
             
@@ -340,6 +366,29 @@ def import_project():
             subprocess.run(["scp", local_projects_json, f"{mac_user}@{mac_host}:{remote_docs_dir}/Config/projects.json"], check=True)
             subprocess.run(["scp", local_shows_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/shows.json"], check=True)
             subprocess.run(["scp", local_settings_json, f"{mac_user}@{mac_host}:{remote_app_data_dir}/settings.json"], check=True)
+
+            # Upload thema.jpg to remote host
+            local_thema_src = None
+            thema_candidates = [
+                os.path.join(generator_path, "Media", "thema.jpg"),
+                os.path.join(generator_path, "thema.jpg"),
+                "/volume1/Beamer/FreeShow/Media/thema.jpg",
+                "/volume1/Beamer/FreeShow/thema.jpg",
+                "/app/public/thumbnails/thema.jpg"
+            ]
+            for c in thema_candidates:
+                if os.path.exists(c):
+                    local_thema_src = c
+                    break
+            
+            if local_thema_src:
+                print("Uploading thema.jpg to remote host...")
+                try:
+                    subprocess.run(["scp", local_thema_src, f"{mac_user}@{mac_host}:{remote_docs_dir}/thema.jpg"], check=False)
+                    subprocess.run(["scp", local_thema_src, f"{mac_user}@{mac_host}:{remote_docs_dir}/Media/thema.jpg"], check=False)
+                    print("thema.jpg uploaded successfully to remote host.")
+                except Exception as e:
+                    print(f"Warning: Failed to upload thema.jpg to remote host: {e}")
         
         print(f"Project '{project_name}' successfully imported and set as active!")
         return True

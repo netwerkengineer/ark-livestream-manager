@@ -105,6 +105,7 @@ export default function FreeshowGenerator() {
   // Maintenance states
   const [duplicateGroups, setDuplicateGroups] = useState<any[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [comparingPair, setComparingPair] = useState<any[] | null>(null);
   const [catalogSongs, setCatalogSongs] = useState<any[]>([]);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -469,6 +470,32 @@ export default function FreeshowGenerator() {
     localStorage.setItem('freeshow_lang', lang);
   }, [lang]);
 
+  // Load manualItems and projectName from localStorage on mount
+  useEffect(() => {
+    const savedItems = localStorage.getItem('freeshow_manual_items');
+    if (savedItems) {
+      try {
+        setManualItems(JSON.parse(savedItems));
+      } catch (e) {
+        console.error("Failed to parse saved manual items:", e);
+      }
+    }
+    const savedProjectName = localStorage.getItem('freeshow_project_name');
+    if (savedProjectName) {
+      setProjectName(savedProjectName);
+    }
+  }, []);
+
+  // Save manualItems to localStorage
+  useEffect(() => {
+    localStorage.setItem('freeshow_manual_items', JSON.stringify(manualItems));
+  }, [manualItems]);
+
+  // Save projectName to localStorage
+  useEffect(() => {
+    localStorage.setItem('freeshow_project_name', projectName);
+  }, [projectName]);
+
   useEffect(() => {
     if (inputType === 'database' && databaseSubTab === 'catalog') {
       fetchShows();
@@ -763,6 +790,30 @@ export default function FreeshowGenerator() {
       alert(t('network_error_label') + e.message);
     }
     setIsScanning(false);
+  };
+
+  const optimizeMediaPaths = async () => {
+    setIsOptimizing(true);
+    setStatus(t('optimizing_media_paths'));
+    try {
+      const res = await fetch('/api/maintenance/fix-media');
+      const data = await res.json();
+      if (data.success) {
+        setStatus(t('media_paths_optimized')
+          .replace('{scanned}', data.showsScanned.toString())
+          .replace('{fixed}', data.pathsFixed.toString())
+          .replace('{copied}', data.filesCopied.toString())
+          .replace('{symlinks}', data.symlinksCreated.toString()));
+        fetchCatalog();
+      } else {
+        alert(t('optimization_failed_label') + data.error);
+        setStatus(t('optimization_failed'));
+      }
+    } catch (e: any) {
+      alert(t('network_error_label') + e.message);
+      setStatus(t('optimization_failed'));
+    }
+    setIsOptimizing(false);
   };
 
   const downloadBackup = async () => {
@@ -2687,9 +2738,14 @@ export default function FreeshowGenerator() {
               <div className="glass-card" style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ margin: 0 }}>📖 {t('library')}</h3>
-                  <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={downloadBackup}>
-                     {t('backup')}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={optimizeMediaPaths} disabled={isOptimizing}>
+                       {isOptimizing ? t('loading') : t('optimize_media')}
+                    </button>
+                    <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={downloadBackup}>
+                       {t('backup')}
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>

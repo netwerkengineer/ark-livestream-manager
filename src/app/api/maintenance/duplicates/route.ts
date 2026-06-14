@@ -93,6 +93,13 @@ export async function GET(req: NextRequest) {
     const groups: { [key: string]: ShowMeta[] } = {};
     const processed = new Set<string>();
 
+    // Helper om namen te normaliseren
+    const cleanName = (s: string) => s.toLowerCase()
+      .replace(/^(ik weet|opwekking|lied|psalm|a|the|with|een|het|de|met)\s+/g, '')
+      .replace(/\s+(we\s*\d+|copy|kopie|v\d+|\d+|[\(\)]+|[-_]+)/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+
     for (let i = 0; i < showList.length; i++) {
       if (processed.has(showList[i].filename)) continue;
       
@@ -111,20 +118,51 @@ export async function GET(req: NextRequest) {
           isDuplicate = true;
         }
 
+        // 1b. Genormaliseerde naam match (bijv. "Ik weet Mijn Verlosser Leeft" en "Mijn Verlosser Leeft")
+        if (!isDuplicate && current.name && target.name) {
+          const n1 = cleanName(current.name);
+          const n2 = cleanName(target.name);
+          if (n1 === n2 && n1.length >= 4) {
+            isDuplicate = true;
+          }
+        }
+
         // 2. Zeer gelijke bestandsnaam (fuzzy)
         if (!isDuplicate) {
           const lFunc = typeof levenshtein === 'function' ? levenshtein : (levenshtein as any).levenshteinEditDistance;
           if (typeof lFunc === 'function') {
             const dist = lFunc(current.filename.toLowerCase(), target.filename.toLowerCase());
-            if (dist <= 4 && (current.filename.includes('(') || target.filename.includes('('))) {
+            // Match if filename is very close (e.g. distance <= 5) and contains typical duplicate markers
+            const hasDuplicateMarker = 
+              current.filename.includes('(') || target.filename.includes('(') ||
+              current.filename.includes('-') || target.filename.includes('-') ||
+              current.filename.toLowerCase().includes('copy') || target.filename.toLowerCase().includes('copy') ||
+              current.filename.toLowerCase().includes('kopie') || target.filename.toLowerCase().includes('kopie') ||
+              /\d/.test(current.filename) || /\d/.test(target.filename);
+              
+            if (dist <= 5 && hasDuplicateMarker) {
               isDuplicate = true;
             }
           }
         }
 
-        // 3. Exacte inhoud (slides tekst)
-        if (!isDuplicate && current.contentHash && current.contentHash === target.contentHash) {
-          isDuplicate = true;
+        // 3. Fuzzy inhoud (slides tekst)
+        if (!isDuplicate && current.contentHash && target.contentHash) {
+          const len1 = current.contentHash.length;
+          const len2 = target.contentHash.length;
+          const maxLen = Math.max(len1, len2);
+          
+          // Only do expensive Levenshtein if lengths are within 25% of each other
+          if (maxLen > 0 && Math.abs(len1 - len2) / maxLen <= 0.25) {
+            const lFunc = typeof levenshtein === 'function' ? levenshtein : (levenshtein as any).levenshteinEditDistance;
+            if (typeof lFunc === 'function') {
+              const dist = lFunc(current.contentHash.toLowerCase(), target.contentHash.toLowerCase());
+              const similarity = (maxLen - dist) / maxLen;
+              if (similarity >= 0.88) { // 88% similarity
+                isDuplicate = true;
+              }
+            }
+          }
         }
 
         // 4. Fuzzy check op show namen (indien ze erg op elkaar lijken, bijv. "Lied 1" en "Lied 1a")
