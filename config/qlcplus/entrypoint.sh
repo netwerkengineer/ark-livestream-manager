@@ -65,12 +65,21 @@ echo "Auto-detected: IP=$NAS_IP, ArtNet Line=$ARTNET_LINE, OSC Line=$OSC_LINE"
 # This injects the detected IP and Line indexes into the InputOutputMap XML
 cp "$PROJECT" /tmp/project.qxw
 
+# Determine output parameters based on QLC_OUTPUT_IP environment variable
+if [ -n "$QLC_OUTPUT_IP" ] && [ "$QLC_OUTPUT_IP" != "broadcast" ] && [ "$QLC_OUTPUT_IP" != "church" ]; then
+    echo "ArtNet Output set to Unicast: $QLC_OUTPUT_IP"
+    OUTPUT_PARAMS="<PluginParameters outputIP=\"$QLC_OUTPUT_IP\"/>"
+else
+    echo "ArtNet Output set to Broadcast"
+    OUTPUT_PARAMS="<PluginParameters/>"
+fi
+
 # Inject mappings. Note: In church/home setup we bridge ArtNet on Universe 1 (input & output) and OSC on Universe 2 (input)
 sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
  <InputOutputMap>\
   <Universe Name="Universe 1" ID="0" Passthrough="True">\
    <Input Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'"><PluginParameters/></Input>\
-   <Output Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'"><PluginParameters outputIP="192.168.40.100"/></Output>\
+   <Output Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'">'"$OUTPUT_PARAMS"'</Output>\
   </Universe>\
   <Universe Name="Universe 2" ID="1">\
    <Input Plugin="OSC" UID="'"$NAS_IP"'" Line="'"$OSC_LINE"'"><PluginParameters/></Input>\
