@@ -19,6 +19,26 @@ interface ShowMeta {
   } | null;
 }
 
+function getWords(s: string): Set<string> {
+  const words = s.toLowerCase().match(/\w+/g) || [];
+  return new Set(words);
+}
+
+function jaccardSimilarity(s1: string, s2: string): number {
+  const w1 = getWords(s1);
+  const w2 = getWords(s2);
+  if (w1.size === 0 || w2.size === 0) return 0;
+  
+  let intersectionSize = 0;
+  for (const w of w1) {
+    if (w2.has(w)) {
+      intersectionSize++;
+    }
+  }
+  const unionSize = w1.size + w2.size - intersectionSize;
+  return intersectionSize / unionSize;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const authSession = await isAuthorized(req, undefined, "freeshow");
@@ -146,22 +166,11 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // 3. Fuzzy inhoud (slides tekst)
+        // 3. Fuzzy inhoud (slides tekst) - Jaccard overlap
         if (!isDuplicate && current.contentHash && target.contentHash) {
-          const len1 = current.contentHash.length;
-          const len2 = target.contentHash.length;
-          const maxLen = Math.max(len1, len2);
-          
-          // Only do expensive Levenshtein if lengths are within 25% of each other
-          if (maxLen > 0 && Math.abs(len1 - len2) / maxLen <= 0.25) {
-            const lFunc = typeof levenshtein === 'function' ? levenshtein : (levenshtein as any).levenshteinEditDistance;
-            if (typeof lFunc === 'function') {
-              const dist = lFunc(current.contentHash.toLowerCase(), target.contentHash.toLowerCase());
-              const similarity = (maxLen - dist) / maxLen;
-              if (similarity >= 0.88) { // 88% similarity
-                isDuplicate = true;
-              }
-            }
+          const similarity = jaccardSimilarity(current.contentHash, target.contentHash);
+          if (similarity >= 0.75) { // 75% overlap
+            isDuplicate = true;
           }
         }
 
