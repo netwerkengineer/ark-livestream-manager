@@ -14,6 +14,28 @@ export async function GET(req: NextRequest) {
     const settings = getSettings() as any;
     const freeshowPath = settings.freeshowPath || '';
 
+    let categories: Record<string, any> = {
+      song: { name: "category.song", icon: "song", default: true },
+      presentation: { name: "category.presentation", icon: "presentation", default: true },
+      scripture: { name: "category.scripture", icon: "scripture", default: true }
+    };
+
+    if (freeshowPath) {
+      try {
+        const settingsSyncedPath = path.join(freeshowPath, 'Config', 'settings_synced.json');
+        const exists = await fs.access(settingsSyncedPath).then(() => true).catch(() => false);
+        if (exists) {
+          const content = await fs.readFile(settingsSyncedPath, 'utf-8');
+          const config = JSON.parse(content);
+          if (config.categories) {
+            categories = { ...categories, ...config.categories };
+          }
+        }
+      } catch (err) {
+        console.error("Failed to read settings_synced.json categories:", err);
+      }
+    }
+
     const catalog: { songs: { name: string, category: string }[], bibles: string[] } = {
       songs: [],
       bibles: []
@@ -70,7 +92,7 @@ export async function GET(req: NextRequest) {
       } catch(err) {}
     }
 
-    return NextResponse.json({ success: true, catalog });
+    return NextResponse.json({ success: true, catalog, categories });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

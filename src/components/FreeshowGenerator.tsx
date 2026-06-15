@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { translations } from '@/lib/translations';
 
 export default function FreeshowGenerator() {
@@ -124,6 +124,12 @@ export default function FreeshowGenerator() {
   const [showsSearch, setShowsSearch] = useState('');
   const [showsCategoryFilter, setShowsCategoryFilter] = useState('all');
   const [showsSortOrder, setShowsSortOrder] = useState<'name'|'modified'>('name');
+
+  const [freeshowCategories, setFreeshowCategories] = useState<Record<string, { name: string; icon: string; default?: boolean }>>({
+    song: { name: 'category.song', icon: 'song', default: true },
+    presentation: { name: 'category.presentation', icon: 'presentation', default: true },
+    scripture: { name: 'category.scripture', icon: 'scripture', default: true }
+  });
 
   const [selectedShow, setSelectedShow] = useState<any>(null); // Full JSON array [id, showObj]
   const [showEditorTitle, setShowEditorTitle] = useState('');
@@ -586,10 +592,36 @@ export default function FreeshowGenerator() {
     return Array.from(new Set([t('bottom'), ...fromTemplate, ...fromManual]));
   }, [templateItems, manualItems]);
 
+  const uniqueCategories = React.useMemo(() => {
+    const categoriesFromShows = showsList.map(s => s.category).filter(Boolean);
+    const categoriesFromCatalog = catalogSongs.map(s => s.category).filter(Boolean);
+    const categoriesFromConfig = Object.keys(freeshowCategories || {});
+    return Array.from(new Set([
+      'song',
+      'presentation',
+      'scripture',
+      'unknown',
+      ...categoriesFromConfig,
+      ...categoriesFromShows,
+      ...categoriesFromCatalog
+    ])).filter(c => c !== 'all');
+  }, [showsList, catalogSongs, freeshowCategories]);
+
   const getTranslatedTitle = (title: string) => {
     // Probeer de titel te vertalen, val terug op origineel als geen vertaling beschikbaar is
     const translated = t(title);
     return translated === title ? title : translated;
+  };
+
+  const getCategoryDisplayName = (catId: string) => {
+    if (catId === 'song') return 'Liederen';
+    if (catId === 'presentation') return 'Presentaties';
+    if (catId === 'scripture') return 'Bijbelteksten';
+    if (catId === 'unknown') return 'Onbekend';
+    
+    const cat = freeshowCategories[catId];
+    if (!cat) return catId;
+    return cat.name || catId;
   };
 
   const refreshCatalog = async () => {
@@ -600,6 +632,9 @@ export default function FreeshowGenerator() {
       if (data.success) {
         setCatalog(data.catalog);
         setCatalogSongs(data.catalog.songs);
+        if (data.categories) {
+          setFreeshowCategories(data.categories);
+        }
         setErrorMessage('');
       } else {
         setErrorMessage(t('catalog_error_label') + (data.error || 'Onbekende fout'));
@@ -975,6 +1010,9 @@ export default function FreeshowGenerator() {
       const data = await res.json();
       if (data.success) {
         setShowsList(data.shows);
+        if (data.categories) {
+          setFreeshowCategories(data.categories);
+        }
       } else {
         setErrorMessage(data.error || 'Fout bij inladen shows');
       }
@@ -1532,7 +1570,7 @@ export default function FreeshowGenerator() {
   };
 
 
-  const filteredAvailableSongs = catalog.songs.filter(s => s.category === 'song');
+  const filteredAvailableSongs = catalog.songs.filter(s => s.category !== 'presentation' && s.category !== 'scripture');
 
   return (
     <div style={{ width: '100%' }}>
@@ -1728,12 +1766,12 @@ export default function FreeshowGenerator() {
                       
                       <div className="glass-card" style={{ padding: '0.8rem', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '0.5rem' }}>
-                          {songInput ? `Zoekresultaten (${catalogSongs.filter(s => s.category !== 'presentation' && s.name.toLowerCase().includes(songInput.toLowerCase())).length})` : 'Selecteer een lied uit de catalogus:'}
+                          {songInput ? `Zoekresultaten (${catalogSongs.filter(s => s.category !== 'presentation' && s.category !== 'scripture' && s.name.toLowerCase().includes(songInput.toLowerCase())).length})` : 'Selecteer een lied uit de catalogus:'}
                         </span>
                         
                         <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '4px' }}>
                           {catalogSongs
-                            .filter(s => s.category !== 'presentation' && (!songInput || s.name.toLowerCase().includes(songInput.toLowerCase())))
+                            .filter(s => s.category !== 'presentation' && s.category !== 'scripture' && (!songInput || s.name.toLowerCase().includes(songInput.toLowerCase())))
                             .slice(0, 50)
                             .map((song, i) => (
                               <div 
@@ -1758,12 +1796,12 @@ export default function FreeshowGenerator() {
                               >
                                 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#fff' }}>{song.name}</span>
                                 <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.1)', color: 'var(--primary)', fontWeight: 600 }}>
-                                  {song.category}
+                                  {getCategoryDisplayName(song.category)}
                                 </span>
                               </div>
                             ))
                           }
-                          {catalogSongs.filter(s => s.category !== 'presentation' && (!songInput || s.name.toLowerCase().includes(songInput.toLowerCase()))).length === 0 && (
+                          {catalogSongs.filter(s => s.category !== 'presentation' && s.category !== 'scripture' && (!songInput || s.name.toLowerCase().includes(songInput.toLowerCase()))).length === 0 && (
                             <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>
                               Geen liederen gevonden. Typ hierboven om handmatig toe te voegen.
                             </div>
@@ -2128,7 +2166,7 @@ export default function FreeshowGenerator() {
                   <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{item.filename}</div>
                     <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('modified')}: {new Date(item.modified).toLocaleString()}</div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('category')}: {item.category}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('category')}: {getCategoryDisplayName(item.category)}</div>
                     {item.mediaInfo && (
                       <div style={{ marginTop: '0.5rem', padding: '0.4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid var(--primary)' }}>
                         🎬 <b>{t('background')}:</b> {item.mediaInfo.name} ({item.mediaInfo.type})
@@ -2189,10 +2227,11 @@ export default function FreeshowGenerator() {
                   onChange={e => setShowEditorCategory(e.target.value)}
                   style={{ margin: 0 }}
                 >
-                  <option value="song">Liederen (song)</option>
-                  <option value="presentation">Presentaties (presentation)</option>
-                  <option value="scripture">Bijbelteksten (scripture)</option>
-                  <option value="unknown">Onbekend (unknown)</option>
+                  {uniqueCategories.map(cat => (
+                    <option key={cat} value={cat}>
+                      {getCategoryDisplayName(cat)} ({cat})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -2577,10 +2616,11 @@ export default function FreeshowGenerator() {
                     style={{ margin: 0, width: '150px' }}
                   >
                     <option value="all">Alle Categorieën</option>
-                    <option value="song">Liederen (song)</option>
-                    <option value="presentation">Presentaties (presentation)</option>
-                    <option value="scripture">Bijbelteksten (scripture)</option>
-                    <option value="unknown">Onbekend (unknown)</option>
+                    {uniqueCategories.map(cat => (
+                      <option key={cat} value={cat}>
+                        {getCategoryDisplayName(cat)} ({cat})
+                      </option>
+                    ))}
                   </select>
                   {/* Sorting */}
                   <select 
@@ -2622,7 +2662,7 @@ export default function FreeshowGenerator() {
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', opacity: 0.8 }}>
-                              🏷️ {show.category}
+                              🏷️ {getCategoryDisplayName(show.category)}
                             </span>
                             <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', opacity: 0.8 }}>
                               📄 {show.slideCount} slides
@@ -2769,7 +2809,7 @@ export default function FreeshowGenerator() {
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ overflow: 'hidden' }}>
                             <div style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{song.name}</div>
-                            <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{song.category}</div>
+                            <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{getCategoryDisplayName(song.category)}</div>
                           </div>
                           <button 
                             onClick={() => deleteFromLibrary(song.name + '.show')}
@@ -2939,7 +2979,7 @@ export default function FreeshowGenerator() {
       )}
 
       <datalist id="available-songs">
-        {catalogSongs.filter(s => s.category !== 'presentation').map((song, i) => <option key={i} value={song.name} />)}
+        {catalogSongs.filter(s => s.category !== 'presentation' && s.category !== 'scripture').map((song, i) => <option key={i} value={song.name} />)}
       </datalist>
       <datalist id="available-presentations">
         {catalogSongs.filter(s => s.category === 'presentation').map((song, i) => <option key={i} value={song.name} />)}
