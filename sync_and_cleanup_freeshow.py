@@ -31,11 +31,11 @@ def run_command_with_key(*args, **kwargs):
                     except:
                         pass
             
-            new_cmd = [prog] + ssh_key_args + ["-o", "StrictHostKeyChecking=no"]
+            new_cmd = [prog] + ssh_key_args + ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
             i = 1
             while i < len(cmd_list):
                 item = cmd_list[i]
-                if item == "-o" and i + 1 < len(cmd_list) and "StrictHostKeyChecking" in cmd_list[i+1]:
+                if item == "-o" and i + 1 < len(cmd_list) and ("StrictHostKeyChecking" in cmd_list[i+1] or "UserKnownHostsFile" in cmd_list[i+1]):
                     i += 2
                     continue
                 new_cmd.append(item)
@@ -62,7 +62,7 @@ def run_command_with_key(*args, **kwargs):
                     except:
                         pass
             
-            inject = "-o StrictHostKeyChecking=no"
+            inject = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
             if key_path:
                 inject += f" -i {key_path}"
             cmd_list = cmd_list.replace(prog, f"{prog} {inject}", 1)

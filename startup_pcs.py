@@ -49,14 +49,14 @@ def get_ssh_key_args():
 
 def run_ssh_cmd(user, host_ip, remote_cmd, capture=False):
     ssh_key_args = get_ssh_key_args()
-    cmd = ["ssh"] + ssh_key_args + ["-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", remote_cmd]
+    cmd = ["ssh"] + ssh_key_args + ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", f"{user}@{host_ip}", remote_cmd]
     return subprocess.run(cmd, capture_output=capture, text=True)
 
 def wait_for_ssh(user, host, max_attempts=60):
     print(f"Waiting for remote host {host} to become available via SSH as user {user}...")
     ssh_key_args = get_ssh_key_args()
     for i in range(1, max_attempts + 1):
-        cmd = ["ssh"] + ssh_key_args + ["-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"]
+        cmd = ["ssh"] + ssh_key_args + ["-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
             print(f"Host {host} is online!")
