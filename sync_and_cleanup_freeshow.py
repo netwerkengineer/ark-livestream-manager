@@ -7,6 +7,73 @@ import base64
 import sys
 import glob
 
+# Helper to intercept subprocess.run for ssh, scp, and sftp to enforce correct key permissions
+def run_command_with_key(*args, **kwargs):
+    cmd_list = args[0]
+    if isinstance(cmd_list, list) and len(cmd_list) > 0:
+        prog = cmd_list[0]
+        if prog in ["ssh", "scp", "sftp"]:
+            candidates = [
+                "/app/data/id_ed25519",
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "id_ed25519"),
+                "/volume1/docker/ark-livestream-manager/data/id_ed25519"
+            ]
+            ssh_key_args = []
+            for c in candidates:
+                if os.path.exists(c):
+                    tmp_key = "/tmp/id_ed25519_temp"
+                    try:
+                        import shutil
+                        shutil.copy2(c, tmp_key)
+                        os.chmod(tmp_key, 0o600)
+                        ssh_key_args = ["-i", tmp_key]
+                        break
+                    except:
+                        pass
+            
+            new_cmd = [prog] + ssh_key_args + ["-o", "StrictHostKeyChecking=no"]
+            i = 1
+            while i < len(cmd_list):
+                item = cmd_list[i]
+                if item == "-o" and i + 1 < len(cmd_list) and "StrictHostKeyChecking" in cmd_list[i+1]:
+                    i += 2
+                    continue
+                new_cmd.append(item)
+                i += 1
+            args = (new_cmd,) + args[1:]
+    elif isinstance(cmd_list, str):
+        if cmd_list.startswith("scp ") or cmd_list.startswith("ssh ") or cmd_list.startswith("sftp "):
+            prog = cmd_list.split()[0]
+            candidates = [
+                "/app/data/id_ed25519",
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "id_ed25519"),
+                "/volume1/docker/ark-livestream-manager/data/id_ed25519"
+            ]
+            key_path = None
+            for c in candidates:
+                if os.path.exists(c):
+                    tmp_key = "/tmp/id_ed25519_temp"
+                    try:
+                        import shutil
+                        shutil.copy2(c, tmp_key)
+                        os.chmod(tmp_key, 0o600)
+                        key_path = tmp_key
+                        break
+                    except:
+                        pass
+            
+            inject = "-o StrictHostKeyChecking=no"
+            if key_path:
+                inject += f" -i {key_path}"
+            cmd_list = cmd_list.replace(prog, f"{prog} {inject}", 1)
+            args = (cmd_list,) + args[1:]
+            
+    return original_run(*args, **kwargs)
+
+original_run = subprocess.run
+subprocess.run = run_command_with_key
+
+
 def get_show_id_from_file(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as f:

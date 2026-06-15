@@ -29,13 +29,35 @@ def get_ssh_user(host_ip):
         return "admin"
     return "jeffreygo"
 
+def get_ssh_key_args():
+    candidates = [
+        "/app/data/id_ed25519",
+        os.path.join(SCRIPT_DIR, "data", "id_ed25519"),
+        "/volume1/docker/ark-livestream-manager/data/id_ed25519"
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            tmp_key = "/tmp/id_ed25519_temp"
+            try:
+                import shutil
+                shutil.copy2(c, tmp_key)
+                os.chmod(tmp_key, 0o600)
+                return ["-i", tmp_key]
+            except Exception as e:
+                print(f"Error preparing temporary SSH key: {e}")
+    return []
+
+def run_ssh_cmd(user, host_ip, remote_cmd, capture=False):
+    ssh_key_args = get_ssh_key_args()
+    cmd = ["ssh"] + ssh_key_args + ["-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", remote_cmd]
+    return subprocess.run(cmd, capture_output=capture, text=True)
+
 def wait_for_ssh(user, host, max_attempts=60):
     print(f"Waiting for remote host {host} to become available via SSH as user {user}...")
+    ssh_key_args = get_ssh_key_args()
     for i in range(1, max_attempts + 1):
-        res = subprocess.run(
-            ["ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"],
-            capture_output=True, text=True
-        )
+        cmd = ["ssh"] + ssh_key_args + ["-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode == 0:
             print(f"Host {host} is online!")
             return True
@@ -78,7 +100,7 @@ def startup_single_plug(plug, settings):
             if host_ip in known_windows_hosts:
                 is_win = True
             else:
-                res = subprocess.run(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host_ip}", "cmd.exe /c echo windows"], capture_output=True, text=True)
+                res = run_ssh_cmd(user, host_ip, "cmd.exe /c echo windows", capture=True)
                 is_win = "windows" in res.stdout.lower()
             
             # Case A: FreeShow Host (or home environment fallback)
@@ -88,28 +110,28 @@ def startup_single_plug(plug, settings):
                 
                 if is_win:
                     print(f"[{name}] Launching FreeShow on Windows via schtasks...")
-                    subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartFreeShow || powershell -Command \"Start-Process FreeShow\""])
+                    run_ssh_cmd(user, host_ip, "schtasks /run /tn StartFreeShow || powershell -Command \"Start-Process FreeShow\"")
                 else:
                     print(f"[{name}] Launching FreeShow on Mac...")
-                    subprocess.run(["ssh", f"{user}@{host_ip}", "open -a FreeShow"])
+                    run_ssh_cmd(user, host_ip, "open -a FreeShow")
                 
                 # If OBS is on the same machine, launch it too
                 if obs_host == host_ip or host_ip == "192.168.2.20":
                     if is_win:
                         print(f"[{name}] Launching OBS on Windows via schtasks...")
-                        subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
+                        run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\"")
                     else:
                         print(f"[{name}] Launching OBS on Mac...")
-                        subprocess.run(["ssh", f"{user}@{host_ip}", "open -a OBS"])
+                        run_ssh_cmd(user, host_ip, "open -a OBS")
             
             # Case B: OBS Host only
             elif host_ip == obs_host:
                 if is_win:
                     print(f"[{name}] Launching OBS on Windows via schtasks...")
-                    subprocess.run(["ssh", f"{user}@{host_ip}", "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\""])
+                    run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\"")
                 else:
                     print(f"[{name}] Launching OBS on Mac...")
-                    subprocess.run(["ssh", f"{user}@{host_ip}", "open -a OBS"])
+                    run_ssh_cmd(user, host_ip, "open -a OBS")
             
             else:
                 # Custom host - just log and try standard apps if applicable
