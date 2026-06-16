@@ -1,22 +1,17 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting QLC+ (Headless, Operate Mode) ==="
+echo "=== Starting QLC+ v5 (Headless, Netwerk-first Mode) ==="
 
-# Prevent crash: remove any saved config from previous session
-# QLC+ saves workspace paths that become invalid after restart,
-# causing it to crash on boot. We clean this on every start.
+# Clean any configuration file that might cause boot issues or contain stale workspace paths
 rm -f "/root/.config/qlcplus/Q Light Controller Plus.conf"
+rm -f "/root/.qlcplus/Q Light Controller Plus.conf"
 
-# Start QLC+ without project in background
-# -w: enable Web interface on port 9999
-# -n: nogui - hide graphical interface
-# -p: operate mode - load the virtual console in active state
-qlcplus -w -n -p &
+# Start QLC+ v5 in headless web-modus op poort 9999
+qlcplus-qml --web --web-port 9999 &
 QLC_PID=$!
 
-# Wait for web server to become available
-echo "Waiting for QLC+ web server..."
+echo "Waiting for QLC+ v5 web server..."
 for i in $(seq 1 30); do
     if curl -s -o /dev/null http://localhost:9999 2>/dev/null; then
         echo "Web server is ready!"
@@ -29,52 +24,36 @@ sleep 2
 PROJECT="/QLC/ark_church_lighting.qxw"
 if [ ! -f "$PROJECT" ]; then
     echo "No project file found at $PROJECT"
-    echo "Load a project manually via the web interface at port 9999."
     wait $QLC_PID
     exit 0
 fi
 
-# Fetch the config page HTML to detect available network interfaces
+# Interface auto-detectie
 CONFIG_HTML=$(curl -s http://localhost:9999/config)
-
-# Auto-detect the LAN IP (192.168.x.x or other local IP) from ArtNet plugin options
 NAS_IP=$(echo "$CONFIG_HTML" | awk -F'"' '/\[ArtNet\] 192\.168\./ && /option value/ {match($0, /192\.168\.[0-9]+\.[0-9]+/); print substr($0, RSTART, RLENGTH); exit}')
 
 if [ -z "$NAS_IP" ]; then
-    echo "Warning: Could not detect 192.168.x.x LAN IP from ArtNet interfaces. Trying fallback to any IP..."
-    # Exclude localhost (127.0.0.1) if possible, but fallback to it if it's the only one
     NAS_IP=$(echo "$CONFIG_HTML" | awk -F'"' '/\[ArtNet\] (192\.|172\.|10\.)[0-9]+\.[0-9]+\.[0-9]+/ && /option value/ {match($0, /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); print substr($0, RSTART, RLENGTH); exit}')
 fi
+if [ -z "$NAS_IP" ]; then NAS_IP="127.0.0.1"; fi
 
-if [ -z "$NAS_IP" ]; then
-    echo "Warning: Could not detect any local IP from ArtNet. Trying localhost..."
-    NAS_IP="127.0.0.1"
-fi
-
-# Find the Line indexes for the detected IP address
 ARTNET_LINE=$(echo "$CONFIG_HTML" | awk -v ip="$NAS_IP" -F'"' '$0 ~ "\\[ArtNet\\] "ip && /option value/ {split($2, a, "|"); print a[2]; exit}')
 OSC_LINE=$(echo "$CONFIG_HTML" | awk -v ip="$NAS_IP" -F'"' '$0 ~ "\\[OSC\\] "ip && /option value/ {split($2, a, "|"); print a[2]; exit}')
 
-# Fallbacks if line detection failed
 if [ -z "$ARTNET_LINE" ]; then ARTNET_LINE="0"; fi
 if [ -z "$OSC_LINE" ]; then OSC_LINE="0"; fi
 
 echo "Auto-detected: IP=$NAS_IP, ArtNet Line=$ARTNET_LINE, OSC Line=$OSC_LINE"
 
-# Create a modified copy of the project with correct universe mappings
-# This injects the detected IP and Line indexes into the InputOutputMap XML
 cp "$PROJECT" /tmp/project.qxw
 
-# Determine output parameters based on QLC_OUTPUT_IP environment variable
-if [ -n "$QLC_OUTPUT_IP" ] && [ "$QLC_OUTPUT_IP" != "broadcast" ] && [ "$QLC_OUTPUT_IP" != "church" ]; then
-    echo "ArtNet Output set to Unicast: $QLC_OUTPUT_IP"
+if [ "$QLC_OUTPUT_IP" != "broadcast" ] && [ -n "$QLC_OUTPUT_IP" ]; then
     OUTPUT_PARAMS="<PluginParameters outputIP=\"$QLC_OUTPUT_IP\"/>"
 else
-    echo "ArtNet Output set to Broadcast"
     OUTPUT_PARAMS="<PluginParameters/>"
 fi
 
-# Inject mappings. Note: In church/home setup we bridge ArtNet on Universe 1 (input & output) and OSC on Universe 2 (input)
+# Injecteer de gedetecteerde poorten in het XML-bestand
 sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
  <InputOutputMap>\
   <Universe Name="Universe 1" ID="0" Passthrough="True">\
@@ -86,9 +65,9 @@ sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
   </Universe>\
  </InputOutputMap>' /tmp/project.qxw
 
-echo "Loading project with auto-configured universes..."
-# CRITICAL FIX: QLC+ 4.14 uses the parameter name 'qlcprj' in Web Access /loadProject form, not 'qlcFile'
-curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject > /dev/null
-echo "=== Project loaded successfully! ==="
+echo "Loading project into QLC+ v5 via API..."
+# V5 API-call om de workspace direct te laden
+curl -s -X POST -F "file=@/tmp/project.qxw" http://localhost:9999/api/v1/project > /dev/null
+echo "=== QLC+ v5 Project succesvol geladen! ==="
 
 wait $QLC_PID

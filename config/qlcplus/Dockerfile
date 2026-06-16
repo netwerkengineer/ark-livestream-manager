@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libusb-1.0-0 \
     libftdi1-2 \
+    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Massimo Callegari's QLC+ OBS repository and GPG key for Debian 12 (Bookworm)
@@ -17,7 +18,12 @@ RUN echo 'deb http://download.opensuse.org/repositories/home:/mcallegari79/Debia
 
 # Install QLC+ (qt5 build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    qlcplus-qt5 \
+    qlcplus5 \
+    qml6-module-qtquick-controls \
+    qml6-module-qtquick-layouts \
+    qml6-module-qtquick-templates \
+    qml6-module-qtquick-window \
+    qml6-module-qtquick \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directories for fixtures and project
