@@ -664,8 +664,12 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
      * Verticale uitlijning is geperfectioneerd met `line-height: var(--list-item-height) !important`.
   3. De wijziging is succesvol doorgevoerd en de containers zijn op Proxmox LXC 112 herstart.
 
-### 5. Voorbereiding voor NAS Deployment & GitHub Push
+### 5. Companion OSC UDP-poort mapping in hoofd-compose
+* **Probleem:** In de hoofd `docker-compose.yml` (die gebruikt wordt voor de NAS-deployment) ontbrak de mapping voor UDP-poort `12321`. Hierdoor kon Companion op de NAS geen OSC-berichten ontvangen, hoewel dat in de afzonderlijke `companion/docker-compose.yml` wel gedefinieerd was.
+* **Oplossing:** We hebben `- "12321:12321/udp"` toegevoegd aan de `companion` service in de hoofd [docker-compose.yml](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/docker-compose.yml). Hiermee is OSC-ontvangst nu ook op de NAS gegarandeerd.
+
+### 6. Voorbereiding voor NAS Deployment & GitHub Push
 * **Oplossing:**
-  1. Alle gewijzigde bestanden (QLC+ Dockerfile, entrypoint, projectbestand en walkthrough) zijn gecommit en gepusht naar de GitHub repository `main` branch.
+  1. Alle gewijzigde bestanden (QLC+ Dockerfile, entrypoint, projectbestand, docker-compose.yml en walkthrough) zijn gecommit en gepusht naar de GitHub repository `main` branch.
   2. Het lokale project is nu volledig schoon en gereed voor deployment naar de kerk-NAS met behulp van het script `deploy_nas.py`.
 
