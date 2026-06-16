@@ -628,3 +628,33 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
   3. Als het commando faalt (macOS/Linux), schakelt het systeem dynamisch over naar het universele temp-pad `/tmp/led_control.py` en het commando `python3`.
   4. Hierdoor kan het LED-paneel zowel thuis op een macOS-machine (MacBook Pro) als in de kerk op de Windows OBS/FreeShow-pc's naadloos worden getest en ingezet.
 
+---
+
+## 📺 24. Upgrade QLC+ naar Versie 5.2.2 (v24.0)
+
+### 1. Upgrade QLC+ v5 en Qt6 QML Dependencies
+* **Probleem:** We wilden QLC+ upgraden van de verouderde versie 4 naar de nieuwste versie 5 (v5.2.2). De headless Docker-omgeving moest echter correct worden geconfigureerd met Qt6 QML dependencies om te voorkomen dat QLC+ v5 (dat is overgestapt op Qt6) crasht bij het opstarten met offscreen rendering.
+* **Oplossing:** 
+  1. In [Dockerfile](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/Dockerfile) hebben we de Massimo Callegari Debian 12 repository toegevoegd en het pakket `qlcplus5` geïnstalleerd ter vervanging van `qlcplus-qt5`.
+  2. We hebben de benodigde Qt6 QML runtime modules geïnstalleerd (`qml6-module-qtquick-controls`, `qml6-module-qtquick-layouts`, `qml6-module-qtquick-templates`, `qml6-module-qtquick-window`, en `qml6-module-qtquick`) om crashes door ontbrekende GUI/offscreen componenten op te lossen.
+  3. We hebben `fontconfig` toegevoegd voor correcte offscreen font rendering.
+
+### 2. Update Entrypoint voor Headless QLC+ v5 API-Projectlading
+* **Probleem:** De v4 opstartcommando's (`qlcplus -w -n -p`) en project-load endpoints (`POST /loadProject`) zijn veranderd of werken anders in QLC+ v5. Het direct laden van het project via de command-line optie `-o` werkt niet betrouwbaar op Synology DSM- en Proxmox/LXC-kernels.
+* **Oplossing:**
+  1. In [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) hebben we het startcommando aangepast naar de v5 QML-versie: `qlcplus-qml --web --web-port 9999`.
+  2. We hebben de opschoning van configuratiebestanden bijgewerkt zodat zowel `/root/.config/qlcplus/Q Light Controller Plus.conf` als `/root/.qlcplus/Q Light Controller Plus.conf` worden verwijderd voor de start, wat vastlopen en conflicten voorkomt.
+  3. De API-aanroep om het project met dynamisch gedetecteerde universe-interfaces te laden, is aangepast naar de nieuwe v5 API: `curl -s -X POST -F "file=@/tmp/project.qxw" http://localhost:9999/api/v1/project`.
+
+### 3. Proxmox LXC 112 Deployment en Service Integratie
+* **Probleem:** Het script `deploy_proxmox.sh` herbouwde voorheen alleen de `livestream-manager` container, waardoor QLC+- en Tuya-updates niet automatisch live gingen bij een deploy op Proxmox.
+* **Oplossing:**
+  1. We hebben [deploy_proxmox.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/deploy_proxmox.sh) geüpdatet zodat het `docker compose up -d --build livestream-manager qlcplus tuya-control` uitvoert.
+  2. We hebben de deployment gedraaid en geverifieerd dat alle containers succesvol bouwen en opstarten op LXC 112.
+  3. De QLC+ containerlogs laten zien dat de server start, netwerkinterfaces detecteert en het kerkproject succesvol importeert via de v5 API (`=== QLC+ v5 Project succesvol geladen! ===`).
+
+### 4. Voorbereiding voor NAS Deployment & GitHub Push
+* **Oplossing:**
+  1. Alle gewijzigde bestanden (waaronder de QLC+-updates en de projectfile `config/ark_church_lighting.qxw`) zijn gecommit en gepusht naar de GitHub repository `main` branch.
+  2. Het lokale project is nu volledig schoon en gereed voor deployment naar de kerk-NAS met behulp van het script `deploy_nas.py`.
+
