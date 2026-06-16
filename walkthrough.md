@@ -653,8 +653,19 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
   2. We hebben de deployment gedraaid en geverifieerd dat alle containers succesvol bouwen en opstarten op LXC 112.
   3. De QLC+ containerlogs laten zien dat de server start, netwerkinterfaces detecteert en het kerkproject succesvol importeert via de `/loadProject` endpoint (`=== QLC+ v5 Project succesvol geladen! ===`).
 
-### 4. Voorbereiding voor NAS Deployment & GitHub Push
+### 4. Verbetering CSS-Styling Frame Titels in de Web UI
+* **Probleem:** De titels van verschillende frames en widgets (zoals "Fresnel Dimmer (Submaster)", "Lichtshows / Chases", enz.) waren te groot, overlapten met knoppen en braken onhandig af over meerdere regels in de web-output.
 * **Oplossing:**
-  1. Alle gewijzigde bestanden (waaronder de QLC+-updates en de projectfile `config/ark_church_lighting.qxw`) zijn gecommit en gepusht naar de GitHub repository `main` branch.
+  1. In [Dockerfile](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/Dockerfile) hebben we een build-stap toegevoegd die custom CSS-overrides onderaan `/usr/share/qlcplus/web/webaccess-v5.css` toevoegt.
+  2. We hebben de `.frame-title` CSS aangepast:
+     * De font-size is verkleind naar `calc(var(--text-size-default) * 0.75)` zodat deze beter past.
+     * Automatisch afbreken is uitgeschakeld via `white-space: nowrap !important`.
+     * Overlopende tekst wordt netjes afgekapt met een ellipsis (...) via `overflow: hidden !important; text-overflow: ellipsis !important;`.
+     * Verticale uitlijning is geperfectioneerd met `line-height: var(--list-item-height) !important`.
+  3. De wijziging is succesvol doorgevoerd en de containers zijn op Proxmox LXC 112 herstart.
+
+### 5. Voorbereiding voor NAS Deployment & GitHub Push
+* **Oplossing:**
+  1. Alle gewijzigde bestanden (QLC+ Dockerfile, entrypoint, projectbestand en walkthrough) zijn gecommit en gepusht naar de GitHub repository `main` branch.
   2. Het lokale project is nu volledig schoon en gereed voor deployment naar de kerk-NAS met behulp van het script `deploy_nas.py`.
 
