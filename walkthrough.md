@@ -644,14 +644,14 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 * **Oplossing:**
   1. In [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) hebben we het startcommando aangepast naar de v5 QML-versie: `qlcplus-qml --web --web-port 9999`.
   2. We hebben de opschoning van configuratiebestanden bijgewerkt zodat zowel `/root/.config/qlcplus/Q Light Controller Plus.conf` als `/root/.qlcplus/Q Light Controller Plus.conf` worden verwijderd voor de start, wat vastlopen en conflicten voorkomt.
-  3. De API-aanroep om het project met dynamisch gedetecteerde universe-interfaces te laden, is aangepast naar de nieuwe v5 API: `curl -s -X POST -F "file=@/tmp/project.qxw" http://localhost:9999/api/v1/project`.
+  3. De project-upload API-aanroep is gecorrigeerd naar het `/loadProject` endpoint met de form-parameter `qlcprj` (gelijk aan QLC+ v5's native interface): `curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject`.
 
 ### 3. Proxmox LXC 112 Deployment en Service Integratie
 * **Probleem:** Het script `deploy_proxmox.sh` herbouwde voorheen alleen de `livestream-manager` container, waardoor QLC+- en Tuya-updates niet automatisch live gingen bij een deploy op Proxmox.
 * **Oplossing:**
   1. We hebben [deploy_proxmox.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/deploy_proxmox.sh) geüpdatet zodat het `docker compose up -d --build livestream-manager qlcplus tuya-control` uitvoert.
   2. We hebben de deployment gedraaid en geverifieerd dat alle containers succesvol bouwen en opstarten op LXC 112.
-  3. De QLC+ containerlogs laten zien dat de server start, netwerkinterfaces detecteert en het kerkproject succesvol importeert via de v5 API (`=== QLC+ v5 Project succesvol geladen! ===`).
+  3. De QLC+ containerlogs laten zien dat de server start, netwerkinterfaces detecteert en het kerkproject succesvol importeert via de `/loadProject` endpoint (`=== QLC+ v5 Project succesvol geladen! ===`).
 
 ### 4. Voorbereiding voor NAS Deployment & GitHub Push
 * **Oplossing:**
