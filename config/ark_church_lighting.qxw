@@ -11,9 +11,12 @@
    <BeatGenerator BeatType="Disabled" BPM="0"/>
    <NetworkServer Type="Native" AutoStart="False" Name="" Password=""/>
    <Universe Name="Universe 1" ID="0" Passthrough="True">
-    <Output Plugin="ArtNet" UID="127.0.0.1" Line="0"/>
+    <Input Plugin="ArtNet" UID="192.168.2.109" Line="1"/>
+    <Output Plugin="ArtNet" UID="192.168.2.109" Line="1"/>
    </Universe>
-   <Universe Name="Universe 2" ID="1"/>
+   <Universe Name="Universe 2" ID="1">
+    <Input Plugin="OSC" UID="192.168.2.109" Line="1"/>
+   </Universe>
    <Universe Name="Universe 3" ID="2"/>
    <Universe Name="Universe 4" ID="3"/>
   </InputOutputMap>
@@ -553,7 +556,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="10" Y="10" Width="300" Height="400"/>
+    <WindowState Visible="True" X="0" Y="0" Width="300" Height="400"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>
@@ -626,7 +629,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="320" Y="10" Width="400" Height="230"/>
+    <WindowState Visible="True" X="315" Y="0" Width="370" Height="215"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>
@@ -745,6 +748,37 @@
      <Intensity Adjust="False">100</Intensity>
      <Input Universe="1" Channel="31488"/>
     </Button>
+    <SpeedDial Caption="Duration" ID="5">
+     <WindowState Visible="True" X="370" Y="190" Width="20" Height="20"/>
+     <Appearance>
+      <FrameStyle>Sunken</FrameStyle>
+      <ForegroundColor>Default</ForegroundColor>
+      <BackgroundColor>4279703319</BackgroundColor>
+      <BackgroundImage>None</BackgroundImage>
+      <Font>Default</Font>
+     </Appearance>
+     <Visibility>0</Visibility>
+     <AbsoluteValue Minimum="0" Maximum="10000"/>
+     <Time>0</Time>
+     <Function FadeIn="6" FadeOut="6" Duration="6">17</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">16</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">10</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">14</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">11</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">15</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">12</Function>
+     <Function FadeIn="6" FadeOut="6" Duration="6">13</Function>
+     <Preset ID="16">
+      <Name>Fast Fade</Name>
+      <Value>1000</Value>
+      <Input Universe="1" Channel="1000" UpperValue="0"/>
+     </Preset>
+     <Preset ID="17">
+      <Name>Slow Fade</Name>
+      <Value>4000</Value>
+      <Input Universe="1" Channel="1001" UpperValue="0"/>
+     </Preset>
+    </SpeedDial>
    </Frame>
    <Frame Caption="Color Picker (ADJ Bars)" ID="30">
     <Appearance>
@@ -882,7 +916,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="730" Y="10" Width="400" Height="230"/>
+    <WindowState Visible="True" X="695" Y="0" Width="400" Height="230"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>
@@ -1010,7 +1044,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="730" Y="250" Width="400" Height="230"/>
+    <WindowState Visible="True" X="745" Y="250" Width="400" Height="230"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>
@@ -1138,7 +1172,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="1140" Y="10" Width="400" Height="230"/>
+    <WindowState Visible="True" X="1140" Y="0" Width="400" Height="230"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>

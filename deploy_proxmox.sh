@@ -13,7 +13,7 @@ ssh -o StrictHostKeyChecking=no root@192.168.2.200 << 'PROXMOX'
   pct push 112 /root/deploy.tar.gz /mnt/data/docker/ark-livestream-manager/deploy.tar.gz
   pct exec 112 -- sh -c "cd /mnt/data/docker/ark-livestream-manager && tar -xzf deploy.tar.gz && rm deploy.tar.gz"
   pct exec 112 -- sh -c "cd /mnt/data/docker/ark-livestream-manager && chown -R 101001:101001 . || true"
-  pct exec 112 -- sh -c "cd /mnt/data/docker/ark-livestream-manager && docker compose up -d --build livestream-manager"
+  pct exec 112 -- sh -c "cd /mnt/data/docker/ark-livestream-manager && docker compose up -d --build livestream-manager qlcplus tuya-control"
 PROXMOX
 
 echo "Deployment naar Proxmox succesvol!"
