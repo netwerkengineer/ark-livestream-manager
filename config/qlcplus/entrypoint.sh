@@ -65,9 +65,8 @@ sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
   </Universe>\
  </InputOutputMap>' /tmp/project.qxw
 
-echo "Loading project into QLC+ v5 via API..."
-# V5 API-call om de workspace direct te laden
-curl -s -X POST -F "file=@/tmp/project.qxw" http://localhost:9999/api/v1/project > /dev/null
+echo "Loading project into QLC+ v5 via /loadProject..."
+curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject > /dev/null
 echo "=== QLC+ v5 Project succesvol geladen! ==="
 
 wait $QLC_PID
