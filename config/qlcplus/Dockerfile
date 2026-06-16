@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Append custom CSS overrides for QLC+ v5 Web UI frame headers/titles
-RUN echo '\n/* Custom Overrides for Frame Titles */\n.frame-title {\n  display: block !important;\n  font-size: calc(var(--text-size-default) * 0.75) !important;\n  font-weight: 600 !important;\n  white-space: nowrap !important;\n  overflow: hidden !important;\n  text-overflow: ellipsis !important;\n  padding-left: 6px !important;\n  padding-right: 6px !important;\n  text-align: left !important;\n  margin-right: auto !important;\n  line-height: var(--list-item-height) !important;\n}' >> /usr/share/qlcplus/web/webaccess-v5.css
+RUN echo '\n/* Custom Overrides for Frame Titles */\n.frame-title {\n  display: block !important;\n  font-size: calc(var(--text-size-default) * 0.55) !important;\n  font-weight: 600 !important;\n  white-space: nowrap !important;\n  overflow: hidden !important;\n  text-overflow: ellipsis !important;\n  padding-left: 6px !important;\n  padding-right: 6px !important;\n  text-align: left !important;\n  margin-right: auto !important;\n  line-height: var(--list-item-height) !important;\n}' >> /usr/share/qlcplus/web/webaccess-v5.css
 
 # Create directories for fixtures and project
 RUN mkdir -p /root/.qlcplus/fixtures /QLC

@@ -658,7 +658,7 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 * **Oplossing:**
   1. In [Dockerfile](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/Dockerfile) hebben we een build-stap toegevoegd die custom CSS-overrides onderaan `/usr/share/qlcplus/web/webaccess-v5.css` toevoegt.
   2. We hebben de `.frame-title` CSS aangepast:
-     * De font-size is verkleind naar `calc(var(--text-size-default) * 0.75)` zodat deze beter past.
+     * De font-size is verkleind naar `calc(var(--text-size-default) * 0.55)` zodat deze beter past en langere titels leesbaarder blijven.
      * Automatisch afbreken is uitgeschakeld via `white-space: nowrap !important`.
      * Overlopende tekst wordt netjes afgekapt met een ellipsis (...) via `overflow: hidden !important; text-overflow: ellipsis !important;`.
      * Verticale uitlijning is geperfectioneerd met `line-height: var(--list-item-height) !important`.
