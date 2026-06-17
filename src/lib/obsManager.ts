@@ -17,8 +17,16 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
   const settings = getSettings();
   if (!settings.ledPanelEnabled) return;
 
-  const remoteHost = settings.ledHost || settings.freeShowHost || '192.168.2.20';
-  const remoteUser = settings.sshUser || 'jeffreygo';
+  const remoteHost = settings.ledHost || settings.obsHost || '192.168.2.100';
+  let remoteUser = 'jeffreygo';
+  if (remoteHost === '192.168.2.100') {
+    remoteUser = 'beamer';
+  } else if (remoteHost === '192.168.2.101') {
+    remoteUser = 'admin';
+  } else if (settings.sshUser) {
+    remoteUser = settings.sshUser;
+  }
+
   const macAddress = settings.ledPanelMac || '';
   const statusStr = isActive ? 'active' : 'inactive';
 
