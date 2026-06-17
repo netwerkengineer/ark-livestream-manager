@@ -704,5 +704,24 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
         - ./data/id_rsa:/home/nextjs/.ssh/id_rsa:ro
   ```
   Hierdoor is de werkende RSA-sleutel direct beschikbaar als default SSH identity voor de container-gebruiker `nextjs`.
-* **Shutdown Graceful Execution:**
-  Met de nieuwe sleutel-permissies stuurt `shutdown_pcs.py` nu daadwerkelijk het command `shutdown /s /f /t 0` succesvol via SSH naar de Windows PC's, zodat ze netjes en veilig afsluiten voordat de Tuya smart plug de stroom na 15 seconden uitschakelt.
+* **Shutdown Graceful Execution & Wait Time Increase:**
+  Met de nieuwe sleutel-permissies stuurt `shutdown_pcs.py` nu daadwerkelijk het command `shutdown /s /f /t 0` succesvol via SSH naar de Windows PC's. Omdat 15 seconden te kort bleek te zijn voor de Windows PC's om volledig af te sluiten (waardoor de stroom er al af ging tijdens het afsluitproces), hebben we deze wachttijd in [shutdown_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/shutdown_pcs.py) verhoogd van **15 naar 35 seconden**.
+
+---
+
+## 📺 26. LED-paneel Windows Support & Encoding Crash Fix (v26.0)
+
+### 1. SSH Gebruiker en Host Mappings
+* **Probleem:** Het start/stop-script voor het LED-paneel (`obsManager.ts`) maakte gebruik van een statische SSH-gebruiker (`settings.sshUser`) die standaard op `"admin"` stond ingesteld. Dit faalde op de OBS PC (`192.168.2.100`) omdat de gebruikersnaam daar `"beamer"` is. Bovendien viel het script terug op de Beamer PC (`freeShowHost`) in plaats van de OBS PC.
+* **Oplossing:** We hebben [obsManager.ts](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/lib/obsManager.ts) aangepast om:
+  1. De OBS PC (`settings.obsHost` / `192.168.2.100`) als fallback host te gebruiken voor het LED-paneel.
+  2. De SSH-gebruikersnaam dynamisch te mappen op basis van het IP-adres (gebruiker `beamer` voor `192.168.2.100`, gebruiker `admin` for `192.168.2.101`).
+
+### 2. Python Installatie op OBS PC
+* **Probleem:** De OBS PC had geen Python geïnstalleerd, waardoor het script `led_control.py` niet kon worden uitgevoerd.
+* **Oplossing:** We hebben Python 3.11.5 op afstand geïnstalleerd op de OBS PC via `winget` (`winget install --id Python.Python.3.11 --scope user --silent`). Dit installeert Python in de gebruikersomgeving zonder dat er UAC-prompts nodig zijn.
+
+### 3. CP1252 Emojis Encoding Crash
+* **Probleem:** Bij het testen van `led_control.py` op de OBS PC bleek dat de Bluetooth-verbinding en de overdracht van het signaal naar het LED-paneel 100% succesvol verliepen. Echter, direct na verzending crashte het script op een `UnicodeEncodeError` omdat Windows SSH-terminals gebruikmaken van de `CP1252`-codering, die de emojis `✅` (green check) en `❌` (red cross) niet kon encoderen.
+* **Oplossing:** We hebben de emoji-symbolen in [led_control.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/led_control.py) vervangen door veilige ASCII-strings (`[SUCCESS]` en `[ERROR]`), waardoor het script nu foutloos en stabiel voltooid wordt.
+
