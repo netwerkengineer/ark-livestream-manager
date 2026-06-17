@@ -24,9 +24,9 @@ def get_settings():
 
 def get_ssh_user(host_ip):
     if host_ip == "192.168.2.100":
-        return "beamer"
-    elif host_ip == "192.168.2.101":
         return "admin"
+    elif host_ip == "192.168.2.101":
+        return "beamer"
     return "jeffreygo"
 
 def get_ssh_key_args():
@@ -110,7 +110,10 @@ def startup_single_plug(plug, settings):
                 
                 if is_win:
                     print(f"[{name}] Launching FreeShow on Windows via schtasks...")
-                    run_ssh_cmd(user, host_ip, "schtasks /run /tn StartFreeShow || powershell -Command \"Start-Process FreeShow\"")
+                    res = run_ssh_cmd(user, host_ip, "schtasks /run /tn StartFreeShow")
+                    if res.returncode != 0:
+                        print(f"[{name}] Scheduled task StartFreeShow not found or failed. Running fallback Start-Process...")
+                        run_ssh_cmd(user, host_ip, "powershell -Command \"Start-Process FreeShow\"")
                 else:
                     print(f"[{name}] Launching FreeShow on Mac...")
                     run_ssh_cmd(user, host_ip, "open -a FreeShow")
@@ -119,7 +122,10 @@ def startup_single_plug(plug, settings):
                 if obs_host == host_ip or host_ip == "192.168.2.20":
                     if is_win:
                         print(f"[{name}] Launching OBS on Windows via schtasks...")
-                        run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\"")
+                        res = run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS")
+                        if res.returncode != 0:
+                            print(f"[{name}] Scheduled task StartOBS not found or failed. Running fallback Start-Process...")
+                            run_ssh_cmd(user, host_ip, "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe' -WorkingDirectory 'C:\\Program Files\\obs-studio\\bin\\64bit'\"")
                     else:
                         print(f"[{name}] Launching OBS on Mac...")
                         run_ssh_cmd(user, host_ip, "open -a OBS")
@@ -128,7 +134,10 @@ def startup_single_plug(plug, settings):
             elif host_ip == obs_host:
                 if is_win:
                     print(f"[{name}] Launching OBS on Windows via schtasks...")
-                    run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS || powershell -Command \"Start-Process obs64\"")
+                    res = run_ssh_cmd(user, host_ip, "schtasks /run /tn StartOBS")
+                    if res.returncode != 0:
+                        print(f"[{name}] Scheduled task StartOBS not found or failed. Running fallback Start-Process...")
+                        run_ssh_cmd(user, host_ip, "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe' -WorkingDirectory 'C:\\Program Files\\obs-studio\\bin\\64bit'\"")
                 else:
                     print(f"[{name}] Launching OBS on Mac...")
                     run_ssh_cmd(user, host_ip, "open -a OBS")
