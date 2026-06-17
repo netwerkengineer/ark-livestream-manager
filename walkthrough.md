@@ -673,3 +673,36 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
   1. Alle gewijzigde bestanden (QLC+ Dockerfile, entrypoint, projectbestand, docker-compose.yml en walkthrough) zijn gecommit en gepusht naar de GitHub repository `main` branch.
   2. Het lokale project is nu volledig schoon en gereed voor deployment naar de kerk-NAS met behulp van het script `deploy_nas.py`.
 
+---
+
+## 📺 25. SSH-sleutel en Autorisatie Fix voor Windows PC's en NAS (v25.0)
+
+### 1. SSH-Sleutel Mismatch Analyse
+* **Probleem:** Bij het starten van de slimme stekkers startte de OBS PC en de Beamer PC netjes op (omdat het stroomrelais via Tuya werd ingeschakeld), maar OBS/FreeShow werden niet automatisch opgestart. Het controleren via de logs liet zien dat de SSH-verbinding naar `beamer@192.168.2.100` faalde.
+* **Oorzaak:** 
+  1. De user `jeffrey` op de NAS kan verbinding maken met de Windows PC via SSH zonder wachtwoord omdat zijn persoonlijke sleutel (`id_rsa`) is geautoriseerd in Windows.
+  2. De Docker-container van `livestream-manager` en `tuya-control` gebruikten echter een speciaal gegenereerde Ed25519-sleutel (`id_ed25519`) die *niet* geautoriseerd was op de Windows PC's.
+  3. In `startup_pcs.py` dwong `get_ssh_key_args()` het gebruik van deze niet-geautoriseerde `id_ed25519` af via de `-i` vlag.
+  4. In `shutdown_pcs.py` werd geen `-i` vlag meegegeven, waardoor SSH terugviel op de standaard root-sleutels van de container. De shutdown-actie *leek* te werken omdat de PC uitging, maar in werkelijkheid faalde het SSH-commando stilletjes (stderr/stdout naar `/dev/null`) en werd na 15 seconden de stroom hard verbroken door de Tuya plug, wat de PC abrupt uitzette.
+
+### 2. Gerealiseerde Oplossingen & Aanpassingen
+* **SSH Sleutel Check Uitbreiding (`startup_pcs.py` & `shutdown_pcs.py`):**
+  We hebben `get_ssh_key_args()` in [startup_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/startup_pcs.py) aangepast en dezelfde functie toegevoegd aan [shutdown_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/shutdown_pcs.py) om zowel de geautoriseerde RSA-sleutel (`id_rsa`) als de ED25519-sleutel te controleren:
+  ```python
+  candidates = [
+      "/app/data/id_rsa",
+      os.path.join(SCRIPT_DIR, "data", "id_rsa"),
+      "/volume1/docker/ark-livestream-manager/data/id_rsa",
+      "/app/data/id_ed25519",
+      ...
+  ]
+  ```
+  De scripts kopiëren nu de eerste gevonden sleutel naar `/tmp/id_ssh_temp` met permissie `600` en gebruiken deze voor de SSH-handshake.
+* **Docker Compose Volume Mount Update (`docker-compose.yml`):**
+  We hebben de `id_rsa` sleutel gemount in de `livestream-manager` service in [docker-compose.yml](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/docker-compose.yml):
+  ```yaml
+        - ./data/id_rsa:/home/nextjs/.ssh/id_rsa:ro
+  ```
+  Hierdoor is de werkende RSA-sleutel direct beschikbaar als default SSH identity voor de container-gebruiker `nextjs`.
+* **Shutdown Graceful Execution:**
+  Met de nieuwe sleutel-permissies stuurt `shutdown_pcs.py` nu daadwerkelijk het command `shutdown /s /f /t 0` succesvol via SSH naar de Windows PC's, zodat ze netjes en veilig afsluiten voordat de Tuya smart plug de stroom na 15 seconden uitschakelt.

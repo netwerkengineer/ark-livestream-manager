@@ -29,6 +29,27 @@ def get_ssh_user(host_ip):
         return "admin"
     return "jeffreygo"
 
+def get_ssh_key_args():
+    candidates = [
+        "/app/data/id_rsa",
+        os.path.join(SCRIPT_DIR, "data", "id_rsa"),
+        "/volume1/docker/ark-livestream-manager/data/id_rsa",
+        "/app/data/id_ed25519",
+        os.path.join(SCRIPT_DIR, "data", "id_ed25519"),
+        "/volume1/docker/ark-livestream-manager/data/id_ed25519"
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            tmp_key = "/tmp/id_ssh_temp"
+            try:
+                import shutil
+                shutil.copy2(c, tmp_key)
+                os.chmod(tmp_key, 0o600)
+                return ["-i", tmp_key]
+            except Exception as e:
+                print(f"Error preparing temporary SSH key: {e}")
+    return []
+
 def detect_os(user, host_ip):
     # Returns "windows", "macos", or "linux"
     # Quick check for known static hosts to avoid SSH roundtrip & timeouts
@@ -40,21 +61,27 @@ def detect_os(user, host_ip):
     if host_ip in known_hosts:
         return known_hosts[host_ip]
 
+    ssh_key_args = get_ssh_key_args()
+
     try:
-        res = subprocess.run([
-            "ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", 
-            f"{user}@{host_ip}", "cmd.exe /c echo windows"
-        ], capture_output=True, text=True, timeout=3)
+        res = subprocess.run(
+            ["ssh"] + ssh_key_args + [
+                "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                f"{user}@{host_ip}", "cmd.exe /c echo windows"
+            ], capture_output=True, text=True, timeout=3
+        )
         if "windows" in res.stdout.lower():
             return "windows"
     except Exception:
         pass
         
     try:
-        res = subprocess.run([
-            "ssh", "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", 
-            f"{user}@{host_ip}", "uname"
-        ], capture_output=True, text=True, timeout=3)
+        res = subprocess.run(
+            ["ssh"] + ssh_key_args + [
+                "-o", "ConnectTimeout=2", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                f"{user}@{host_ip}", "uname"
+            ], capture_output=True, text=True, timeout=3
+        )
         if "darwin" in res.stdout.lower():
             return "macos"
     except Exception:
@@ -92,10 +119,13 @@ def shutdown_single_plug_sequence(plug, settings):
             cmd = "sudo /sbin/shutdown -h now"
             
         print(f"[{name}] Sending remote shutdown command ({cmd}) to host ({host_ip})...")
-        subprocess.run([
-            "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
-            f"{user}@{host_ip}", cmd
-        ])
+        ssh_key_args = get_ssh_key_args()
+        subprocess.run(
+            ["ssh"] + ssh_key_args + [
+                "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                f"{user}@{host_ip}", cmd
+            ]
+        )
         print(f"[{name}] Waiting 15 seconds for host to shut down/sleep...")
         time.sleep(15)
         
@@ -182,10 +212,13 @@ def main():
                 
             print(f"[{name}] Initiating SSH command ({cmd}) for host ({host_ip})...")
             # Run SSH in background
-            p = subprocess.Popen([
-                "ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", 
-                f"{user}@{host_ip}", cmd
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ssh_key_args = get_ssh_key_args()
+            p = subprocess.Popen(
+                ["ssh"] + ssh_key_args + [
+                    "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                    f"{user}@{host_ip}", cmd
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             running_ssh_processes.append(p)
             
     # Wait for SSH commands to initiate

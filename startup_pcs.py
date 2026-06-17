@@ -31,13 +31,16 @@ def get_ssh_user(host_ip):
 
 def get_ssh_key_args():
     candidates = [
+        "/app/data/id_rsa",
+        os.path.join(SCRIPT_DIR, "data", "id_rsa"),
+        "/volume1/docker/ark-livestream-manager/data/id_rsa",
         "/app/data/id_ed25519",
         os.path.join(SCRIPT_DIR, "data", "id_ed25519"),
         "/volume1/docker/ark-livestream-manager/data/id_ed25519"
     ]
     for c in candidates:
         if os.path.exists(c):
-            tmp_key = "/tmp/id_ed25519_temp"
+            tmp_key = "/tmp/id_ssh_temp"
             try:
                 import shutil
                 shutil.copy2(c, tmp_key)
