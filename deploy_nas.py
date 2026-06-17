@@ -126,7 +126,7 @@ def run_with_pty(cmd, description, nas_pass, socket_path):
             except:
                 break
         
-        if time.time() - start_time > 1200:
+        if time.time() - start_time > 3600:
             print("\nTimeout bereikt.")
             proc.terminate()
             break
@@ -289,7 +289,7 @@ def deploy():
         f"(pkill -f '[t]uya_http_server.py' || true) && "
         f"echo \"[DEBUG NAS] Oude Tuya server gestopt\" && "
         f"{cleanup_emulators}"
-        f"(env SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || env SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
+        f"(env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
         f"echo \"[DEBUG NAS] Docker compose gelukt\" && "
         f"docker image prune -f"
         f" 2>&1'"

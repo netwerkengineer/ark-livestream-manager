@@ -5,6 +5,8 @@ services:
     ports:
       - "8000:8000"
       - "12321:12321/udp"
+      - "9000:9000/udp"
+      - "12322:12322/udp"
     volumes:
       - /mnt/data/docker/companion:/companion
     restart: always
