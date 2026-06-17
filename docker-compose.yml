@@ -16,6 +16,7 @@ services:
       - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:${FREESHOW_PATH:-/volume1/Beamer/FreeShow}
       - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:/app/public/thumbnails
       - ./data/id_ed25519:/home/nextjs/.ssh/id_ed25519:ro
+      - ./data/id_rsa:/home/nextjs/.ssh/id_rsa:ro
     environment:
       - NODE_ENV=production
       - PORT=3005
