@@ -205,8 +205,18 @@ export default function LightsPage() {
   };
 
   const handleColorClick = async (groupTitle: string, sceneId: number, name: string) => {
-    const isActive = activeColors[groupTitle] === sceneId;
+    const oldSceneId = activeColors[groupTitle];
+    const isActive = oldSceneId === sceneId;
     try {
+      // Als er al een andere kleur aan stond in deze groep, zet die dan eerst uit in QLC+
+      if (oldSceneId !== null && oldSceneId !== undefined && oldSceneId !== sceneId) {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: oldSceneId }),
+        });
+      }
+
       const res = await fetch("/api/qlc/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
