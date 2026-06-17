@@ -24,9 +24,9 @@ def get_settings():
 
 def get_ssh_user(host_ip):
     if host_ip == "192.168.2.100":
-        return "admin"
-    elif host_ip == "192.168.2.101":
         return "beamer"
+    elif host_ip == "192.168.2.101":
+        return "admin"
     return "jeffreygo"
 
 def get_ssh_key_args():
