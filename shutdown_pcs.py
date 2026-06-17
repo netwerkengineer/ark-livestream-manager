@@ -126,8 +126,8 @@ def shutdown_single_plug_sequence(plug, settings):
                 f"{user}@{host_ip}", cmd
             ]
         )
-        print(f"[{name}] Waiting 15 seconds for host to shut down/sleep...")
-        time.sleep(15)
+        print(f"[{name}] Waiting 35 seconds for host to shut down/sleep...")
+        time.sleep(35)
         
     print(f"[{name}] Turning off plug power...")
     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id])
@@ -225,10 +225,10 @@ def main():
     for p in running_ssh_processes:
         p.wait()
         
-    # 2. Wait 15 seconds if we triggered any PC shutdowns
+    # 2. Wait 35 seconds if we triggered any PC shutdowns
     if hosts_shutting_down:
-        print("Waiting 15 seconds for remote hosts to shut down gracefully...")
-        time.sleep(15)
+        print("Waiting 35 seconds for remote hosts to shut down gracefully...")
+        time.sleep(35)
         
     # 3. Power off all plugs
     overall_success = True

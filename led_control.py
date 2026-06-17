@@ -310,7 +310,7 @@ async def main() -> None:
 
                 print("Finished transmitting payload. Closing BLE connection.")
                 await client.stop_notify(UUID_NOTIFY)
-                print("✅ Successfully updated LED panel text!")
+                print("[SUCCESS] Successfully updated LED panel text!")
                 return
         except Exception as e:
             print(f"Error during BLE communication: {e}")
@@ -318,7 +318,7 @@ async def main() -> None:
                 print("Retrying in 2.0s...")
                 await asyncio.sleep(2.0)
             else:
-                print("❌ Failed to update LED panel after maximum retries.")
+                print("[ERROR] Failed to update LED panel after maximum retries.")
                 sys.exit(1)
 
 if __name__ == "__main__":
