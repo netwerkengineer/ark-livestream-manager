@@ -230,6 +230,15 @@ def patch_project():
 
     # Save XML
     tree.write(project_path, encoding="UTF-8", xml_declaration=True)
+
+    # Post-process to insert DOCTYPE Workspace (required by QLC+)
+    with open(project_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    if len(lines) > 1 and 'DOCTYPE Workspace' not in lines[1]:
+        lines.insert(1, '<!DOCTYPE Workspace>\n')
+        with open(project_path, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+
     print("✓ Successfully saved patched QLC+ project file.")
 
 if __name__ == "__main__":
