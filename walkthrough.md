@@ -724,4 +724,10 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 ### 3. CP1252 Emojis Encoding Crash
 * **Probleem:** Bij het testen van `led_control.py` op de OBS PC bleek dat de Bluetooth-verbinding en de overdracht van het signaal naar het LED-paneel 100% succesvol verliepen. Echter, direct na verzending crashte het script op een `UnicodeEncodeError` omdat Windows SSH-terminals gebruikmaken van de `CP1252`-codering, die de emojis `✅` (green check) en `❌` (red cross) niet kon encoderen.
 * **Oplossing:** We hebben de emoji-symbolen in [led_control.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/led_control.py) vervangen door veilige ASCII-strings (`[SUCCESS]` en `[ERROR]`), waardoor het script nu foutloos en stabiel voltooid wordt.
+---
 
+## 📺 27. Color Picker Scene Mixing Fix (v27.0)
+
+### 1. Scene Mixing in QLC+
+* **Probleem:** In de live-app UI schakelde de oplichting van de actieve kleurdot netjes om wanneer een andere kleur in dezelfde groep werd geselecteerd. In QLC+ bleef de vorige kleur-scène echter *aan* staan, waardoor de fysieke lampen de oude en nieuwe kleuren met elkaar gingen mengen. De gebruiker moest handmatig twee keer op een kleur klikken om de oude status uit te zetten.
+* **Oplossing:** We hebben de kleur-klik handler `handleColorClick` in zowel [page.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/lights/page.tsx) als [LightsControl.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/LightsControl.tsx) aangepast. Wanneer er een andere kleur wordt geselecteerd binnen dezelfde groep, stuurt de app nu eerst een extra OSC-verzoek naar QLC+ om de oude actieve scène expliciet uit te schakelen (door deze nogmaals te triggeren) alvorens de nieuwe kleur in te schakelen. Hierdoor lopen de status in de app en QLC+ nu volledig synchroon.

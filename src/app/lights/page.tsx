@@ -29,10 +29,16 @@ export default function LightsPage() {
   const [fresnel3, setFresnel3] = useState(0);
   const [fresnel4, setFresnel4] = useState(0);
   const [fresnelMaster, setFresnelMaster] = useState(0);
-  const [activeColors, setActiveColors] = useState<{[groupTitle: string]: number | null}>({});
+  const [activeColors, setActiveColors] = useState<{[sceneId: number]: boolean}>({});
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
+
+  const isWsConnected = useRef(false);
+  const useFallbackHost = useRef(false);
+  const lastFaderChangeTime = useRef<{[faderId: number]: number}>({});
+  const lastWidgetClickTime = useRef<{[widgetId: number]: number}>({});
+  const lastActionTime = useRef<number>(0);
 
   const handleFadeChange = async (value: number) => {
     setActiveFade(value);
@@ -65,6 +71,140 @@ export default function LightsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // WebSocket synchronization with QLC+ Virtual Console states
+  useEffect(() => {
+    if (!settings || !settings.qlcEnabled) return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout;
+    let isMounted = true;
+
+    const WIDGET_IDS = [
+      // Main Scenes
+      1, 2, 3, 4,
+      // Chases
+      20, 24,
+      // Faders
+      81, 82, 83, 84, 85,
+      // Colors
+      ...[10, 30, 40, 50, 60, 100, 110, 120, 130].flatMap(startId => 
+        Array.from({ length: 8 }, (_, i) => startId + i)
+      )
+    ];
+
+    const connect = () => {
+      try {
+        const host = settings.qlcHost;
+        let wsHost = host;
+        if (!wsHost || wsHost === '127.0.0.1' || wsHost === 'localhost' || useFallbackHost.current) {
+          wsHost = window.location.hostname;
+        }
+        const wsUrl = `ws://${wsHost}:9999/qlcplusWS`;
+        
+        console.log(`[QLC+ WebSocket] Connecting to ${wsUrl} (fallback: ${useFallbackHost.current})...`);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log("[QLC+ WebSocket] Connected successfully!");
+          isWsConnected.current = true;
+          // Query status of all widgets to initialize state
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            WIDGET_IDS.forEach(id => {
+              ws!.send(`QLC+API|getWidgetStatus|${id}`);
+            });
+          }
+        };
+
+        ws.onmessage = (event) => {
+          if (!isMounted) return;
+          const data = event.data;
+          const parts = data.split('|');
+          if (parts[0] === 'QLC+API' && parts[1] === 'getWidgetStatus') {
+            const widgetId = parseInt(parts[2]);
+            const value = parseInt(parts[3]);
+            const isActive = value === 255;
+            const now = Date.now();
+
+            // 1. Fresnel Faders (81 - 85) with fighting prevention
+            const lastChange = lastFaderChangeTime.current[widgetId] || 0;
+            if (now - lastChange > 1200) { // 1.2s threshold
+              if (widgetId === 81) setFresnel1(value);
+              else if (widgetId === 82) setFresnel2(value);
+              else if (widgetId === 83) setFresnel3(value);
+              else if (widgetId === 84) setFresnel4(value);
+              else if (widgetId === 85) setFresnelMaster(value);
+            }
+            
+            // 2. Main Scenes (1 - 4)
+            if ([1, 2, 3, 4].includes(widgetId)) {
+              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
+              if (now - lastClick > 1000) { // 1.0s threshold
+                if (isActive) {
+                  setActiveScene(widgetId);
+                } else {
+                  setActiveScene(prev => prev === widgetId ? null : prev);
+                }
+              }
+            }
+            
+            // 3. Chases (20, 24)
+            else if ([20, 24].includes(widgetId)) {
+              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
+              if (now - lastClick > 1000) {
+                if (isActive) {
+                  setActiveChase(widgetId);
+                } else {
+                  setActiveChase(prev => prev === widgetId ? null : prev);
+                }
+              }
+            }
+            
+            // 4. Color Pickers (10 - 140)
+            else if (widgetId >= 10 && widgetId <= 140) {
+              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
+              if (now - lastClick > 1000) {
+                setActiveColors(prev => ({ ...prev, [widgetId]: isActive }));
+              }
+            }
+          }
+        };
+
+        ws.onclose = () => {
+          isWsConnected.current = false;
+          console.log("[QLC+ WebSocket] Connection closed, reconnecting in 5s...");
+          if (isMounted) {
+            reconnectTimeout = setTimeout(connect, 5000);
+          }
+        };
+
+        ws.onerror = (err) => {
+          isWsConnected.current = false;
+          console.error("[QLC+ WebSocket] Error occurred:", err);
+          // Try fallback to window.location.hostname next time
+          if (!useFallbackHost.current && host && host !== '127.0.0.1' && host !== 'localhost') {
+            console.log("[QLC+ WebSocket] Switching to fallback host (localhost/hostname)");
+            useFallbackHost.current = true;
+          }
+        };
+      } catch (err) {
+        console.error("[QLC+ WebSocket] Setup failed:", err);
+        if (isMounted) {
+          reconnectTimeout = setTimeout(connect, 5000);
+        }
+      }
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (ws) {
+        ws.close();
+      }
+      clearTimeout(reconnectTimeout);
+    };
+  }, [settings]);
+
   // Debounced sender function for range faders
   const sendOscValue = (path: string, value: number) => {
     if (debounceTimers.current[path]) {
@@ -86,6 +226,8 @@ export default function LightsPage() {
 
   const handleFaderChange = (faderNum: number | "master", valueStr: string) => {
     const val = parseInt(valueStr) || 0;
+    const faderId = faderNum === "master" ? 85 : (80 + faderNum);
+    lastFaderChangeTime.current[faderId] = Date.now();
     
     if (faderNum === "master") {
       setFresnelMaster(val);
@@ -106,7 +248,23 @@ export default function LightsPage() {
   };
 
   const handleSceneClick = async (sceneId: number, name: string) => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
     const isActive = activeScene === sceneId;
+    
+    // Optimistic UI update
+    if (isActive) {
+      setActiveScene(null);
+    } else {
+      setActiveScene(sceneId);
+      setActiveChase(null);
+      setActiveColors({});
+    }
+
+    lastWidgetClickTime.current[sceneId] = now;
+
     try {
       const res = await fetch("/api/qlc/action", {
         method: "POST",
@@ -114,14 +272,7 @@ export default function LightsPage() {
         body: JSON.stringify({ sceneId }),
       });
       if (res.ok) {
-        if (isActive) {
-          setActiveScene(null);
-          showStatus("success", `Scène uitgeschakeld: ${name}`);
-        } else {
-          setActiveScene(sceneId);
-          setActiveColors({});
-          showStatus("success", `Scène gestart: ${name}`);
-        }
+        showStatus("success", isActive ? `Scène uitgeschakeld: ${name}` : `Scène gestart: ${name}`);
       } else {
         throw new Error("Trigger failed");
       }
@@ -132,7 +283,23 @@ export default function LightsPage() {
   };
 
   const handleChaseClick = async (sceneId: number, name: string) => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
     const isActive = activeChase === sceneId;
+    
+    // Optimistic UI update
+    if (isActive) {
+      setActiveChase(null);
+    } else {
+      setActiveChase(sceneId);
+      setActiveScene(null);
+      setActiveColors({});
+    }
+
+    lastWidgetClickTime.current[sceneId] = now;
+
     try {
       const res = await fetch("/api/qlc/action", {
         method: "POST",
@@ -140,14 +307,7 @@ export default function LightsPage() {
         body: JSON.stringify({ sceneId }),
       });
       if (res.ok) {
-        if (isActive) {
-          setActiveChase(null);
-          showStatus("success", `Lichtshow uitgeschakeld: ${name}`);
-        } else {
-          setActiveChase(sceneId);
-          setActiveColors({});
-          showStatus("success", `Lichtshow gestart: ${name}`);
-        }
+        showStatus("success", isActive ? `Lichtshow uitgeschakeld: ${name}` : `Lichtshow gestart: ${name}`);
       } else {
         throw new Error("Trigger failed");
       }
@@ -157,82 +317,116 @@ export default function LightsPage() {
     }
   };
 
-  const handleBlackout = async () => {
-    // 1. Turn off active scene if any
-    if (activeScene !== null) {
+  const sendOscValueImmediate = async (path: string, value: number) => {
+    try {
       await fetch("/api/qlc/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sceneId: activeScene }),
+        body: JSON.stringify({ path, value }),
       });
+    } catch (err) {
+      console.error(`Failed to send QLC OSC immediate value for ${path}:`, err);
     }
-    // 2. Turn off active chase if any
-    if (activeChase !== null) {
-      await fetch("/api/qlc/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sceneId: activeChase }),
-      });
-    }
-    // 3. Turn off any active individual color groups
-    for (const groupTitle of Object.keys(activeColors)) {
-      const activeId = activeColors[groupTitle];
-      if (activeId !== null && activeId !== undefined) {
-        await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: activeId }),
-        });
-      }
-    }
-    // 4. Reset Fresnel faders to 0
-    setFresnel1(0);
-    sendOscValue("/ark/light/fresnel/1", 0);
-    setFresnel2(0);
-    sendOscValue("/ark/light/fresnel/2", 0);
-    setFresnel3(0);
-    sendOscValue("/ark/light/fresnel/3", 0);
-    setFresnel4(0);
-    sendOscValue("/ark/light/fresnel/4", 0);
-    setFresnelMaster(0);
-    sendOscValue("/ark/light/fresnel/master", 0);
+  };
 
-    // 5. Reset all states in UI
+  const handleBlackout = async () => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    const activeColorIds = Object.keys(activeColors)
+      .map(Number)
+      .filter(id => activeColors[id]);
+
+    // Optimistic UI update
     setActiveScene(null);
     setActiveChase(null);
     setActiveColors({});
-    showStatus("success", "BLACKOUT: Alle lichten uitgeschakeld.");
-  };
+    setFresnel1(0);
+    setFresnel2(0);
+    setFresnel3(0);
+    setFresnel4(0);
+    setFresnelMaster(0);
 
-  const handleColorClick = async (groupTitle: string, sceneId: number, name: string) => {
-    const oldSceneId = activeColors[groupTitle];
-    const isActive = oldSceneId === sceneId;
+    if (activeScene !== null) lastWidgetClickTime.current[activeScene] = now;
+    if (activeChase !== null) lastWidgetClickTime.current[activeChase] = now;
+    activeColorIds.forEach(id => {
+      lastWidgetClickTime.current[id] = now;
+    });
+
+    const faderIds = [81, 82, 83, 84, 85];
+    faderIds.forEach(id => {
+      lastFaderChangeTime.current[id] = now;
+    });
+
     try {
-      // Als er al een andere kleur aan stond in deze groep, zet die dan eerst uit in QLC+
-      if (oldSceneId !== null && oldSceneId !== undefined && oldSceneId !== sceneId) {
+      if (activeScene !== null) {
         await fetch("/api/qlc/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: oldSceneId }),
+          body: JSON.stringify({ sceneId: activeScene }),
         });
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+      if (activeChase !== null) {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: activeChase }),
+        });
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+      for (const id of activeColorIds) {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: id }),
+        });
+        await new Promise(resolve => setTimeout(resolve, 30));
       }
 
+      const paths = [
+        "/ark/light/fresnel/1",
+        "/ark/light/fresnel/2",
+        "/ark/light/fresnel/3",
+        "/ark/light/fresnel/4",
+        "/ark/light/fresnel/master"
+      ];
+
+      for (const path of paths) {
+        await sendOscValueImmediate(path, 0);
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+
+      showStatus("success", "BLACKOUT: Alle lichten uitgeschakeld.");
+    } catch (error) {
+      console.error("Failed to perform blackout:", error);
+      showStatus("error", "Fout bij uitvoeren blackout");
+    }
+  };
+
+  const handleColorClick = async (groupTitle: string, sceneId: number, name: string) => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    const isActive = !!activeColors[sceneId];
+
+    // Optimistic UI update
+    setActiveColors(prev => ({ ...prev, [sceneId]: !isActive }));
+    setActiveScene(null);
+    setActiveChase(null);
+
+    lastWidgetClickTime.current[sceneId] = now;
+
+    try {
       const res = await fetch("/api/qlc/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sceneId }),
       });
       if (res.ok) {
-        if (isActive) {
-          setActiveColors(prev => ({ ...prev, [groupTitle]: null }));
-          showStatus("success", `Kleur uitgeschakeld: ${name}`);
-        } else {
-          setActiveColors(prev => ({ ...prev, [groupTitle]: sceneId }));
-          showStatus("success", `Kleur ingeschakeld: ${name}`);
-          // Clear active main scenes since we are now custom mixing colors
-          setActiveScene(null);
-          setActiveChase(null);
-        }
+        showStatus("success", isActive ? `Kleur uitgeschakeld: ${name}` : `Kleur ingeschakeld: ${name}`);
       } else {
         throw new Error("Trigger failed");
       }
@@ -243,45 +437,99 @@ export default function LightsPage() {
   };
 
   const handleGroupOff = async (groupTitle: string, startId: number) => {
-    const activeId = activeColors[groupTitle];
-    if (activeId !== undefined && activeId !== null) {
-      try {
-        const res = await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: activeId }),
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    const activeIds: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const sceneId = startId + i;
+      if (activeColors[sceneId]) {
+        activeIds.push(sceneId);
+      }
+    }
+
+    if (activeIds.length > 0) {
+      // Optimistic UI update
+      setActiveColors(prev => {
+        const next = { ...prev };
+        activeIds.forEach(id => {
+          next[id] = false;
+          lastWidgetClickTime.current[id] = now;
         });
-        if (res.ok) {
-          setActiveColors(prev => ({ ...prev, [groupTitle]: null }));
-          showStatus("success", `Groep ${groupTitle} uitgeschakeld.`);
+        return next;
+      });
+
+      try {
+        for (const id of activeIds) {
+          await fetch("/api/qlc/action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sceneId: id }),
+          });
+          await new Promise(resolve => setTimeout(resolve, 30));
         }
+        showStatus("success", `Groep ${groupTitle} uitgeschakeld.`);
       } catch (error) {
         console.error("Failed to turn group off:", error);
         showStatus("error", `Fout bij uitschakelen groep ${groupTitle}`);
       }
     } else {
-      showStatus("error", `Geen actieve kleur bekend voor ${groupTitle}. Klik op een kleur om deze uit te zetten.`);
+      showStatus("error", `Geen actieve kleur bekend voor ${groupTitle}.`);
     }
   };
 
   const handleGroupWhite = async (groupTitle: string, startId: number) => {
-    const whiteSceneId = startId + 7; // White is offset 7
-    const isActive = activeColors[groupTitle] === whiteSceneId;
-    if (isActive) return;
-    
-    try {
-      const res = await fetch("/api/qlc/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sceneId: whiteSceneId }),
-      });
-      if (res.ok) {
-        setActiveColors(prev => ({ ...prev, [groupTitle]: whiteSceneId }));
-        // Clear active main scenes since we are now custom mixing colors
-        setActiveScene(null);
-        setActiveChase(null);
-        showStatus("success", `Groep ${groupTitle} op Wit gezet.`);
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    const whiteSceneId = startId + 7;
+    const activeIdsToTurnOff: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const sceneId = startId + i;
+      if (activeColors[sceneId]) {
+        activeIdsToTurnOff.push(sceneId);
       }
+    }
+
+    const isWhiteActive = !!activeColors[whiteSceneId];
+    if (isWhiteActive && activeIdsToTurnOff.length === 0) return;
+
+    // Optimistic UI update
+    setActiveColors(prev => {
+      const next = { ...prev };
+      activeIdsToTurnOff.forEach(id => {
+        next[id] = false;
+        lastWidgetClickTime.current[id] = now;
+      });
+      if (!isWhiteActive) {
+        next[whiteSceneId] = true;
+        lastWidgetClickTime.current[whiteSceneId] = now;
+      }
+      return next;
+    });
+
+    setActiveScene(null);
+    setActiveChase(null);
+
+    try {
+      for (const id of activeIdsToTurnOff) {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: id }),
+        });
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+      if (!isWhiteActive) {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: whiteSceneId }),
+        });
+      }
+      showStatus("success", `Groep ${groupTitle} op Wit gezet.`);
     } catch (error) {
       console.error("Failed to set group to white:", error);
       showStatus("error", `Fout bij instellen Wit voor ${groupTitle}`);
@@ -506,7 +754,7 @@ export default function LightsPage() {
                       { offset: 7, name: "White", color: "#ffffff" }
                     ].map(c => {
                       const sceneId = group.startId + c.offset;
-                      const isActive = activeColors[group.title] === sceneId;
+                      const isActive = !!activeColors[sceneId];
                       return (
                         <button 
                           key={c.offset}

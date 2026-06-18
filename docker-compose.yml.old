@@ -1,0 +1,94 @@
+services:
+  livestream-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: livestream-manager
+    restart: always
+    network_mode: host
+    extra_hosts:
+      - "livestream-manager:127.0.0.1"
+    volumes:
+      - ./data:/app/data
+      - ./companion-data:/app/companion-data
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:${FREESHOW_PATH:-/volume1/Beamer/FreeShow}
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:/app/public/thumbnails
+      - ./data/id_ed25519:/home/nextjs/.ssh/id_ed25519:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - HOSTNAME=0.0.0.0
+      - TZ=Europe/Amsterdam
+
+
+  companion:
+    image: companion-nas-v4-3-4:latest
+    container_name: companion
+    restart: always
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    volumes:
+      - ./companion-data:/companion
+    networks:
+      - ark-net
+
+  qlcplus:
+    build:
+      context: .
+      dockerfile: config/qlcplus/Dockerfile
+    container_name: qlcplus
+    restart: always
+    network_mode: host
+    environment:
+      - QLC_OUTPUT_IP=${QLC_OUTPUT_IP:-broadcast}
+    volumes:
+      - ./config/ark_church_lighting.qxw:/QLC/ark_church_lighting.qxw
+      - ./config/qlcplus/config:/root/.config/qlcplus
+
+  x32-emulator:
+    build:
+      context: ./config/emulators/x32-emulator
+      dockerfile: Dockerfile
+    container_name: x32-emulator
+    restart: always
+    ports:
+      - "10023:10023/udp"
+    networks:
+      - ark-net
+
+  atem-emulator:
+    build:
+      context: ./config/emulators/atem-emulator
+      dockerfile: Dockerfile
+    container_name: atem-emulator
+    restart: always
+    ports:
+      - "9910:9910/udp"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ATEM_MODEL=ATEM Mini Pro
+    networks:
+      - ark-net
+
+  tuya-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tuya-control
+    restart: always
+    network_mode: host
+    user: root
+    entrypoint: ["python3", "tuya_http_server.py"]
+    environment:
+      - TZ=Europe/Amsterdam
+    volumes:
+      - ./data:/app/data
+      - ${FREESHOW_PATH:-/volume1/Beamer/FreeShow}:${FREESHOW_PATH:-/volume1/Beamer/FreeShow}
+      - ${SSH_KEY_DIR:-/root/.ssh}:/root/.ssh:ro
+
+networks:
+  ark-net:
+    driver: bridge

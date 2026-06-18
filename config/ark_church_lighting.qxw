@@ -519,6 +519,166 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
+  <Function ID="100" Type="Scene" Name="KLS Spot 1: Red">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="101" Type="Scene" Name="KLS Spot 1: Green">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="102" Type="Scene" Name="KLS Spot 1: Blue">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="103" Type="Scene" Name="KLS Spot 1: Amber">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,100,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,100,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="104" Type="Scene" Name="KLS Spot 1: Magenta">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="105" Type="Scene" Name="KLS Spot 1: Cyan">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="106" Type="Scene" Name="KLS Spot 1: UV">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,100,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,100,4,0,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="107" Type="Scene" Name="KLS Spot 1: White">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="110" Type="Scene" Name="KLS Spot 2: Red">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="111" Type="Scene" Name="KLS Spot 2: Green">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,255,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,255,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="112" Type="Scene" Name="KLS Spot 2: Blue">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="113" Type="Scene" Name="KLS Spot 2: Amber">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,100,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,100,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="114" Type="Scene" Name="KLS Spot 2: Magenta">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="115" Type="Scene" Name="KLS Spot 2: Cyan">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,255,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,255,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="116" Type="Scene" Name="KLS Spot 2: UV">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,100,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,100,7,0,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="117" Type="Scene" Name="KLS Spot 2: White">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,255,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,255,7,255,8,255,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="120" Type="Scene" Name="KLS Spot 3: Red">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,0,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="121" Type="Scene" Name="KLS Spot 3: Green">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,255,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,255,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="122" Type="Scene" Name="KLS Spot 3: Blue">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="123" Type="Scene" Name="KLS Spot 3: Amber">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,100,11,0,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,100,11,0,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="124" Type="Scene" Name="KLS Spot 3: Magenta">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="125" Type="Scene" Name="KLS Spot 3: Cyan">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,255,11,255,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,255,11,255,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="126" Type="Scene" Name="KLS Spot 3: UV">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,100,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,100,10,0,11,255,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="127" Type="Scene" Name="KLS Spot 3: White">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,255,11,255,12,0,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,255,10,255,11,255,12,0,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="130" Type="Scene" Name="KLS Spot 4: Red">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,0,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,0,14,0</FixtureVal>
+  </Function>
+  <Function ID="131" Type="Scene" Name="KLS Spot 4: Green">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,255,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,255,14,0</FixtureVal>
+  </Function>
+  <Function ID="132" Type="Scene" Name="KLS Spot 4: Blue">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,255</FixtureVal>
+  </Function>
+  <Function ID="133" Type="Scene" Name="KLS Spot 4: Amber">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,100,14,0</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,100,14,0</FixtureVal>
+  </Function>
+  <Function ID="134" Type="Scene" Name="KLS Spot 4: Magenta">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,0,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,0,14,255</FixtureVal>
+  </Function>
+  <Function ID="135" Type="Scene" Name="KLS Spot 4: Cyan">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="136" Type="Scene" Name="KLS Spot 4: UV">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,100,13,0,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,100,13,0,14,255</FixtureVal>
+  </Function>
+  <Function ID="137" Type="Scene" Name="KLS Spot 4: White">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,255,13,255,14,255</FixtureVal>
+  </Function>
   <Monitor DisplayMode="0" ShowLabels="1">
    <Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1</Font>
    <ChannelStyle>0</ChannelStyle>
@@ -974,7 +1134,202 @@
      <Action>Toggle</Action>
      <Input ID="0" Universe="1" Channel="24549"/>
     </Button>
-   </SoloFrame>
+    </SoloFrame>
+    <Frame Caption="KLS Spot 1" ID="100">
+     <WindowState Visible="True" X="1100" Y="0" Width="400" Height="230"/>
+     <AllowResize>True</AllowResize>
+     <ShowHeader>True</ShowHeader>
+     <ShowEnableButton>True</ShowEnableButton>
+     <Collapsed>False</Collapsed>
+     <Disabled>False</Disabled>
+     <Button Caption="RED" ID="101">
+      <WindowState Visible="True" X="10" Y="40" Width="80" Height="80"/>
+      <Function ID="100"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="GREEN" ID="102">
+      <WindowState Visible="True" X="100" Y="40" Width="80" Height="80"/>
+      <Function ID="101"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="BLUE" ID="103">
+      <WindowState Visible="True" X="190" Y="40" Width="80" Height="80"/>
+      <Function ID="102"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="AMBER" ID="104">
+      <WindowState Visible="True" X="280" Y="40" Width="80" Height="80"/>
+      <Function ID="103"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="MAGENTA" ID="105">
+      <WindowState Visible="True" X="10" Y="130" Width="80" Height="80"/>
+      <Function ID="104"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="CYAN" ID="106">
+      <WindowState Visible="True" X="100" Y="130" Width="80" Height="80"/>
+      <Function ID="105"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="UV" ID="107">
+      <WindowState Visible="True" X="190" Y="130" Width="80" Height="80"/>
+      <Function ID="106"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="WHITE" ID="108">
+      <WindowState Visible="True" X="280" Y="130" Width="80" Height="80"/>
+      <Function ID="107"/>
+      <Action>Toggle</Action>
+     </Button>
+    </Frame>
+    <Frame Caption="KLS Spot 2" ID="110">
+     <WindowState Visible="True" X="1100" Y="235" Width="400" Height="230"/>
+     <AllowResize>True</AllowResize>
+     <ShowHeader>True</ShowHeader>
+     <ShowEnableButton>True</ShowEnableButton>
+     <Collapsed>False</Collapsed>
+     <Disabled>False</Disabled>
+     <Button Caption="RED" ID="111">
+      <WindowState Visible="True" X="10" Y="40" Width="80" Height="80"/>
+      <Function ID="110"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="GREEN" ID="112">
+      <WindowState Visible="True" X="100" Y="40" Width="80" Height="80"/>
+      <Function ID="111"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="BLUE" ID="113">
+      <WindowState Visible="True" X="190" Y="40" Width="80" Height="80"/>
+      <Function ID="112"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="AMBER" ID="114">
+      <WindowState Visible="True" X="280" Y="40" Width="80" Height="80"/>
+      <Function ID="113"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="MAGENTA" ID="115">
+      <WindowState Visible="True" X="10" Y="130" Width="80" Height="80"/>
+      <Function ID="114"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="CYAN" ID="116">
+      <WindowState Visible="True" X="100" Y="130" Width="80" Height="80"/>
+      <Function ID="115"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="UV" ID="117">
+      <WindowState Visible="True" X="190" Y="130" Width="80" Height="80"/>
+      <Function ID="116"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="WHITE" ID="118">
+      <WindowState Visible="True" X="280" Y="130" Width="80" Height="80"/>
+      <Function ID="117"/>
+      <Action>Toggle</Action>
+     </Button>
+    </Frame>
+    <Frame Caption="KLS Spot 3" ID="120">
+     <WindowState Visible="True" X="1100" Y="470" Width="400" Height="230"/>
+     <AllowResize>True</AllowResize>
+     <ShowHeader>True</ShowHeader>
+     <ShowEnableButton>True</ShowEnableButton>
+     <Collapsed>False</Collapsed>
+     <Disabled>False</Disabled>
+     <Button Caption="RED" ID="121">
+      <WindowState Visible="True" X="10" Y="40" Width="80" Height="80"/>
+      <Function ID="120"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="GREEN" ID="122">
+      <WindowState Visible="True" X="100" Y="40" Width="80" Height="80"/>
+      <Function ID="121"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="BLUE" ID="123">
+      <WindowState Visible="True" X="190" Y="40" Width="80" Height="80"/>
+      <Function ID="122"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="AMBER" ID="124">
+      <WindowState Visible="True" X="280" Y="40" Width="80" Height="80"/>
+      <Function ID="123"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="MAGENTA" ID="125">
+      <WindowState Visible="True" X="10" Y="130" Width="80" Height="80"/>
+      <Function ID="124"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="CYAN" ID="126">
+      <WindowState Visible="True" X="100" Y="130" Width="80" Height="80"/>
+      <Function ID="125"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="UV" ID="127">
+      <WindowState Visible="True" X="190" Y="130" Width="80" Height="80"/>
+      <Function ID="126"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="WHITE" ID="128">
+      <WindowState Visible="True" X="280" Y="130" Width="80" Height="80"/>
+      <Function ID="127"/>
+      <Action>Toggle</Action>
+     </Button>
+    </Frame>
+    <Frame Caption="KLS Spot 4" ID="130">
+     <WindowState Visible="True" X="1100" Y="705" Width="400" Height="230"/>
+     <AllowResize>True</AllowResize>
+     <ShowHeader>True</ShowHeader>
+     <ShowEnableButton>True</ShowEnableButton>
+     <Collapsed>False</Collapsed>
+     <Disabled>False</Disabled>
+     <Button Caption="RED" ID="131">
+      <WindowState Visible="True" X="10" Y="40" Width="80" Height="80"/>
+      <Function ID="130"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="GREEN" ID="132">
+      <WindowState Visible="True" X="100" Y="40" Width="80" Height="80"/>
+      <Function ID="131"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="BLUE" ID="133">
+      <WindowState Visible="True" X="190" Y="40" Width="80" Height="80"/>
+      <Function ID="132"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="AMBER" ID="134">
+      <WindowState Visible="True" X="280" Y="40" Width="80" Height="80"/>
+      <Function ID="133"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="MAGENTA" ID="135">
+      <WindowState Visible="True" X="10" Y="130" Width="80" Height="80"/>
+      <Function ID="134"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="CYAN" ID="136">
+      <WindowState Visible="True" X="100" Y="130" Width="80" Height="80"/>
+      <Function ID="135"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="UV" ID="137">
+      <WindowState Visible="True" X="190" Y="130" Width="80" Height="80"/>
+      <Function ID="136"/>
+      <Action>Toggle</Action>
+     </Button>
+     <Button Caption="WHITE" ID="138">
+      <WindowState Visible="True" X="280" Y="130" Width="80" Height="80"/>
+      <Function ID="137"/>
+      <Action>Toggle</Action>
+     </Button>
+    </Frame>
   </Frame>
  </VirtualConsole>
+ <SimpleDesk>
+  <Engine/>
+ </SimpleDesk>
 </Workspace>

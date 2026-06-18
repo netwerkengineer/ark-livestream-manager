@@ -83,6 +83,9 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           results.push({ ...item, status: 'missing', text: '', error: e.message });
         }
+      } else {
+        // Passthrough for other item types (media, section, youtube, etc.)
+        results.push({ ...item, status: 'passthrough', text: '' });
       }
     }
 
