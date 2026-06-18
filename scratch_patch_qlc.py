@@ -128,10 +128,10 @@ def patch_project():
     # Spot 3: X=1140, Y=10
     # Spot 4: X=1140, Y=250
     spot_coords = {
-        1: (730, 10),
-        2: (730, 250),
-        3: (1140, 10),
-        4: (1140, 250)
+        1: (746, 569),
+        2: (1158, 569),
+        3: (746, 810),
+        4: (1158, 810)
     }
 
     for spot_num, coords in spot_coords.items():
@@ -199,7 +199,7 @@ def patch_project():
     ET.SubElement(sd_app, f"{ns_prefix}BackgroundImage").text = "None"
     ET.SubElement(sd_app, f"{ns_prefix}Font").text = "Default"
 
-    ET.SubElement(sd_elem, f"{ns_prefix}WindowState", Visible="True", X="730", Y="490", Width="200", Height="175")
+    ET.SubElement(sd_elem, f"{ns_prefix}WindowState", Visible="True", X="10", Y="730", Width="200", Height="175")
     ET.SubElement(sd_elem, f"{ns_prefix}Visibility").text = "43"
 
     # Add functions to speed dial
