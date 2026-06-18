@@ -225,36 +225,35 @@ export default function FreeshowGenerator() {
         // Push parent slide first
         flatSlides.push(slide);
 
+        // Collect children from ALL sources, deduplicate
+        const childrenSeen = new Set<string>();
+        const addChild = (childId: string, extra: any = {}) => {
+          if (childrenSeen.has(childId)) return;
+          childrenSeen.add(childId);
+          flatSlides.push({
+            id: childId,
+            parentId: slide.id,
+            parentBackground: slide.background || rawSlide?.background,
+            ...extra
+          });
+        };
+
         // 1. Layout-level children (object)
-        if (slide.children && Object.keys(slide.children).length > 0) {
+        if (slide.children && typeof slide.children === 'object') {
           for (const [childId, childData] of Object.entries(slide.children)) {
-            flatSlides.push({
-              id: childId,
-              parentId: slide.id,
-              parentBackground: slide.background,
-              ...(typeof childData === 'object' ? childData : {})
-            });
+            addChild(childId, typeof childData === 'object' ? childData : {});
           }
         }
-        // 2. Root-level children array/list on raw slide (e.g. Alpha and omega)
-        else if (rawSlide && Array.isArray(rawSlide.children) && rawSlide.children.length > 0) {
-          for (const childId of rawSlide.children) {
-            flatSlides.push({
-              id: childId,
-              parentId: slide.id,
-              parentBackground: slide.background || rawSlide.background
-            });
-          }
-        }
-        // 3. Root-level children object on raw slide
-        else if (rawSlide && rawSlide.children && typeof rawSlide.children === 'object' && Object.keys(rawSlide.children).length > 0) {
-          for (const [childId, childData] of Object.entries(rawSlide.children)) {
-            flatSlides.push({
-              id: childId,
-              parentId: slide.id,
-              parentBackground: slide.background || rawSlide.background,
-              ...(typeof childData === 'object' ? childData : {})
-            });
+        // 2. Raw slide children (array or object) — NOT mutually exclusive
+        if (rawSlide?.children) {
+          if (Array.isArray(rawSlide.children)) {
+            for (const childId of rawSlide.children) {
+              addChild(childId);
+            }
+          } else if (typeof rawSlide.children === 'object') {
+            for (const [childId, childData] of Object.entries(rawSlide.children)) {
+              addChild(childId, typeof childData === 'object' ? childData : {});
+            }
           }
         }
       }

@@ -99,26 +99,59 @@ export async function generateBackup(
         try {
           await fs.access(showsDir);
           await fs.symlink(showsDir, path.join(zipFsDir, 'Shows'));
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[Backup] Shows symlink failed: ${showsDir}`, e);
+        }
 
         const biblesDir = path.join(freeshowPath, 'Bibles');
         try {
           await fs.access(biblesDir);
           await fs.symlink(biblesDir, path.join(zipFsDir, 'Bibles'));
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[Backup] Bibles symlink failed: ${biblesDir}`, e);
+        }
 
         const projectsDir = freeshowProjectPath || path.join(freeshowPath, 'projects');
         try {
           await fs.access(projectsDir);
           await fs.symlink(projectsDir, path.join(zipFsDir, 'projects'));
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[Backup] Projects symlink failed: ${projectsDir}`, e);
+        }
 
         if (includeMedia) {
-          const mediaDir = freeshowMediaPath || path.join(freeshowPath, 'Media');
+          console.log(`[Backup-File] includeMedia=true, freeshowMediaPath="${freeshowMediaPath}", freeshowPath="${freeshowPath}"`);
+          let mediaDir = freeshowMediaPath || path.join(freeshowPath, 'media');
+          
+          let mediaExists = false;
           try {
             await fs.access(mediaDir);
-            await fs.symlink(mediaDir, path.join(zipFsDir, 'Media'));
-          } catch (e) {}
+            mediaExists = true;
+            console.log(`[Backup-File] Media directory found at: ${mediaDir}`);
+          } catch (e) {
+            console.error(`[Backup-File] Media directory NOT found at: ${mediaDir}`);
+            const altMediaDir = mediaDir.endsWith('media') 
+              ? mediaDir.replace(/media$/, 'Media')
+              : mediaDir.replace(/Media$/, 'media');
+            try {
+              await fs.access(altMediaDir);
+              mediaDir = altMediaDir;
+              mediaExists = true;
+              console.log(`[Backup-File] Media found at alternative: ${altMediaDir}`);
+            } catch (e2) {
+              console.error(`[Backup-File] Media also NOT found at: ${altMediaDir}`);
+            }
+          }
+          
+          if (mediaExists) {
+            const symlinkTarget = path.join(zipFsDir, 'Media');
+            try {
+              await fs.symlink(mediaDir, symlinkTarget);
+              console.log(`[Backup-File] Media symlink created: ${symlinkTarget} -> ${mediaDir}`);
+            } catch (e) {
+              console.error(`[Backup-File] Media symlink creation failed`, e);
+            }
+          }
         }
       }
     }
@@ -273,26 +306,82 @@ export function generateStreamBackup(
           try {
             await fs.access(showsDir);
             await fs.symlink(showsDir, path.join(zipFsDir, 'Shows'));
-          } catch (e) {}
+          } catch (e) {
+            console.error(`[Backup] Shows symlink failed: ${showsDir}`, e);
+          }
 
           const biblesDir = path.join(freeshowPath, 'Bibles');
           try {
             await fs.access(biblesDir);
             await fs.symlink(biblesDir, path.join(zipFsDir, 'Bibles'));
-          } catch (e) {}
+          } catch (e) {
+            console.error(`[Backup] Bibles symlink failed: ${biblesDir}`, e);
+          }
 
           const projectsDir = freeshowProjectPath || path.join(freeshowPath, 'projects');
           try {
             await fs.access(projectsDir);
             await fs.symlink(projectsDir, path.join(zipFsDir, 'projects'));
-          } catch (e) {}
+          } catch (e) {
+            console.error(`[Backup] Projects symlink failed: ${projectsDir}`, e);
+          }
 
           if (includeMedia) {
-            const mediaDir = freeshowMediaPath || path.join(freeshowPath, 'Media');
+            console.log(`[Backup] includeMedia=true, freeshowMediaPath="${freeshowMediaPath}", freeshowPath="${freeshowPath}"`);
+            let mediaDir = freeshowMediaPath || path.join(freeshowPath, 'media');
+            
+            // Try configured/default path first, then fallback to other case
+            let mediaExists = false;
             try {
               await fs.access(mediaDir);
-              await fs.symlink(mediaDir, path.join(zipFsDir, 'Media'));
-            } catch (e) {}
+              mediaExists = true;
+              console.log(`[Backup] Media directory found at: ${mediaDir}`);
+            } catch (e) {
+              console.error(`[Backup] Media directory NOT found at: ${mediaDir}`);
+              // Try alternative case
+              const altMediaDir = mediaDir.endsWith('media') 
+                ? mediaDir.replace(/media$/, 'Media')
+                : mediaDir.replace(/Media$/, 'media');
+              try {
+                await fs.access(altMediaDir);
+                mediaDir = altMediaDir;
+                mediaExists = true;
+                console.log(`[Backup] Media directory found at alternative path: ${altMediaDir}`);
+              } catch (e2) {
+                console.error(`[Backup] Media directory also NOT found at: ${altMediaDir}`);
+              }
+            }
+            
+            if (mediaExists) {
+              // Verify it's a directory and list contents
+              try {
+                const stat = await fs.stat(mediaDir);
+                console.log(`[Backup] Media stat: isDir=${stat.isDirectory()}, size=${stat.size}`);
+                const items = await fs.readdir(mediaDir);
+                console.log(`[Backup] Media directory contains ${items.length} items: ${items.slice(0, 10).join(', ')}${items.length > 10 ? '...' : ''}`);
+              } catch (e) {
+                console.error(`[Backup] Cannot read media directory: ${mediaDir}`, e);
+              }
+              
+              // Create symlink
+              const symlinkTarget = path.join(zipFsDir, 'Media');
+              try {
+                await fs.symlink(mediaDir, symlinkTarget);
+                console.log(`[Backup] Media symlink created: ${symlinkTarget} -> ${mediaDir}`);
+                
+                // Verify symlink works
+                try {
+                  const linkItems = await fs.readdir(symlinkTarget);
+                  console.log(`[Backup] Symlink verification: can read ${linkItems.length} items through symlink`);
+                } catch (e) {
+                  console.error(`[Backup] Symlink verification FAILED: cannot read through symlink`, e);
+                }
+              } catch (e) {
+                console.error(`[Backup] Media symlink creation failed: ${mediaDir} -> ${symlinkTarget}`, e);
+              }
+            }
+          } else {
+            console.log(`[Backup] includeMedia=false, skipping media`);
           }
         }
       }

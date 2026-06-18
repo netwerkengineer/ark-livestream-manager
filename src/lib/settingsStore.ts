@@ -134,7 +134,9 @@ export interface BroadcastButton {
   midiNote?: number;
   midiOutNote?: number;
   midiOutChannel?: number;
+  requiredPermission?: string;
 }
+
 
 const DEFAULT_SETTINGS: AppSettings = {
   thumbnailSavePath: "/volume1/Beamer/FreeShow/Media",
@@ -220,7 +222,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   // Freeshow Defaults
   freeshowPath: "/volume1/Beamer/FreeShow",
   freeshowProjectPath: "/volume1/Beamer/FreeShow/projects",
-  freeshowMediaPath: "/volume1/Beamer/FreeShow/media",
+  freeshowMediaPath: "/volume1/Beamer/FreeShow/Media",
   freeshowTrashPath: "/volume1/Beamer/FreeShow/.trash",
   autoSaveToNas: false,
   defaultTemplate: "template.project",

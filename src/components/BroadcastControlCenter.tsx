@@ -23,9 +23,11 @@ interface ServiceStatus {
 
 interface BroadcastControlCenterProps {
   settings: any;
+  userRole?: string;
+  userPermissions?: string[];
 }
 
-export default function BroadcastControlCenter({ settings }: BroadcastControlCenterProps) {
+export default function BroadcastControlCenter({ settings, userRole, userPermissions = [] }: BroadcastControlCenterProps) {
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const [midiPeers, setMidiPeers] = useState<string[]>([]);
   const [plugs, setPlugs] = useState<any[]>([]);
@@ -163,7 +165,12 @@ export default function BroadcastControlCenter({ settings }: BroadcastControlCen
 
 
 
-  const actions = settings?.broadcastButtons || [];
+  const allActions = settings?.broadcastButtons || [];
+  const actions = allActions.filter((action: any) => {
+    if (!action.requiredPermission) return true; // no restriction — visible to all with control access
+    if (userRole === "admin") return true; // admins see everything
+    return userPermissions.includes(action.requiredPermission);
+  });
 
   return (
     <div className="flex flex-col gap-6">

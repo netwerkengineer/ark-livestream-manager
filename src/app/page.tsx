@@ -944,7 +944,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
         >
-          <BroadcastControlCenter settings={settings} />
+          <BroadcastControlCenter settings={settings} userRole={userRole || undefined} userPermissions={userPermissions} />
         </motion.div>
       ) : activeTab === "lights" ? (
         <motion.div
@@ -1879,6 +1879,22 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                                   <option value="slate">Grijs</option>
                                 </select>
                               </div>
+                            </div>
+
+                            <div className="input-group" style={{ marginTop: '4px' }}>
+                              <label className="input-label" style={{ fontSize: '0.7rem' }}>🔒 Vereiste Machtiging (Wie mag deze knop zien?)</label>
+                              <select className="input-field" value={btn.requiredPermission || ''} onChange={(e) => {
+                                const newBtns = [...settings.broadcastButtons];
+                                newBtns[idx].requiredPermission = e.target.value || undefined;
+                                setSettings({...settings, broadcastButtons: newBtns});
+                              }}>
+                                <option value="">Geen restrictie (iedereen met Control Center)</option>
+                                <option value="planner">Stream Planner</option>
+                                <option value="control">Control Center</option>
+                                <option value="monitor">Live Monitor</option>
+                                <option value="lights">Lichtregie</option>
+                                <option value="freeshow">FreeShow Projecten</option>
+                              </select>
                             </div>
 
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
