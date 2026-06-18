@@ -731,3 +731,15 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 ### 1. Scene Mixing in QLC+
 * **Probleem:** In de live-app UI schakelde de oplichting van de actieve kleurdot netjes om wanneer een andere kleur in dezelfde groep werd geselecteerd. In QLC+ bleef de vorige kleur-scène echter *aan* staan, waardoor de fysieke lampen de oude en nieuwe kleuren met elkaar gingen mengen. De gebruiker moest handmatig twee keer op een kleur klikken om de oude status uit te zetten.
 * **Oplossing:** We hebben de kleur-klik handler `handleColorClick` in zowel [page.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/lights/page.tsx) als [LightsControl.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/LightsControl.tsx) aangepast. Wanneer er een andere kleur wordt geselecteerd binnen dezelfde groep, stuurt de app nu eerst een extra OSC-verzoek naar QLC+ om de oude actieve scène expliciet uit te schakelen (door deze nogmaals te triggeren) alvorens de nieuwe kleur in te schakelen. Hierdoor lopen de status in de app en QLC+ nu volledig synchroon.
+
+---
+
+## 📺 28. QLC+ KLS Spot OSC Bindings & SimpleDesk Fix (v28.0)
+
+### 1. SimpleDesk-blok in QLC+ hersteld
+* **Probleem:** De SimpleDesk reageerde niet meer in QLC+ na eerdere bewerkingen van het QXW-bestand.
+* **Oplossing:** Het ontbrekende `<SimpleDesk>`-blok is handmatig hersteld en toegevoegd aan het einde van [ark_church_lighting.qxw](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/ark_church_lighting.qxw).
+
+### 2. KLS-200 individuele lampbesturing
+* **Probleem:** De kleurknoppen voor de individuele spots 1 t/m 4 deden niets via de app, hoewel de scènes/functies wel in QLC+ stonden. De widgets in Virtual Console misten de bijbehorende `<Input>`-configuratie met de OSC-kanaalhashes.
+* **Oplossing:** We hebben [scratch_patch_qlc.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/scratch_patch_qlc.py) uitgevoerd om de Virtual Console widgets programmatisch te patchen. Alle 32 kleurknoppen hebben nu correcte bindings naar de OSC-paden `/ark/light/scene/{func_id}` (met bijbehorende CRC16 hashes als kanaalnummer), en ook de Speed Dial widget (ID 99) is toegevoegd. Dit is succesvol gedeployed naar de Proxmox-omgeving en de containers zijn herstart.
