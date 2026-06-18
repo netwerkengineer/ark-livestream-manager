@@ -629,10 +629,10 @@ export default function LightsControl({ settings }: LightsControlProps) {
                 {[
                   { label: "Direct (0s)", value: 0 },
                   { label: "0.5s", value: 13 },
-                  { label: "1s", value: 25 },
-                  { label: "2s", value: 51 },
-                  { label: "3s", value: 76 },
-                  { label: "5s", value: 127 }
+                  { label: "1s", value: 26 },
+                  { label: "2s", value: 52 },
+                  { label: "3s", value: 77 },
+                  { label: "5s", value: 128 }
                 ].map(p => (
                   <button
                     key={p.value}
