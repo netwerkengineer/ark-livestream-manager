@@ -31,12 +31,7 @@ const YoutubeIcon = ({ size = 20, color = "currentColor", style = {} }: { size?:
 );
 
 export default function StreamMonitor({ settings, scheduledStreams }: StreamMonitorProps) {
-  const [obsState, setObsState] = useState<{
-    connected: boolean;
-    obsStats: any | null;
-    serviceSettings: any | null;
-    error: string | null;
-  }>({ connected: false, obsStats: null, serviceSettings: null, error: null });
+  const [obsState, setObsState] = useState<any>({ connected: false, obsStats: null, serviceSettings: null, error: null });
 
   const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [streamDetails, setStreamDetails] = useState<any>(null);
@@ -45,6 +40,7 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
   const [reconnecting, setReconnecting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [ledTestMsg, setLedTestMsg] = useState<string | null>(null);
+  const [screenshotData, setScreenshotData] = useState<string | null>(null);
 
   const [ytStats, setYtStats] = useState<{
     active: boolean;
@@ -109,11 +105,30 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
     }
   }, []);
 
+  const fetchOBSScreenshot = useCallback(async () => {
+    if (!obsState.connected) return;
+    try {
+      const res = await fetch('/api/obs/screenshot');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.imageData) {
+          setScreenshotData(data.imageData);
+        }
+      }
+    } catch (err) {}
+  }, [obsState.connected]);
+
   useEffect(() => {
     fetchOBSStatus();
     const interval = setInterval(fetchOBSStatus, 2000);
     return () => clearInterval(interval);
   }, [fetchOBSStatus]);
+
+  useEffect(() => {
+    fetchOBSScreenshot();
+    const interval = setInterval(fetchOBSScreenshot, 3000);
+    return () => clearInterval(interval);
+  }, [fetchOBSScreenshot]);
 
   // Fetch stream details when a stream is selected
   useEffect(() => {
@@ -200,6 +215,21 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
     return obsKey === streamDetails.streamKey;
   };
 
+  const executeObsAction = async (action: string, payload?: any) => {
+    try {
+      const res = await fetch('/api/obs/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload })
+      });
+      if (res.ok) {
+        fetchOBSStatus(); // trigger refresh immediately
+      }
+    } catch (err) {
+      console.error("OBS Action failed", err);
+    }
+  };
+
   const obsStats = obsState.obsStats;
   const obsConnected = obsState.connected;
 
@@ -265,11 +295,11 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
                 </div>
                 <div className="stat-box">
                   <span className="stat-label">Bitrate</span>
-                  <span className="stat-value">{obsStats?.outputBitrate || 0} kbps</span>
+                  <span className="stat-value">{obsState.bitrateKbps || 0} kbps</span>
                 </div>
                 <div className="stat-box">
                   <span className="stat-label">FPS</span>
-                  <span className="stat-value">{obsStats?.outputFps?.toFixed(1) || 0}</span>
+                  <span className="stat-value">{obsState.fps?.toFixed(1) || 0}</span>
                 </div>
                 <div className="stat-box">
                   <span className="stat-label">Dropped Frames</span>
@@ -280,6 +310,51 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
               </div>
             )}
           </section>
+
+          {obsConnected && (
+            <section className="glass-card" style={{ padding: '16px' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}><MonitorPlay size={18} /> Program Output</h2>
+              {screenshotData ? (
+                <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <img src={screenshotData} alt="OBS Program Output" style={{ width: '100%', display: 'block' }} />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                  Wachten op beelden...
+                </div>
+              )}
+            </section>
+          )}
+
+          {obsConnected && (
+            <section className="glass-card" style={{ padding: '16px' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>OBS Controls</h2>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => executeObsAction('ToggleStream')}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
+                    background: obsStats?.outputActive ? 'rgba(239, 68, 68, 0.2)' : 'rgba(74, 222, 128, 0.2)',
+                    color: obsStats?.outputActive ? '#ef4444' : '#4ade80',
+                    borderLeft: `4px solid ${obsStats?.outputActive ? '#ef4444' : '#4ade80'}`
+                  }}
+                >
+                  {obsStats?.outputActive ? 'Stop Streaming' : 'Start Streaming'}
+                </button>
+                <button
+                  onClick={() => executeObsAction('ToggleRecord')}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
+                    background: obsState.recordStatus?.outputActive ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                    color: obsState.recordStatus?.outputActive ? '#ef4444' : '#fff',
+                    borderLeft: `4px solid ${obsState.recordStatus?.outputActive ? '#ef4444' : '#fff'}`
+                  }}
+                >
+                  {obsState.recordStatus?.outputActive ? 'Stop Recording' : 'Start Recording'}
+                </button>
+              </div>
+            </section>
+          )}
 
           {obsConnected && obsStats?.outputActive && streamDetails && (
             <motion.section
@@ -380,6 +455,79 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
 
         {/* Config Check Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {obsConnected && (
+            <section className="glass-card" style={{ padding: '16px' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>Scènes & Bronnen</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {obsState.scenes?.map((scene: any) => (
+                  <div key={scene.sceneName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '6px' }}>
+                    <span style={{ fontWeight: obsState.currentProgramScene === scene.sceneName ? 'bold' : 'normal', color: obsState.currentProgramScene === scene.sceneName ? '#4ade80' : '#fff' }}>
+                      {scene.sceneName}
+                    </span>
+                    <button
+                      onClick={() => executeObsAction('SetCurrentProgramScene', { sceneName: scene.sceneName })}
+                      disabled={obsState.currentProgramScene === scene.sceneName}
+                      style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', cursor: obsState.currentProgramScene === scene.sceneName ? 'default' : 'pointer', opacity: obsState.currentProgramScene === scene.sceneName ? 0.3 : 1 }}
+                    >
+                      Zet Live
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {obsState.programSceneItems && obsState.programSceneItems.length > 0 && (
+                <div>
+                  <h3 style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '8px' }}>Bronnen (Huidige Scène)</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {obsState.programSceneItems.map((item: any) => (
+                      <button
+                        key={item.sceneItemId}
+                        onClick={() => executeObsAction('SetSceneItemEnabled', { sceneName: obsState.currentProgramScene, sceneItemId: item.sceneItemId, sceneItemEnabled: !item.sceneItemEnabled })}
+                        style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: '4px', border: 'none', background: item.sceneItemEnabled ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)', color: item.sceneItemEnabled ? '#4ade80' : 'var(--muted)', cursor: 'pointer' }}
+                      >
+                        {item.sceneItemEnabled ? '👁 ' : '⊘ '}
+                        {item.sourceName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {obsConnected && obsState.audioInputs && obsState.audioInputs.length > 0 && (
+            <section className="glass-card" style={{ padding: '16px' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>Audio Mixer</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {obsState.audioInputs.map((input: any) => (
+                  <div key={input.inputName} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '6px' }}>
+                    <div style={{ flex: 1, minWidth: '100px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {input.inputName}
+                    </div>
+                    <div style={{ width: '100px', display: 'flex', alignItems: 'center' }}>
+                      <input 
+                        type="range" 
+                        min="-100" max="0" step="0.5" 
+                        value={input.volumeDb} 
+                        onChange={(e) => executeObsAction('SetInputVolume', { inputName: input.inputName, inputVolumeDb: parseFloat(e.target.value) })}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div style={{ width: '50px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                      {input.volumeDb.toFixed(1)} dB
+                    </div>
+                    <button
+                      onClick={() => executeObsAction('ToggleInputMute', { inputName: input.inputName })}
+                      style={{ padding: '6px', borderRadius: '4px', border: 'none', background: input.inputMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.1)', color: input.inputMuted ? '#ef4444' : '#fff', cursor: 'pointer' }}
+                      title={input.inputMuted ? "Unmute" : "Mute"}
+                    >
+                      {input.inputMuted ? '🔇' : '🔊'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="glass-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
               <ShieldCheck size={20} color="var(--primary)" />

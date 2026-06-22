@@ -60,8 +60,7 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
     const pythonCmd = isWindows ? 'python' : 'python3';
     const localScriptPath = path.join(process.cwd(), 'led_control.py');
 
-    // scp command
-    const scpCmd = `scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${localScriptPath}" "${remoteUser}@[${remoteHost}]:${remoteScriptPath}"`;
+    const scpCmd = `scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${localScriptPath}" "${remoteUser}@${remoteHost}:${remoteScriptPath}"`;
     
     // ssh run command
     let runCmd = "";
@@ -98,6 +97,14 @@ interface OBSState {
   obsStats: any | null;
   serviceSettings: any | null;
   error: string | null;
+  bitrateKbps: number;
+  fps: number;
+  recordStatus: any | null;
+  scenes: any[] | null;
+  currentProgramScene: string | null;
+  currentPreviewScene: string | null;
+  programSceneItems: any[] | null;
+  audioInputs: any[] | null;
 }
 
 let obs: OBSWebSocket | null = null;
@@ -106,7 +113,18 @@ let state: OBSState = {
   obsStats: null,
   serviceSettings: null,
   error: null,
+  bitrateKbps: 0,
+  fps: 0,
+  recordStatus: null,
+  scenes: null,
+  currentProgramScene: null,
+  currentPreviewScene: null,
+  programSceneItems: null,
+  audioInputs: null
 };
+
+let previousBytes = 0;
+let previousPollTime = 0;
 let pollTimer: NodeJS.Timeout | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let initialized = false;
@@ -116,6 +134,51 @@ async function pollStats() {
   try {
     const streamStatus = await obs.call('GetStreamStatus');
     const svcSettings = await obs.call('GetStreamServiceSettings');
+    const stats = await obs.call('GetStats');
+    const recordStatus = await obs.call('GetRecordStatus');
+    const sceneList = await obs.call('GetSceneList');
+    const inputList = await obs.call('GetInputList');
+    
+    // Process audio inputs
+    const audioInputs = [];
+    for (const input of inputList.inputs) {
+      const kind = String(input.inputKind || '').toLowerCase();
+      if (kind.includes('audio') || kind.includes('mic') || kind.includes('desktop')) {
+        try {
+          const vol = await obs.call('GetInputVolume', { inputName: String(input.inputName) });
+          const mute = await obs.call('GetInputMute', { inputName: String(input.inputName) });
+          audioInputs.push({
+            inputName: input.inputName,
+            inputKind: input.inputKind,
+            volumeMul: vol.inputVolumeMul,
+            volumeDb: vol.inputVolumeDb,
+            inputMuted: mute.inputMuted
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Get current scene items
+    let programSceneItems: any[] = [];
+    if (sceneList.currentProgramSceneName) {
+      try {
+        const items = await obs.call('GetSceneItemList', { sceneName: sceneList.currentProgramSceneName });
+        programSceneItems = items.sceneItems;
+      } catch (e) {}
+    }
+
+    // Calculate bitrate
+    const now = Date.now();
+    let bitrateKbps = 0;
+    if (previousPollTime > 0 && streamStatus.outputActive) {
+      const timeDiff = (now - previousPollTime) / 1000;
+      const bytesDiff = (streamStatus.outputBytes as number) - previousBytes;
+      if (bytesDiff > 0 && timeDiff > 0) {
+        bitrateKbps = Math.round((bytesDiff * 8) / 1000 / timeDiff);
+      }
+    }
+    previousBytes = (streamStatus.outputBytes as number) || 0;
+    previousPollTime = now;
     
     const isActive = streamStatus.outputActive === true;
     if (lastStreamActiveState !== isActive) {
@@ -125,6 +188,15 @@ async function pollStats() {
 
     state.obsStats = streamStatus;
     state.serviceSettings = svcSettings;
+    state.fps = stats.activeFps as number;
+    state.bitrateKbps = bitrateKbps;
+    state.recordStatus = recordStatus;
+    state.scenes = sceneList.scenes;
+    state.currentProgramScene = sceneList.currentProgramSceneName;
+    state.currentPreviewScene = sceneList.currentPreviewSceneName;
+    state.programSceneItems = programSceneItems;
+    state.audioInputs = audioInputs;
+    
     state.error = null;
   } catch (err: any) {
     console.error('[OBS Manager] Poll error:', err.message);
@@ -163,6 +235,10 @@ async function connect() {
       console.log('[OBS Manager] Connection closed. Scheduling reconnect...');
       state.connected = false;
       state.obsStats = null;
+      state.recordStatus = null;
+      state.scenes = null;
+      state.audioInputs = null;
+      state.programSceneItems = null;
       if (pollTimer) clearInterval(pollTimer);
       scheduleReconnect();
     });
@@ -215,4 +291,9 @@ export async function setOBSStreamConfig(config: {
   // Refresh cached settings
   state.serviceSettings = await obs.call('GetStreamServiceSettings');
   return state.serviceSettings;
+}
+
+/** Expose OBS instance for advanced specific API routes */
+export function getOBSClient() {
+  return obs;
 }

@@ -497,8 +497,13 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
   dataFile.project.shows.splice(startIdx, 0, ...showsToPush);
 }
 
-export async function serializeProject(dataJson: any): Promise<Uint8Array> {
+export async function serializeProject(dataJson: any, generatorState?: any): Promise<Uint8Array> {
   const zip = new JSZip();
   zip.file("data.json", JSON.stringify(dataJson));
+  
+  if (generatorState) {
+    zip.file("livestream_state.json", JSON.stringify(generatorState, null, 2));
+  }
+  
   return await zip.generateAsync({ type: "uint8array" });
 }

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { translations } from '@/lib/translations';
-
+import JSZip from 'jszip';
 export default function FreeshowGenerator() {
   const [lang, setLang] = useState<string>('nl');
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,6 @@ export default function FreeshowGenerator() {
   const [newPassword, setNewPassword] = useState('');
 
   const [showHelp, setShowHelp] = useState(false);
-
   const [items, setItems] = useState<any[]>([]); // De gecombineerde lijst voor weergave
   const [manualItems, setManualItems] = useState<any[]>([]);
   const [templateItems, setTemplateItems] = useState<any[]>([]);
@@ -560,33 +559,29 @@ export default function FreeshowGenerator() {
     let combined: any[] = [];
     
     activeTemplate.forEach(tItem => {
-      // Voeg items toe die VÓÓR deze sectie moeten komen
-      if (tItem.type === 'section') {
-        const beforeMatches = manualItems.filter(m => m.targetSection === tItem.title && m.insertPosition === 'before');
-        combined.push(...beforeMatches);
-      }
+      // Voeg items toe die VÓÓR dit item moeten komen
+      const beforeMatches = manualItems.filter(m => m.targetSection === tItem.title && m.insertPosition === 'before');
+      combined.push(...beforeMatches);
       
       combined.push(tItem);
       
-      // Voeg items toe die NÁ deze sectie moeten komen
-      if (tItem.type === 'section') {
-        const afterMatches = manualItems.filter(m => m.targetSection === tItem.title && m.insertPosition === 'after');
-        combined.push(...afterMatches);
-      }
+      // Voeg items toe die NÁ dit item moeten komen
+      const afterMatches = manualItems.filter(m => m.targetSection === tItem.title && m.insertPosition === 'after');
+      combined.push(...afterMatches);
     });
 
     const remaining = manualItems.filter(m => 
       !m.targetSection || 
       m.targetSection === t('bottom') || 
-      !activeTemplate.some(t => t.type === 'section' && t.title === m.targetSection)
+      !activeTemplate.some(t => t.title === m.targetSection)
     );
     
     setItems([...combined, ...remaining]);
   }, [manualItems, templateItems, useTemplate]);
 
-  // Dynamische lijst van alle beschikbare secties voor de dropdown
+  // Dynamische lijst van alle beschikbare secties/items voor de dropdown
   const allAvailableSections = React.useMemo(() => {
-    const fromTemplate = templateItems.filter(i => i.type === 'section' && !i.isRemoved).map(i => i.title);
+    const fromTemplate = templateItems.filter(i => !i.isRemoved).map(i => i.title);
     const fromManual = manualItems.filter(i => i.type === 'section').map(i => i.title);
     return Array.from(new Set([t('bottom'), ...fromTemplate, ...fromManual]));
   }, [templateItems, manualItems]);
@@ -680,7 +675,9 @@ export default function FreeshowGenerator() {
       if (data.success) {
         setAvailableProjects(data.projects);
       }
-    } catch(e) {}
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const toggleSettings = () => {
@@ -1452,6 +1449,98 @@ export default function FreeshowGenerator() {
     }
   };
 
+  const loadProjectFromServer = async (filename: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/projects/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+      const data = await res.json();
+      if (data.success && data.state) {
+        setManualItems(data.state.manualItems || []);
+        if (data.state.projectName) setProjectName(data.state.projectName);
+        setUseTemplate(false);
+        setStatus("Project ingeladen!");
+      } else {
+        alert("Kan status niet inladen: " + (data.error || "Bestand is geen opgeslagen livestream project"));
+      }
+    } catch(e) {
+      alert("Fout bij laden: " + e);
+    }
+    setLoading(false);
+  };
+
+  const deleteProjectFromServer = async (filename: string) => {
+    if (!confirm(`Weet je zeker dat je het project '${filename}' wilt verwijderen van de server?`)) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(`Project verwijderd!`);
+        fetchProjects();
+      } else {
+        alert("Kon project niet verwijderen: " + data.error);
+      }
+    } catch (e) {
+      alert("Fout bij verwijderen: " + e);
+    }
+    setLoading(false);
+  };
+
+  const moveManualItemUp = (id: string) => {
+    setManualItems(prev => {
+      const idx = prev.findIndex(item => item.id === id);
+      if (idx > 0) {
+        const newItems = [...prev];
+        [newItems[idx - 1], newItems[idx]] = [newItems[idx], newItems[idx - 1]];
+        return newItems;
+      }
+      return prev;
+    });
+  };
+
+  const moveManualItemDown = (id: string) => {
+    setManualItems(prev => {
+      const idx = prev.findIndex(item => item.id === id);
+      if (idx !== -1 && idx < prev.length - 1) {
+        const newItems = [...prev];
+        [newItems[idx], newItems[idx + 1]] = [newItems[idx + 1], newItems[idx]];
+        return newItems;
+      }
+      return prev;
+    });
+  };
+
+  const loadProjectFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setLoading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const stateFile = zip.file("livestream_state.json");
+      if (!stateFile) {
+        alert("Dit .project bestand bevat geen 'livestream_state.json'. Het is waarschijnlijk niet met deze tool opgeslagen, of met een oudere versie.");
+        setLoading(false);
+        return;
+      }
+      const stateJsonStr = await stateFile.async("string");
+      const stateObj = JSON.parse(stateJsonStr);
+      setManualItems(stateObj.manualItems || []);
+      if (stateObj.projectName) setProjectName(stateObj.projectName);
+      setUseTemplate(false);
+      setStatus("Project succesvol ingeladen!");
+    } catch(err) {
+      alert("Fout bij uitlezen ZIP-bestand: " + err);
+    }
+    setLoading(false);
+    e.target.value = ""; // reset
+  };
+
   const handleGenerate = async (mode: 'download' | 'nas') => {
     setLoading(true);
     setStatus(mode === 'nas' ? t('saving_on_server') : t('project_creating'));
@@ -1475,7 +1564,6 @@ export default function FreeshowGenerator() {
           setStatus(t('project_save_success'));
           // Reset after success
           setTimeout(() => {
-            setManualItems([]);
             setStatus('');
           }, 3000);
         } else {
@@ -1495,7 +1583,6 @@ export default function FreeshowGenerator() {
         setStatus(t('project_download_success'));
         // Reset na succes
         setTimeout(() => {
-          setManualItems([]);
           setStatus('');
         }, 3000);
       }
@@ -1637,6 +1724,7 @@ export default function FreeshowGenerator() {
             </div>
           )}
 
+
       {showHelp && (
         <div className="glass-card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b', padding: '1.5rem 2rem' }}>
           <button onClick={() => setShowHelp(false)} style={{ float: 'right', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem', opacity: 0.5 }}>✕</button>
@@ -1690,6 +1778,24 @@ export default function FreeshowGenerator() {
                   className="input" style={{ height: '350px', fontFamily: 'monospace' }}
                   value={draftItem.text} onChange={e => updateItemText(draftItem.id, e.target.value)}
                 />
+                <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>Sectie verplaatsen</label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <select 
+                      className="input" style={{ marginBottom: 0, fontSize: '0.85rem', flex: 2 }} 
+                      value={draftItem.targetSection || t('bottom')} 
+                      onChange={e => setDraftItem({ ...draftItem, targetSection: e.target.value })}
+                    >
+                      {allAvailableSections.map(s => <option key={s} value={s}>{getTranslatedTitle(s)}</option>)}
+                    </select>
+                    <button 
+                      className="button" style={{ flex: 1, padding: '0.5rem', fontSize: '0.7rem', background: draftItem.insertPosition === 'before' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: draftItem.insertPosition === 'before' ? '#020617' : '#ffffff' }}
+                      onClick={() => setDraftItem({ ...draftItem, insertPosition: draftItem.insertPosition === 'before' ? 'after' : 'before' })}
+                    >
+                      {draftItem.insertPosition === 'before' ? t('before') : t('after')}
+                    </button>
+                  </div>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={cancelDraft}>{t('annuleren')}</button>
@@ -2050,6 +2156,51 @@ export default function FreeshowGenerator() {
                 </div>
                 {status && <p style={{ textAlign: 'center', marginTop: '1rem', color: 'var(--primary)' }}>{status}</p>}
               </div>
+
+              <div className="glass-card" style={{ marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📂</span> Bestaand Project Inladen
+                  </h2>
+                  <button onClick={() => fetchProjects()} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '0.9rem', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Lijst met projecten vernieuwen">↻</button>
+                </div>
+                
+                <p style={{ opacity: 0.8, fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.4' }}>
+                  Kies een opgeslagen project van de NAS om de liederen weer in te laden.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '0.5rem' }} className="custom-scrollbar">
+                  {availableProjects.length === 0 ? (
+                    <div style={{ padding: '1rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', opacity: 0.7, fontSize: '0.85rem' }}>
+                      Geen projecten gevonden.
+                    </div>
+                  ) : (
+                    availableProjects.map(proj => (
+                      <div key={proj} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.8rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.85rem', wordBreak: 'break-all', paddingRight: '0.5rem' }}>{proj}</span>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                          <button className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.4)', color: 'var(--primary)' }} onClick={() => loadProjectFromServer(proj)}>
+                            Inladen
+                          </button>
+                          <button className="button" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171' }} onClick={() => deleteProjectFromServer(proj)} title="Verwijder project">
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.8rem' }}>
+                  <p style={{ fontSize: '0.8rem', marginBottom: '0.4rem', opacity: 0.8 }}>Of upload een lokaal <strong>.project</strong> bestand:</p>
+                  <input 
+                    type="file" 
+                    accept=".project,.zip" 
+                    onChange={loadProjectFromFile} 
+                    style={{ display: 'block', width: '100%', padding: '0.5rem', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '6px', cursor: 'pointer' }} 
+                  />
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -2061,9 +2212,17 @@ export default function FreeshowGenerator() {
               {selectedIds.length > 0 && (
                 <button 
                   onClick={removeSelected}
-                  style={{ fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '3px 8px', borderRadius: '4px' }}
+                  style={{ fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   🗑️ {t('clear_selected')} ({selectedIds.length})
+                </button>
+              )}
+              {items.length > 0 && (
+                <button 
+                  onClick={() => { if(confirm('Weet je zeker dat je de lijst wilt wissen?')) setManualItems([]); }}
+                  style={{ fontSize: '0.7rem', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  🗑️ Alles wissen
                 </button>
               )}
             </div>
@@ -2122,14 +2281,13 @@ export default function FreeshowGenerator() {
                 {item.type !== 'section' && (
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     {item.source !== 'template' && (
-                       <button onClick={() => setDraftItem(item)} style={{ padding: '2px', opacity: 0.6 }} title={t('edit_staging')}>✏️</button>
+                       <>
+                         <button onClick={() => moveManualItemUp(item.id)} style={{ padding: '2px 6px', margin: '0 2px', opacity: 0.9, cursor: 'pointer', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: '#fff', fontSize: '0.8rem' }} title="Omhoog verplaatsen">↑</button>
+                         <button onClick={() => moveManualItemDown(item.id)} style={{ padding: '2px 6px', margin: '0 2px', opacity: 0.9, cursor: 'pointer', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: '#fff', fontSize: '0.8rem' }} title="Omlaag verplaatsen">↓</button>
+                         <button onClick={() => setDraftItem(item)} style={{ padding: '2px', opacity: 0.6, cursor: 'pointer', background: 'transparent', border: 'none', marginLeft: '6px' }} title={t('edit_staging')}>✏️</button>
+                       </>
                     )}
-                    {item.source === 'template' && item.isMedia && (
-                      <button onClick={() => { setMediaAttachTarget(item.id); setMediaTargetMode('swap'); setInputType('media'); }} style={{ padding: '2px', opacity: 0.6 }} title={t('swap_media')}>📸</button>
-                    )}
-                    {item.source === 'template' && (
-                      <button onClick={() => { setMediaAttachTarget(item.id); setMediaTargetMode('append'); setInputType('media'); }} style={{ padding: '2px', opacity: 0.6 }} title={t('add_extra_slide')}>🎬+</button>
-                    )}
+
                     <button 
                       onClick={() => {
                         if (item.source === 'template') {

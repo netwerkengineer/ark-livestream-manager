@@ -30,7 +30,10 @@ export default function LightsControl({ settings }: LightsControlProps) {
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
+  const [activeStrobe, setActiveStrobe] = useState<number | null>(null);
+  const [strobeSpeed, setStrobeSpeed] = useState<number>(128);
 
+  const eventSourceRef = useRef<EventSource | null>(null);
   const isWsConnected = useRef(false);
   const useFallbackHost = useRef(false);
   const lastFaderChangeTime = useRef<{[faderId: number]: number}>({});
@@ -56,53 +59,38 @@ export default function LightsControl({ settings }: LightsControlProps) {
   useEffect(() => {
     if (!settings || !settings.qlcEnabled) return;
 
-    let ws: WebSocket | null = null;
+    let es: EventSource | null = null;
     let reconnectTimeout: NodeJS.Timeout;
     let isMounted = true;
 
-    const WIDGET_IDS = [
-      // Main Scenes
-      1, 2, 3, 4,
-      // Chases
-      20, 24,
-      // Faders
-      81, 82, 83, 84, 85,
-      // Colors
-      ...[10, 30, 40, 50, 60, 100, 110, 120, 130].flatMap(startId => 
-        Array.from({ length: 8 }, (_, i) => startId + i)
-      )
-    ];
-
     const connect = () => {
       try {
-        const host = settings.qlcHost;
-        let wsHost = host;
-        if (!wsHost || wsHost === '127.0.0.1' || wsHost === 'localhost' || useFallbackHost.current) {
-          wsHost = window.location.hostname;
-        }
-        const wsUrl = `ws://${wsHost}:9999/qlcplusWS`;
-        
-        console.log(`[QLC+ WebSocket Components] Connecting to ${wsUrl} (fallback: ${useFallbackHost.current})...`);
-        ws = new WebSocket(wsUrl);
+        console.log("[QLC+ SSE] Connecting to /api/qlc/stream...");
+        es = new EventSource('/api/qlc/stream');
+        eventSourceRef.current = es;
 
-        ws.onopen = () => {
-          console.log("[QLC+ WebSocket Components] Connected successfully!");
+        es.onopen = () => {
+          console.log("[QLC+ SSE] Connected successfully!");
           isWsConnected.current = true;
-          // Query status of all widgets to initialize state
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            WIDGET_IDS.forEach(id => {
-              ws!.send(`QLC+API|getWidgetStatus|${id}`);
-            });
-          }
         };
 
-        ws.onmessage = (event) => {
+        es.onmessage = (event) => {
           if (!isMounted) return;
           const data = event.data;
           const parts = data.split('|');
+          
+          let widgetId: number | null = null;
+          let value: number | null = null;
+
           if (parts[0] === 'QLC+API' && parts[1] === 'getWidgetStatus') {
-            const widgetId = parseInt(parts[2]);
-            const value = parseInt(parts[3]);
+            widgetId = parseInt(parts[2]);
+            value = parseInt(parts[3]);
+          } else if (parts.length >= 3 && !isNaN(parseInt(parts[0])) && (parts[1] === 'BUTTON' || parts[1] === 'SLIDER')) {
+            widgetId = parseInt(parts[0]);
+            value = parseInt(parts[2]);
+          }
+
+          if (widgetId !== null && value !== null && !isNaN(widgetId) && !isNaN(value)) {
             const isActive = value === 255;
             const now = Date.now();
 
@@ -118,58 +106,54 @@ export default function LightsControl({ settings }: LightsControlProps) {
             
             // 2. Main Scenes (1 - 4)
             if ([1, 2, 3, 4].includes(widgetId)) {
-              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
-              if (now - lastClick > 1000) { // 1.0s threshold
-                if (isActive) {
-                  setActiveScene(widgetId);
-                } else {
-                  setActiveScene(prev => prev === widgetId ? null : prev);
-                }
-              }
+              if (isActive) setActiveScene(widgetId);
+              else setActiveScene(prev => prev === widgetId ? null : prev);
             }
-            
+
             // 3. Chases (20, 24)
             else if ([20, 24].includes(widgetId)) {
-              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
-              if (now - lastClick > 1000) {
-                if (isActive) {
-                  setActiveChase(widgetId);
-                } else {
-                  setActiveChase(prev => prev === widgetId ? null : prev);
+              if (isActive) setActiveChase(widgetId);
+              else setActiveChase(prev => prev === widgetId ? null : prev);
+            }
+
+            // 4. Color Pickers (11 - 138)
+            else if (widgetId >= 11 && widgetId <= 138) {
+              const lastDigit = widgetId % 10;
+              if (lastDigit >= 1 && lastDigit <= 8) {
+                const startId = widgetId - lastDigit;
+                if ([10, 30, 40, 50, 60, 100, 110, 120, 130].includes(startId)) {
+                  const sceneId = widgetId - 1;
+                  setActiveColors(prev => ({ ...prev, [sceneId]: isActive }));
                 }
               }
             }
-            
-            // 4. Color Pickers (10 - 140)
-            else if (widgetId >= 10 && widgetId <= 140) {
-              const lastClick = lastWidgetClickTime.current[widgetId] || 0;
-              if (now - lastClick > 1000) {
-                setActiveColors(prev => ({ ...prev, [widgetId]: isActive }));
+
+            // 5. Strobe Buttons (201 - 208)
+            else if (widgetId >= 201 && widgetId <= 208) {
+              const sceneId = widgetId + 10; // button 201 -> chaser 211
+              if (isActive) {
+                setActiveStrobe(sceneId);
+              } else {
+                setActiveStrobe(prev => prev === sceneId ? null : prev);
               }
             }
           }
         };
 
-        ws.onclose = () => {
+        es.onerror = (err) => {
           isWsConnected.current = false;
-          console.log("[QLC+ WebSocket Components] Connection closed, reconnecting in 5s...");
+          es?.close();
+          eventSourceRef.current = null;
+          console.error("[QLC+ SSE] Error occurred:", err);
           if (isMounted) {
+            clearTimeout(reconnectTimeout);
             reconnectTimeout = setTimeout(connect, 5000);
           }
         };
-
-        ws.onerror = (err) => {
-          isWsConnected.current = false;
-          console.error("[QLC+ WebSocket Components] Error occurred:", err);
-          // Try fallback to window.location.hostname next time
-          if (!useFallbackHost.current && host && host !== '127.0.0.1' && host !== 'localhost') {
-            console.log("[QLC+ WebSocket Components] Switching to fallback host (localhost/hostname)");
-            useFallbackHost.current = true;
-          }
-        };
       } catch (err) {
-        console.error("[QLC+ WebSocket Components] Setup failed:", err);
+        console.error("[QLC+ SSE] Setup failed:", err);
         if (isMounted) {
+          clearTimeout(reconnectTimeout);
           reconnectTimeout = setTimeout(connect, 5000);
         }
       }
@@ -179,9 +163,10 @@ export default function LightsControl({ settings }: LightsControlProps) {
 
     return () => {
       isMounted = false;
-      if (ws) {
-        ws.close();
+      if (es) {
+        es.close();
       }
+      eventSourceRef.current = null;
       clearTimeout(reconnectTimeout);
     };
   }, [settings]);
@@ -313,62 +298,45 @@ export default function LightsControl({ settings }: LightsControlProps) {
     }
   };
 
-  const handleBlackout = async () => {
+  const handleResetAll = async () => {
     const now = Date.now();
     if (now - lastActionTime.current < 400) return;
     lastActionTime.current = now;
 
-    const activeColorIds = Object.keys(activeColors)
-      .map(Number)
-      .filter(id => activeColors[id]);
-
-    // Optimistic UI update
-    setActiveScene(null);
-    setActiveChase(null);
-    setActiveColors({});
-    setFresnel1(0);
-    setFresnel2(0);
-    setFresnel3(0);
-    setFresnel4(0);
-    setFresnelMaster(0);
-
-    if (activeScene !== null) lastWidgetClickTime.current[activeScene] = now;
-    if (activeChase !== null) lastWidgetClickTime.current[activeChase] = now;
-    activeColorIds.forEach(id => {
-      lastWidgetClickTime.current[id] = now;
+    // Collect all ACTIVE widget IDs from our local state
+    const activeWidgetIds: number[] = [];
+    if (activeScene !== null) activeWidgetIds.push(activeScene);
+    if (activeChase !== null) activeWidgetIds.push(activeChase);
+    if (activeStrobe !== null) activeWidgetIds.push(activeStrobe);
+    
+    Object.keys(activeColors).forEach(idStr => {
+      const id = Number(idStr);
+      if (activeColors[id]) {
+        activeWidgetIds.push(id);
+      }
     });
 
+    // 1. Send toggle commands ONLY to the widgets that are currently ON
+    for (const widgetId of activeWidgetIds) {
+      try {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId: widgetId }),
+        });
+        await new Promise(resolve => setTimeout(resolve, 40)); // Small delay
+      } catch (err) {
+        console.error(`Failed to toggle off widget ${widgetId}:`, err);
+      }
+    }
+
+    // 2. Set all Fresnel dimmers to 0 (OSC)
     const faderIds = [81, 82, 83, 84, 85];
     faderIds.forEach(id => {
       lastFaderChangeTime.current[id] = now;
     });
 
     try {
-      if (activeScene !== null) {
-        await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: activeScene }),
-        });
-        await new Promise(resolve => setTimeout(resolve, 30));
-      }
-      if (activeChase !== null) {
-        await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: activeChase }),
-        });
-        await new Promise(resolve => setTimeout(resolve, 30));
-      }
-      for (const id of activeColorIds) {
-        await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: id }),
-        });
-        await new Promise(resolve => setTimeout(resolve, 30));
-      }
-
       const paths = [
         "/ark/light/fresnel/1",
         "/ark/light/fresnel/2",
@@ -376,16 +344,110 @@ export default function LightsControl({ settings }: LightsControlProps) {
         "/ark/light/fresnel/4",
         "/ark/light/fresnel/master"
       ];
-
       for (const path of paths) {
         await sendOscValueImmediate(path, 0);
         await new Promise(resolve => setTimeout(resolve, 30));
       }
+    } catch (err) {
+      console.error("Failed to reset Fresnel dimmers:", err);
+    }
 
-      showStatus("success", "BLACKOUT: Alle lichten uitgeschakeld.");
+    // 3. Clear all React states optimistically
+    setActiveScene(null);
+    setActiveChase(null);
+    setActiveColors({});
+    setActiveStrobe(null);
+    setFresnel1(0);
+    setFresnel2(0);
+    setFresnel3(0);
+    setFresnel4(0);
+    setFresnelMaster(0);
+
+    // Register widget click times to prevent immediate WebSocket overwrite
+    if (activeScene !== null) lastWidgetClickTime.current[activeScene] = now;
+    if (activeChase !== null) lastWidgetClickTime.current[activeChase] = now;
+    if (activeStrobe !== null) lastWidgetClickTime.current[activeStrobe] = now;
+    Object.keys(activeColors).forEach(id => {
+      lastWidgetClickTime.current[Number(id)] = now;
+    });
+
+    showStatus("success", "Alles gereset: alle lichten en functies uitgeschakeld.");
+  };
+
+  const handleBlackout = async () => {
+    await handleResetAll();
+  };
+
+  const handleStrobeClick = async (sceneId: number, name: string) => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    const isActive = activeStrobe === sceneId;
+
+    // Optimistic UI update
+    if (isActive) {
+      setActiveStrobe(null);
+    } else {
+      setActiveStrobe(sceneId);
+    }
+
+    lastWidgetClickTime.current[sceneId] = now;
+
+    try {
+      const res = await fetch("/api/qlc/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sceneId }),
+      });
+      if (res.ok) {
+        showStatus("success", isActive ? "Stroboscoop uitgeschakeld" : `Stroboscoop gestart: ${name}`);
+      } else {
+        throw new Error("Trigger failed");
+      }
     } catch (error) {
-      console.error("Failed to perform blackout:", error);
-      showStatus("error", "Fout bij uitvoeren blackout");
+      console.error("Failed to trigger strobe action:", error);
+      showStatus("error", "Fout bij aanpassen stroboscoop");
+    }
+  };
+
+  const handleStrobeOff = async () => {
+    const now = Date.now();
+    if (now - lastActionTime.current < 400) return;
+    lastActionTime.current = now;
+
+    if (activeStrobe !== null) {
+      const sceneId = activeStrobe;
+      setActiveStrobe(null);
+      lastWidgetClickTime.current[sceneId] = now;
+
+      try {
+        await fetch("/api/qlc/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sceneId }),
+        });
+        showStatus("success", "Stroboscoop uitgeschakeld");
+      } catch (error) {
+        console.error("Failed to turn strobe off:", error);
+      }
+    }
+  };
+
+  const handleStrobeSpeedChange = async (sliderValue: number) => {
+    setStrobeSpeed(sliderValue);
+    
+    // Invert slider value: 0 is Slow (Duration=2000ms, QLC receives 255), 255 is Fast (Duration=20ms, QLC receives 0)
+    const qlcValue = 255 - sliderValue;
+
+    try {
+      await fetch("/api/qlc/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: "/ark/light/strobe/speed", value: qlcValue }),
+      });
+    } catch (err) {
+      console.error("Failed to set strobe speed:", err);
     }
   };
 
@@ -552,13 +614,16 @@ export default function LightsControl({ settings }: LightsControlProps) {
           <section className="glass-card">
             <div className="color-group-header" style={{ marginBottom: "20px" }}>
               <h3 className="section-title" style={{ margin: 0 }}><Sun size={18} className="text-orange" /> Hoofdscènes & Lichtshows</h3>
-              <button 
-                onClick={handleBlackout} 
-                className="btn-group-action off"
-                style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}
-              >
-                BLACKOUT (ALL OFF)
-              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+
+                <button 
+                  onClick={handleBlackout} 
+                  className="btn-group-action off"
+                  style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}
+                >
+                  BLACKOUT (ALL OFF)
+                </button>
+              </div>
             </div>
             
             <p className="group-label">Hoofdscènes</p>
@@ -717,6 +782,94 @@ export default function LightsControl({ settings }: LightsControlProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Strobe Control Card */}
+          <section className="glass-card" style={{ marginTop: "24px" }}>
+            <div className="color-group-header" style={{ marginBottom: "20px" }}>
+              <h3 className="section-title" style={{ margin: 0 }}>
+                <Zap size={18} className="text-yellow" /> Stroboscoop (Flitser)
+              </h3>
+              <button 
+                onClick={handleStrobeOff} 
+                className="btn-group-action off"
+                disabled={activeStrobe === null}
+                style={{ 
+                  padding: '6px 12px', 
+                  fontSize: '0.75rem', 
+                  borderColor: 'rgba(239, 68, 68, 0.4)', 
+                  color: activeStrobe === null ? 'var(--muted)' : '#fca5a5',
+                  opacity: activeStrobe === null ? 0.5 : 1,
+                  cursor: activeStrobe === null ? 'not-allowed' : 'pointer'
+                }}
+              >
+                STROBE UIT
+              </button>
+            </div>
+
+            <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginBottom: "16px", lineHeight: "1.4" }}>
+              Kies een kleur om de stroboscoop te starten. Gebruik de schuifregelaar om de flitssnelheid aan te passen.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "24px", alignItems: "center" }}>
+              {/* Color Buttons */}
+              <div className="colors-row" style={{ flexWrap: "wrap", gap: "10px" }}>
+                {[
+                  { id: 211, name: "Red", color: "#ef4444" },
+                  { id: 212, name: "Green", color: "#22c55e" },
+                  { id: 213, name: "Blue", color: "#3b82f6" },
+                  { id: 214, name: "Amber", color: "#f59e0b" },
+                  { id: 215, name: "Magenta", color: "#d946ef" },
+                  { id: 216, name: "Cyan", color: "#06b6d4" },
+                  { id: 217, name: "UV", color: "#8b5cf6" },
+                  { id: 218, name: "White", color: "#ffffff" }
+                ].map(c => {
+                  const isActive = activeStrobe === c.id;
+                  return (
+                    <button 
+                      key={c.id}
+                      onClick={() => handleStrobeClick(c.id, c.name)}
+                      title={`Stroboscoop ${c.name}`}
+                      style={{ 
+                        backgroundColor: c.color,
+                        boxShadow: isActive ? `0 0 16px 4px ${c.color}` : 'none',
+                        border: isActive ? '3px solid #fff' : '2px solid rgba(0,0,0,0.3)',
+                        transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                        zIndex: isActive ? 2 : 1,
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer'
+                      }}
+                      className={`color-dot-btn ${isActive ? 'active' : ''}`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Speed Slider */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--muted)" }}>
+                  <span>Snelheid: {strobeSpeed}</span>
+                  <span>
+                    {strobeSpeed < 50 ? "Langzaam" : strobeSpeed < 150 ? "Normaal" : strobeSpeed < 230 ? "Snel" : "Extreem"}
+                  </span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="255" 
+                  value={strobeSpeed} 
+                  onChange={(e) => handleStrobeSpeedChange(Number(e.target.value))}
+                  style={{ 
+                    width: "100%", 
+                    accentColor: "var(--primary)",
+                    cursor: "pointer"
+                  }}
+                />
+              </div>
             </div>
           </section>
         </div>

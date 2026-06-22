@@ -123,7 +123,15 @@ export async function POST(req: NextRequest) {
     });
 
     const dataJson = await createFreeShowProject(date, showsList, projectName, DEFAULT_TEMPLATE_PATH, useTemplate);
-    const serialized = await serializeProject(dataJson);
+    
+    // Save state so we can re-import later
+    const generatorState = {
+      manualItems: items,
+      projectName: projectName,
+      useTemplate: useTemplate
+    };
+    
+    const serialized = await serializeProject(dataJson, generatorState);
     const filename = projectName ? `${projectName.replace(/[\\/:*?"<>|]/g, '-')}.project` : `Project-${date.replace(/\//g, '-')}.project`;
 
     // Save directly to NAS if requested
