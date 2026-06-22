@@ -32,3 +32,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const authSession = await isAuthorized(req, undefined, "freeshow");
+    if (!authSession) {
+      return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+    }
+
+    const url = new URL(req.url);
+    const filename = url.searchParams.get('filename');
+
+    if (!filename || !filename.endsWith('.project') || filename.includes('/') || filename.includes('\\')) {
+      return NextResponse.json({ error: "Ongeldige bestandsnaam" }, { status: 400 });
+    }
+
+    const settings = getSettings() as any;
+    const projectDir = settings.freeshowProjectPath || '';
+
+    if (!projectDir) {
+      return NextResponse.json({ error: "Project directory niet geconfigureerd" }, { status: 400 });
+    }
+
+    const filePath = path.join(projectDir, filename);
+
+    try {
+      await fs.unlink(filePath);
+      return NextResponse.json({ success: true });
+    } catch (err) {
+      return NextResponse.json({ error: "Bestand kon niet worden verwijderd" }, { status: 500 });
+    }
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
