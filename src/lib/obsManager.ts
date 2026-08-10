@@ -8,10 +8,72 @@
 
 import OBSWebSocket from 'obs-websocket-js';
 import { getSettings } from './settingsStore';
+import { youtubeFetch } from './tokenStore';
 import { exec } from 'child_process';
 import path from 'path';
 
 let lastStreamActiveState: boolean | null = null;
+let youtubePollTimer: NodeJS.Timeout | null = null;
+
+export async function checkYouTubeLiveState(): Promise<boolean | null> {
+  try {
+    const res = await youtubeFetch(
+      "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=status&broadcastStatus=active&mine=true",
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.items && Array.isArray(data.items)) {
+      const isLive = data.items.some(
+        (item: any) => item.status?.lifeCycleStatus === "live" || item.status?.lifeCycleStatus === "liveStarting"
+      );
+      return isLive;
+    }
+    return false;
+  } catch (err: any) {
+    console.error("[YouTube Live Check] Error fetching live status:", err?.message || err);
+    return null;
+  }
+}
+
+export async function updateLedState(isOBSActive: boolean) {
+  const settings = getSettings();
+  if (!settings.ledPanelEnabled) return;
+
+  const triggerSource = settings.ledTriggerSource || "youtube";
+
+  if (triggerSource === "obs") {
+    if (lastStreamActiveState !== isOBSActive) {
+      lastStreamActiveState = isOBSActive;
+      handleStreamStateChange(isOBSActive);
+    }
+  } else {
+    // YouTube trigger mode
+    const isYtLive = await checkYouTubeLiveState();
+    if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
+      lastStreamActiveState = isYtLive;
+      console.log(`[LED Control] YouTube status changed to: ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}. Updating LED Sign Board...`);
+      handleStreamStateChange(isYtLive);
+    }
+  }
+}
+
+function initYouTubeLivePolling() {
+  if (youtubePollTimer) return;
+  youtubePollTimer = setInterval(async () => {
+    const settings = getSettings();
+    if (!settings.ledPanelEnabled) return;
+    const triggerSource = settings.ledTriggerSource || "youtube";
+    if (triggerSource === "youtube") {
+      const isYtLive = await checkYouTubeLiveState();
+      if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
+        lastStreamActiveState = isYtLive;
+        console.log(`[LED Control] Periodic YouTube check: status changed to ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}`);
+        handleStreamStateChange(isYtLive);
+      }
+    }
+  }, 10000);
+}
 
 export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null) {
   const settings = getSettings();
@@ -181,10 +243,7 @@ async function pollStats() {
     previousPollTime = now;
     
     const isActive = streamStatus.outputActive === true;
-    if (lastStreamActiveState !== isActive) {
-      lastStreamActiveState = isActive;
-      handleStreamStateChange(isActive);
-    }
+    await updateLedState(isActive);
 
     state.obsStats = streamStatus;
     state.serviceSettings = svcSettings;
@@ -259,6 +318,7 @@ async function connect() {
 
 /** Initialize the OBS manager (call once on server start) */
 export function ensureOBSManager() {
+  initYouTubeLivePolling();
   if (!initialized) {
     initialized = true;
     connect();

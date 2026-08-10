@@ -85,6 +85,14 @@ export default function LightsControl({ settings }: LightsControlProps) {
           if (parts[0] === 'QLC+API' && parts[1] === 'getWidgetStatus') {
             widgetId = parseInt(parts[2]);
             value = parseInt(parts[3]);
+          } else if (parts[0] === '99' && parts[1] === 'SPEED_STATE') {
+            const ms = parseInt(parts[2]);
+            const ratio = ms / 10000;
+            const presets = [0.0, 0.05, 0.10, 0.20, 0.30, 0.50];
+            const closest = presets.reduce((prev, curr) =>
+              Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
+            );
+            setActiveFade(closest);
           } else if (parts.length >= 3 && !isNaN(parseInt(parts[0])) && (parts[1] === 'BUTTON' || parts[1] === 'SLIDER')) {
             widgetId = parseInt(parts[0]);
             value = parseInt(parts[2]);
@@ -692,12 +700,12 @@ export default function LightsControl({ settings }: LightsControlProps) {
               <p className="group-label" style={{ marginBottom: "12px", color: "var(--muted)" }}>Overgangstijd (Fade)</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {[
-                  { label: "Direct (0s)", value: 0 },
-                  { label: "0.5s", value: 13 },
-                  { label: "1s", value: 26 },
-                  { label: "2s", value: 52 },
-                  { label: "3s", value: 77 },
-                  { label: "5s", value: 128 }
+                  { label: "Direct (0s)", value: 0.0 },
+                  { label: "0.5s", value: 0.05 },
+                  { label: "1s", value: 0.10 },
+                  { label: "2s", value: 0.20 },
+                  { label: "3s", value: 0.30 },
+                  { label: "5s", value: 0.50 }
                 ].map(p => (
                   <button
                     key={p.value}
