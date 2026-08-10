@@ -791,6 +791,10 @@
     <AbsoluteValue Minimum="0" Maximum="10000">
      <Input ID="0" Universe="1" Channel="30906" />
     </AbsoluteValue>
+    <Function FadeIn="1" FadeOut="1" Duration="0">0</Function>
+    <Function FadeIn="1" FadeOut="1" Duration="0">1</Function>
+    <Function FadeIn="1" FadeOut="1" Duration="0">2</Function>
+    <Function FadeIn="1" FadeOut="1" Duration="0">3</Function>
     <Function FadeIn="1" FadeOut="1" Duration="0">10</Function>
     <Function FadeIn="1" FadeOut="1" Duration="0">11</Function>
     <Function FadeIn="1" FadeOut="1" Duration="0">12</Function>

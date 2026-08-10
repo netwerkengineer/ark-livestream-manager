@@ -438,7 +438,20 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const getGroupedStreams = () => {
     const groups: any[] = [];
     scheduledStreams.forEach((stream: any) => {
-      const timeStr = new Date(stream.startTime).toISOString().slice(0, 16);
+      let timeStr = "";
+      try {
+        if (stream.startTime) {
+          const date = new Date(stream.startTime);
+          if (!isNaN(date.getTime())) {
+            timeStr = date.toISOString().slice(0, 16);
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing stream startTime:", stream.startTime, e);
+      }
+      if (!timeStr) {
+        timeStr = "Onbekende tijd";
+      }
       const key = `${stream.title}_${timeStr}`;
       const existing = groups.find((g: any) => g.key === key);
       

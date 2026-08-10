@@ -91,6 +91,7 @@ export interface AppSettings {
   ledActiveColor?: string;
   ledInactiveText?: string;
   ledInactiveColor?: string;
+  ledTriggerSource?: "youtube" | "obs";
 }
 
 export interface LocalUser {
@@ -246,7 +247,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ledActiveText: "LIVESTREAM ON AIR",
   ledActiveColor: "#ff0000",
   ledInactiveText: "LIVESTREAM OFFLINE",
-  ledInactiveColor: "#00ff00"
+  ledInactiveColor: "#00ff00",
+  ledTriggerSource: "youtube"
 };
 
 // Ensure data directory exists
