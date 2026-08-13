@@ -142,40 +142,50 @@ export function parseStyleString(styleStr: string): React.CSSProperties {
 }
 
 export function getAlignmentStyle(alignValue: any): React.CSSProperties {
-  let horizontal = 'center';
-  let vertical = 'center';
-
-  if (typeof alignValue === 'string') {
-    const parts = alignValue.toLowerCase().split(' ');
-    if (parts.length === 2) {
-      vertical = parts[0];
-      horizontal = parts[1];
-    } else if (parts.length === 1) {
-      horizontal = parts[0];
-    }
-  } else if (typeof alignValue === 'object' && alignValue !== null) {
-    horizontal = alignValue.horizontal || 'center';
-    vertical = alignValue.vertical || 'center';
+  if (!alignValue) {
+    return {
+      justifyContent: 'center',
+      textAlign: 'center',
+      alignItems: 'center'
+    };
   }
 
-  const hMap: Record<string, string> = {
-    left: 'flex-start',
-    center: 'center',
-    right: 'flex-end'
-  };
+  const val = String(alignValue).toLowerCase().trim();
 
-  const vMap: Record<string, string> = {
-    top: 'flex-start',
-    middle: 'center',
-    center: 'center',
-    bottom: 'flex-end'
-  };
+  if (val === 'left') {
+    return {
+      justifyContent: 'flex-start',
+      textAlign: 'left',
+      alignItems: 'flex-start'
+    };
+  }
 
+  if (val === 'right') {
+    return {
+      justifyContent: 'flex-end',
+      textAlign: 'right',
+      alignItems: 'flex-end'
+    };
+  }
+
+  if (val === 'center') {
+    return {
+      justifyContent: 'center',
+      textAlign: 'center',
+      alignItems: 'center'
+    };
+  }
+
+  // If align contains CSS (e.g. "justify-content: flex-end;"), parse it
+  if (val.includes(':')) {
+    return parseStyleString(alignValue);
+  }
+
+  // Default fallback
   return {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: vMap[vertical] || 'center',
-    alignItems: hMap[horizontal] || 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    alignItems: 'center'
   };
 }
 
@@ -255,11 +265,15 @@ export function applyTemplateToSlide(slide: any, template: any): any {
 }
 
 export function getContainerStyle(item: any): React.CSSProperties {
+  const styleObj = item.style ? parseStyleString(item.style) : {};
+  const alignObj = getAlignmentStyle(item.align);
+
   return {
-    width: '100%',
-    height: '100%',
-    ...getAlignmentStyle(item.align),
-    ...(item.style ? parseStyleString(item.style) : {})
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    ...styleObj,
+    ...alignObj
   };
 }
 
