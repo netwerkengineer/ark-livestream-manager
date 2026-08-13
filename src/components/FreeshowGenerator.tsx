@@ -6,6 +6,7 @@ import PreviewModal from './freeshow/PreviewModal';
 import SectionInput from './freeshow/SectionInput';
 import SongInput from './freeshow/SongInput';
 import PresentationInput from './freeshow/PresentationInput';
+import BibleInput from './freeshow/BibleInput';
 import {
   BIBLE_BOOKS,
   resolveMediaPath,
@@ -1583,22 +1584,21 @@ export default function FreeshowGenerator() {
                   )}
 
                 {inputType === 'bible' && (
-                  <div>
-                    <select className="input" value={bibleTranslation} onChange={e => setBibleTranslation(e.target.value)}>
-                       {catalog.bibles.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <select className="input" value={bibleBook} onChange={e => setBibleBook(e.target.value)} style={{ flex: 2 }}>
-                        {BIBLE_BOOKS.map(b => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                      <input type="number" className="input" value={bibleChapter} onChange={e => setBibleChapter(e.target.value)} style={{ flex: 1 }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <input type="number" className="input" value={bibleVerseStart} onChange={e => setBibleVerseStart(e.target.value)} placeholder={t('from')} />
-                      <input type="number" className="input" value={bibleVerseEnd} onChange={e => setBibleVerseEnd(e.target.value)} placeholder={t('to')} />
-                    </div>
-                    <button className="button" style={{ width: '100%', marginTop: '0.5rem' }} onClick={adHocAddBible} title={t('add_bible_to_staging')}>+ {t('add_bible')}</button>
-                  </div>
+                  <BibleInput
+                    bibleTranslation={bibleTranslation}
+                    setBibleTranslation={setBibleTranslation}
+                    bibleBook={bibleBook}
+                    setBibleBook={setBibleBook}
+                    bibleChapter={bibleChapter}
+                    setBibleChapter={setBibleChapter}
+                    bibleVerseStart={bibleVerseStart}
+                    setBibleVerseStart={setBibleVerseStart}
+                    bibleVerseEnd={bibleVerseEnd}
+                    setBibleVerseEnd={setBibleVerseEnd}
+                    availableBibles={catalog.bibles}
+                    onAddBible={adHocAddBible}
+                    t={t}
+                  />
                 )}
                 {inputType === 'section' && (
                   <SectionInput
