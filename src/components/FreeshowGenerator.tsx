@@ -7,6 +7,7 @@ import SectionInput from './freeshow/SectionInput';
 import SongInput from './freeshow/SongInput';
 import PresentationInput from './freeshow/PresentationInput';
 import BibleInput from './freeshow/BibleInput';
+import YoutubeInput from './freeshow/YoutubeInput';
 import {
   BIBLE_BOOKS,
   resolveMediaPath,
@@ -1687,12 +1688,13 @@ export default function FreeshowGenerator() {
 
 
                 {inputType === 'youtube' && (
-                  <div>
-                    <input type="text" className="input" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder={t('youtube_placeholder')} />
-                    <button className="button" style={{ width: '100%', marginTop: '0.5rem' }} onClick={adHocAddYoutube} disabled={isDownloading}>
-                      {isDownloading ? t('downloading') : `⬇️ ${t('download_add')}`}
-                    </button>
-                  </div>
+                  <YoutubeInput
+                    youtubeUrl={youtubeUrl}
+                    setYoutubeUrl={setYoutubeUrl}
+                    isDownloading={isDownloading}
+                    onAddYoutube={adHocAddYoutube}
+                    t={t}
+                  />
                 )}
 
                 <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
