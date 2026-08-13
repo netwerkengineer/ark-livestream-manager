@@ -225,6 +225,9 @@ export function applyTemplateToSlideItem(slideItem: any, templateItem: any): any
 export function applyTemplateToSlide(slide: any, template: any): any {
   const merged = { ...slide };
 
+  // If no template, return slide as-is
+  if (!template) return merged;
+
   // Apply background
   if (template.background) {
     merged.background = template.background;
