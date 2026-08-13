@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
 import { isAuthorized } from "@/lib/authHelper";
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 export const dynamic = 'force-dynamic';
@@ -83,9 +83,15 @@ export async function POST(req: NextRequest) {
         // Execute in background (fire and forget)
         const logPath = path.join(dataDir, 'sync_cleanup.log');
         fs.appendFileSync(logPath, `\n--- DIRECT SCRIPTURE DELETION TRIGGERED AT ${new Date().toISOString()} ---\n`);
-        
-        exec(`python3 "${scriptPath}" --delete-all-scriptures --local-only >> "${logPath}" 2>&1 &`);
-        
+
+        // Use spawn with array args to prevent command injection
+        const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+        const child = spawn('python3', [scriptPath, '--delete-all-scriptures', '--local-only'], {
+          detached: true,
+          stdio: ['ignore', logStream, logStream]
+        });
+        child.unref();
+
         success = true;
         responseText = 'OK: Scripture deletion started via direct execution (no daemon)';
         console.log(`[WIPE SCRIPTURES API] Direct execution started: ${scriptPath}`);

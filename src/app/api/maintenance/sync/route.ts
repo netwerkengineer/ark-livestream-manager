@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings } from '@/lib/settingsStore';
 import { isAuthorized } from "@/lib/authHelper";
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 export const dynamic = 'force-dynamic';
@@ -83,9 +83,15 @@ export async function POST(req: NextRequest) {
         // Execute in background (fire and forget)
         const logPath = path.join(dataDir, 'sync_cleanup.log');
         fs.appendFileSync(logPath, `\n--- DIRECT MANUAL SYNC TRIGGERED AT ${new Date().toISOString()} ---\n`);
-        
-        exec(`python3 "${scriptPath}" >> "${logPath}" 2>&1 &`);
-        
+
+        // Use spawn with array args to prevent command injection
+        const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+        const child = spawn('python3', [scriptPath], {
+          detached: true,
+          stdio: ['ignore', logStream, logStream]
+        });
+        child.unref();
+
         success = true;
         responseText = 'OK: Manual sync started via direct execution (no daemon)';
         console.log(`[SYNC API] Direct execution started: ${scriptPath}`);
