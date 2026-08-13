@@ -2,6 +2,21 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { translations } from '@/lib/translations';
 import JSZip from 'jszip';
+import {
+  BIBLE_BOOKS,
+  resolveMediaPath,
+  getOrderedSlides,
+  getSlideBackground,
+  parseStyleString,
+  getAlignmentStyle,
+  applyTemplateToSlideItem,
+  applyTemplateToSlide,
+  getContainerStyle,
+  getLineStyle,
+  getSegmentStyle,
+  getTranslatedTitle,
+  getCategoryDisplayName
+} from '@/lib/freeshowUtils';
 export default function FreeshowGenerator() {
   const [lang, setLang] = useState<string>('nl');
   const [loading, setLoading] = useState(false);
