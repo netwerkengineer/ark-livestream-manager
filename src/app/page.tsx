@@ -2242,3 +2242,4 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       </AnimatePresence>
     </div>
   );
+}
