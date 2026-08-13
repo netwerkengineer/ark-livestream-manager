@@ -63,14 +63,15 @@ export function getOrderedSlides(show: any): any[] {
 }
 
 export function getSlideBackground(show: any, slideIdx: number): any {
-  if (!show?.slides || !show?.layouts) return null;
+  if (!show?.slides) return null;
 
-  const slideIds = Object.keys(show.slides);
-  if (slideIdx < 0 || slideIdx >= slideIds.length) return null;
+  const ordered = getOrderedSlides(show);
+  if (slideIdx < 0 || slideIdx >= ordered.length) return null;
 
-  const slideId = slideIds[slideIdx];
-  const slide = show.slides[slideId];
+  const layoutSlide = ordered[slideIdx];
+  if (!layoutSlide) return null;
 
+  const slide = show.slides[layoutSlide.id];
   return slide?.background || null;
 }
 
