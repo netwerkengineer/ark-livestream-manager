@@ -251,5 +251,5 @@ Proprietary - Ark Church
 
 ## Credits
 
-Ontwikkeld door Jeffrey van de Go voor Ark Church
+Ontwikkeld door Jeffrey Go voor Ark Church
 Versie 2.2.0 (Augustus 2026)
