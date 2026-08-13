@@ -42,6 +42,10 @@ import {
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 import LightsControl from "@/components/LightsControl";
 import BackupRestoreSettings from "@/components/BackupRestoreSettings";
+import SetupWizard from "@/components/SetupWizard";
+import LoginScreen from "@/components/LoginScreen";
+import DashboardHeader from "@/components/DashboardHeader";
+import TabNavigation from "@/components/TabNavigation";
 
 
 export default function Dashboard() {
@@ -97,9 +101,6 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [userRole, setUserRole] = useState<"admin" | "operator" | null>(null);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [operatorUsernameInput, setOperatorUsernameInput] = useState("");
-  const [operatorPasswordInput, setOperatorPasswordInput] = useState("");
-  const [authError, setAuthError] = useState("");
 
   // User Management States
   const [localUsers, setLocalUsers] = useState<any[]>([]);
@@ -248,29 +249,6 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         .catch(err => console.error("Error fetching projects for template list:", err));
     }
   }, [showSettings, settingsTab]);
-
-  const handleOperatorLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-    try {
-      const res = await fetch("/api/auth/operator", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: operatorUsernameInput,
-          password: operatorPasswordInput
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAuthError(data.error || "Aanmelden mislukt");
-        return;
-      }
-      window.location.reload();
-    } catch (err: any) {
-      setAuthError("Netwerkfout tijdens het inloggen");
-    }
-  };
 
   const handleOperatorLogout = async () => {
     try {
@@ -498,137 +476,25 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // 3. Show local operator login screen if not authenticated
   if (!isOperatorAuthenticated) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '32px' }}>
-        <div className="logo-container">
-          <img src="/logo.png" alt="Ark Church Logo" />
-          <h1 className="gradient-text">Ark Church Operations Center</h1>
-        </div>
-        <form onSubmit={handleOperatorLogin} className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', width: '450px' }}>
-          <h2 style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '10px' }}>Aanmelden</h2>
-          
-          <div className="input-group">
-            <label className="input-label">Gebruikersnaam</label>
-            <input 
-              type="text"
-              className="input-field" 
-              required
-              value={operatorUsernameInput}
-              onChange={(e) => setOperatorUsernameInput(e.target.value)}
-              placeholder="Gebruikersnaam"
-            />
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Wachtwoord</label>
-            <input 
-              type="password"
-              className="input-field" 
-              required
-              value={operatorPasswordInput}
-              onChange={(e) => setOperatorPasswordInput(e.target.value)}
-              placeholder="••••••••"
-            />
-          </div>
-
-          {authError && (
-            <p style={{ color: '#f87171', fontSize: '0.85rem', textAlign: 'center' }}>
-              {authError}
-            </p>
-          )}
-
-          <button 
-            type="submit"
-            className="btn-primary" 
-            style={{ width: '100%', marginTop: '10px' }}
-          >
-            Aanmelden
-          </button>
-        </form>
-      </div>
-    );
+    return <LoginScreen onLogin={() => window.location.reload()} />;
   }
 
   return (
     <div className="dashboard-container">
-      <div className="logo-container" style={{ marginBottom: '48px', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src="/logo.png" alt="Ark Church Logo" />
-          <div>
-            <h1 style={{ fontSize: '1.5rem', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>Ark Church <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'normal', color: 'var(--primary)' }}>v2.2.0</span></h1>
-            <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Operations Center</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={() => setShowHelp(true)} className="btn-outline" style={{ padding: '10px' }} title="Help">
-            <HelpCircle size={20} />
-          </button>
-          {userRole === "admin" && (
-            <button onClick={() => setShowSettings(true)} className="btn-outline" style={{ padding: '10px' }} title="Instellingen">
-              <Settings size={20} />
-            </button>
-          )}
-          <div style={{ borderLeft: '1px solid var(--card-border)', height: '24px', margin: '0 8px' }}></div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600 }}>
-              {userRole === "admin" ? "ADMINISTRATOR" : "OPERATOR"}
-            </p>
-            <p style={{ fontSize: '0.9rem' }}>{currentUser}</p>
-          </div>
-          <button onClick={handleOperatorLogout} className="btn-outline" style={{ padding: '10px' }} title="Afmelden Operator">
-            <User size={20} />
-          </button>
-        </div>
-      </div>
-      
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        {(userRole === "admin" || userPermissions.includes("planner")) && (
-          <button 
-            onClick={() => setActiveTab("planner")} 
-            className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
-            style={{ padding: '8px 20px', borderRadius: '12px' }}
-          >
-            <Calendar size={18} /> Stream Planner
-          </button>
-        )}
-        {(userRole === "admin" || userPermissions.includes("control")) && (
-          <button 
-            onClick={() => setActiveTab("control")} 
-            className={activeTab === "control" ? "btn-primary" : "btn-outline"}
-            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
-          >
-            <ShieldAlert size={18} /> Control Center
-          </button>
-        )}
-        {(userRole === "admin" || userPermissions.includes("monitor")) && (
-          <button 
-            onClick={() => setActiveTab("monitor")} 
-            className={activeTab === "monitor" ? "btn-primary" : "btn-outline"}
-            style={{ padding: '8px 20px', borderRadius: '12px' }}
-          >
-            <Activity size={18} /> Live Monitor
-          </button>
-        )}
-        {(userRole === "admin" || userPermissions.includes("lights")) && (
-          <button 
-            onClick={() => setActiveTab("lights")} 
-            className={activeTab === "lights" ? "btn-primary" : "btn-outline"}
-            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "lights" ? 'none' : '1px solid rgba(249, 115, 22, 0.4)' }}
-          >
-            <Sun size={18} /> Lichtregie
-          </button>
-        )}
-        {(userRole === "admin" || userPermissions.includes("freeshow")) && (
-          <button 
-            onClick={() => setActiveTab("freeshow")} 
-            className={activeTab === "freeshow" ? "btn-primary" : "btn-outline"}
-            style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "freeshow" ? 'none' : '1px solid rgba(56, 189, 248, 0.4)' }}
-          >
-            <Layers size={18} /> FreeShow Projecten
-          </button>
-        )}
-      </div>
+      <DashboardHeader
+        userRole={userRole}
+        currentUser={currentUser}
+        onShowHelp={() => setShowHelp(true)}
+        onShowSettings={() => setShowSettings(true)}
+        onLogout={handleOperatorLogout}
+      />
+
+      <TabNavigation
+        activeTab={activeTab}
+        userRole={userRole}
+        userPermissions={userPermissions}
+        onTabChange={setActiveTab}
+      />
 
       <AnimatePresence mode="wait">
         {activeTab === "planner" ? (
@@ -2376,124 +2242,3 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
       </AnimatePresence>
     </div>
   );
-}
-
-function SetupWizard({ settings: initialSettings, onComplete }: { settings: any, onComplete: (s: any) => void }) {
-  const [step, setStep] = useState(1);
-  const [settings, setSettings] = useState(initialSettings);
-  const [loading, setLoading] = useState(false);
-
-  const handleNext = () => setStep(s => s + 1);
-  const handleBack = () => setStep(s => s - 1);
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...settings, isSetupComplete: true })
-      });
-      if (res.ok) {
-        onComplete(await res.json());
-      } else {
-        const errorData = await res.json();
-        alert("Fout bij opslaan: " + (errorData.error || res.statusText));
-      }
-    } catch (err: any) {
-      alert("Netwerkfout: " + err.message);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#020617', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-    >
-      <div className="glass-card" style={{ width: '100%', maxWidth: '600px', padding: '48px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <img src="/logo.png" alt="Logo" style={{ width: '64px', margin: '0 auto 24px' }} />
-          <h1 className="gradient-text" style={{ fontSize: '2rem' }}>Welkom bij Ark Church</h1>
-          <p style={{ color: 'var(--muted)', marginTop: '8px' }}>Laten we het Operations Center configureren voor je NAS.</p>
-        </div>
-
-        {/* Steps Progress */}
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          {[1,2,3].map(s => (
-            <div key={s} style={{ width: '40px', height: '4px', borderRadius: '2px', background: step >= s ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }}></div>
-          ))}
-        </div>
-
-        <div style={{ minHeight: '300px' }}>
-          {step === 1 && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Key size={24} color="var(--primary)" />
-                <h2 style={{ fontSize: '1.25rem' }}>YouTube API Instellingen</h2>
-              </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Voer de Google OAuth Client ID en Secret in van de Google Cloud Console.</p>
-              <div className="input-group">
-                <label className="input-label">Google Client ID</label>
-                <input className="input-field" value={settings.googleClientId} onChange={e => setSettings({...settings, googleClientId: e.target.value})} placeholder="12345-abcde.apps.googleusercontent.com" />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Google Client Secret</label>
-                <input className="input-field" type="password" value={settings.googleClientSecret} onChange={e => setSettings({...settings, googleClientSecret: e.target.value})} placeholder="GOCSPX-..." />
-              </div>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Database size={24} color="var(--primary)" />
-                <h2 style={{ fontSize: '1.25rem' }}>NAS Bestandsopslag</h2>
-              </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Waar moeten we de thumbnails voor OBS opslaan?</p>
-              <div className="input-group">
-                <label className="input-label">Bestandspad (NAS)</label>
-                <input className="input-field" value={settings.thumbnailSavePath} onChange={e => setSettings({...settings, thumbnailSavePath: e.target.value})} placeholder="/volume1/Beamer/FreeShow/Media" />
-                <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '8px' }}>Standaard: /volume1/Beamer/FreeShow/Media</p>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Link size={24} color="var(--primary)" />
-                <h2 style={{ fontSize: '1.25rem' }}>Toegang via Internet</h2>
-              </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Vul de URL in die je gebruikt om de app te bezoeken (nodig voor OAuth).</p>
-              <div className="input-group">
-                <label className="input-label">Website URL</label>
-                <input className="input-field" value={settings.nextAuthUrl} onChange={e => setSettings({...settings, nextAuthUrl: e.target.value})} placeholder="http://192.168.2.250:3000" />
-                <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '8px' }}>Bijv: http://192.168.2.250:3000 of https://live.arkchurch.nl</p>
-              </div>
-            </motion.div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
-          {step > 1 ? (
-            <button onClick={handleBack} className="btn-outline">
-              <ChevronLeft size={18} /> Terug
-            </button>
-          ) : <div></div>}
-          
-          {step < 3 ? (
-            <button onClick={handleNext} className="btn-primary">
-              Volgende <ChevronRight size={18} />
-            </button>
-          ) : (
-            <button onClick={handleSave} className="btn-primary" disabled={loading}>
-              {loading ? "Opslaan..." : <><CheckCircle2 size={18} /> Voltooien</>}
-            </button>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
