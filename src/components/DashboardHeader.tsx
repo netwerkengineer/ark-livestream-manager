@@ -1,6 +1,7 @@
 "use client";
 
 import { HelpCircle, Settings, User } from "lucide-react";
+import { VERSION } from "@/lib/version";
 
 interface DashboardHeaderProps {
   userRole: "admin" | "operator" | null;
@@ -23,7 +24,7 @@ export default function DashboardHeader({
         <img src="/logo.png" alt="Ark Church Logo" />
         <div>
           <h1 style={{ fontSize: '1.5rem', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Ark Church <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'normal', color: 'var(--primary)' }}>v2.2.0</span>
+            Ark Church <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'normal', color: 'var(--primary)' }}>v{VERSION}</span>
           </h1>
           <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>Operations Center</p>
         </div>
