@@ -58,3 +58,5 @@ next-env.d.ts
 /__pycache__/
 /*.pdf
 /config/qlcplus/config/
+/temp_build/
+/temp_companion/

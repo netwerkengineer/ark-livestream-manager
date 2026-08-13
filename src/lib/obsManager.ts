@@ -9,8 +9,92 @@
 import OBSWebSocket from 'obs-websocket-js';
 import { getSettings } from './settingsStore';
 import { youtubeFetch } from './tokenStore';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import path from 'path';
+
+// Helper function to validate and sanitize shell arguments
+function sanitizeShellArg(arg: string): string {
+  // Remove any characters that could be used for command injection
+  // Allow only alphanumeric, spaces, hyphens, underscores, dots, slashes, colons, and hash
+  return arg.replace(/[^a-zA-Z0-9\s\-_./:@#]/g, '');
+}
+
+// Helper to execute SSH command safely
+function execSshCommand(
+  user: string,
+  host: string,
+  command: string,
+  callback: (error: Error | null, stdout: string, stderr: string) => void
+): void {
+  const sanitizedUser = sanitizeShellArg(user);
+  const sanitizedHost = sanitizeShellArg(host);
+
+  const args = [
+    '-o', 'ConnectTimeout=3',
+    '-o', 'StrictHostKeyChecking=no',
+    `${sanitizedUser}@${sanitizedHost}`,
+    command
+  ];
+
+  let stdout = '';
+  let stderr = '';
+
+  const proc = spawn('ssh', args);
+
+  proc.stdout.on('data', (data) => {
+    stdout += data.toString();
+  });
+
+  proc.stderr.on('data', (data) => {
+    stderr += data.toString();
+  });
+
+  proc.on('close', (code) => {
+    if (code === 0) {
+      callback(null, stdout, stderr);
+    } else {
+      callback(new Error(`SSH command failed with code ${code}`), stdout, stderr);
+    }
+  });
+
+  proc.on('error', (err) => {
+    callback(err, stdout, stderr);
+  });
+}
+
+// Helper to execute SCP command safely
+function execScpCommand(
+  localPath: string,
+  user: string,
+  host: string,
+  remotePath: string,
+  callback: (error: Error | null) => void
+): void {
+  const sanitizedUser = sanitizeShellArg(user);
+  const sanitizedHost = sanitizeShellArg(host);
+  const sanitizedRemotePath = sanitizeShellArg(remotePath);
+
+  const args = [
+    '-o', 'ConnectTimeout=5',
+    '-o', 'StrictHostKeyChecking=no',
+    localPath,
+    `${sanitizedUser}@${sanitizedHost}:${sanitizedRemotePath}`
+  ];
+
+  const proc = spawn('scp', args);
+
+  proc.on('close', (code) => {
+    if (code === 0) {
+      callback(null);
+    } else {
+      callback(new Error(`SCP command failed with code ${code}`));
+    }
+  });
+
+  proc.on('error', (err) => {
+    callback(err);
+  });
+}
 
 let lastStreamActiveState: boolean | null = null;
 let youtubePollTimer: NodeJS.Timeout | null = null;
@@ -109,41 +193,53 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
 
   console.log(`[LED Control] OBS stream state changed to: ${statusStr}. Destination: ${remoteHost}, Text: "${text}", Color: "${color}". Detecting remote OS...`);
 
-  // Detect remote OS
-  const detectCmd = `ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "cmd.exe /c echo windows"`;
+  // Sanitize inputs
+  const sanitizedMac = macAddress ? sanitizeShellArg(macAddress) : '';
+  const sanitizedText = text ? text.replace(/["\\]/g, '') : '';  // Remove quotes and backslashes
+  const sanitizedColor = color ? sanitizeShellArg(color) : '';
 
-  exec(detectCmd, (detectErr, detectStdout) => {
+  // Detect remote OS
+  execSshCommand(remoteUser, remoteHost, 'cmd.exe /c echo windows', (detectErr, detectStdout) => {
     const isWindows = !detectErr && detectStdout.includes("windows");
     console.log(`[LED Control] Remote host OS detected: ${isWindows ? 'Windows' : 'macOS/Linux'}`);
 
+    const sanitizedUser = sanitizeShellArg(remoteUser);
     const remoteScriptPath = isWindows
-      ? `C:/Users/${remoteUser}/AppData/Local/Temp/led_control.py`
+      ? `C:/Users/${sanitizedUser}/AppData/Local/Temp/led_control.py`
       : `/tmp/led_control.py`;
-    const pythonCmd = isWindows ? 'python' : 'python3';
     const localScriptPath = path.join(process.cwd(), 'led_control.py');
 
-    const scpCmd = `scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${localScriptPath}" "${remoteUser}@${remoteHost}:${remoteScriptPath}"`;
-    
-    // ssh run command
-    let runCmd = "";
-    let args = `--status ${statusStr}`;
-    if (macAddress) args += ` --mac ${macAddress}`;
-    if (text) args += ` --text \\"${text.replace(/"/g, '\\"')}\\"`;
-    if (color) args += ` --color \\"${color}\\"`;
-    
-    if (isWindows) {
-      runCmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "python \\"${remoteScriptPath}\\" ${args}"`;
-    } else {
-      runCmd = `ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${remoteUser}@${remoteHost}" "if [ -f /opt/homebrew/bin/python3 ]; then /opt/homebrew/bin/python3 \\"${remoteScriptPath}\\" ${args}; elif [ -f /usr/local/bin/python3 ]; then /usr/local/bin/python3 \\"${remoteScriptPath}\\" ${args}; else python3 \\"${remoteScriptPath}\\" ${args}; fi"`;
-    }
-
-    // Execute remote copy and run
-    exec(scpCmd, (err, stdout, stderr) => {
+    // Copy script to remote host
+    execScpCommand(localScriptPath, remoteUser, remoteHost, remoteScriptPath, (err) => {
       if (err) {
         console.error(`[LED Control] scp copy failed: ${err.message}. Running remote script anyway...`);
       }
-      
-      exec(runCmd, (errRun, stdoutRun, stderrRun) => {
+
+      // Build Python command arguments
+      const pythonArgs = ['--status', statusStr];
+      if (sanitizedMac) {
+        pythonArgs.push('--mac', sanitizedMac);
+      }
+      if (sanitizedText) {
+        pythonArgs.push('--text', sanitizedText);
+      }
+      if (sanitizedColor) {
+        pythonArgs.push('--color', sanitizedColor);
+      }
+
+      // Build remote command
+      let remoteCommand: string;
+      if (isWindows) {
+        remoteCommand = `python "${remoteScriptPath}" ${pythonArgs.join(' ')}`;
+      } else {
+        // Try multiple Python paths on Unix-like systems
+        const pyPath = remoteScriptPath;
+        const pyArgs = pythonArgs.join(' ');
+        remoteCommand = `if [ -f /opt/homebrew/bin/python3 ]; then /opt/homebrew/bin/python3 "${pyPath}" ${pyArgs}; elif [ -f /usr/local/bin/python3 ]; then /usr/local/bin/python3 "${pyPath}" ${pyArgs}; else python3 "${pyPath}" ${pyArgs}; fi`;
+      }
+
+      // Execute remote Python script
+      execSshCommand(remoteUser, remoteHost, remoteCommand, (errRun, stdoutRun, stderrRun) => {
         if (errRun) {
           console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
         } else {
