@@ -15,6 +15,11 @@ export const BIBLE_BOOKS = [
 export function resolveMediaPath(filePath: string): string {
   if (!filePath) return '';
 
+  // HTTP(S) URLs - return as-is
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  }
+
   // Absolute path
   if (filePath.startsWith('/') || filePath.match(/^[A-Z]:\\/i)) {
     return filePath;
