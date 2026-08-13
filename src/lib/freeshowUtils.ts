@@ -35,44 +35,93 @@ export function resolveMediaPath(filePath: string): string {
 }
 
 export function getOrderedSlides(show: any): any[] {
-  if (!show?.slides) return [];
+  if (!show) return [];
 
-  const groups = show.groups || [];
-  const slides = show.slides;
-  const layouts = show.layouts || {};
+  const activeLayoutId = show.settings?.activeLayout;
+  if (activeLayoutId && show.layouts?.[activeLayoutId]?.slides) {
+    const flatSlides: any[] = [];
+    const layoutSlides = show.layouts[activeLayoutId].slides;
 
-  let orderedSlides: any[] = [];
+    for (const slide of layoutSlides) {
+      const rawSlide = show.slides?.[slide.id];
 
-  for (const group of groups) {
-    const layoutId = group.layout;
-    const layout = layouts[layoutId];
+      // Push parent slide first
+      flatSlides.push(slide);
 
-    if (!layout) continue;
+      // Collect children from ALL sources, deduplicate
+      const childrenSeen = new Set<string>();
+      const addChild = (childId: string, extra: any = {}) => {
+        if (childrenSeen.has(childId)) return;
+        childrenSeen.add(childId);
+        flatSlides.push({
+          id: childId,
+          parentId: slide.id,
+          parentBackground: slide.background || rawSlide?.background,
+          ...extra
+        });
+      };
 
-    for (const slideRef of layout) {
-      const slideId = slideRef.id;
-      const slide = slides[slideId];
+      // 1. Layout-level children (object)
+      if (slide.children && typeof slide.children === 'object') {
+        for (const [childId, childData] of Object.entries(slide.children)) {
+          addChild(childId, typeof childData === 'object' ? childData : {});
+        }
+      }
 
-      if (slide) {
-        orderedSlides.push({ ...slide, id: slideId });
+      // 2. Raw slide children (array or object)
+      if (rawSlide?.children) {
+        if (Array.isArray(rawSlide.children)) {
+          for (const childId of rawSlide.children) {
+            addChild(childId);
+          }
+        } else if (typeof rawSlide.children === 'object') {
+          for (const [childId, childData] of Object.entries(rawSlide.children)) {
+            addChild(childId, typeof childData === 'object' ? childData : {});
+          }
+        }
+      }
+    }
+    return flatSlides;
+  }
+
+  // Fallback: return all slides if no layout
+  if (show.slides) {
+    return Object.keys(show.slides).map(id => ({ id }));
+  }
+
+  return [];
+}
+
+export function getSlideBackground(show: any, slideIdx: number): any {
+  if (!show || !show.layouts) return null;
+
+  const ordered = getOrderedSlides(show);
+
+  // Check current slide and its parent first
+  const currentSlide = ordered[slideIdx];
+  if (currentSlide) {
+    if (currentSlide.background && show.media?.[currentSlide.background]) {
+      return show.media[currentSlide.background];
+    }
+    if (currentSlide.parentBackground && show.media?.[currentSlide.parentBackground]) {
+      return show.media[currentSlide.parentBackground];
+    }
+  }
+
+  // Check backwards for active backgrounds
+  for (let i = slideIdx - 1; i >= 0; i--) {
+    const layoutSlide = ordered[i];
+    if (layoutSlide) {
+      if (layoutSlide.background && show.media?.[layoutSlide.background]) {
+        return show.media[layoutSlide.background];
+      }
+      if (layoutSlide.parentBackground && show.media?.[layoutSlide.parentBackground]) {
+        return show.media[layoutSlide.parentBackground];
       }
     }
   }
 
-  return orderedSlides;
-}
-
-export function getSlideBackground(show: any, slideIdx: number): any {
-  if (!show?.slides) return null;
-
-  const ordered = getOrderedSlides(show);
-  if (slideIdx < 0 || slideIdx >= ordered.length) return null;
-
-  const layoutSlide = ordered[slideIdx];
-  if (!layoutSlide) return null;
-
-  const slide = show.slides[layoutSlide.id];
-  return slide?.background || null;
+  return null;
 }
 
 export function parseStyleString(styleStr: string): React.CSSProperties {
