@@ -20,14 +20,36 @@ export function resolveMediaPath(filePath: string): string {
     return filePath;
   }
 
-  // Absolute path
-  if (filePath.startsWith('/') || filePath.match(/^[A-Z]:\\/i)) {
-    return filePath;
+  const base = '/api/freeshow/media';
+
+  // Windows absolute paths (e.g. Z:\FreeShow\Media\...)
+  if (filePath.match(/^[A-Z]:\\/i)) {
+    // Remove drive letter (e.g. Z:\)
+    let pathWithoutDrive = filePath.replace(/^[A-Z]:\\/i, '');
+
+    // Remove FreeShow\Media\ prefix if present
+    pathWithoutDrive = pathWithoutDrive.replace(/^FreeShow[/\\]Media[/\\]/i, '');
+
+    // Convert backslashes to forward slashes
+    const normalizedPath = pathWithoutDrive.replace(/\\/g, '/');
+
+    return `${base}/${normalizedPath}`;
+  }
+
+  // Unix absolute paths
+  if (filePath.startsWith('/')) {
+    // Try to extract relative path from common base paths
+    const mediaMatch = filePath.match(/\/Media\/(.+)$/i);
+    if (mediaMatch) {
+      return `${base}/${mediaMatch[1]}`;
+    }
+    // Fallback: use filename only
+    const parts = filePath.split('/');
+    const filename = parts[parts.length - 1];
+    return `${base}/${filename}`;
   }
 
   // Relative path from FreeShow media folder
-  const base = '/api/freeshow/media';
-
   // Strip leading dots or slashes
   let cleanPath = filePath.replace(/^\.+[/\\]/, '');
 
@@ -36,7 +58,10 @@ export function resolveMediaPath(filePath: string): string {
     cleanPath = cleanPath.replace(/^media[/\\]/, '');
   }
 
-  return `${base}/${encodeURIComponent(cleanPath)}`;
+  // Convert backslashes to forward slashes
+  cleanPath = cleanPath.replace(/\\/g, '/');
+
+  return `${base}/${cleanPath}`;
 }
 
 export function getOrderedSlides(show: any): any[] {
