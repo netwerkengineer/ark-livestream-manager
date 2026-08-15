@@ -91,11 +91,16 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
     // not just the text part.
     const fetchOptions = { bodies: [''], markSeen: true, struct: true };
     const results = await connection.search(searchCriteria, fetchOptions);
+    console.log(`[Email Sync] ${results.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
 
     for (const res of results) {
       const allParts = imaps.getParts(res.parts as any);
-      const fullPart = allParts.find((part: any) => part.which === '');
-      if (!fullPart) continue;
+      console.log(`[Email Sync] Onderdelen in bericht: ${JSON.stringify(allParts.map((p: any) => p.which))}`);
+      const fullPart = allParts.find((part: any) => part.which === '' || part.which === 'TEXT');
+      if (!fullPart) {
+        console.error('[Email Sync] Geen bruikbaar berichtdeel gevonden, wordt overgeslagen.');
+        continue;
+      }
 
       const parsedMail = await simpleParser(fullPart.body);
       const content = parsedMail.text || '';
