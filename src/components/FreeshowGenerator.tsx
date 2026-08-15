@@ -1927,7 +1927,7 @@ export default function FreeshowGenerator() {
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flex: 1, overflow: 'hidden' }}>
               {comparingPair.map((item, i) => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                   <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{item.filename}</div>
                     <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('modified')}: {new Date(item.modified).toLocaleString()}</div>
@@ -1938,7 +1938,7 @@ export default function FreeshowGenerator() {
                       </div>
                     )}
                   </div>
-                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                  <div style={{ flex: 1, minHeight: 0, background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.9rem', lineHeight: '1.6' }}>
                     {item.contentHash ? item.contentHash.split('\n').map((line: string, li: number) => (
                       <div key={li}>{line}</div>
                     )) : t('no_text_found')}
