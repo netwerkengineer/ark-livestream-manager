@@ -2,11 +2,16 @@ import imaps from 'imap-simple';
 import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { getSettings } from '@/lib/settingsStore';
 import { parseServiceEmail, ParsedMedia } from '@/lib/emailParser';
 import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStore';
+import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
 
+const execFilePromise = promisify(execFile);
 const ATTACHMENTS_DIR = path.join(process.cwd(), 'data', 'emailAttachments');
+const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.-]/g, '_');
@@ -40,6 +45,45 @@ function resolveAttachmentPaths(items: ParsedMedia[], saved: { filename: string;
       || saved.find(s => s.filename.toLowerCase().includes(wanted) || wanted.includes(s.filename.toLowerCase()));
     if (match) {
       item.filePath = match.path;
+    }
+  }
+}
+
+// Downloads a YouTube link mentioned in a service-planning email so it can
+// be embedded as real media in the generated FreeShow project. Uses
+// execFile (argument array, no shell) rather than a shell string - the URL
+// comes from an email, which is less trusted input than the existing
+// (admin-triggered) yt-download route this mirrors.
+async function downloadYoutubeVideo(url: string, dir: string): Promise<{ filePath: string; title: string } | null> {
+  if (!YOUTUBE_URL_RE.test(url)) return null;
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const { stdout: metadataJson } = await execFilePromise('yt-dlp', ['--dump-json', '--skip-download', url]);
+    const metadata = JSON.parse(metadataJson);
+    const videoTitle = (metadata.title || 'video').replace(/[\\/:*?"<>|]/g, '-').trim();
+    const fileName = `${videoTitle}.mp4`;
+    const finalPath = path.join(dir, fileName);
+
+    await execFilePromise('yt-dlp', [
+      '-f', 'bestvideo[height<=1080]+bestaudio/best',
+      '--merge-output-format', 'mp4',
+      '-o', finalPath,
+      url
+    ]);
+
+    return { filePath: finalPath, title: videoTitle };
+  } catch (err) {
+    console.error(`[Email Sync] YouTube-download mislukt voor ${url}:`, err);
+    return null;
+  }
+}
+
+async function resolveYoutubeDownloads(items: ParsedMedia[], dir: string) {
+  for (const item of items) {
+    if (item.mediaType !== 'youtube' || !item.url) continue;
+    const result = await downloadYoutubeVideo(item.url, dir);
+    if (result) {
+      item.filePath = result.filePath;
     }
   }
 }
@@ -225,7 +269,9 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
         }
       }
       const saved = saveAttachments(messageId, attachments);
-      resolveAttachmentPaths(parsed.items.filter((i): i is ParsedMedia => i.type === 'media'), saved);
+      const mediaItems = parsed.items.filter((i): i is ParsedMedia => i.type === 'media');
+      resolveAttachmentPaths(mediaItems, saved);
+      await resolveYoutubeDownloads(mediaItems, path.join(ATTACHMENTS_DIR, sanitizeFilename(messageId)));
 
       const draft = mergeParsedEmailIntoDraft(parsed, {
         messageId,
@@ -236,6 +282,18 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
 
       if (draft) {
         touchedDrafts.set(draft.serviceDate, draft);
+        // Best-effort: keep the FreeShow project in sync with every new
+        // mail automatically. A conflict (someone edited it directly in
+        // FreeShow) is left for a medewerker to resolve in the review tab
+        // rather than force-overwritten here.
+        try {
+          const result = await generateProjectForDraft(draft);
+          if (!result.success && !result.conflict) {
+            console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} mislukt: ${result.message}`);
+          }
+        } catch (genErr) {
+          console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} gaf een fout:`, genErr);
+        }
       }
     }
 
