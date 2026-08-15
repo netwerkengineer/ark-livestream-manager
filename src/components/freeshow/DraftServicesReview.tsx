@@ -38,6 +38,8 @@ interface DraftService {
   media: DraftMedia[];
   sourceEmails: SourceEmailRecord[];
   lastUpdatedAt: string;
+  lastGeneratedAt?: string;
+  lastGenerationNotes?: string[];
 }
 interface UnassignedEmailRecord extends SourceEmailRecord {
   excerpt: string;
@@ -65,6 +67,9 @@ export default function DraftServicesReview() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [conflictId, setConflictId] = useState<string | null>(null);
+  const [genMessage, setGenMessage] = useState<Record<string, string>>({});
 
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
@@ -106,6 +111,32 @@ export default function DraftServicesReview() {
 
   const allNotes = (draft: DraftService) => draft.sourceEmails.flatMap(e => e.notes);
 
+  const generateProject = async (serviceDate: string, force: boolean) => {
+    setGeneratingId(serviceDate);
+    setConflictId(null);
+    setGenMessage(prev => ({ ...prev, [serviceDate]: '' }));
+    try {
+      const res = await fetch('/api/email/drafts/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceDate, force })
+      });
+      const data = await res.json();
+      if (data.conflict) {
+        setConflictId(serviceDate);
+      } else if (data.success) {
+        setGenMessage(prev => ({ ...prev, [serviceDate]: '✅ ' + (data.message || 'Project bijgewerkt') }));
+        await fetchDrafts();
+      } else {
+        setGenMessage(prev => ({ ...prev, [serviceDate]: '❌ ' + (data.message || data.error || 'Onbekende fout') }));
+      }
+    } catch (e: any) {
+      setGenMessage(prev => ({ ...prev, [serviceDate]: '❌ ' + e.message }));
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
   return (
     <div className="glass-card" style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -133,11 +164,28 @@ export default function DraftServicesReview() {
             const notes = allNotes(draft);
             return (
               <div key={draft.id} className="glass-card" style={{ padding: '1.2rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <h3 style={{ margin: 0, textTransform: 'capitalize' }}>{formatDate(draft.serviceDate)}</h3>
                   <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>
                     Laatst bijgewerkt: {new Date(draft.lastUpdatedAt).toLocaleString('nl-NL')} · {draft.sourceEmails.length} mail(s)
                   </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                    {draft.lastGeneratedAt
+                      ? `📁 Project gegenereerd: ${new Date(draft.lastGeneratedAt).toLocaleString('nl-NL')}`
+                      : '📁 Nog geen project gegenereerd'}
+                    {genMessage[draft.serviceDate] && <span style={{ marginLeft: '0.6rem' }}>{genMessage[draft.serviceDate]}</span>}
+                  </span>
+                  <button
+                    className="button"
+                    style={{ fontSize: '0.7rem', padding: '0.3rem 0.7rem', background: 'rgba(255,255,255,0.08)' }}
+                    onClick={() => generateProject(draft.serviceDate, false)}
+                    disabled={generatingId === draft.serviceDate}
+                  >
+                    {generatingId === draft.serviceDate ? 'Bezig...' : draft.lastGeneratedAt ? '🔄 Project bijwerken' : '📁 Project aanmaken'}
+                  </button>
                 </div>
 
                 {notes.length > 0 && (
@@ -146,6 +194,31 @@ export default function DraftServicesReview() {
                     {notes.map((n, i) => (
                       <div key={i} style={{ fontSize: '0.75rem', opacity: 0.8 }}>• {n}</div>
                     ))}
+                  </div>
+                )}
+
+                {draft.lastGenerationNotes && draft.lastGenerationNotes.length > 0 && (
+                  <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.3rem' }}>Niet automatisch in het project verwerkt:</div>
+                    {draft.lastGenerationNotes.map((n, i) => (
+                      <div key={i} style={{ fontSize: '0.75rem', opacity: 0.8 }}>• {n}</div>
+                    ))}
+                  </div>
+                )}
+
+                {conflictId === draft.serviceDate && (
+                  <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
+                      ⚠️ Het project is buiten de app gewijzigd sinds de laatste update. Overschrijven verwijdert die wijziging.
+                    </span>
+                    <button
+                      className="button"
+                      style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#fca5a5', fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                      onClick={() => generateProject(draft.serviceDate, true)}
+                      disabled={generatingId === draft.serviceDate}
+                    >
+                      Toch overschrijven
+                    </button>
                   </div>
                 )}
 

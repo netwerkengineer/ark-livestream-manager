@@ -56,6 +56,8 @@ export interface DraftService {
   lastUpdatedAt: string;
   lastGeneratedHash?: string;
   lastGeneratedAt?: string;
+  projectFilePath?: string;
+  lastGenerationNotes?: string[];
 }
 
 interface StoreShape {
@@ -221,6 +223,28 @@ export function mergeParsedEmailIntoDraft(
     notes: parsed.notes
   });
   draft.lastUpdatedAt = now;
+
+  writeStore(store);
+  return draft;
+}
+
+/**
+ * Records the result of generating/overwriting the FreeShow project for a
+ * service date - the hash lets a future generation detect whether the file
+ * was changed outside the app (directly in FreeShow) since we last wrote it.
+ */
+export function updateGenerationInfo(
+  serviceDate: string,
+  info: { hash: string; filePath: string; generatedAt: string; notes?: string[] }
+): DraftService | null {
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  if (!draft) return null;
+
+  draft.lastGeneratedHash = info.hash;
+  draft.lastGeneratedAt = info.generatedAt;
+  draft.projectFilePath = info.filePath;
+  draft.lastGenerationNotes = info.notes || [];
 
   writeStore(store);
   return draft;
