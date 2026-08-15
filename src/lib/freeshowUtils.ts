@@ -12,6 +12,14 @@ export const BIBLE_BOOKS = [
   "Titus", "Filemon", "Hebreeën", "Jakobus", "1 Petrus", "2 Petrus", "1 Johannes", "2 Johannes", "3 Johannes", "Judas", "Openbaring"
 ];
 
+// Strips diacritics (ë, ï, ü, ...) so "1 Samuel"/"Korinthiers" match
+// "1 Samuël"/"Korinthiërs" regardless of which side (typed input, or a
+// specific .fsb bible file's internal book names) omits the accent -
+// different translations aren't consistent about this.
+export function foldDiacritics(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export function resolveMediaPath(filePath: string): string {
   if (!filePath) return '';
 

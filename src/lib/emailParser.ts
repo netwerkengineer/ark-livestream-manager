@@ -1,4 +1,4 @@
-import { BIBLE_BOOKS } from './freeshowUtils';
+import { BIBLE_BOOKS, foldDiacritics } from './freeshowUtils';
 
 export interface ParsedSong {
   type: 'song';
@@ -53,12 +53,6 @@ function parseServiceDate(raw: string): string | null {
   const day = d.padStart(2, '0');
   const month = m.padStart(2, '0');
   return `${y}-${month}-${day}`;
-}
-
-// Strips diacritics (ë, ï, ü, ï, ...) so "1 Samuel"/"Korinthiers" match
-// "1 Samuël"/"Korinthiërs" - people commonly type these without accents.
-function foldDiacritics(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 function findBibleBook(name: string): string | null {
