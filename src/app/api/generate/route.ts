@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
     // Use pure alphanumeric 11-char IDs like FreeShow
     const generateId = () => Math.random().toString(36).padEnd(15, '0').substring(2, 13);
 
+    const toClientPath = (p: string | undefined | null) => p ? toFreeShowClientPath(p, settings.freeshowPath, settings.freeshowClientPath) : p;
+
     items.forEach((item: any) => {
       const sanitizeName = (name: string) => name.replace(/[\\/:*?"<>|]/g, ' ').trim();
       const showId = item.id || generateId();
@@ -64,7 +66,8 @@ export async function POST(req: NextRequest) {
         type: item.type,
         source: item.source,
         isRemoved: item.isRemoved,
-        swappedMediaPath: item.swappedMediaPath,
+        swappedMediaPath: toClientPath(item.swappedMediaPath),
+        extraSlides: (item.extraSlides || []).map((s: any) => ({ ...s, path: toClientPath(s.path) })),
         targetSection: item.targetSection
       };
 
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
         showsList.push({
           ...baseShow,
           fullData: item.fullData,
-          backgroundMedia: item.backgroundMedia,
+          backgroundMedia: toClientPath(item.backgroundMedia),
           backgroundType: item.backgroundType,
           data: {
             name: sanitizeName(`${item.title}${item.artist ? ' - ' + item.artist : ''}`),
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
         showsList.push({
           ...baseShow,
           refData: item.bibleData,
-          backgroundMedia: item.backgroundMedia,
+          backgroundMedia: toClientPath(item.backgroundMedia),
           backgroundType: item.backgroundType,
           data: {
             name: sanitizeName(`${item.ref} - ${item.translation}`),
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
       } else if (item.type === 'media') {
         showsList.push({
           ...baseShow,
-          filePath: toFreeShowClientPath(item.filePath, settings.freeshowPath, settings.freeshowClientPath),
+          filePath: toClientPath(item.filePath),
           metaType: item.metaType,
           title: item.title
         });
@@ -115,7 +118,11 @@ export async function POST(req: NextRequest) {
          showsList.push({
            ...baseShow,
            title: item.title,
-           slides: item.slides
+           slides: (item.slides || []).map((s: any) => ({
+             ...s,
+             filePath: toClientPath(s.filePath),
+             backgroundMedia: toClientPath(s.backgroundMedia)
+           }))
          });
       } else if (item.source === 'template') {
         // Voor template items die geen specifieke data-wijziging hebben behalve eventueel swappedMediaPath
