@@ -53,13 +53,18 @@ function resolveAttachmentPaths(items: ParsedMedia[], saved: { filename: string;
  */
 export async function checkEmailsForProjects(): Promise<DraftService[]> {
   const settings = getSettings() as any;
+  const imapHost = settings.imapHost || process.env.IMAP_HOST || 'imap.gmail.com';
   const config = {
     imap: {
       user: settings.imapUser || process.env.IMAP_USER || '',
       password: settings.imapPass || process.env.IMAP_PASSWORD || '',
-      host: settings.imapHost || process.env.IMAP_HOST || 'imap.gmail.com',
+      host: imapHost,
       port: Number(settings.imapPort) || Number(process.env.IMAP_PORT) || 993,
       tls: true,
+      // node-imap doesn't set SNI by default; without it some IMAP hosts
+      // (Gmail included) return a fallback/self-signed cert instead of the
+      // real one, and the TLS handshake fails with "self-signed certificate".
+      tlsOptions: { servername: imapHost },
       authTimeout: 3000
     }
   };
