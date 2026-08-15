@@ -68,7 +68,11 @@ export async function GET(req: NextRequest) {
           const cached = memoryCache[file];
           
           let showData: CachedShow;
-          if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+          // A cache entry written by an older schema (before contentHash was
+          // added) matches on mtime/size but lacks it, which crashed every
+          // single scan (contentHash.substring on undefined) - never
+          // resulting in a duplicate group at all. Treat that as stale too.
+          if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size && typeof cached.contentHash === 'string') {
             showData = cached;
           } else {
             const content = await fs.readFile(filePath, 'utf-8');
