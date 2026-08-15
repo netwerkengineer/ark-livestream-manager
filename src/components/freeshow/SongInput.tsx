@@ -8,6 +8,7 @@ interface SongInputProps {
   catalogSongs: Array<{ name: string; category: string }>;
   onAddSong: (title?: string) => void;
   t: (key: string) => string;
+  freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
 }
 
 export default function SongInput({
@@ -15,7 +16,8 @@ export default function SongInput({
   setSongInput,
   catalogSongs,
   onAddSong,
-  t
+  t,
+  freeshowCategories
 }: SongInputProps) {
   const filteredSongs = catalogSongs.filter(
     s => s.category !== 'presentation' &&
@@ -64,7 +66,7 @@ export default function SongInput({
             >
               <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#fff' }}>{song.name}</span>
               <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.1)', color: 'var(--primary)', fontWeight: 600 }}>
-                {getCategoryDisplayName(song.category)}
+                {getCategoryDisplayName(song.category, freeshowCategories)}
               </span>
             </div>
           ))}
