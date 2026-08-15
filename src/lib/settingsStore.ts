@@ -83,6 +83,7 @@ export interface AppSettings {
   imapPass?: string;
   imapHost?: string;
   imapPort?: number;
+  emailSubjectKeyword?: string;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
   sshUser?: string;
@@ -240,6 +241,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   imapPass: "",
   imapHost: "imap.gmail.com",
   imapPort: 993,
+  emailSubjectKeyword: "Liturgie",
   ledPanelEnabled: false,
   ledPanelMac: "",
   sshUser: "jeffreygo",
