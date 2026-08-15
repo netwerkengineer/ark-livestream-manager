@@ -44,6 +44,37 @@ function resolveAttachmentPaths(items: ParsedMedia[], saved: { filename: string;
   }
 }
 
+interface RawFetchedMessage {
+  parts: Record<string, string>;
+  attributes: any;
+}
+
+// imap-simple's own search+fetch combination (connection.search / getParts)
+// was unreliable in testing against Gmail: it consistently returned zero
+// body parts even for messages confirmed present via raw IMAP protocol
+// testing. This drives node-imap's lower-level fetch API directly instead -
+// the same primitive imap-simple itself is built on - which is the standard,
+// well-documented way to read message bodies/attachments.
+function rawFetch(imap: any, source: any, options: any): Promise<RawFetchedMessage[]> {
+  return new Promise((resolve, reject) => {
+    const messages: RawFetchedMessage[] = [];
+    const f = imap.fetch(source, options);
+    f.on('message', (msg: any) => {
+      const parts: Record<string, string> = {};
+      let attributes: any = null;
+      msg.on('body', (stream: any, info: any) => {
+        let buffer = '';
+        stream.on('data', (chunk: Buffer) => { buffer += chunk.toString('utf8'); });
+        stream.once('end', () => { parts[info.which] = buffer; });
+      });
+      msg.once('attributes', (attrs: any) => { attributes = attrs; });
+      msg.once('end', () => { messages.push({ parts, attributes }); });
+    });
+    f.once('error', reject);
+    f.once('end', () => resolve(messages));
+  });
+}
+
 interface AttachmentPart {
   partID: string;
   filename: string;
@@ -70,26 +101,21 @@ function findAttachmentParts(struct: any, parts: AttachmentPart[] = []): Attachm
 
 function decodeAttachmentBody(body: string, encoding: string): Buffer {
   if (encoding === 'base64') return Buffer.from(body, 'base64');
-  if (encoding === 'quoted-printable') return Buffer.from(body, 'utf-8');
   return Buffer.from(body, 'utf-8');
 }
 
-async function fetchAttachments(connection: any, uid: number, struct: any): Promise<{ filename: string; content: Buffer }[]> {
+async function fetchAttachments(imap: any, uid: number, struct: any): Promise<{ filename: string; content: Buffer }[]> {
   const attachmentParts = findAttachmentParts(struct);
   if (attachmentParts.length === 0) return [];
 
-  const results = await connection.search([['UID', String(uid)]], {
-    bodies: attachmentParts.map(p => p.partID),
-    markSeen: false
-  });
-  if (results.length === 0) return [];
+  const fetched = await rawFetch(imap, [uid], { bodies: attachmentParts.map(p => p.partID) });
+  if (fetched.length === 0) return [];
 
-  const fetchedParts = imaps.getParts(results[0].parts as any);
   const attachments: { filename: string; content: Buffer }[] = [];
   for (const ap of attachmentParts) {
-    const found = fetchedParts.find((p: any) => p.which === ap.partID);
-    if (found?.body) {
-      attachments.push({ filename: ap.filename, content: decodeAttachmentBody(found.body, ap.encoding) });
+    const body = fetched[0].parts[ap.partID];
+    if (body) {
+      attachments.push({ filename: ap.filename, content: decodeAttachmentBody(body, ap.encoding) });
     }
   }
   return attachments;
@@ -129,6 +155,7 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
   try {
     const connection = await imaps.connect(config);
     await connection.openBox('INBOX');
+    const imap = (connection as any).imap;
 
     // For a shared/existing mailbox, restrict the IMAP-side search to
     // subjects containing the configured keyword so unrelated mail is never
@@ -138,38 +165,38 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
     const searchCriteria: any[] = subjectKeyword
       ? ['UNSEEN', ['SUBJECT', subjectKeyword]]
       : ['UNSEEN'];
-    // HEADER + TEXT is the reliable, well-documented imap-simple fetch shape.
-    // Fetching the whole raw message via bodies: [''] returned zero parts in
-    // testing against Gmail, so attachments are fetched separately below via
-    // the BODYSTRUCTURE (struct: true) instead of relying on that.
-    const fetchOptions = { bodies: ['HEADER', 'TEXT'], markSeen: true, struct: true };
-    const results = await connection.search(searchCriteria, fetchOptions);
-    console.log(`[Email Sync] ${results.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
+    // Search only for matching UIDs here - body/attachment content is fetched
+    // separately below via rawFetch(), see its comment for why.
+    const uids: number[] = await connection.search(searchCriteria, { bodies: [] })
+      .then((results: any[]) => results.map(r => r.attributes.uid));
+    console.log(`[Email Sync] ${uids.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
 
-    for (const res of results) {
-      const allParts = imaps.getParts(res.parts as any);
-      const headerPart = allParts.find((part: any) => part.which === 'HEADER');
-      const textPart = allParts.find((part: any) => part.which === 'TEXT');
-      if (!textPart) {
-        console.error('[Email Sync] Geen tekstdeel gevonden in bericht, wordt overgeslagen.');
+    for (const uid of uids) {
+      const fetched = await rawFetch(imap, [uid], { bodies: ['HEADER', 'TEXT'], struct: true, markSeen: true });
+      if (fetched.length === 0) {
+        console.error(`[Email Sync] Kon bericht UID ${uid} niet ophalen, wordt overgeslagen.`);
+        continue;
+      }
+      const { parts, attributes } = fetched[0];
+      const textBody = parts['TEXT'];
+      if (!textBody) {
+        console.error(`[Email Sync] Geen tekstdeel in bericht UID ${uid}, onderdelen: ${JSON.stringify(Object.keys(parts))}`);
         continue;
       }
 
-      const rawMessage = `${headerPart?.body || ''}\r\n${textPart.body}`;
+      const rawMessage = `${parts['HEADER'] || ''}\r\n${textBody}`;
       const parsedMail = await simpleParser(rawMessage);
-      const content = parsedMail.text || textPart.body || '';
-      const messageId = parsedMail.messageId || `${Date.now()}`;
+      const content = parsedMail.text || textBody;
+      const messageId = parsedMail.messageId || `${uid}-${Date.now()}`;
       const subject = parsedMail.subject || '(geen onderwerp)';
       const receivedAt = (parsedMail.date || new Date()).toISOString();
 
       const parsed = parseServiceEmail(content);
 
-      const uid = (res.attributes as any)?.uid;
-      const struct = (res.attributes as any)?.struct;
       let attachments: { filename: string; content: Buffer }[] = [];
-      if (uid && struct) {
+      if (attributes?.struct) {
         try {
-          attachments = await fetchAttachments(connection, uid, struct);
+          attachments = await fetchAttachments(imap, uid, attributes.struct);
         } catch (attErr) {
           console.error('[Email Sync] Bijlagen ophalen mislukt:', attErr);
         }
