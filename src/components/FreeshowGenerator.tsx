@@ -1336,6 +1336,18 @@ export default function FreeshowGenerator() {
     setStatus('');
   };
 
+  // Saves the draft to the FreeShow catalog only - not added to the current
+  // playlist/project. For media, the file was already written to the media
+  // folder at upload time, so there's nothing extra to save.
+  const saveDraftToLibrary = async () => {
+    if (!draftItem) return;
+    if (draftItem.type === 'song' || draftItem.type === 'bible') {
+      await saveShowToNas(draftItem);
+    }
+    setDraftItem(null);
+    setStatus(t('saved_to_library'));
+  };
+
   const updateItemText = (id: number, text: string) => {
     if (draftItem && draftItem.id === id) {
        setDraftItem({ ...draftItem, text, status: 'manual' });
@@ -1539,6 +1551,14 @@ export default function FreeshowGenerator() {
                   }}>{t('add_to_builder_btn')}</button>
                 </div>
               </div>
+              <button
+                className="button"
+                style={{ width: '100%', marginTop: '0.5rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', fontSize: '0.75rem' }}
+                onClick={saveDraftToLibrary}
+                title={t('save_to_library_help')}
+              >
+                {t('save_to_library_btn')}
+              </button>
             </div>
           ) : (
             <>
