@@ -1285,6 +1285,20 @@ export default function SettingsPanel({
                 />
               </div>
 
+              <div className="input-group">
+                <label className="input-label">FreeShow Hoofdmap, zoals de FreeShow-computer 'm zelf ziet</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.freeshowClientPath || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, freeshowClientPath: e.target.value })}
+                  placeholder="/Volumes/Projects/Beamer/FreeShow"
+                />
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Dezelfde map als hierboven, maar dan het pad zoals de computer waar FreeShow op draait 'm ziet (bv. een Mac-volume of Windows-netwerkschijf). Nodig zodat media-bestanden die deze app aanmaakt (uploads, e-mailbijlagen) correct verwijzen in het gegenereerde project — leeg laten als het exact hetzelfde pad is.
+                </p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="input-group">
                   <label className="input-label">Projecten Map</label>

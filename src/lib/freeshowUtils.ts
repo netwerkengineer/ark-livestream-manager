@@ -20,6 +20,22 @@ export function foldDiacritics(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// The server (this app) and the machine FreeShow actually runs on mount the
+// same shared folder at different paths (e.g. server: /mnt/data/Projects/...,
+// FreeShow's Mac: /Volumes/Projects/...). A path this app just wrote to disk
+// is only useful inside a generated show if it's rewritten to how FreeShow's
+// own machine sees that same file - otherwise the media reference silently
+// renders as a black slide. Both roots come from settings
+// (freeshowPath / freeshowClientPath); if either is unset, the path is left
+// unchanged so nothing breaks for setups that haven't configured this yet.
+export function toFreeShowClientPath(serverPath: string, serverRoot?: string, clientRoot?: string): string {
+  if (!serverPath || !serverRoot || !clientRoot || serverRoot === clientRoot) return serverPath;
+  if (serverPath.startsWith(serverRoot)) {
+    return clientRoot + serverPath.slice(serverRoot.length);
+  }
+  return serverPath;
+}
+
 export function resolveMediaPath(filePath: string): string {
   if (!filePath) return '';
 
