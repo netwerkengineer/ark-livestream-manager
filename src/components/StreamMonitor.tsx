@@ -84,8 +84,11 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
 
   useEffect(() => {
     fetchYoutubeStats();
-    // Poll every 10 seconds
-    const interval = setInterval(fetchYoutubeStats, 10000);
+    // Poll every 30 seconds - the no-selection fallback path can chain up to
+    // 4 YouTube API calls per poll, and polling too aggressively here is what
+    // burns through the daily YouTube API quota (confirmed via quotaExceeded
+    // errors in production after this ran for hours at a 10s interval).
+    const interval = setInterval(fetchYoutubeStats, 30000);
     return () => clearInterval(interval);
   }, [fetchYoutubeStats]);
 

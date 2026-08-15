@@ -4,6 +4,13 @@ import { youtubeFetch } from "@/lib/tokenStore";
 
 export const dynamic = "force-dynamic";
 
+// The no-videoId path can chain up to 4 YouTube API calls (active/upcoming/
+// any broadcast lookups + video details) - a short cache keeps multiple
+// clients polling this endpoint concurrently from each retriggering that
+// whole chain, which is what burned through the daily YouTube API quota.
+const NO_SELECTION_CACHE_TTL_MS = 15000;
+let noSelectionCache: { data: any; timestamp: number } | null = null;
+
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req);
   if (!authSession) {
@@ -12,6 +19,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const queryVideoId = searchParams.get("videoId");
+
+  if (!queryVideoId && noSelectionCache && Date.now() - noSelectionCache.timestamp < NO_SELECTION_CACHE_TTL_MS) {
+    return NextResponse.json(noSelectionCache.data);
+  }
+
+  const respond = (data: any) => {
+    if (!queryVideoId) noSelectionCache = { data, timestamp: Date.now() };
+    return NextResponse.json(data);
+  };
 
   try {
     let broadcastId: string | null = queryVideoId;
@@ -72,7 +88,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!broadcastId) {
-      return NextResponse.json({
+      return respond({
         active: false,
         broadcastStatus: "offline",
         title: "",
@@ -102,7 +118,7 @@ export async function GET(req: NextRequest) {
       const viewCount = stats?.viewCount ? parseInt(stats.viewCount) : 0;
       const liveContent = videoItem.snippet?.liveBroadcastContent; // 'live', 'upcoming', 'none'
 
-      return NextResponse.json({
+      return respond({
         active: liveContent === "live",
         broadcastStatus: liveContent, // 'live', 'upcoming', or 'none'
         title: videoItem.snippet?.title || broadcastTitle,
@@ -113,7 +129,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return respond({
       active: false,
       broadcastStatus: lifeCycleStatus === "live" ? "live" : "offline",
       title: broadcastTitle,
