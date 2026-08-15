@@ -194,7 +194,7 @@ export function createShowObject(show: any) {
       activeLayout: defaultLayoutId,
       template: show.data.category === 'scripture' ? 'scripture' : 'default'
     },
-    timestamps: { created: now, modified: now, used: now },
+    timestamps: { created: now, modified: null, used: null },
     meta: isBibleShow ? {
       copyright: show.refData.metadata?.copyright || "",
       title: show.refData.translationName || ""
@@ -258,7 +258,6 @@ export function createComplexShowObject(item: any) {
     }
 
     const slideItems: any[] = [];
-    const childIds: string[] = [];
 
     if (isMedia && !isBackground) {
       const itemId = generateId();
@@ -269,7 +268,6 @@ export function createComplexShowObject(item: any) {
         style: "top:0px;left:0px;height:1080px;width:1920px;",
         fit: "contain"
       });
-      childIds.push(itemId);
     } else if (slideData.text) {
       const itemId = generateId();
       const lines = slideData.text.split('\n').filter((l:any) => l.trim() !== '').map((line:any) => ({
@@ -284,7 +282,6 @@ export function createComplexShowObject(item: any) {
         align: "",
         auto: false
       });
-      childIds.push(itemId);
     }
 
     slides[slideId] = {
@@ -292,8 +289,7 @@ export function createComplexShowObject(item: any) {
       color: slideData.color || null,
       settings: {},
       notes: "",
-      items: slideItems,
-      children: childIds
+      items: slideItems
     };
 
     const layoutSlide: any = { id: slideId };
@@ -314,8 +310,9 @@ export function createComplexShowObject(item: any) {
     name: item.title || "Custom Show",
     private: false,
     category: "presentation",
-    settings: { activeLayout: layoutId, template: null },
-    timestamps: { created: now, modified: now, used: now },
+    settings: { activeLayout: layoutId, template: false },
+    timestamps: { created: now, modified: null, used: null },
+    meta: {},
     slides: slides,
     layouts: { [layoutId]: { name: "Default", notes: "", slides: layoutSlides } },
     media: media,
@@ -354,8 +351,7 @@ export function createMediaShowObject(item: any) {
         style: "top:0px;left:0px;height:1080px;width:1920px;",
         fit: "contain"
       }
-    ],
-    children: []
+    ]
   };
 
   const layoutSlide: any = { id: slideId };
@@ -374,8 +370,9 @@ export function createMediaShowObject(item: any) {
     name: item.title,
     private: false,
     category: "presentation",
-    settings: { activeLayout: layoutId, template: null },
-    timestamps: { created: now, modified: now, used: now },
+    settings: { activeLayout: layoutId, template: false },
+    timestamps: { created: now, modified: null, used: null },
+    meta: {},
     slides: slides,
     layouts: layouts,
     media: media,
@@ -459,10 +456,9 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
               color: null,
               settings: { timer: extra.timer || 5, auto: true, loop: !!extra.loop },
               notes: "",
-              items: [],
-              children: []
+              items: []
             };
-            layout.slides.push({ id: slideId, children: {}, background: mediaId });
+            layout.slides.push({ id: slideId, background: mediaId });
             if (!dataFile.files.includes(extra.path)) dataFile.files.push(extra.path);
           });
         }
