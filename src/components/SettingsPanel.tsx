@@ -1400,6 +1400,20 @@ export default function SettingsPanel({
                   />
                 </div>
               </div>
+
+              <div className="input-group">
+                <label className="input-label">Verplicht woord in onderwerp</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.emailSubjectKeyword ?? "Liturgie"}
+                  onChange={(e) => onSettingsChange({ ...settings, emailSubjectKeyword: e.target.value })}
+                  placeholder="Liturgie"
+                />
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Alleen ongelezen mails waarvan het onderwerp dit woord bevat worden opgehaald en gemarkeerd als gelezen — andere mail in dit postvak wordt niet aangeraakt. Leeg laten om elke ongelezen mail te controleren.
+                </p>
+              </div>
             </section>
           )}
 

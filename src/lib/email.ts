@@ -74,7 +74,14 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
     const connection = await imaps.connect(config);
     await connection.openBox('INBOX');
 
-    const searchCriteria = ['UNSEEN'];
+    // For a shared/existing mailbox, restrict the IMAP-side search to
+    // subjects containing the configured keyword so unrelated mail is never
+    // fetched or marked as read by this sync - only matching messages are
+    // touched at all. Leave the keyword empty to check every unread mail.
+    const subjectKeyword: string = (settings.emailSubjectKeyword ?? 'Liturgie').trim();
+    const searchCriteria: any[] = subjectKeyword
+      ? ['UNSEEN', ['SUBJECT', subjectKeyword]]
+      : ['UNSEEN'];
     // Fetch the full raw message (bodies: ['']) so mailparser can extract attachments,
     // not just the text part.
     const fetchOptions = { bodies: [''], markSeen: true, struct: true };
