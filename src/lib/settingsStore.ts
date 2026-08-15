@@ -236,7 +236,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ftpPort: 21,
   webdavUrl: "https://stack.netwerkengineer.nl/webdav/files/jeffreygo",
   webdavUser: "jeffreygo",
-  webdavPass: "Q01wra7qQnxaqgEkFYPtUt6_2kc",
+  webdavPass: "",
   imapUser: "",
   imapPass: "",
   imapHost: "imap.gmail.com",
