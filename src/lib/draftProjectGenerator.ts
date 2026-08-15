@@ -84,9 +84,13 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
 }
 
 // Only youtube downloads and image/video attachments can become a real
-// FreeShow media show today - PowerPoint attachments and generic links have
+// FreeShow media item today - PowerPoint attachments and generic links have
 // no conversion path in this codebase, so they're surfaced as a note for a
 // medewerker to add by hand instead of silently dropped.
+//
+// layer: 'direct' adds it as a standalone media item in the running order
+// (native FreeShow play/pause/stop controls) instead of wrapping it inside
+// a "presentation" show, which has no video transport controls at all.
 function resolveMediaItem(media: DraftMedia, settings: any): any | null {
   if (!media.filePath) return null;
   const metaType = inferMetaType(media.filePath);
@@ -94,6 +98,7 @@ function resolveMediaItem(media: DraftMedia, settings: any): any | null {
   return {
     id: media.id,
     type: 'media',
+    layer: 'direct',
     targetSection: media.section,
     filePath: toFreeShowClientPath(media.filePath, settings.freeshowPath, settings.freeshowClientPath),
     metaType,
