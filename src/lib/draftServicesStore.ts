@@ -154,6 +154,13 @@ export function mergeParsedEmailIntoDraft(
 
   const now = new Date().toISOString();
   let draft = store.services[parsed.serviceDate];
+
+  // Safety net: if this exact message was already merged (e.g. re-synced
+  // after a transient error elsewhere), don't process it again.
+  if (draft && emailMeta.messageId && draft.sourceEmails.some(e => e.messageId === emailMeta.messageId)) {
+    return draft;
+  }
+
   if (!draft) {
     draft = {
       id: parsed.serviceDate,
