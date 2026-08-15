@@ -332,21 +332,30 @@ export function getCategoryDisplayName(
   catId: string,
   freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>
 ): string {
-  // FreeShow custom categories (e.g. "ff29de14140") store their real name
-  // in settings_synced.json, keyed by that id. Prefer it when available.
-  const customName = freeshowCategories?.[catId]?.name;
-  if (customName) return customName;
-
   const map: Record<string, string> = {
     'user': 'Eigen',
     'song': 'Lied',
     'presentation': 'Presentatie',
     'scripture': 'Schrift',
+    'unknown': 'Onbekend',
     'Songs': 'Liederen',
     'Presentation': 'Presentatie',
     'Media': 'Media',
     'User': 'Eigen'
   };
 
-  return map[catId] || catId;
+  // Built-in categories store an untranslated i18n key (e.g. "category.song")
+  // as their "name" in settings_synced.json, not a display name - use our own.
+  if (map[catId]) return map[catId];
+
+  // FreeShow custom categories (e.g. "ff29de14140") store their real name
+  // in settings_synced.json, keyed by that id. Prefer it when available.
+  const entry = freeshowCategories?.[catId];
+  if (entry?.name) return entry.name;
+
+  // A custom category that exists but has no name set yet - FreeShow itself
+  // labels these "Unnamed" rather than showing the generated id.
+  if (entry) return 'Naamloos';
+
+  return catId;
 }
