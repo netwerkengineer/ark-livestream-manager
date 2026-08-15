@@ -75,6 +75,19 @@ function rawFetch(imap: any, source: any, options: any): Promise<RawFetchedMessa
   });
 }
 
+// node-imap's raw fetch() has no markSeen convenience option - that's an
+// imap-simple-only wrapper that silently does nothing if passed here
+// (unrecognized object keys are just ignored). Without this, a message is
+// never actually marked \Seen, so it gets reprocessed and re-merged on
+// every future sync.
+function markSeen(imap: any, uid: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    imap.addFlags(uid, '\\Seen', (err: any) => {
+      if (err) reject(err); else resolve();
+    });
+  });
+}
+
 interface AttachmentPart {
   partID: string;
   filename: string;
@@ -172,7 +185,7 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
     console.log(`[Email Sync] ${uids.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
 
     for (const uid of uids) {
-      const fetched = await rawFetch(imap, [uid], { bodies: ['HEADER', 'TEXT'], struct: true, markSeen: true });
+      const fetched = await rawFetch(imap, [uid], { bodies: ['HEADER', 'TEXT'], struct: true });
       if (fetched.length === 0) {
         console.error(`[Email Sync] Kon bericht UID ${uid} niet ophalen, wordt overgeslagen.`);
         continue;
@@ -182,6 +195,16 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
       if (!textBody) {
         console.error(`[Email Sync] Geen tekstdeel in bericht UID ${uid}, onderdelen: ${JSON.stringify(Object.keys(parts))}`);
         continue;
+      }
+
+      // Mark seen now that the message has been successfully fetched, so a
+      // failure further down (attachment fetch, store write) can't leave it
+      // permanently stuck as unread-and-unprocessable, but a message we
+      // never even got the text for is left unseen for a retry next sync.
+      try {
+        await markSeen(imap, uid);
+      } catch (seenErr) {
+        console.error(`[Email Sync] Kon bericht UID ${uid} niet als gelezen markeren:`, seenErr);
       }
 
       const rawMessage = `${parts['HEADER'] || ''}\r\n${textBody}`;
