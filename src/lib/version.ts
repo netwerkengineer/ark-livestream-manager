@@ -1,5 +1,3 @@
-/**
- * Application version
- * This should be updated with each release
- */
-export const VERSION = '2.4.0';
+import pkg from '../../package.json';
+
+export const VERSION = pkg.version;
