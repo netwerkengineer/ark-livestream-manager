@@ -143,7 +143,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                     <option value="all">Alle Categorieën</option>
                     {uniqueCategories.map(cat => (
                       <option key={cat} value={cat}>
-                        {getCategoryDisplayName(cat, freeshowCategories)} ({cat})
+                        {getCategoryDisplayName(cat, freeshowCategories)}
                       </option>
                     ))}
                   </select>
