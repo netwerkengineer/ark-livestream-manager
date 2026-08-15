@@ -116,16 +116,32 @@ export function createShowObject(show: any) {
           }
         ],
         customDynamicValues: {
+          // Real bible templates often use the numbered {scripture1_...}
+          // placeholder form (built for showing multiple translations side
+          // by side) rather than the unprefixed {scripture_...} one - FreeShow's
+          // own template-merge code treats scripture1_* as authoritative and
+          // scripture_* as just a convenience alias of it. Only unprefixed
+          // values here meant those placeholders stayed blank when a real
+          // scripture template got applied. This church only uses one
+          // translation, so scripture1_* just duplicates the same values.
           scripture_name: show.refData.translationName || "",
           scripture_book: show.refData.book,
           scripture_book_abbr: show.refData.bookAbbr || show.refData.book.substring(0, 3),
           scripture_chapter: show.refData.chapter.toString(),
           scripture_reference_full: slideRef,
+          scripture_reference_last: slideRef,
           meta_copyright: show.refData.metadata?.copyright || "",
           meta_title: show.refData.translationName || "",
           scripture_reference: slideRef,
           scripture_verses: verseRange,
-          scripture_text: chunk.map((v: any) => [v.verse, v.text])
+          scripture_text: chunk.map((v: any) => [v.verse, v.text]),
+          scripture1_name: show.refData.translationName || "",
+          scripture1_book: show.refData.book,
+          scripture1_book_abbr: show.refData.bookAbbr || show.refData.book.substring(0, 3),
+          scripture1_chapter: show.refData.chapter.toString(),
+          scripture1_reference: slideRef,
+          scripture1_verses: verseRange,
+          scripture1_text: chunk.map((v: any) => [v.verse, v.text])
         }
       };
     } else {
