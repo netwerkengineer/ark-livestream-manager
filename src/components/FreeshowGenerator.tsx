@@ -1481,11 +1481,31 @@ export default function FreeshowGenerator() {
             <div className="glass-card" style={{ border: '2px solid var(--primary)', background: 'rgba(56, 189, 248, 0.05)' }}>
               <h2 style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{t('staging_area_title')}</h2>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '12px', marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>{draftItem.type === 'song' ? draftItem.title : draftItem.ref}</div>
-                <textarea 
-                  className="input" style={{ height: '350px', fontFamily: 'monospace' }}
-                  value={draftItem.text} onChange={e => updateItemText(draftItem.id, e.target.value)}
-                />
+                {draftItem.type === 'media' ? (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.8rem' }}>📎 {draftItem.title}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', minHeight: '160px' }}>
+                      {draftItem.metaType === 'image' ? (
+                        <img src={resolveMediaPath(draftItem.filePath)} alt={draftItem.title} style={{ maxWidth: '100%', maxHeight: '220px', objectFit: 'contain' }} />
+                      ) : (
+                        <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.6 }}>🎬<div style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>{t('video')}</div></div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', fontSize: '0.7rem', opacity: 0.7 }}>
+                      <span>{draftItem.layer === 'direct' ? t('file') : draftItem.layer === 'background' ? t('background') : t('foreground')}</span>
+                      {draftItem.metaType === 'image' && <span>· {draftItem.timer || 5}s</span>}
+                      {draftItem.loop && <span>· 🔁 {t('loop')}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 'bold', marginBottom: '1rem' }}>{draftItem.type === 'song' ? draftItem.title : draftItem.ref}</div>
+                    <textarea
+                      className="input" style={{ height: '350px', fontFamily: 'monospace' }}
+                      value={draftItem.text} onChange={e => updateItemText(draftItem.id, e.target.value)}
+                    />
+                  </>
+                )}
                 <div style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>Sectie verplaatsen</label>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -1505,11 +1525,12 @@ export default function FreeshowGenerator() {
                   </div>
                 </div>
               </div>
+              <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.5rem' }}>{t('staging_area_help')}</div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={cancelDraft}>{t('annuleren')}</button>
                 <div style={{ display: 'flex', flex: 2, gap: '0.4rem' }}>
                   <button className="button" style={{ flex: 1, background: 'var(--primary)', color: '#020617' }} onClick={confirmDraft}>{t('add_to_playlist_btn')}</button>
-                  <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={() => { 
+                  <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={() => {
                     setBuilderSlides([...builderSlides, draftItem]); 
                     setDraftItem(null); 
                     setStatus(t('item_added_to_playlist')); // Logic matches add to builder usually but let's stick to translations
