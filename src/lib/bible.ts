@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import fs from 'fs/promises';
 import path from 'path';
 import { getSettings } from '@/lib/settingsStore';
+import { foldDiacritics } from '@/lib/freeshowUtils';
 
 export interface BibleVerse {
   book: string;
@@ -37,8 +38,9 @@ export async function getBibleVerses(translation: string, bookName: string, chap
     const bibleData = Array.isArray(rawData) ? rawData[1] : rawData;
 
     const books = bibleData.books || [];
-    const book = books.find((b: any) => 
-      b.name.toLowerCase() === bookName.toLowerCase() || 
+    const normalizedBookName = foldDiacritics(bookName.toLowerCase());
+    const book = books.find((b: any) =>
+      foldDiacritics(b.name.toLowerCase()) === normalizedBookName ||
       b.number === bookName
     );
 
