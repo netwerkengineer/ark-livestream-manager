@@ -80,7 +80,13 @@ export function parseServiceEmail(text: string): ParsedEmail {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    if (!line) continue;
+    if (!line) {
+      // A blank line ends the current block (paragraph), so trailing text
+      // like a sign-off ("Groetjes, Jan") after a block isn't misclassified
+      // as an unrecognized item within that block.
+      currentBlock = null;
+      continue;
+    }
 
     const dateMatch = line.match(SERVICE_DATE_RE);
     if (dateMatch) {
