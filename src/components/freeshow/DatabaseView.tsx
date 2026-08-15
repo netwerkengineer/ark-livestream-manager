@@ -56,6 +56,7 @@ interface DatabaseViewProps {
   restoreSelectedItems: () => void;
   emptyTrash: () => void;
   t: (key: string) => string;
+  freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
 }
 
 export default function DatabaseView(props: DatabaseViewProps) {
@@ -112,7 +113,8 @@ export default function DatabaseView(props: DatabaseViewProps) {
     downloadBackup,
     restoreSelectedItems,
     emptyTrash,
-    t
+    t,
+    freeshowCategories
   } = props;
 
   return (
@@ -141,7 +143,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                     <option value="all">Alle Categorieën</option>
                     {uniqueCategories.map(cat => (
                       <option key={cat} value={cat}>
-                        {getCategoryDisplayName(cat)} ({cat})
+                        {getCategoryDisplayName(cat, freeshowCategories)} ({cat})
                       </option>
                     ))}
                   </select>
@@ -185,7 +187,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', opacity: 0.8 }}>
-                              🏷️ {getCategoryDisplayName(show.category)}
+                              🏷️ {getCategoryDisplayName(show.category, freeshowCategories)}
                             </span>
                             <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', opacity: 0.8 }}>
                               📄 {show.slideCount} slides
@@ -332,7 +334,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ overflow: 'hidden' }}>
                             <div style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{song.name}</div>
-                            <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{getCategoryDisplayName(song.category)}</div>
+                            <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{getCategoryDisplayName(song.category, freeshowCategories)}</div>
                           </div>
                           <button 
                             onClick={() => deleteFromLibrary(song.name + '.show')}

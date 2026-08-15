@@ -328,7 +328,15 @@ export function getTranslatedTitle(title: string): string {
   return translations[title] || title;
 }
 
-export function getCategoryDisplayName(catId: string): string {
+export function getCategoryDisplayName(
+  catId: string,
+  freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>
+): string {
+  // FreeShow custom categories (e.g. "ff29de14140") store their real name
+  // in settings_synced.json, keyed by that id. Prefer it when available.
+  const customName = freeshowCategories?.[catId]?.name;
+  if (customName) return customName;
+
   const map: Record<string, string> = {
     'user': 'Eigen',
     'song': 'Lied',

@@ -1573,6 +1573,7 @@ export default function FreeshowGenerator() {
                      catalogSongs={catalogSongs}
                      onAddSong={adHocAddSong}
                      t={t}
+                     freeshowCategories={freeshowCategories}
                    />
                  )}
 
@@ -1583,6 +1584,7 @@ export default function FreeshowGenerator() {
                       catalogSongs={catalogSongs}
                       onAddSong={adHocAddSong}
                       t={t}
+                      freeshowCategories={freeshowCategories}
                     />
                   )}
 
@@ -1882,7 +1884,7 @@ export default function FreeshowGenerator() {
                   <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{item.filename}</div>
                     <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('modified')}: {new Date(item.modified).toLocaleString()}</div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('category')}: {getCategoryDisplayName(item.category)}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>{t('category')}: {getCategoryDisplayName(item.category, freeshowCategories)}</div>
                     {item.mediaInfo && (
                       <div style={{ marginTop: '0.5rem', padding: '0.4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid var(--primary)' }}>
                         🎬 <b>{t('background')}:</b> {item.mediaInfo.name} ({item.mediaInfo.type})
@@ -1945,7 +1947,7 @@ export default function FreeshowGenerator() {
                 >
                   {uniqueCategories.map(cat => (
                     <option key={cat} value={cat}>
-                      {getCategoryDisplayName(cat)} ({cat})
+                      {getCategoryDisplayName(cat, freeshowCategories)} ({cat})
                     </option>
                   ))}
                 </select>
@@ -2146,6 +2148,7 @@ export default function FreeshowGenerator() {
           loadingShows={loadingShows}
           showsList={showsList}
           uniqueCategories={uniqueCategories}
+          freeshowCategories={freeshowCategories}
           builderSlides={builderSlides}
           setBuilderSlides={setBuilderSlides}
           builderTitle={builderTitle}
