@@ -1,9 +1,10 @@
 "use client";
 import React from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
+import DraftServicesReview from './DraftServicesReview';
 
 interface DatabaseViewProps {
-  databaseSubTab: 'catalog' | 'builder' | 'maintenance';
+  databaseSubTab: 'catalog' | 'builder' | 'maintenance' | 'drafts';
   showsSearch: string;
   setShowsSearch: (value: string) => void;
   showsCategoryFilter: string;
@@ -500,6 +501,8 @@ export default function DatabaseView(props: DatabaseViewProps) {
                </div>
               </div>
           )}
+
+          {databaseSubTab === 'drafts' && <DraftServicesReview />}
     </div>
   );
 }

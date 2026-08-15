@@ -1,8 +1,57 @@
 import imaps from 'imap-simple';
 import { simpleParser } from 'mailparser';
+import fs from 'fs';
+import path from 'path';
 import { getSettings } from '@/lib/settingsStore';
+import { parseServiceEmail, ParsedMedia } from '@/lib/emailParser';
+import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStore';
 
-export async function checkEmailsForProjects() {
+const ATTACHMENTS_DIR = path.join(process.cwd(), 'data', 'emailAttachments');
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+}
+
+function saveAttachments(messageId: string, attachments: { filename?: string; content: Buffer }[]): { filename: string; path: string }[] {
+  if (attachments.length === 0) return [];
+  const dir = path.join(ATTACHMENTS_DIR, sanitizeFilename(messageId || Date.now().toString()));
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const saved: { filename: string; path: string }[] = [];
+  for (const att of attachments) {
+    if (!att.filename) continue;
+    const safeName = sanitizeFilename(att.filename);
+    const filePath = path.join(dir, safeName);
+    fs.writeFileSync(filePath, att.content);
+    saved.push({ filename: att.filename, path: filePath });
+  }
+  return saved;
+}
+
+// Matches a "(bijlage: naam)" reference from the email body against the
+// attachments that were actually saved, so the draft can reference the
+// real file instead of just the filename someone typed in the text.
+function resolveAttachmentPaths(items: ParsedMedia[], saved: { filename: string; path: string }[]) {
+  for (const item of items) {
+    if (item.mediaType !== 'attachment' || !item.attachmentName) continue;
+    const wanted = item.attachmentName.trim().toLowerCase();
+    const match = saved.find(s => s.filename.toLowerCase() === wanted)
+      || saved.find(s => s.filename.toLowerCase().includes(wanted) || wanted.includes(s.filename.toLowerCase()));
+    if (match) {
+      item.filePath = match.path;
+    }
+  }
+}
+
+/**
+ * Polls the configured IMAP inbox for unread service-planning emails,
+ * parses each one with the rule-based section parser, and merges the
+ * result into the draft-services store (data/draftServices.json).
+ * Nothing here touches FreeShow itself - that only happens once a
+ * medewerker reviews and generates/updates a project from the drafts tab.
+ */
+export async function checkEmailsForProjects(): Promise<DraftService[]> {
   const settings = getSettings() as any;
   const config = {
     imap: {
@@ -19,60 +68,50 @@ export async function checkEmailsForProjects() {
     throw new Error('IMAP-gegevens zijn niet geconfigureerd.');
   }
 
+  const touchedDrafts = new Map<string, DraftService>();
+
   try {
     const connection = await imaps.connect(config);
     await connection.openBox('INBOX');
 
     const searchCriteria = ['UNSEEN'];
-    const fetchOptions = { bodies: ['HEADER', 'TEXT'], markSeen: true };
+    // Fetch the full raw message (bodies: ['']) so mailparser can extract attachments,
+    // not just the text part.
+    const fetchOptions = { bodies: [''], markSeen: true, struct: true };
     const results = await connection.search(searchCriteria, fetchOptions);
-
-    const parsedProjects = [];
 
     for (const res of results) {
       const allParts = imaps.getParts(res.parts as any);
-      const textPart = allParts.find((part: any) => part.which === 'TEXT');
-      
-      if (textPart) {
-        const parsedMail = await simpleParser(textPart.body);
-        const content = parsedMail.text || '';
-        
-        const project = parseEmailContentToProject(content);
-        if (project.songs.length > 0 || project.scriptures.length > 0) {
-          parsedProjects.push(project);
-        }
+      const fullPart = allParts.find((part: any) => part.which === '');
+      if (!fullPart) continue;
+
+      const parsedMail = await simpleParser(fullPart.body);
+      const content = parsedMail.text || '';
+      const messageId = parsedMail.messageId || `${Date.now()}`;
+      const subject = parsedMail.subject || '(geen onderwerp)';
+      const receivedAt = (parsedMail.date || new Date()).toISOString();
+
+      const parsed = parseServiceEmail(content);
+
+      const saved = saveAttachments(messageId, (parsedMail.attachments || []).map(a => ({ filename: a.filename, content: a.content })));
+      resolveAttachmentPaths(parsed.items.filter((i): i is ParsedMedia => i.type === 'media'), saved);
+
+      const draft = mergeParsedEmailIntoDraft(parsed, {
+        messageId,
+        subject,
+        receivedAt,
+        excerpt: content.slice(0, 500)
+      });
+
+      if (draft) {
+        touchedDrafts.set(draft.serviceDate, draft);
       }
     }
 
     connection.end();
-    return parsedProjects;
+    return Array.from(touchedDrafts.values());
   } catch (error) {
     console.error('IMAP Error:', error);
     throw error;
   }
-}
-
-function parseEmailContentToProject(text: string) {
-  const lines = text.split('\n');
-  const project = { date: new Date().toLocaleDateString('nl-NL'), songs: [] as string[], scriptures: [] as string[] };
-  
-  for (const line of lines) {
-    const cleanLine = line.trim();
-    if (!cleanLine) continue;
-
-    // Detect format: Title - Artist
-    if (cleanLine.includes(' - ') && !/\d:\d/.test(cleanLine)) {
-      project.songs.push(cleanLine);
-    }
-    // Detect Bible verse: Book Chapter:Verse(s)
-    else if (/\d:\d/.test(cleanLine)) {
-      project.scriptures.push(cleanLine);
-    }
-    // Detect date if specified like "12/04/26"
-    else if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(cleanLine)) {
-      project.date = cleanLine;
-    }
-  }
-
-  return project;
 }
