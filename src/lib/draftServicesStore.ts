@@ -109,6 +109,25 @@ function dedupeSongTitle(existing: DraftSong[], title: string): boolean {
   return existing.some(s => s.title.trim().toLowerCase() === normalized);
 }
 
+function isDuplicateScripture(existing: DraftScripture[], item: Extract<ParsedItem, { type: 'scripture' }>): boolean {
+  return existing.some(s =>
+    s.book === item.book &&
+    s.chapter === item.chapter &&
+    s.verseStart === item.verseStart &&
+    s.verseEnd === item.verseEnd &&
+    s.translation.trim().toLowerCase() === item.translation.trim().toLowerCase()
+  );
+}
+
+function isDuplicateMedia(existing: DraftMedia[], item: Extract<ParsedItem, { type: 'media' }>): boolean {
+  return existing.some(m => {
+    if (m.mediaType !== item.mediaType) return false;
+    if (item.url) return m.url === item.url;
+    if (item.attachmentName) return m.attachmentName?.trim().toLowerCase() === item.attachmentName.trim().toLowerCase();
+    return false;
+  });
+}
+
 /**
  * Merges one parsed email into the draft service for its service date,
  * creating the draft if it doesn't exist yet. If the email had no
@@ -161,26 +180,30 @@ export function mergeParsedEmailIntoDraft(
         });
       }
     } else if (item.type === 'scripture') {
-      draft.scriptures.push({
-        id: newId(),
-        book: item.book,
-        chapter: item.chapter,
-        verseStart: item.verseStart,
-        verseEnd: item.verseEnd,
-        translation: item.translation,
-        section: item.section,
-        addedAt: now
-      });
+      if (!isDuplicateScripture(draft.scriptures, item)) {
+        draft.scriptures.push({
+          id: newId(),
+          book: item.book,
+          chapter: item.chapter,
+          verseStart: item.verseStart,
+          verseEnd: item.verseEnd,
+          translation: item.translation,
+          section: item.section,
+          addedAt: now
+        });
+      }
     } else if (item.type === 'media') {
-      draft.media.push({
-        id: newId(),
-        mediaType: item.mediaType,
-        url: item.url,
-        attachmentName: item.attachmentName,
-        filePath: item.filePath,
-        section: item.section,
-        addedAt: now
-      });
+      if (!isDuplicateMedia(draft.media, item)) {
+        draft.media.push({
+          id: newId(),
+          mediaType: item.mediaType,
+          url: item.url,
+          attachmentName: item.attachmentName,
+          filePath: item.filePath,
+          section: item.section,
+          addedAt: now
+        });
+      }
     }
   }
 

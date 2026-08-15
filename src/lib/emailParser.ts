@@ -55,9 +55,15 @@ function parseServiceDate(raw: string): string | null {
   return `${y}-${month}-${day}`;
 }
 
+// Strips diacritics (ë, ï, ü, ï, ...) so "1 Samuel"/"Korinthiers" match
+// "1 Samuël"/"Korinthiërs" - people commonly type these without accents.
+function foldDiacritics(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function findBibleBook(name: string): string | null {
-  const normalized = name.trim().toLowerCase();
-  const found = BIBLE_BOOKS.find(b => b.toLowerCase() === normalized);
+  const normalized = foldDiacritics(name.trim().toLowerCase());
+  const found = BIBLE_BOOKS.find(b => foldDiacritics(b.toLowerCase()) === normalized);
   return found || null;
 }
 
