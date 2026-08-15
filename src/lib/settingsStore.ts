@@ -68,6 +68,7 @@ export interface AppSettings {
   freeshowProjectPath?: string;
   freeshowMediaPath?: string;
   freeshowTrashPath?: string;
+  freeshowClientPath?: string;
   autoSaveToNas?: boolean;
   defaultTemplate?: string;
   backupTarget?: string;

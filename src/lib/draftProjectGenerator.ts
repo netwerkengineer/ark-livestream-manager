@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settingsStore';
 import { checkLocalSongExists, getLocalSongText, getLocalShowData, fetchLyricsFromInternet } from '@/lib/songs';
 import { getBibleVerses } from '@/lib/bible';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
+import { toFreeShowClientPath } from '@/lib/freeshowUtils';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
 
 export interface GenerateResult {
@@ -86,7 +87,7 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
 // FreeShow media show today - PowerPoint attachments and generic links have
 // no conversion path in this codebase, so they're surfaced as a note for a
 // medewerker to add by hand instead of silently dropped.
-function resolveMediaItem(media: DraftMedia): any | null {
+function resolveMediaItem(media: DraftMedia, settings: any): any | null {
   if (!media.filePath) return null;
   const metaType = inferMetaType(media.filePath);
   if (!metaType) return null;
@@ -94,7 +95,7 @@ function resolveMediaItem(media: DraftMedia): any | null {
     id: media.id,
     type: 'media',
     targetSection: media.section,
-    filePath: media.filePath,
+    filePath: toFreeShowClientPath(media.filePath, settings.freeshowPath, settings.freeshowClientPath),
     metaType,
     title: media.attachmentName || path.basename(media.filePath)
   };
@@ -176,7 +177,7 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
   for (const media of draft.media) {
-    const item = resolveMediaItem(media);
+    const item = resolveMediaItem(media, settings);
     if (item) {
       showsList.push(item);
     } else if (media.mediaType !== 'link') {

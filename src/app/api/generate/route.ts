@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
+import { toFreeShowClientPath } from '@/lib/freeshowUtils';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
 import fs from 'fs/promises';
@@ -14,13 +15,13 @@ export async function POST(req: NextRequest) {
 
     const { date, projectName, items, useTemplate, saveToNas, projectPath } = await req.json();
     const showsList: any[] = [];
-    
+    const settings = getSettings() as any;
+
     // 1. Find the template path to use
     let DEFAULT_TEMPLATE_PATH = "";
-    
+
     // Check settings for custom template
     try {
-      const settings = getSettings() as any;
       if (settings.defaultTemplate && settings.freeshowProjectPath) {
         const customPath = path.join(settings.freeshowProjectPath, settings.defaultTemplate);
         try {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       } else if (item.type === 'media') {
         showsList.push({
           ...baseShow,
-          filePath: item.filePath,
+          filePath: toFreeShowClientPath(item.filePath, settings.freeshowPath, settings.freeshowClientPath),
           metaType: item.metaType,
           title: item.title
         });
