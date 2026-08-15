@@ -61,8 +61,6 @@ export function createShowObject(show: any) {
     }
 
     const isBible = show.data.category === 'scripture';
-    const itemIds: string[] = [];
-    const layoutChildren: any = {};
 
     if (isBible && show.refData && show.refData.chunks) {
       const chunk = show.refData.chunks[idx] || [];
@@ -75,9 +73,6 @@ export function createShowObject(show: any) {
 
       const itemIdMain = generateId();
       const itemIdDecor = generateId();
-      itemIds.push(itemIdMain, itemIdDecor);
-      layoutChildren[itemIdMain] = {};
-      layoutChildren[itemIdDecor] = {};
 
       const lines: any[] = [{ align: "text-align: left;", text: [] }];
 
@@ -120,7 +115,6 @@ export function createShowObject(show: any) {
             decoration: true
           }
         ],
-        children: itemIds,
         customDynamicValues: {
           scripture_name: show.refData.translationName || "",
           scripture_book: show.refData.book,
@@ -141,8 +135,6 @@ export function createShowObject(show: any) {
       }));
 
       const itemId = generateId();
-      itemIds.push(itemId);
-      layoutChildren[itemId] = {};
 
       slides[slideId] = {
         group: activeGroupName,
@@ -157,12 +149,11 @@ export function createShowObject(show: any) {
           align: "",
           auto: false
         }],
-        children: itemIds,
         globalGroup: activeGroupName ? activeGroupName.toLowerCase().replace(/\s+/g, '_') : null
       };
     }
 
-    const layoutPush: any = { id: slideId, children: layoutChildren };
+    const layoutPush: any = { id: slideId };
     if (idx === 0 && bgMediaId) {
       layoutPush.background = bgMediaId;
     }
