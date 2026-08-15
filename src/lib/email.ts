@@ -10,16 +10,25 @@ import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStor
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
 
 const execFilePromise = promisify(execFile);
-const ATTACHMENTS_DIR = path.join(process.cwd(), 'data', 'emailAttachments');
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
-function saveAttachments(messageId: string, attachments: { filename?: string; content: Buffer }[]): { filename: string; path: string }[] {
-  if (attachments.length === 0) return [];
-  const dir = path.join(ATTACHMENTS_DIR, sanitizeFilename(messageId || Date.now().toString()));
+// Attachments/downloaded video must live under FreeShow's own media folder
+// (settings.freeshowMediaPath) - the same directory the manual upload flow
+// (/api/upload) writes into - because FreeShow runs on a separate machine
+// (the Beamer PC) and can only resolve paths inside its own media root.
+// Saving into this app's internal data/ folder produces a path FreeShow
+// can't read at all, which renders as a black slide.
+function getMediaStagingDir(settings: any, messageId: string): string | null {
+  if (!settings.freeshowMediaPath) return null;
+  return path.join(settings.freeshowMediaPath, 'email-import', sanitizeFilename(messageId || Date.now().toString()));
+}
+
+function saveAttachments(dir: string | null, attachments: { filename?: string; content: Buffer }[]): { filename: string; path: string }[] {
+  if (!dir || attachments.length === 0) return [];
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -78,7 +87,8 @@ async function downloadYoutubeVideo(url: string, dir: string): Promise<{ filePat
   }
 }
 
-async function resolveYoutubeDownloads(items: ParsedMedia[], dir: string) {
+async function resolveYoutubeDownloads(items: ParsedMedia[], dir: string | null) {
+  if (!dir) return;
   for (const item of items) {
     if (item.mediaType !== 'youtube' || !item.url) continue;
     const result = await downloadYoutubeVideo(item.url, dir);
@@ -268,10 +278,14 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
           console.error('[Email Sync] Bijlagen ophalen mislukt:', attErr);
         }
       }
-      const saved = saveAttachments(messageId, attachments);
+      const stagingDir = getMediaStagingDir(settings, messageId);
+      if (!stagingDir) {
+        console.error('[Email Sync] Geen freeshowMediaPath ingesteld - bijlagen/YouTube-video worden niet opgeslagen.');
+      }
+      const saved = saveAttachments(stagingDir, attachments);
       const mediaItems = parsed.items.filter((i): i is ParsedMedia => i.type === 'media');
       resolveAttachmentPaths(mediaItems, saved);
-      await resolveYoutubeDownloads(mediaItems, path.join(ATTACHMENTS_DIR, sanitizeFilename(messageId)));
+      await resolveYoutubeDownloads(mediaItems, stagingDir);
 
       const draft = mergeParsedEmailIntoDraft(parsed, {
         messageId,
