@@ -48,6 +48,55 @@ async function resolveSongItem(song: DraftSong): Promise<any> {
   };
 }
 
+// Rough approximation of FreeShow's own smart-fit slide splitting (which
+// measures actual rendered text against the template's text box in pixels).
+// This just word-wraps against the box createShowObject hardcodes for
+// scripture slides (see the "1860px"/"865px"/"font-size: 80px" style below),
+// and packs as many verses as estimated to fit before starting a new slide,
+// instead of always putting exactly one verse per slide.
+const SCRIPTURE_BOX_WIDTH = 1860 - 50; // minus 25px padding each side
+const SCRIPTURE_BOX_HEIGHT = 865 - 50;
+const SCRIPTURE_FONT_SIZE = 80;
+const SCRIPTURE_CHARS_PER_LINE = Math.floor(SCRIPTURE_BOX_WIDTH / (SCRIPTURE_FONT_SIZE * 0.5));
+const SCRIPTURE_LINES_PER_SLIDE = Math.floor(SCRIPTURE_BOX_HEIGHT / (SCRIPTURE_FONT_SIZE * 1.35));
+
+function estimateLines(verses: { verse: string; text: string }[]): number {
+  let lines = 0;
+  let currentLineLength = 0;
+  for (const v of verses) {
+    const words = `${v.verse} ${v.text}`.split(/\s+/);
+    for (const word of words) {
+      if (!word) continue;
+      if (currentLineLength === 0) {
+        currentLineLength = word.length;
+        lines++;
+      } else if (currentLineLength + 1 + word.length <= SCRIPTURE_CHARS_PER_LINE) {
+        currentLineLength += 1 + word.length;
+      } else {
+        lines++;
+        currentLineLength = word.length;
+      }
+    }
+  }
+  return lines;
+}
+
+function groupVersesForSlides(verses: { verse: string; text: string }[]): { verse: string; text: string }[][] {
+  const groups: { verse: string; text: string }[][] = [];
+  let current: { verse: string; text: string }[] = [];
+  for (const v of verses) {
+    const proposed = [...current, v];
+    if (current.length > 0 && estimateLines(proposed) > SCRIPTURE_LINES_PER_SLIDE) {
+      groups.push(current);
+      current = [v];
+    } else {
+      current.push(v);
+    }
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
 // Mirrors /api/preview's bible resolution exactly (same chunking/text shape)
 // so the generated slides look identical to what the manual Builder makes.
 async function resolveScriptureItem(scripture: DraftScripture): Promise<any | null> {
@@ -56,7 +105,7 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
     const bibleRes = await getBibleVerses(scripture.translation, scripture.book, scripture.chapter, scripture.verseStart, verseEnd);
     if (!bibleRes.verses || bibleRes.verses.length === 0) return null;
 
-    const chunks: any[] = bibleRes.verses.map((v: any) => [v]);
+    const chunks: any[] = groupVersesForSlides(bibleRes.verses);
     const textMap = chunks.map(chunk => chunk.map((v: any) => `${v.verse}. ${v.text}`).join('\n')).join('\n\n');
     const ref = `${scripture.book} ${scripture.chapter}:${scripture.verseStart}${scripture.verseEnd ? '-' + scripture.verseEnd : ''}`;
 
@@ -70,10 +119,10 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
         book: bibleRes.bookInfo?.name || scripture.book,
         bookNumber: bibleRes.bookInfo?.number,
         bookAbbr: bibleRes.bookInfo?.abbreviation,
+        translationName: bibleRes.translationName,
         chapter: scripture.chapter,
         verses: bibleRes.verses,
-        chunks,
-        versesPerSlide: 1
+        chunks
       },
       data: { name: `${ref} - ${scripture.translation}`, category: 'scripture', text: textMap }
     };

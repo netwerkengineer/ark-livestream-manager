@@ -113,7 +113,7 @@ export function createShowObject(show: any) {
             type: "text",
             lines: [
               { align: "", text: [{ value: slideRef, style: "font-size: 55px;color: rgb(255 255 255 / 0.8);" }] },
-              { align: "", text: [{ value: show.refData.metadata?.name || "Bijbel", style: "font-size: 40px;color: rgb(255 255 255 / 0.7);" }] }
+              { align: "", text: [{ value: show.refData.translationName || "Bijbel", style: "font-size: 40px;color: rgb(255 255 255 / 0.7);" }] }
             ],
             style: "top: 900px;left: 30px;width: 1860px;height: 150px;",
             align: "",
@@ -122,13 +122,13 @@ export function createShowObject(show: any) {
         ],
         children: itemIds,
         customDynamicValues: {
-          scripture_name: show.refData.metadata?.name || "",
+          scripture_name: show.refData.translationName || "",
           scripture_book: show.refData.book,
           scripture_book_abbr: show.refData.bookAbbr || show.refData.book.substring(0, 3),
           scripture_chapter: show.refData.chapter.toString(),
           scripture_reference_full: slideRef,
           meta_copyright: show.refData.metadata?.copyright || "",
-          meta_title: show.refData.metadata?.name || "",
+          meta_title: show.refData.translationName || "",
           scripture_reference: slideRef,
           scripture_verses: verseRange,
           scripture_text: chunk.map((v: any) => [v.verse, v.text])
@@ -169,9 +169,15 @@ export function createShowObject(show: any) {
     layoutSlides.push(layoutPush);
   });
 
+  const isBibleShow = show.data.category === 'scripture' && show.refData;
+
   const defaultLayoutId = generateId();
   const showLayouts: any = {};
-  showLayouts[defaultLayoutId] = { name: "Default", notes: "", slides: layoutSlides };
+  showLayouts[defaultLayoutId] = {
+    name: isBibleShow ? (show.refData.translationName || "Default") : "Default",
+    notes: "",
+    slides: layoutSlides
+  };
 
   const showObj: any = {
     name: show.data.name,
@@ -182,12 +188,39 @@ export function createShowObject(show: any) {
       template: show.data.category === 'scripture' ? 'scripture' : 'default'
     },
     timestamps: { created: now, modified: now, used: now },
-    meta: {},
+    meta: isBibleShow ? {
+      copyright: show.refData.metadata?.copyright || "",
+      title: show.refData.translationName || ""
+    } : {},
     slides: slides,
     layouts: showLayouts,
     media: showMedia,
     quickAccess: {}
   };
+
+  // Links this show back to the bible collection/verses it was generated
+  // from - this is what makes FreeShow recognize it as "scripture" content
+  // (editable via its own bible tools, template-aware), not just plain text.
+  // FreeShow itself splits long verses into numbered sub-parts ("1_1","1_2")
+  // for finer slide control; this isn't reproduced here, so each verse gets
+  // a single "_1" part instead - close enough for FreeShow to recognize the
+  // reference, but won't support FreeShow's own long-verse re-splitting.
+  if (isBibleShow) {
+    const allVerses: string[] = (show.refData.chunks || []).flat().map((v: any) => `${v.verse}_1`);
+    showObj.reference = {
+      type: "scripture",
+      data: {
+        collection: show.refData.collectionId || "",
+        translations: 1,
+        version: show.refData.translationName || "",
+        api: false,
+        book: show.refData.bookNumber || "",
+        chapter: Number(show.refData.chapter),
+        verses: [allVerses],
+        attributionString: ""
+      }
+    };
+  }
 
   return showObj;
 }

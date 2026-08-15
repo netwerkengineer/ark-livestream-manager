@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
                   book: bibleRes.bookInfo?.name || book,
                   bookNumber: bibleRes.bookInfo?.number,
                   bookAbbr: bibleRes.bookInfo?.abbreviation,
+                  translationName: bibleRes.translationName,
                   chapter: chap,
                   verses: bibleRes.verses,
                   chunks: chunks,
