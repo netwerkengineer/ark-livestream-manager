@@ -130,7 +130,7 @@ export default function FreeshowGenerator() {
   const [isDeletingScriptures, setIsDeletingScriptures] = useState(false);
 
   // Shows Database Dashboard geconsolideerde states
-  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'>('catalog');
+  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'drafts'>('catalog');
   const [showsList, setShowsList] = useState<any[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsSearch, setShowsSearch] = useState('');
@@ -1654,12 +1654,19 @@ export default function FreeshowGenerator() {
                       >
                         🛠️ Nieuwe Show {builderSlides.length > 0 ? `(${builderSlides.length})` : '(Builder)'}
                       </button>
-                      <button 
-                        className="button" 
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'maintenance' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }} 
+                      <button
+                        className="button"
+                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'maintenance' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
                         onClick={() => setDatabaseSubTab('maintenance')}
                       >
                         🧹 Database Onderhoud
+                      </button>
+                      <button
+                        className="button"
+                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'drafts' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
+                        onClick={() => setDatabaseSubTab('drafts')}
+                      >
+                        📬 Concept-diensten (mail)
                       </button>
                     </div>
                   </div>

@@ -1350,6 +1350,56 @@ export default function SettingsPanel({
                   Gegenereerde projecten automatisch opslaan op de NAS
                 </label>
               </div>
+
+              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>📬 E-mail koppeling (concept-diensten)</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-12px' }}>
+                IMAP-postvak dat gecontroleerd wordt op liturgie-aanleveringen van worship leaders.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                <div className="input-group">
+                  <label className="input-label">IMAP Host</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.imapHost || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, imapHost: e.target.value })}
+                    placeholder="imap.gmail.com"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Poort</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={settings.imapPort || 993}
+                    onChange={(e) => onSettingsChange({ ...settings, imapPort: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="input-group">
+                  <label className="input-label">Gebruikersnaam</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.imapUser || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, imapUser: e.target.value })}
+                    placeholder="liturgie@arkchurch.nl"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Wachtwoord</label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    value={settings.imapPass || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, imapPass: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
             </section>
           )}
 
