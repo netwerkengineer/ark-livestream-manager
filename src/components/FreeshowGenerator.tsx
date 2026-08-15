@@ -320,7 +320,6 @@ export default function FreeshowGenerator() {
       'song',
       'presentation',
       'scripture',
-      'unknown',
       ...categoriesFromConfig,
       ...categoriesFromShows,
       ...categoriesFromCatalog
@@ -1947,7 +1946,7 @@ export default function FreeshowGenerator() {
                 >
                   {uniqueCategories.map(cat => (
                     <option key={cat} value={cat}>
-                      {getCategoryDisplayName(cat, freeshowCategories)} ({cat})
+                      {getCategoryDisplayName(cat, freeshowCategories)}
                     </option>
                   ))}
                 </select>
