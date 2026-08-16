@@ -1488,20 +1488,10 @@ export default function FreeshowGenerator() {
               <h4 style={{ marginBottom: '0.6rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span>🎥</span> {t('help_media_advanced_title')}</h4>
               <p style={{ opacity: 0.85 }}>{t('help_media_advanced_desc')}</p>
             </div>
-            
-            <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>📄 {t('download_manual_pdf')}</h4>
-              <p style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '1rem' }}>{t('manual_print_hint')}</p>
-              <a 
-                href={`/manual/${lang}`} 
-                target="_blank" 
-                className="button"
-                style={{ background: 'var(--primary)', textDecoration: 'none', display: 'inline-block', fontSize: '0.8rem' }}
-              >
-                📥 {t('download')}
-              </a>
-            </div>
           </div>
+          <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '1.5rem', marginBottom: 0 }}>
+            {t('full_manual_hint_prefix')} <strong>?</strong> {t('full_manual_hint_suffix')}
+          </p>
         </div>
       )}
 

@@ -966,6 +966,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>Tip voor OBS:</p>
                 <p style={{ fontSize: '0.85rem' }}>In OBS kun je een 'Afbeelding' bron toevoegen die verwijst naar <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px' }}>thema.jpg</code> in de geconfigureerde map. Deze wordt dan automatisch bijgewerkt!</p>
               </div>
+
+              <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', border: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>📄 Volledige handleiding</p>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '4px 0 0 0' }}>Alle onderdelen van de app, inclusief Instellingen en FreeShow Projecten. Klik op &quot;Afdrukken&quot; en kies &quot;Opslaan als PDF&quot; in je browser.</p>
+                </div>
+                <a
+                  href="/manual/nl"
+                  target="_blank"
+                  className="button"
+                  style={{ background: 'var(--primary)', color: '#020617', textDecoration: 'none', display: 'inline-block', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                >
+                  Open handleiding
+                </a>
+              </div>
             </div>
           </motion.div>
         )}
