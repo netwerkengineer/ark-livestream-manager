@@ -1,15 +1,15 @@
 # Walkthrough: QLC+ ArtNet Unicast Routing Fix
 
-Dit document beschrijft hoe we de ArtNet-communicatie hebben opgelost tussen de headless QLC+ container op container 112 (`192.168.2.222`) en de ArtNet-Node (`192.168.40.100`).
+Dit document beschrijft hoe we de ArtNet-communicatie hebben opgelost tussen de headless QLC+ container op container 112 (`192.0.2.10`) en de ArtNet-Node (`198.51.100.20`).
 
 ---
 
 ## 🔍 Probleemanalyse
 
-Bij het configureren van QLC+ via de ingebouwde webinterface (`http://192.168.2.222:9999/config`) traden de volgende problemen op:
-1. **Web UI Beperking:** De QLC+ Web-configuratiepagina biedt geen invoervelden voor specifieke plugin-parameters (zoals het doel-IP voor unicast ArtNet-berichten: `outputIP="192.168.40.100"`).
+Bij het configureren van QLC+ via de ingebouwde webinterface (`http://192.0.2.10:9999/config`) traden de volgende problemen op:
+1. **Web UI Beperking:** De QLC+ Web-configuratiepagina biedt geen invoervelden voor specifieke plugin-parameters (zoals het doel-IP voor unicast ArtNet-berichten: `outputIP="198.51.100.20"`).
 2. **Configuratie Overschrijving:** Zodra een interface werd geselecteerd in de Web UI, schreef QLC+ een lokaal override-bestand (`/root/.config/qlcplus/Q Light Controller Plus.conf`) in de container. Dit bestand bevatte wel de interface-mapping, maar *niet* het unicast IP-adres.
-3. **Fallback naar Broadcast:** Hierdoor viel QLC+ terug op broadcast (`192.168.2.255`). Broadcast-pakketten kunnen de router-gateway naar het andere subnet (`192.168.40.0/24`) niet passeren, waardoor de lichten niet reageerden.
+3. **Fallback naar Broadcast:** Hierdoor viel QLC+ terug op broadcast (`192.0.2.255`). Broadcast-pakketten kunnen de router-gateway naar het andere subnet (`198.51.100.0/24`) niet passeren, waardoor de lichten niet reageerden.
 
 ---
 
@@ -18,13 +18,13 @@ Bij het configureren van QLC+ via de ingebouwde webinterface (`http://192.168.2.
 We hebben dit opgelost door de configuratie direct in de bestanden vast te leggen en de netwerkinfrastructuur van de container te corrigeren:
 
 ### 1. Directe XML Project-configuratie (`config/ark_church_lighting.qxw`)
-We hebben de Universe 1 mappings in het projectbestand direct aangepast naar de host-interface (`192.168.2.222`) en de line-index (`Line 9`) van de container, met behoud van de specifieke `PluginParameters`:
+We hebben de Universe 1 mappings in het projectbestand direct aangepast naar de host-interface (`192.0.2.10`) en de line-index (`Line 9`) van de container, met behoud van de specifieke `PluginParameters`:
 
 ```xml
     <Universe Name="Universe 1" ID="0">
-     <Input Plugin="OSC" UID="192.168.2.222" Line="9"/>
-     <Output Plugin="ArtNet" UID="192.168.2.222" Line="9">
-      <PluginParameters outputIP="192.168.40.100"/>
+     <Input Plugin="OSC" UID="192.0.2.10" Line="9"/>
+     <Output Plugin="ArtNet" UID="192.0.2.10" Line="9">
+      <PluginParameters outputIP="198.51.100.20"/>
      </Output>
     </Universe>
 ```
@@ -67,12 +67,12 @@ We hebben de werking geverifieerd via tcpdump op de host-interface (`eth0`):
    
    **Output:**
    ```
-   18:03:25.043244 IP 192.168.2.222.6454 > 192.168.40.100.6454: UDP, length 530
-   18:03:26.043234 IP 192.168.2.222.6454 > 192.168.2.255.6454: UDP, length 14
+   18:03:25.043244 IP 192.0.2.10.6454 > 198.51.100.20.6454: UDP, length 530
+   18:03:26.043234 IP 192.0.2.10.6454 > 192.0.2.255.6454: UDP, length 14
    ```
 
 ### Conclusie:
-* De DMX-gegevens (lengte 530 bytes) worden **succesvol als unicast** direct naar het IP-adres van de ArtNet-Node (`192.168.40.100`) verzonden.
+* De DMX-gegevens (lengte 530 bytes) worden **succesvol als unicast** direct naar het IP-adres van de ArtNet-Node (`198.51.100.20`) verzonden.
 * De communicatie is stabiel en de lampen kunnen nu direct bediend worden vanuit de webinterface!
 
 > [!WARNING]
@@ -117,7 +117,7 @@ We hebben QLC+ en het projectbestand omgebouwd naar een **Multi-Universe-archite
 
 *   **Universe 1 (Index 0) - DMX Wash & Passthrough:**
     *   **Input:** `ArtNet` (van de Scenesetter via ArtNet-node) met **`Passthrough="True"`** ingeschakeld.
-    *   **Output:** `ArtNet` (naar de ArtNet-node/lampen met behoud van unicast IP `192.168.40.100`).
+    *   **Output:** `ArtNet` (naar de ArtNet-node/lampen met behoud van unicast IP `198.51.100.20`).
 *   **Universe 2 (Index 1) - OSC Besturing:**
     *   **Input:** `OSC` (van de Next.js live app).
 
@@ -137,11 +137,11 @@ Bij het deployen van QLC+ op de Synology NAS kwamen we tegen twee kernel-specifi
 
 ### Oplossing: Auto-Detecting Entrypoint Script
 
-We hebben het [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) script volledig herschreven met een slim mechanisme dat bij **elke opstart** automatisch:
+We hebben het `config/qlcplus/entrypoint.sh` script volledig herschreven met een slim mechanisme dat bij **elke opstart** automatisch:
 
 1. **Config opschoning** — Verwijdert het QLC+ configuratiebestand (`Q Light Controller Plus.conf`) om crash-loops te voorkomen
 2. **Achtergrond opstart** — Start QLC+ zonder project in de achtergrond en wacht tot de webserver (poort 9999) beschikbaar is
-3. **Auto-detectie** — Haalt de HTML van de `/config` pagina op en parseert de dropdown-menu's om het juiste LAN IP-adres (192.168.x.x) en bijbehorende **Line indexes** te detecteren voor ArtNet en OSC plugins
+3. **Auto-detectie** — Haalt de HTML van de `/config` pagina op en parseert de dropdown-menu's om het juiste LAN IP-adres (192.0.2.x) en bijbehorende **Line indexes** te detecteren voor ArtNet en OSC plugins
 4. **XML injectie** — Kopieert het projectbestand naar `/tmp`, injecteert de gedetecteerde Line indexes in de `<InputOutputMap>` sectie via `sed`
 5. **Web API laden** — Laadt het geconfigureerde project via `POST /loadProject` (multipart form upload) — dezelfde methode als de browser's "Load project" knop
 
@@ -154,7 +154,7 @@ Container Start
     ├─ qlcplus -w -n -p &  (background, no project)
     ├─ wait for port 9999
     ├─ curl /config → parse HTML
-    │   ├─ detect NAS_IP (192.168.2.250)
+    │   ├─ detect NAS_IP (192.0.2.50)
     │   ├─ detect ARTNET_LINE (8)
     │   └─ detect OSC_LINE (8)
     ├─ sed: inject mappings into /tmp/project.qxw
@@ -179,25 +179,25 @@ Voor toekomstige installaties op de NAS:
 ### Probleem 1: rtpMIDI Deelnemers niet zichtbaar in de App (Altijd 0)
 - **Oorzaak:** In `midiBridge.ts` luisterde de code naar `peerAdded` en `peerRemoved` op de `rtpmidi.Session` instantie. In de `rtpmidi` bibliotheek bestaan deze events echter niet op de `Session` klasse (ze zijn wel aanwezig in de discovery/mDNS module, maar mDNS is uitgeschakeld/niet beschikbaar in onze Docker container). De juiste events om netwerk-MIDI verbindingen te registreren zijn `streamAdded` en `streamRemoved`.
 - **Oplossing:** 
-  1. We hebben de event listeners in [midiBridge.ts](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/lib/midiBridge.ts) omgeschreven naar `streamAdded` en `streamRemoved`.
+  1. We hebben de event listeners in `src/lib/midiBridge.ts` omgeschreven naar `streamAdded` en `streamRemoved`.
   2. Om extra robuustheid te garanderen, hebben we `getActiveMidiPeers()` aangepast om de actieve streams live uit te lezen via de session methode `midiSession.getStreams()`. Dit voorkomt dat de status uit sync raakt bij eventuele gemiste pakketjes.
   3. We hebben de peer-naam gesaneerd door null-byte karakters (`\0`) en trailing whitespace te verwijderen (`name.replace(/\0/g, '').trim()`), aangezien RTP-MIDI netwerk-namen null-terminated zijn en dit vreemde tekens in de browser kon veroorzaken.
 
 ### Probleem 2: Knoppen in het Broadcast Control Center zijn Wit (Geen Kleur)
 - **Oorzaak:** In `BroadcastControlCenter.tsx` werd geprobeerd om inline stijlen te renderen via `getColorStyle(action.color)`. De stijlen werden echter overruled door de user-agent (browser default) stijlen van de `<button>` tag omdat Next.js App Router geen ondersteuning biedt voor de lokale `<style jsx>` blocken zonder extra plugins.
 - **Oplossing:** 
-  1. We hebben de styling verplaatst naar de globale [globals.css](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/globals.css) stylesheet. Hierin zijn expliciete klassen gedefinieerd voor `.emergency-btn` en alle kleuren (`.green`, `.red`, `.amber`, `.slate`, `.blue`, `.purple`, `.default`) met `!important` tags om te garanderen dat de kleuren altijd correct overschreven worden.
-  2. We hebben [BroadcastControlCenter.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/BroadcastControlCenter.tsx) aangepast om direct de kleurklasse te injecteren (`className="emergency-btn {action.color}"`) en de inline stijlen en het lokale `<style jsx>` block volledig opgeruimd.
+  1. We hebben de styling verplaatst naar de globale `src/app/globals.css` stylesheet. Hierin zijn expliciete klassen gedefinieerd voor `.emergency-btn` en alle kleuren (`.green`, `.red`, `.amber`, `.slate`, `.blue`, `.purple`, `.default`) met `!important` tags om te garanderen dat de kleuren altijd correct overschreven worden.
+  2. We hebben `src/components/BroadcastControlCenter.tsx` aangepast om direct de kleurklasse te injecteren (`className="emergency-btn {action.color}"`) en de inline stijlen en het lokale `<style jsx>` block volledig opgeruimd.
 
 ### Resultaten & Verificatie:
 - **Netwerk MIDI logs:** Na het herstarten van de container zien we in de logs dat de connectie met de Mac direct tot stand komt en het juiste event triggert:
   ```
-  [MIDI] Peer verbonden: MacBook Pro van Jeffrey (undefined)
-  info: Data channel to MacBook Pro van Jeffrey established
+  [MIDI] Peer verbonden: MacBook Pro (undefined)
+  info: Data channel to MacBook Pro established
   ```
 - **Status API:** De status-API `/api/services/status` geeft nu netjes de verbonden peer terug:
   ```json
-  "midiPeers": ["MacBook Pro van Jeffrey"]
+  "midiPeers": ["MacBook Pro"]
   ```
 - **Visueel:** De knoppen tonen nu hun respectievelijke kleuren (`green`, `red`, `amber`, `slate`) en de aangesloten peers worden live getoond onder "Actieve rtpMIDI Deelnemers" op het dashboard.
 
@@ -214,7 +214,7 @@ Voor toekomstige installaties op de NAS:
   1. In `midiBridge.ts` werd bij `rtpmidi.manager.createSession` de parameter `{ name: sessionName }` meegegeven. De `rtpmidi` bibliotheek verwacht hier echter `{ localName, bonjourName }`. Omdat deze keys ontbraken, viel Bonjour terug op de systeem-hostname (`os.hostname()`), wat standaard de Docker container-ID is.
   2. De container werd in Docker gestart zonder expliciete `--hostname` parameter, waardoor de hostname een willekeurige container-ID string werd.
 - **Oplossing:**
-  1. We hebben de configuratie in [midiBridge.ts](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/lib/midiBridge.ts) gecorrigeerd naar `{ localName: sessionName, bonjourName: sessionName }`. Hierdoor wordt de in de settings ingestelde naam (standaard `Ark-Church-App`, of een andere custom naam) correct naar AppleMIDI gecommuniceerd.
+  1. We hebben de configuratie in `src/lib/midiBridge.ts` gecorrigeerd naar `{ localName: sessionName, bonjourName: sessionName }`. Hierdoor wordt de in de settings ingestelde naam (standaard `Ark-Church-App`, of een andere custom naam) correct naar AppleMIDI gecommuniceerd.
   2. We hebben de Docker container gestart met de parameter `--hostname livestream-manager` zodat de default hostname van het systeem ook netjes en herkenbaar is.
 
 ### Probleem 5: MIDI In Note veld op het instellingenscherm was verplicht
@@ -223,7 +223,7 @@ Voor toekomstige installaties op de NAS:
 
 ## 7. Behringer X32 en ATEM Mini Emulators voor Offline Testen (v8.0)
 
-We hebben een volledige testomgeving opgezet op Proxmox LXC 112 (`192.168.2.222`) door emulatoren voor de Behringer X32 (audiomixer) en de Blackmagic ATEM Mini (videoswitcher) te draaien in Docker containers. Hierdoor kan er thuis offline getest worden met Bitfocus Companion en de Live Manager app zonder fysieke apparatuur.
+We hebben een volledige testomgeving opgezet op Proxmox LXC 112 (`192.0.2.10`) door emulatoren voor de Behringer X32 (audiomixer) en de Blackmagic ATEM Mini (videoswitcher) te draaien in Docker containers. Hierdoor kan er thuis offline getest worden met Bitfocus Companion en de Live Manager app zonder fysieke apparatuur.
 
 ### 1. Gerealiseerde Emulatoren
 - **ATEM Mini Emulator (`pyAtemSim`):**
@@ -237,7 +237,7 @@ We hebben een volledige testomgeving opgezet op Proxmox LXC 112 (`192.168.2.222`
   - Werkt volledig samen met de officiële **Behringer X32-Edit** en **Mixing Station** apps en Bitfocus Companion.
 
 ### 2. Deployment Script (`deploy_emulators.py`)
-Er is een nieuw deployment-script [deploy_emulators.py](file:///Users/jeffreygo/.gemini/antigravity/brain/bf19f21b-92b1-48b3-9ee1-f5a69eaa3005/scratch/deploy_emulators.py) aangemaakt dat automatisch:
+Er is een nieuw deployment-script `deploy_emulators.py` aangemaakt dat automatisch:
 1. De emulatorconfiguraties en de gewijzigde `docker-compose.yml` via SCP naar Proxmox kopieert.
 2. De bestanden met `pct push 112` in LXC container 112 zet.
 3. De containers bouwt en start via `docker compose -f /app/docker-compose.yml up -d --build x32-emulator atem-emulator`.
@@ -247,9 +247,9 @@ Er is een nieuw deployment-script [deploy_emulators.py](file:///Users/jeffreygo/
 - **Docker Status:** Beide containers draaien succesvol op LXC 112:
   - `atem-emulator` -> `Up` op poort `9910/udp`
   - `x32-emulator` -> `Up` op poort `10023/udp`
-- **OSC Handshake Test:** We hebben via een testscript `/xinfo` gestuurd naar de X32-emulator op `192.168.2.222:10023` en kregen direct de correcte model- en firmware-informatie terug:
+- **OSC Handshake Test:** We hebben via een testscript `/xinfo` gestuurd naar de X32-emulator op `192.0.2.10:10023` en kregen direct de correcte model- en firmware-informatie terug:
   ```
-  Success! Response from ('192.168.2.222', 10023): b'/xinfo\x00\x00,ssss\x00\x00\x000.0.0.0\x00X32 Emulator\x00\x00\x00\x00X32\x004.06\x00\x00\x00\x00'
+  Success! Response from ('192.0.2.10', 10023): b'/xinfo\x00\x00,ssss\x00\x00\x000.0.0.0\x00X32 Emulator\x00\x00\x00\x00X32\x004.06\x00\x00\x00\x00'
   ```
 - **Logs:** De container logs tonen de correcte afhandeling van de handshake:
   ```
@@ -259,21 +259,21 @@ Er is een nieuw deployment-script [deploy_emulators.py](file:///Users/jeffreygo/
   ```
 
 ### 4. Hoe thuis te verbinden
-- **ATEM Software Control:** Start de app op je Mac, vul IP `192.168.2.222` in en klik op **Connect**.
-- **X32-Edit:** Ga naar **Setup -> Connection**, voeg handmatig IP `192.168.2.222` toe en verbind (Sync Console -> PC).
-- **Companion:** Voeg X32 en ATEM verbindingen toe gericht op target IP `192.168.2.222` op respectievelijke poorten `10023` en `9910`. De status wordt direct groen!
+- **ATEM Software Control:** Start de app op je Mac, vul IP `192.0.2.10` in en klik op **Connect**.
+- **X32-Edit:** Ga naar **Setup -> Connection**, voeg handmatig IP `192.0.2.10` toe en verbind (Sync Console -> PC).
+- **Companion:** Voeg X32 en ATEM verbindingen toe gericht op target IP `192.0.2.10` op respectievelijke poorten `10023` en `9910`. De status wordt direct groen!
 
 
 ## 🔌 8. Tuya Smart Plug Local Control & Mac Mini Automation (v9.0)
 
-We hebben een volledige automatische stroom- en opstart/afsluitflow gebouwd voor de Mac Mini (`192.168.2.20`) via de LSC Smart Connect (Tuya) slimme stekker. Omdat de slimme stekker op VLAN 40 (`192.168.40.60`) zit en gebruikmaakt van Tuya Protocol 3.5, hebben we de lokale aansturing als volgt ingericht:
+We hebben een volledige automatische stroom- en opstart/afsluitflow gebouwd voor de Mac Mini (`192.0.2.20`) via de LSC Smart Connect (Tuya) slimme stekker. Omdat de slimme stekker op VLAN 40 (`198.51.100.60`) zit en gebruikmaakt van Tuya Protocol 3.5, hebben we de lokale aansturing als volgt ingericht:
 
 ### 1. Lokale Python Aansturing (`control_plug.py`)
-Er is een Python-script geplaatst in [control_plug.py](file:///Users/jeffreygo/.gemini/antigravity/brain/bf19f21b-92b1-48b3-9ee1-f5a69eaa3005/control_plug.py) op LXC 112 dat rechtstreeks en 100% offline (zonder cloud latency) verbinding maakt met de stekker over TCP-poort 6668. Het gebruikt de unieke `local_key` en `device_id` die we via de Tuya Cloud API hebben uitgelezen.
+Er is een Python-script geplaatst in `control_plug.py` op LXC 112 dat rechtstreeks en 100% offline (zonder cloud latency) verbinding maakt met de stekker over TCP-poort 6668. Het gebruikt de unieke `local_key` en `device_id` die we via de Tuya Cloud API hebben uitgelezen.
 
 ### 2. Veilig Afsluiten & Wachtwoordloze Sudo (`shutdown_mac.sh`)
-Om de Mac Mini netjes en veilig af te sluiten voordat we de stroom verbreken, hebben we een wrapper-script [shutdown_mac.sh](file:///Users/jeffreygo/.gemini/antigravity/brain/bf19f21b-92b1-48b3-9ee1-f5a69eaa3005/shutdown_mac.sh) gemaakt dat:
-1. Via SSH inlogt op `jeffreygo@192.168.2.20` met de Ed25519-sleutel van LXC 112.
+Om de Mac Mini netjes en veilig af te sluiten voordat we de stroom verbreken, hebben we een wrapper-script `shutdown_mac.sh` gemaakt dat:
+1. Via SSH inlogt op `beheerder@192.0.2.20` met de Ed25519-sleutel van LXC 112.
 2. Het commando `sudo shutdown -h now` uitvoert (wachtwoordloos gemaakt via `visudo` op de Mac Mini).
 3. 15 seconden wacht tot macOS volledig is afgesloten en stilstaat.
 4. De slimme stekker uitschakelt via `control_plug.py off`.
@@ -282,9 +282,9 @@ Om de Mac Mini netjes en veilig af te sluiten voordat we de stroom verbreken, he
 Omdat Bitfocus Companion in een Docker-sandbox draait en geen directe toegang heeft tot host-scripts of SSH-sleutels, hebben we een lichtgewicht Python HTTP-server gebouwd op LXC 112 die luistert op poort `8088`.
 * **Systemd Service:** De server draait als een actieve achtergrond-service `tuya-control.service` die automatisch opstart bij het booten van de container.
 * **Gevalideerde Endpoints:**
-  * `GET http://192.168.2.222:8088/on` -> Schakelt stroom in (Mac Mini boot direct via `pmset autorestart`), wacht tot de Mac online is, laadt het nieuwste project in en start OBS/FreeShow.
-  * `GET http://192.168.2.222:8088/shutdown` -> Start de veilige afsluitsequentie in de achtergrond.
-  * `GET http://192.168.2.222:8088/status` -> Geeft de huidige relais- en verbruiksstatus van de stekker terug.
+  * `GET http://192.0.2.10:8088/on` -> Schakelt stroom in (Mac Mini boot direct via `pmset autorestart`), wacht tot de Mac online is, laadt het nieuwste project in en start OBS/FreeShow.
+  * `GET http://192.0.2.10:8088/shutdown` -> Start de veilige afsluitsequentie in de achtergrond.
+  * `GET http://192.0.2.10:8088/status` -> Geeft de huidige relais- en verbruiksstatus van de stekker terug.
 
 ### 4. Dynamische Configuratie via de Live Manager UI
 We hebben de instellingen voor de slimme stekker volledig dynamisch gemaakt in plaats van hardgecodeerd:
@@ -307,7 +307,7 @@ Er is een Python-script geplaatst op `/app/import_project.py` op LXC 112 dat:
 
 ### 2. Dynamische Opstart & Afsluit Managers (`startup_pcs.py` & `shutdown_pcs.py`)
 We hebben de shell-scripts vervangen door slimme Python-scripts op LXC 112:
-* **`startup_pcs.py`**: Controleert of de slimme stekker bereikbaar is. Zo ja (thuis), schakelt het de stroom in, wacht op de Mac, importeert het project en start de apps. Zo nee (kerk), slaat het de stroomcyclus over, pingt de OBS-pc (`obsHost`) en FreeShow-pc (`freeShowHost`), voert de projectimport uit en start de apps via SSH (gebruikmakend van de `sshUser` instelling uit `settings.json`, standaard `"jeffreygo"`).
+* **`startup_pcs.py`**: Controleert of de slimme stekker bereikbaar is. Zo ja (thuis), schakelt het de stroom in, wacht op de Mac, importeert het project en start de apps. Zo nee (kerk), slaat het de stroomcyclus over, pingt de OBS-pc (`obsHost`) en FreeShow-pc (`freeShowHost`), voert de projectimport uit en start de apps via SSH (gebruikmakend van de `sshUser` instelling uit `settings.json`, standaard `"beheerder"`).
 * **`shutdown_pcs.py`**: Stuurt bij afwezigheid van de slimme stekker (kerk) SSH-afsluitcommando's naar beide Windows/Mac PC's tegelijk (`shutdown /s /f /t 0` voor Windows, `sudo shutdown -h now` voor Mac).
 
 ---
@@ -333,7 +333,7 @@ Wanneer de PC's handmatig worden aangezet, laadt de FreeShow-pc automatisch het 
 Om de PC's ook op afstand te kunnen bedienen vanaf Companion via LXC 112:
 
 1. Activeer de **OpenSSH-functionaliteit** in Windows 10 (*Instellingen ➔ Optionele functies ➔ OpenSSH Server*).
-2. Voeg de SSH-sleutel van LXC 112 toe aan `C:\Users\jeffreygo\.ssh\authorized_keys` op de Windows PC's.
+2. Voeg de SSH-sleutel van LXC 112 toe aan `C:\Users\beheerder\.ssh\authorized_keys` op de Windows PC's.
 3. **Remote Shutdown**: Werkt out-of-the-box via de Companion "Stop Regie" knop, welke `shutdown_pcs.py` aanroept en de PC's via SSH afsluit.
 4. **Remote Launch (GUI)**: Omdat Windows GUI-apps gestart via SSH in de achtergrond verbergt (Session 0), kun je een Windows *Taakplanner* (Task Scheduler) taak aanmaken genaamd `StartFreeShow` die de app interactief start. Het LXC-script triggert dit dan simpelweg met:
    ```cmd
@@ -367,23 +367,23 @@ Als er meerdere stekkers tegelijk worden uitgeschakeld (bijv. via de `"all"` act
 De HTTP-server (`tuya_http_server.py`) op LXC 112 luistert op poort `8088` en accepteert nu een optionele query parameter `?plug=<plug_id>` om gerichte commando's uit te voeren:
 
 - **Individuele PC's opstarten/afsluiten:**
-  - `GET http://192.168.2.222:8088/on?plug=obs_pc` (Zet OBS PC aan, wacht op SSH, start OBS)
-  - `GET http://192.168.2.222:8088/shutdown?plug=obs_pc` (Sluit OBS PC via SSH af, wacht 15s, zet stroom uit)
-  - `GET http://192.168.2.222:8088/on?plug=freeshow_pc` (Zet FreeShow PC aan, wacht op SSH, importeer project, start FreeShow)
-  - `GET http://192.168.2.222:8088/shutdown?plug=freeshow_pc` (Sluit FreeShow PC via SSH af, wacht 15s, zet stroom uit)
+  - `GET http://192.0.2.10:8088/on?plug=obs_pc` (Zet OBS PC aan, wacht op SSH, start OBS)
+  - `GET http://192.0.2.10:8088/shutdown?plug=obs_pc` (Sluit OBS PC via SSH af, wacht 15s, zet stroom uit)
+  - `GET http://192.0.2.10:8088/on?plug=freeshow_pc` (Zet FreeShow PC aan, wacht op SSH, importeer project, start FreeShow)
+  - `GET http://192.0.2.10:8088/shutdown?plug=freeshow_pc` (Sluit FreeShow PC via SSH af, wacht 15s, zet stroom uit)
 
 - **Alle stekkers tegelijk bedienen:**
-  - `GET http://192.168.2.222:8088/on?plug=all` (of `/on` zonder parameters) -> Start alle geconfigureerde computers op
-  - `GET http://192.168.2.222:8088/shutdown?plug=all` (of `/shutdown` zonder parameters) -> Sluit alle computers netjes af en haalt de stroom eraf
+  - `GET http://192.0.2.10:8088/on?plug=all` (of `/on` zonder parameters) -> Start alle geconfigureerde computers op
+  - `GET http://192.0.2.10:8088/shutdown?plug=all` (of `/shutdown` zonder parameters) -> Sluit alle computers netjes af en haalt de stroom eraf
 
 - **Directe status opvragen:**
-  - `GET http://192.168.2.222:8088/status?plug=obs_pc` -> Vraagt de status op van een specifieke stekker
+  - `GET http://192.0.2.10:8088/status?plug=obs_pc` -> Vraagt de status op van een specifieke stekker
 
 ---
 
 ## 🗂️ 12. Overzichtelijk Instellingenmenu met Tabbladen (v12.0)
 
-Om te voorkomen dat de instellingenpagina een onoverzichtelijke, lange verticale lijst wordt, hebben we de configuratie-interface in [page.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/page.tsx) volledig gereorganiseerd in een moderne, tabbed split-panel layout:
+Om te voorkomen dat de instellingenpagina een onoverzichtelijke, lange verticale lijst wordt, hebben we de configuratie-interface in `src/app/page.tsx` volledig gereorganiseerd in een moderne, tabbed split-panel layout:
 
 ### 1. Tab Navigation & State
 We hebben een nieuwe React state `settingsTab` geïntroduceerd waarmee de gebruiker kan navigeren tussen de volgende categorieën:
@@ -447,7 +447,7 @@ We hebben de afsluitsequentie in `shutdown_pcs.py` gewijzigd om de Mac Mini in s
 ## 🔌 15. Dynamische Detectie van FreeShow Database-Locatie (dataPath) (v15.0)
 
 ### Probleem:
-Het project-importscript `import_project.py` schreef alle `.show` bestanden en `projects.json` altijd hardgecodeerd naar de standaard lokale Documents-map (`/Users/jeffreygo/Documents/FreeShow`). Als de gebruiker in de FreeShow instellingen een aangepast netwerkpad (`dataPath`) had ingesteld (zoals `/Volumes/Projects/Beamer/FreeShow`), werd dit overschreven door het script. Dit verstoorde de verbinding met de NAS.
+Het project-importscript `import_project.py` schreef alle `.show` bestanden en `projects.json` altijd hardgecodeerd naar de standaard lokale Documents-map (`/Users/beheerder/Documents/FreeShow`). Als de gebruiker in de FreeShow instellingen een aangepast netwerkpad (`dataPath`) had ingesteld (zoals `/Volumes/Projects/Beamer/FreeShow`), werd dit overschreven door het script. Dit verstoorde de verbinding met de NAS.
 
 ### Oplossing:
 We hebben `import_project.py` aangepast zodat het dynamisch de configuratie van de doel-PC inleest:
@@ -465,7 +465,7 @@ We hebben `import_project.py` aangepast zodat het dynamisch de configuratie van 
 In Companion zijn verschillende knoppen ingesteld als "2 step" (toggle/aan-uit) knoppen. In de Live Manager / Operations Center webapp was echter niet zichtbaar of deze knoppen aan of uit stonden. De knoppen reageerden wel bij een klik, maar bleven statisch qua uiterlijk.
 
 ### Oplossing:
-We hebben een client-side state management en visuele highlights toegevoegd in [BroadcastControlCenter.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/BroadcastControlCenter.tsx) en [globals.css](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/globals.css):
+We hebben een client-side state management en visuele highlights toegevoegd in `src/components/BroadcastControlCenter.tsx` en `src/app/globals.css`:
 
 1. **State Tracking:** In `BroadcastControlCenter.tsx` hebben we een `activeButtons` status toegevoegd (`Record<string, boolean>`) die per actie-id bijhoudt of de knop is ingeschakeld (toggled).
 2. **Local Storage Persistentie:** Bij het laden van de component (`useEffect` bij mount) wordt de opgeslagen status uit `localStorage` geladen (`acoc_active_buttons`). Zodra een knop succesvol wordt geactiveerd, wordt de status in `localStorage` bijgewerkt. Hierdoor blijft de visuele stand van de knoppen bewaard bij het vernieuwen van de pagina.
@@ -479,13 +479,13 @@ We hebben een client-side state management en visuele highlights toegevoegd in [
 ## 🔌 17. Dynamische Tuya API Host-configuratie voor VPN/Synology NAS (v17.0)
 
 ### Probleem:
-Bij het uitrollen van de container op de kerk-NAS (bereikbaar via VPN op `10.8.0.1` en lokaal op `192.168.2.250`) konden de nieuwe Tuya smart plugs (`192.168.2.126`) niet door de livestream manager worden gedetecteerd. Dit kwam doordat de status API `/api/tuya/status` hardgecodeerd probeerde verbinding te maken met de Tuya HTTP server via `127.0.0.1`, `settings.companionHost` of `172.17.0.1`. In de Synology Docker-omgeving met een VPN-netwerkverbinding waren deze interfaces niet correct gekoppeld aan de Tuya-server op de NAS-host.
+Bij het uitrollen van de container op de kerk-NAS (bereikbaar via VPN op `203.0.113.1` en lokaal op `192.0.2.50`) konden de nieuwe Tuya smart plugs (`192.0.2.126`) niet door de livestream manager worden gedetecteerd. Dit kwam doordat de status API `/api/tuya/status` hardgecodeerd probeerde verbinding te maken met de Tuya HTTP server via `127.0.0.1`, `settings.companionHost` of `172.17.0.1`. In de Synology Docker-omgeving met een VPN-netwerkverbinding waren deze interfaces niet correct gekoppeld aan de Tuya-server op de NAS-host.
 
 ### Oplossing:
 We hebben de Tuya API host dynamisch configureerbaar gemaakt:
 1. **Settings Store:** De optionele string `tuyaApiHost` is toegevoegd aan `AppSettings` en de standaardwaarde is ingesteld op `""` (leeg).
 2. **API Status Route (`route.ts`):** De status-API controleert nu of `settings.tuyaApiHost` is ingevuld. Zo ja, dan wordt dit IP-adres als eerste geprobeerd om de Tuya HTTP control server (`tuya_http_server.py` op poort 8088) te bereiken. Zo niet (of bij falen), valt het systeem terug op de standaard adressen (`127.0.0.1`, `companionHost`, `172.17.0.1`).
-3. **Instellingen UI (`page.tsx`):** Er is een nieuwe configuratiekaart "Tuya Control API Host" toegevoegd aan het tabblad "Slimme Stekkers (Tuya)" in de instellingen. Hier kan de gebruiker het IP-adres (bijv. `10.8.0.1` of `192.168.2.250`) invoeren en opslaan.
+3. **Instellingen UI (`page.tsx`):** Er is een nieuwe configuratiekaart "Tuya Control API Host" toegevoegd aan het tabblad "Slimme Stekkers (Tuya)" in de instellingen. Hier kan de gebruiker het IP-adres (bijv. `203.0.113.1` of `192.0.2.50`) invoeren en opslaan.
 
 Hierdoor is de applicatie volledig flexibel en kan dezelfde image zowel thuis (Proxmox host) als in de kerk (Synology host) draaien zonder code-aanpassingen.
 
@@ -497,7 +497,7 @@ Hierdoor is de applicatie volledig flexibel en kan dezelfde image zowel thuis (P
 *   **Probleem:** QLC+ startte wel op in de Docker-container op Proxmox, maar de Virtual Console bleef volledig leeg. Dit kwam doordat de auto-detectie logica uit `entrypoint.sh` was weggehaald of omzeild en QLC+ met de `-o /QLC/ark_church_lighting.qxw` parameter werd gestart. Deze command-line parameter negeert het projectbestand stilletjes op diverse kernels (waaronder Synology DSM en nieuwere LXC/Docker hostkernels).
 *   **Oorzaak:** Een eerdere poging met de auto-detect API-upload mislukte omdat deze probeerde te POST'en naar `/loadProject` met het parameter-veld `qlcFile`. QLC+ 4.14.x verwacht hier echter specifiek `qlcprj` als form-parameter. Hierdoor werd de upload stilzwijgend genegeerd.
 *   **Oplossing:**
-    1. We hebben de auto-detecting [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) hersteld.
+    1. We hebben de auto-detecting `config/qlcplus/entrypoint.sh` hersteld.
     2. De form-parameter in de `curl` POST-aanroep is gecorrigeerd van `qlcFile` naar **`qlcprj`**.
     3. We hebben extra IP-adres fallbacks toegevoegd om interfaces te detecteren, zelfs als er geen `192.168.` subnet actief is (bijv. localhost fallbacks).
     4. De container `qlcplus-test` start nu betrouwbaar op Proxmox LXC 112 en laadt automatisch het project met de juiste universe-mappings.
@@ -506,7 +506,7 @@ Hierdoor is de applicatie volledig flexibel en kan dezelfde image zowel thuis (P
 *   **Probleem:** Bij het klikken op de rode **BLACKOUT** knop in de Lights app gingen alle kleur-LED's uit, maar bleven de Fresnels (fysieke dimmers) op hun huidige sterkte branden.
 *   **Oorzaak:** Wanneer Blackout wordt geactiveerd, stuurt de app 5 range fader OSC-commando's (voor Fresnel 1, 2, 3, 4 en de Master) in één keer naar QLC+. Omdat UDP-pakketten gelijktijdig aankomen op de netwerkpoort van QLC+, raakt de single-threaded OSC-receiver van QLC+ overbelast en laat deze willekeurige pakketten (zoals de Fresnel Master of individuele dimmers) vallen.
 *   **Oplossing:**
-    1. We hebben `handleBlackout()` in [LightsControl.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/LightsControl.tsx) aangepast om een directe `sendOscValueImmediate` handler te gebruiken in plaats van de 50ms gedebouncte `sendOscValue`.
+    1. We hebben `handleBlackout()` in `src/components/LightsControl.tsx` aangepast om een directe `sendOscValueImmediate` handler te gebruiken in plaats van de 50ms gedebouncte `sendOscValue`.
     2. We sturen de 5 Fresnel OSC-commando's nu **sequentieel met een kleine delay van 30ms** per pakket. Dit geeft QLC+ genoeg tijd om elk signaal te verwerken, waardoor de faders gegarandeerd allemaal op 0 worden gezet en de lichten direct uitgaan.
 
 ---
@@ -549,7 +549,7 @@ De slimme stekkers (Tuya) leken om de paar seconden weg te vallen uit de monitor
 - **Oplossing:** We hebben in `translations.ts` een nieuwe key `youtube_placeholder` gedefinieerd voor alle talen (Nederlands: "Vul YouTube URL in...", Engels: "Enter YouTube URL...", enz.) en het invoerveld in de YouTube-tab aangepast om deze vertaling dynamisch te tonen.
 
 ### 4. Tuya Smart Plug Monitoring Dropouts (Daemon Status Poller)
-- **Probleem:** De status van de slimme stekkers viel elke paar seconden weg (werd offline getoond) op live.netwerkengineer.nl.
+- **Probleem:** De status van de slimme stekkers viel elke paar seconden weg (werd offline getoond) op live.voorbeeldkerk.nl.
 - **Oorzaak:** Wanneer meerdere clients/tabbladen open stonden, stuurde Next.js parallelle queries via HTTP naar de Python-server. Omdat TinyTuya-verbindingen met de stekker synchroon zijn en tot 1.2 seconden duren, ontstonden er socket-botsingen en timeouts.
 - **Oplossing:**
   1. We hebben in `control_plug.py` de socket timeout verhoogd naar 1.0 seconden voor de poortcontrole en 1.2 seconden voor TinyTuya-statusqueries om netwerktolerantie te vergroten.
@@ -568,7 +568,7 @@ Omdat de doorgevoerde wijzigingen na `v2.0.0` uitsluitend bugfixes en patches be
 
 ### 1. YouTube Mismatch Pad-resolutie
 * **Probleem:** Bij het importeren van projecten met YouTube-video's bleef het scherm zwart op de remote FreeShow PC's, omdat de generator lokale Linux-paden genereerde (bijv. `/mnt/data/...`), die niet bestaan op Windows of macOS client PC's.
-* **Oplossing:** We hebben `/Volumes/OWC-DISK/scripts/antigravity/livestream-manager/import_project.py` aangepast om tijdens het uploaden/importeren dynamisch de client `dataPath` te controleren en de pad-prefixes te herschrijven naar het daadwerkelijke pad van de remote cliënt.
+* **Oplossing:** We hebben `import_project.py` aangepast om tijdens het uploaden/importeren dynamisch de client `dataPath` te controleren en de pad-prefixes te herschrijven naar het daadwerkelijke pad van de remote cliënt.
 
 ### 2. Duplicatenzoeker songtekst weergave
 * **Probleem:** De duplicatenzoeker in `app/api/maintenance/duplicates/route.ts` kon geen songteksten tonen en mislukte soms.
@@ -595,13 +595,13 @@ Omdat de doorgevoerde wijzigingen na `v2.0.0` uitsluitend bugfixes en patches be
 ## 📺 22. Companion OSC UDP-poort mapping (v22.0)
 
 ### Probleem:
-FreeShow kon geen acties/chases triggeren in Bitfocus Companion via OSC. FreeShow stuurde correct OSC-commando's naar `192.168.2.222:12321`, maar Companion ontving deze pakketten niet omdat UDP-poort `12321` niet was blootgesteld door de Docker-container op Proxmox LXC 112.
+FreeShow kon geen acties/chases triggeren in Bitfocus Companion via OSC. FreeShow stuurde correct OSC-commando's naar `192.0.2.10:12321`, maar Companion ontving deze pakketten niet omdat UDP-poort `12321` niet was blootgesteld door de Docker-container op Proxmox LXC 112.
 
 ### Oplossing:
 We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de volume-mount gecorrigeerd en de database-configuratie hersteld:
 1. **Docker Compose:** In `/app/companion/docker-compose.yml` (zowel lokaal als op LXC 112) is `- "12321:12321/udp"` toegevoegd aan de `ports` sectie van de `companion` service.
 2. **Volume Mount Fix:** De volume-mount is gecorrigeerd van `/mnt/data/docker/companion:/root/companion-data` naar `/mnt/data/docker/companion:/companion`. Omdat Companion de configuratie wegschrijft naar `/companion` (op basis van `COMPANION_CONFIG_BASEDIR=/companion`), zorgde de oude, foutieve mapping ervoor dat alle instellingen in de tijdelijke container-laag werden opgeslagen en verloren gingen bij hercreatie. Met de nieuwe mapping worden alle instellingen nu permanent op de host opgeslagen.
-3. **Database Herstel:** We hebben de actieve database (`db.sqlite` en backups) van 10 juni 18:33 uur gekopieerd van de Synology NAS (`10.8.0.1`) en via de Proxmox-host in de persistent directory `/mnt/data/docker/companion/v4.3/` gezet met de juiste rechten (`nobody:nogroup`, `777`).
+3. **Database Herstel:** We hebben de actieve database (`db.sqlite` en backups) van 10 juni 18:33 uur gekopieerd van de Synology NAS (`203.0.113.1`) en via de Proxmox-host in de persistent directory `/mnt/data/docker/companion/v4.3/` gezet met de juiste rechten (`nobody:nogroup`, `777`).
 4. **Docker Image Rebuild & Start:** De Companion-image (`companion-v4-latest:latest` v4.3.4) is opnieuw opgebouwd om de `content digest` fout op te lossen, en de container is opnieuw gestart met de nieuwe volume-mount en database.
 
 ### Verificatie:
@@ -635,28 +635,28 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 ### 1. Upgrade QLC+ v5 en Qt6 QML Dependencies
 * **Probleem:** We wilden QLC+ upgraden van de verouderde versie 4 naar de nieuwste versie 5 (v5.2.2). De headless Docker-omgeving moest echter correct worden geconfigureerd met Qt6 QML dependencies om te voorkomen dat QLC+ v5 (dat is overgestapt op Qt6) crasht bij het opstarten met offscreen rendering.
 * **Oplossing:** 
-  1. In [Dockerfile](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/Dockerfile) hebben we de Massimo Callegari Debian 12 repository toegevoegd en het pakket `qlcplus5` geïnstalleerd ter vervanging van `qlcplus-qt5`.
+  1. In `config/qlcplus/Dockerfile` hebben we de Massimo Callegari Debian 12 repository toegevoegd en het pakket `qlcplus5` geïnstalleerd ter vervanging van `qlcplus-qt5`.
   2. We hebben de benodigde Qt6 QML runtime modules geïnstalleerd (`qml6-module-qtquick-controls`, `qml6-module-qtquick-layouts`, `qml6-module-qtquick-templates`, `qml6-module-qtquick-window`, en `qml6-module-qtquick`) om crashes door ontbrekende GUI/offscreen componenten op te lossen.
   3. We hebben `fontconfig` toegevoegd voor correcte offscreen font rendering.
 
 ### 2. Update Entrypoint voor Headless QLC+ v5 API-Projectlading
 * **Probleem:** De v4 opstartcommando's (`qlcplus -w -n -p`) en project-load endpoints (`POST /loadProject`) zijn veranderd of werken anders in QLC+ v5. Het direct laden van het project via de command-line optie `-o` werkt niet betrouwbaar op Synology DSM- en Proxmox/LXC-kernels.
 * **Oplossing:**
-  1. In [entrypoint.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/entrypoint.sh) hebben we het startcommando aangepast naar de v5 QML-versie: `qlcplus-qml --web --web-port 9999`.
+  1. In `config/qlcplus/entrypoint.sh` hebben we het startcommando aangepast naar de v5 QML-versie: `qlcplus-qml --web --web-port 9999`.
   2. We hebben de opschoning van configuratiebestanden bijgewerkt zodat zowel `/root/.config/qlcplus/Q Light Controller Plus.conf` als `/root/.qlcplus/Q Light Controller Plus.conf` worden verwijderd voor de start, wat vastlopen en conflicten voorkomt.
   3. De project-upload API-aanroep is gecorrigeerd naar het `/loadProject` endpoint met de form-parameter `qlcprj` (gelijk aan QLC+ v5's native interface): `curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject`.
 
 ### 3. Proxmox LXC 112 Deployment en Service Integratie
 * **Probleem:** Het script `deploy_proxmox.sh` herbouwde voorheen alleen de `livestream-manager` container, waardoor QLC+- en Tuya-updates niet automatisch live gingen bij een deploy op Proxmox.
 * **Oplossing:**
-  1. We hebben [deploy_proxmox.sh](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/deploy_proxmox.sh) geüpdatet zodat het `docker compose up -d --build livestream-manager qlcplus tuya-control` uitvoert.
+  1. We hebben `deploy_proxmox.sh` geüpdatet zodat het `docker compose up -d --build livestream-manager qlcplus tuya-control` uitvoert.
   2. We hebben de deployment gedraaid en geverifieerd dat alle containers succesvol bouwen en opstarten op LXC 112.
   3. De QLC+ containerlogs laten zien dat de server start, netwerkinterfaces detecteert en het kerkproject succesvol importeert via de `/loadProject` endpoint (`=== QLC+ v5 Project succesvol geladen! ===`).
 
 ### 4. Verbetering CSS-Styling Frame Titels in de Web UI
 * **Probleem:** De titels van verschillende frames en widgets (zoals "Fresnel Dimmer (Submaster)", "Lichtshows / Chases", enz.) waren te groot, overlapten met knoppen en braken onhandig af over meerdere regels in de web-output.
 * **Oplossing:**
-  1. In [Dockerfile](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/qlcplus/Dockerfile) hebben we een build-stap toegevoegd die custom CSS-overrides onderaan `/usr/share/qlcplus/web/webaccess-v5.css` toevoegt.
+  1. In `config/qlcplus/Dockerfile` hebben we een build-stap toegevoegd die custom CSS-overrides onderaan `/usr/share/qlcplus/web/webaccess-v5.css` toevoegt.
   2. We hebben de `.frame-title` CSS aangepast:
      * De font-size is verkleind naar `calc(var(--text-size-default) * 0.55)` zodat deze beter past en langere titels leesbaarder blijven.
      * Automatisch afbreken is uitgeschakeld via `white-space: nowrap !important`.
@@ -666,7 +666,7 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 
 ### 5. Companion OSC UDP-poort mapping in hoofd-compose
 * **Probleem:** In de hoofd `docker-compose.yml` (die gebruikt wordt voor de NAS-deployment) ontbrak de mapping voor UDP-poort `12321`. Hierdoor kon Companion op de NAS geen OSC-berichten ontvangen, hoewel dat in de afzonderlijke `companion/docker-compose.yml` wel gedefinieerd was.
-* **Oplossing:** We hebben `- "12321:12321/udp"` toegevoegd aan de `companion` service in de hoofd [docker-compose.yml](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/docker-compose.yml). Hiermee is OSC-ontvangst nu ook op de NAS gegarandeerd.
+* **Oplossing:** We hebben `- "12321:12321/udp"` toegevoegd aan de `companion` service in de hoofd `docker-compose.yml`. Hiermee is OSC-ontvangst nu ook op de NAS gegarandeerd.
 
 ### 6. Voorbereiding voor NAS Deployment & GitHub Push
 * **Oplossing:**
@@ -678,16 +678,16 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 ## 📺 25. SSH-sleutel en Autorisatie Fix voor Windows PC's en NAS (v25.0)
 
 ### 1. SSH-Sleutel Mismatch Analyse
-* **Probleem:** Bij het starten van de slimme stekkers startte de OBS PC en de Beamer PC netjes op (omdat het stroomrelais via Tuya werd ingeschakeld), maar OBS/FreeShow werden niet automatisch opgestart. Het controleren via de logs liet zien dat de SSH-verbinding naar `beamer@192.168.2.100` faalde.
+* **Probleem:** Bij het starten van de slimme stekkers startte de OBS PC en de Beamer PC netjes op (omdat het stroomrelais via Tuya werd ingeschakeld), maar OBS/FreeShow werden niet automatisch opgestart. Het controleren via de logs liet zien dat de SSH-verbinding naar `beamer@192.0.2.100` faalde.
 * **Oorzaak:** 
-  1. De user `jeffrey` op de NAS kan verbinding maken met de Windows PC via SSH zonder wachtwoord omdat zijn persoonlijke sleutel (`id_rsa`) is geautoriseerd in Windows.
+  1. De user `beheerder` op de NAS kan verbinding maken met de Windows PC via SSH zonder wachtwoord omdat zijn persoonlijke sleutel (`id_rsa`) is geautoriseerd in Windows.
   2. De Docker-container van `livestream-manager` en `tuya-control` gebruikten echter een speciaal gegenereerde Ed25519-sleutel (`id_ed25519`) die *niet* geautoriseerd was op de Windows PC's.
   3. In `startup_pcs.py` dwong `get_ssh_key_args()` het gebruik van deze niet-geautoriseerde `id_ed25519` af via de `-i` vlag.
   4. In `shutdown_pcs.py` werd geen `-i` vlag meegegeven, waardoor SSH terugviel op de standaard root-sleutels van de container. De shutdown-actie *leek* te werken omdat de PC uitging, maar in werkelijkheid faalde het SSH-commando stilletjes (stderr/stdout naar `/dev/null`) en werd na 15 seconden de stroom hard verbroken door de Tuya plug, wat de PC abrupt uitzette.
 
 ### 2. Gerealiseerde Oplossingen & Aanpassingen
 * **SSH Sleutel Check Uitbreiding (`startup_pcs.py` & `shutdown_pcs.py`):**
-  We hebben `get_ssh_key_args()` in [startup_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/startup_pcs.py) aangepast en dezelfde functie toegevoegd aan [shutdown_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/shutdown_pcs.py) om zowel de geautoriseerde RSA-sleutel (`id_rsa`) als de ED25519-sleutel te controleren:
+  We hebben `get_ssh_key_args()` in `startup_pcs.py` aangepast en dezelfde functie toegevoegd aan `shutdown_pcs.py` om zowel de geautoriseerde RSA-sleutel (`id_rsa`) als de ED25519-sleutel te controleren:
   ```python
   candidates = [
       "/app/data/id_rsa",
@@ -699,23 +699,23 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
   ```
   De scripts kopiëren nu de eerste gevonden sleutel naar `/tmp/id_ssh_temp` met permissie `600` en gebruiken deze voor de SSH-handshake.
 * **Docker Compose Volume Mount Update (`docker-compose.yml`):**
-  We hebben de `id_rsa` sleutel gemount in de `livestream-manager` service in [docker-compose.yml](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/docker-compose.yml):
+  We hebben de `id_rsa` sleutel gemount in de `livestream-manager` service in `docker-compose.yml`:
   ```yaml
         - ./data/id_rsa:/home/nextjs/.ssh/id_rsa:ro
   ```
   Hierdoor is de werkende RSA-sleutel direct beschikbaar als default SSH identity voor de container-gebruiker `nextjs`.
 * **Shutdown Graceful Execution & Wait Time Increase:**
-  Met de nieuwe sleutel-permissies stuurt `shutdown_pcs.py` nu daadwerkelijk het command `shutdown /s /f /t 0` succesvol via SSH naar de Windows PC's. Omdat 15 seconden te kort bleek te zijn voor de Windows PC's om volledig af te sluiten (waardoor de stroom er al af ging tijdens het afsluitproces), hebben we deze wachttijd in [shutdown_pcs.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/shutdown_pcs.py) verhoogd van **15 naar 35 seconden**.
+  Met de nieuwe sleutel-permissies stuurt `shutdown_pcs.py` nu daadwerkelijk het command `shutdown /s /f /t 0` succesvol via SSH naar de Windows PC's. Omdat 15 seconden te kort bleek te zijn voor de Windows PC's om volledig af te sluiten (waardoor de stroom er al af ging tijdens het afsluitproces), hebben we deze wachttijd in `shutdown_pcs.py` verhoogd van **15 naar 35 seconden**.
 
 ---
 
 ## 📺 26. LED-paneel Windows Support & Encoding Crash Fix (v26.0)
 
 ### 1. SSH Gebruiker en Host Mappings
-* **Probleem:** Het start/stop-script voor het LED-paneel (`obsManager.ts`) maakte gebruik van een statische SSH-gebruiker (`settings.sshUser`) die standaard op `"admin"` stond ingesteld. Dit faalde op de OBS PC (`192.168.2.100`) omdat de gebruikersnaam daar `"beamer"` is. Bovendien viel het script terug op de Beamer PC (`freeShowHost`) in plaats van de OBS PC.
-* **Oplossing:** We hebben [obsManager.ts](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/lib/obsManager.ts) aangepast om:
-  1. De OBS PC (`settings.obsHost` / `192.168.2.100`) als fallback host te gebruiken voor het LED-paneel.
-  2. De SSH-gebruikersnaam dynamisch te mappen op basis van het IP-adres (gebruiker `beamer` voor `192.168.2.100`, gebruiker `admin` for `192.168.2.101`).
+* **Probleem:** Het start/stop-script voor het LED-paneel (`obsManager.ts`) maakte gebruik van een statische SSH-gebruiker (`settings.sshUser`) die standaard op `"admin"` stond ingesteld. Dit faalde op de OBS PC (`192.0.2.100`) omdat de gebruikersnaam daar `"beamer"` is. Bovendien viel het script terug op de Beamer PC (`freeShowHost`) in plaats van de OBS PC.
+* **Oplossing:** We hebben `src/lib/obsManager.ts` aangepast om:
+  1. De OBS PC (`settings.obsHost` / `192.0.2.100`) als fallback host te gebruiken voor het LED-paneel.
+  2. De SSH-gebruikersnaam dynamisch te mappen op basis van het IP-adres (gebruiker `beamer` voor `192.0.2.100`, gebruiker `admin` for `192.0.2.101`).
 
 ### 2. Python Installatie op OBS PC
 * **Probleem:** De OBS PC had geen Python geïnstalleerd, waardoor het script `led_control.py` niet kon worden uitgevoerd.
@@ -723,14 +723,14 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 
 ### 3. CP1252 Emojis Encoding Crash
 * **Probleem:** Bij het testen van `led_control.py` op de OBS PC bleek dat de Bluetooth-verbinding en de overdracht van het signaal naar het LED-paneel 100% succesvol verliepen. Echter, direct na verzending crashte het script op een `UnicodeEncodeError` omdat Windows SSH-terminals gebruikmaken van de `CP1252`-codering, die de emojis `✅` (green check) en `❌` (red cross) niet kon encoderen.
-* **Oplossing:** We hebben de emoji-symbolen in [led_control.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/led_control.py) vervangen door veilige ASCII-strings (`[SUCCESS]` en `[ERROR]`), waardoor het script nu foutloos en stabiel voltooid wordt.
+* **Oplossing:** We hebben de emoji-symbolen in `led_control.py` vervangen door veilige ASCII-strings (`[SUCCESS]` en `[ERROR]`), waardoor het script nu foutloos en stabiel voltooid wordt.
 ---
 
 ## 📺 27. Color Picker Scene Mixing Fix (v27.0)
 
 ### 1. Scene Mixing in QLC+
 * **Probleem:** In de live-app UI schakelde de oplichting van de actieve kleurdot netjes om wanneer een andere kleur in dezelfde groep werd geselecteerd. In QLC+ bleef de vorige kleur-scène echter *aan* staan, waardoor de fysieke lampen de oude en nieuwe kleuren met elkaar gingen mengen. De gebruiker moest handmatig twee keer op een kleur klikken om de oude status uit te zetten.
-* **Oplossing:** We hebben de kleur-klik handler `handleColorClick` in zowel [page.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/app/lights/page.tsx) als [LightsControl.tsx](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/src/components/LightsControl.tsx) aangepast. Wanneer er een andere kleur wordt geselecteerd binnen dezelfde groep, stuurt de app nu eerst een extra OSC-verzoek naar QLC+ om de oude actieve scène expliciet uit te schakelen (door deze nogmaals te triggeren) alvorens de nieuwe kleur in te schakelen. Hierdoor lopen de status in de app en QLC+ nu volledig synchroon.
+* **Oplossing:** We hebben de kleur-klik handler `handleColorClick` in zowel `src/app/lights/page.tsx` als `src/components/LightsControl.tsx` aangepast. Wanneer er een andere kleur wordt geselecteerd binnen dezelfde groep, stuurt de app nu eerst een extra OSC-verzoek naar QLC+ om de oude actieve scène expliciet uit te schakelen (door deze nogmaals te triggeren) alvorens de nieuwe kleur in te schakelen. Hierdoor lopen de status in de app en QLC+ nu volledig synchroon.
 
 ---
 
@@ -738,8 +738,8 @@ We hebben UDP-poort `12321` (de standaard OSC-poort van Companion) opengezet, de
 
 ### 1. SimpleDesk-blok in QLC+ hersteld
 * **Probleem:** De SimpleDesk reageerde niet meer in QLC+ na eerdere bewerkingen van het QXW-bestand.
-* **Oplossing:** Het ontbrekende `<SimpleDesk>`-blok is handmatig hersteld en toegevoegd aan het einde van [ark_church_lighting.qxw](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/ark_church_lighting.qxw).
+* **Oplossing:** Het ontbrekende `<SimpleDesk>`-blok is handmatig hersteld en toegevoegd aan het einde van `config/ark_church_lighting.qxw`.
 
 ### 2. KLS-200 individuele lampbesturing
 * **Probleem:** De kleurknoppen voor de individuele spots 1 t/m 4 deden niets via de app, hoewel de scènes/functies wel in QLC+ stonden. De widgets in Virtual Console misten de bijbehorende `<Input>`-configuratie met de OSC-kanaalhashes.
-* **Oplossing:** We hebben [scratch_patch_qlc.py](file:///Volumes/OWC-DISK/scripts/antigravity/livestream-manager/scratch_patch_qlc.py) uitgevoerd om de Virtual Console widgets programmatisch te patchen. Alle 32 kleurknoppen hebben nu correcte bindings naar de OSC-paden `/ark/light/scene/{func_id}` (met bijbehorende CRC16 hashes als kanaalnummer), en ook de Speed Dial widget (ID 99) is toegevoegd. Dit is succesvol gedeployed naar de Proxmox-omgeving en de containers zijn herstart.
+* **Oplossing:** We hebben `scratch_patch_qlc.py` uitgevoerd om de Virtual Console widgets programmatisch te patchen. Alle 32 kleurknoppen hebben nu correcte bindings naar de OSC-paden `/ark/light/scene/{func_id}` (met bijbehorende CRC16 hashes als kanaalnummer), en ook de Speed Dial widget (ID 99) is toegevoegd. Dit is succesvol gedeployed naar de Proxmox-omgeving en de containers zijn herstart.
