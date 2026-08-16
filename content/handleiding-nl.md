@@ -182,7 +182,7 @@ Zeven tabbladen bovenaan het toevoegpaneel:
 
 **📁 Sectie** — maak een nieuwe sectiekop aan met een titel en kleur. Secties worden direct aan de Playlist toegevoegd (gaan niet via de Staging Area).
 
-**🗃️ Shows & Database** — zie 5.10–5.12 hieronder.
+**🗃️ Shows & Database** — zie 5.9–5.12 hieronder.
 
 ### 5.3 Plaatsing: sectie + vóór/ná
 
