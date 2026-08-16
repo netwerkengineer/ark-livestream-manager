@@ -56,6 +56,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Copy all Python scripts for direct execution fallback and services
 COPY --from=builder --chown=nextjs:nodejs /app/*.py ./
 
+# Static content read at request time (e.g. the handleiding markdown for
+# /manual/[lang]) isn't picked up by Next's standalone output tracing since
+# it's read via fs at runtime, not imported - needs an explicit copy.
+COPY --from=builder --chown=nextjs:nodejs /app/content ./content
+
 USER nextjs
 
 EXPOSE 3000
