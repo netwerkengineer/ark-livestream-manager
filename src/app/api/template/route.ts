@@ -4,6 +4,7 @@ import path from 'path';
 import JSZip from 'jszip';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
+import { getItemType } from '@/lib/freeshowUtils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
           title: fullShow?.name || s.name || "Naamloze Show",
           index: s.index,
           // Check of het een media-gebaseerde show is (zoals Welkom)
-          isMedia: fullShow?.category === 'media' || (fullShow?.slides && Object.values(fullShow.slides).some((sl: any) => sl.items && sl.items.some((i: any) => i.type === 'media')))
+          isMedia: fullShow?.category === 'media' || (fullShow?.slides && Object.values(fullShow.slides).some((sl: any) => sl.items && sl.items.some((i: any) => getItemType(i) === 'media')))
         };
       }
     });
