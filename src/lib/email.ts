@@ -318,3 +318,21 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
     throw error;
   }
 }
+
+/**
+ * Background counterpart to the manual "Check nu" button - polls the same
+ * checkEmailsForProjects() on an interval so new liturgie-mails get picked
+ * up without a medewerker needing to open the drafts tab. Mirrors
+ * initThumbnailSync()'s startup-then-interval shape. Missing/invalid IMAP
+ * settings just log and retry next tick, same as an unconfigured YouTube
+ * connection does elsewhere in this app.
+ */
+export function initEmailSync() {
+  console.log('[Email Sync] Initializing background email sync task...');
+  checkEmailsForProjects().catch(err => console.error('[Email Sync] Initial check error:', err.message || err));
+
+  setInterval(() => {
+    console.log('[Email Sync] Running scheduled background check...');
+    checkEmailsForProjects().catch(err => console.error('[Email Sync] Scheduled check error:', err.message || err));
+  }, 10 * 60 * 1000);
+}

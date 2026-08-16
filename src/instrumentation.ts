@@ -5,5 +5,8 @@ export async function register() {
     
     const { initThumbnailSync } = await import('./lib/thumbnailSync');
     initThumbnailSync();
+
+    const { initEmailSync } = await import('./lib/email');
+    initEmailSync();
   }
 }

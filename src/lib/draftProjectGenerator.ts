@@ -4,8 +4,8 @@ import crypto from 'crypto';
 import { getSettings } from '@/lib/settingsStore';
 import { checkLocalSongExists, getLocalSongText, getLocalShowData, fetchLyricsFromInternet } from '@/lib/songs';
 import { getBibleVerses } from '@/lib/bible';
-import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
-import { toFreeShowClientPath } from '@/lib/freeshowUtils';
+import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
+import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
 
 export interface GenerateResult {
@@ -22,29 +22,99 @@ function inferMetaType(filePath: string): 'video' | 'image' | null {
   return null;
 }
 
+async function loadFreeshowCategories(settings: any): Promise<Record<string, { name: string }>> {
+  if (!settings.freeshowPath) return {};
+  try {
+    const settingsSyncedPath = path.join(settings.freeshowPath, 'Config', 'settings_synced.json');
+    const content = await fs.readFile(settingsSyncedPath, 'utf-8');
+    const config = JSON.parse(content);
+    return config.categories || {};
+  } catch {
+    return {};
+  }
+}
+
+// Matches the free-text category from a "Liederen (categorie: X):" email
+// header against the church's real FreeShow song categories by display name
+// (not id), so an auto-created song lands next to its siblings instead of
+// always in the generic default bucket. No match -> falls back to the
+// built-in "song" category, which is easy to find and gets flagged in the
+// generation notes rather than silently misfiled.
+function resolveSongCategoryId(rawCategory: string | undefined, categories: Record<string, { name: string }>): { id: string; matched: boolean } {
+  if (!rawCategory) return { id: 'song', matched: false };
+  const target = foldDiacritics(rawCategory.trim().toLowerCase());
+  const match = Object.entries(categories).find(([, cat]) => cat?.name && foldDiacritics(cat.name.toLowerCase()) === target);
+  return match ? { id: match[0], matched: true } : { id: 'song', matched: false };
+}
+
+const sanitizeShowName = (name: string) => name.replace(/[\\/:*?"<>|]/g, ' ').trim();
+
 // Mirrors /api/preview's song resolution: reuse the existing catalog show
-// verbatim if there's a match (preserving its styling), fall back to lyrics
-// fetched from the internet, or an empty placeholder if neither is found -
-// auto-creating a brand new catalog entry is a later phase, not this one.
-async function resolveSongItem(song: DraftSong): Promise<any> {
+// verbatim if there's a match (preserving its styling). If there's no match,
+// this now auto-creates a real catalog entry (mirroring /api/save-show)
+// instead of only embedding transient content in the generated project -
+// worship leaders usually send just a title, so the new show gets either
+// internet-fetched lyrics or a placeholder slide, clearly flagged as such.
+async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: any; note?: string }> {
   const title = song.title;
   const exists = await checkLocalSongExists(title, '');
   let text = '';
   let fullData: { id: string; data: any } | null = null;
+  let note: string | undefined;
 
   if (exists) {
     text = (await getLocalSongText(title, '')) || '';
     fullData = await getLocalShowData(title, '');
   } else {
-    text = (await fetchLyricsFromInternet(title, '')) || '';
+    const fetchedLyrics = (await fetchLyricsFromInternet(title, '')) || '';
+    const hasLyrics = !!fetchedLyrics.trim();
+    text = hasLyrics ? fetchedLyrics : 'Tekst nog toevoegen';
+
+    const cleanName = sanitizeShowName(title);
+
+    if (settings.freeshowPath) {
+      try {
+        const showsDir = path.join(settings.freeshowPath, 'Shows');
+        await fs.mkdir(showsDir, { recursive: true });
+        const filePath = path.join(showsDir, `${cleanName}.show`);
+        const alreadyExists = await fs.access(filePath).then(() => true).catch(() => false);
+
+        if (!alreadyExists) {
+          const categories = await loadFreeshowCategories(settings);
+          const { id: categoryId, matched } = resolveSongCategoryId(song.category, categories);
+          const showId = crypto.randomBytes(6).toString('hex').substring(0, 11);
+          const showObj = createShowObject({ id: showId, data: { name: cleanName, category: categoryId, text } });
+
+          await fs.writeFile(filePath, JSON.stringify([showId, showObj]));
+          fullData = { id: showId, data: showObj };
+
+          note = song.category && !matched
+            ? `Nieuw lied "${cleanName}" aangemaakt in standaardcategorie (categorie "${song.category}" niet gevonden in FreeShow).`
+            : `Nieuw lied "${cleanName}" aangemaakt${matched ? ` in categorie "${song.category}"` : ''} in de catalogus.`;
+          if (!hasLyrics) note += ' Tekst nog toevoegen in FreeShow.';
+        } else {
+          // Collision safety net (e.g. created between the exists-check
+          // above and here) - never clobber, just reuse what's on disk.
+          fullData = await getLocalShowData(title, '');
+        }
+      } catch (err) {
+        console.error(`[Project Generator] Nieuw lied "${cleanName}" opslaan mislukt:`, err);
+        note = `Nieuw lied "${cleanName}" kon niet in de catalogus worden opgeslagen.`;
+      }
+    } else {
+      note = `Lied "${cleanName}" kon niet in de catalogus worden opgeslagen (geen FreeShow-map ingesteld).`;
+    }
   }
 
   return {
-    id: song.id,
-    type: 'song',
-    targetSection: song.section,
-    fullData: fullData || undefined,
-    data: { name: title, category: 'song', text }
+    item: {
+      id: song.id,
+      type: 'song',
+      targetSection: song.section,
+      fullData: fullData || undefined,
+      data: { name: title, category: 'song', text }
+    },
+    note
   };
 }
 
@@ -220,7 +290,9 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
   const showsList: any[] = [];
 
   for (const song of draft.songs) {
-    showsList.push(await resolveSongItem(song));
+    const { item, note } = await resolveSongItem(song, settings);
+    showsList.push(item);
+    if (note) notes.push(note);
   }
   for (const scripture of draft.scriptures) {
     const item = await resolveScriptureItem(scripture);

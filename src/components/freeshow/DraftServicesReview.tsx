@@ -199,7 +199,7 @@ export default function DraftServicesReview() {
 
                 {draft.lastGenerationNotes && draft.lastGenerationNotes.length > 0 && (
                   <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.3rem' }}>Niet automatisch in het project verwerkt:</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.3rem' }}>Opmerkingen bij het genereren:</div>
                     {draft.lastGenerationNotes.map((n, i) => (
                       <div key={i} style={{ fontSize: '0.75rem', opacity: 0.8 }}>• {n}</div>
                     ))}
