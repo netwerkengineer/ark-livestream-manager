@@ -67,8 +67,6 @@ Voordat je hier iets kunt inplannen moet het YouTube-kanaal gekoppeld zijn. Is d
 
 Klik op **"Plan Alles In"** om de uitzending aan te maken. Bij succes verschijnt een bevestiging die je er ook aan herinnert om Facebook Live handmatig in te plannen.
 
-> ℹ️ **Bekende beperking**: de dropdowns voor YouTube Categorie en Playlist werken op dit moment alleen voor gebruikers met de Administrator-rol — een Operator met alleen het recht "Stream Planner" krijgt hier lege lijsten te zien. Vraag een Administrator om de uitzending in te plannen, of om dit voor je te verbeteren.
-
 ### Thumbnail
 
 Klik op de thumbnail-voorvertoning of "Open Editor" om een thumbnail-afbeelding te maken/bewerken. Deze wordt zowel naar YouTube geüpload als lokaal opgeslagen (o.a. als `thema.jpg` op de NAS) zodat OBS/FreeShow deze automatisch als beeld kunnen tonen vóór de uitzending begint.
@@ -378,8 +376,7 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
 - **Bitfocus Companion** — IP, poort
 - **Behringer X32 (OSC)** — IP, poort
 - **Lichtregie (QLC+)** — aan/uit-schakelaar, IP, poort (standaard 7700)
-- **Presentatie (FreeShow)** — FreeShow IP, poort (standaard 5505)
-  > ⚠️ Het veld **"Media Pad op NAS"** op déze tab doet niets — dit is een verouderd/dood veld. Het echte media-pad stel je in bij het tabblad **FreeShow** (`freeshowMediaPath`, zie 8.8).
+- **Presentatie (FreeShow)** — FreeShow IP, poort (standaard 5505). Het media-pad stel je in bij het tabblad **FreeShow** (`freeshowMediaPath`, zie 8.8).
 - **LED Paneel (BK-Light)** — aan/uit, doel-host (leeg = zelfde als FreeShow-host), SSH-gebruiker, Bluetooth MAC (optioneel, anders auto-detectie), tekst/kleur voor "actief" en "inactief"
   > ℹ️ Of het LED-paneel reageert op de YouTube-status of de OBS-status (`ledTriggerSource`) is nog niet in de interface in te stellen — dit staat standaard op "youtube" en kan alleen via het instellingenbestand op de server worden gewijzigd.
 
@@ -462,9 +459,7 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 
 ## 11. Bekende beperkingen (stand van zaken)
 
-- Op de Verbindingen-tab doet het veld "Media Pad op NAS" niets (dood veld) — gebruik het Media-veld op de FreeShow-tab.
 - `ledTriggerSource` (YouTube- vs. OBS-gestuurd LED-signaal) en een `adminPin`-functie voor herstel-/back-up-routes bestaan in de instellingen-data, maar hebben nog geen scherm — alleen via handmatige bewerking van het instellingenbestand op de server.
-- YouTube-categorie en -playlist selecteren in de Stream Planner werkt op dit moment alleen voor Administrators.
 - Facebook-livestreams worden niet automatisch ingepland; dit blijft een handmatige stap via Facebook's eigen Live Producer.
 - Bij het inladen van een `.project`-bestand dat niet door deze app zelf is opgeslagen (native FreeShow, of via de e-mail-koppeling), wordt de playlist best-effort gereconstrueerd — controleer het resultaat voordat je verdergaat.
 - Songtekst-herkenning uit e-mail volgt vaste regels (geen taalmodel); wijkt een aanlevering te veel af van het afgesproken formaat, dan wordt dat als "niet herkend" gemeld in plaats van geraden.
