@@ -1238,7 +1238,15 @@ export default function FreeshowGenerator() {
       }
       const stateJsonStr = await stateFile.async("string");
       const stateObj = JSON.parse(stateJsonStr);
-      setManualItems(stateObj.manualItems || []);
+      if (!Array.isArray(stateObj.manualItems)) {
+        alert(stateObj.draftServiceDate
+          ? "Dit project is aangemaakt via de e-mail-automatisering en kan nog niet worden ingeladen in de handmatige Bouwer. Gebruik de reviewtab voor Diensten om dit project te bekijken of bij te werken."
+          : "Geen laadbare project-status (manualItems) gevonden in dit bestand.");
+        setLoading(false);
+        e.target.value = "";
+        return;
+      }
+      setManualItems(stateObj.manualItems);
       if (stateObj.projectName) setProjectName(stateObj.projectName);
       setUseTemplate(false);
       setStatus("Project succesvol ingeladen!");

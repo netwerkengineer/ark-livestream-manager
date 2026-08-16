@@ -1,6 +1,6 @@
 {
   "name": "livestream-manager",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -21,10 +21,12 @@
     "levenshtein-edit-distance": "^3.0.0",
     "lucide-react": "^1.8.0",
     "mailparser": "^3.9.8",
+    "mammoth": "^1.12.1",
     "next": "16.2.4",
     "next-auth": "^5.0.0-beta.31",
     "node-osc": "^11.4.0",
     "obs-websocket-js": "^5.0.0",
+    "pdf-parse": "^2.4.5",
     "play-dl": "^1.9.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
