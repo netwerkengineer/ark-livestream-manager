@@ -11,11 +11,36 @@ const GROUP_COLORS: any = {
   'bridge': '#f52598',
   'tag': '#7525f5',
   'pre-chorus': '#8825f5',
+  'pre_chorus': '#8825f5',
   'verse': '#5825f5',
   'intro': '#b125f5',
   'outro': '#b125f5',
   'break': '#f52525'
 };
+
+// FreeShow's own global-group ids (confirmed against the real FreeShow
+// source's text importer, converters/txt.ts, which returns these exact
+// literals for recognized labels) - when a label maps to one of these,
+// globalGroup lets FreeShow's own group name/color registry take over
+// instead of only using the color we guess below.
+const GROUP_KEYWORDS: Record<string, string> = {
+  verse: 'verse', vers: 'verse', couplet: 'verse',
+  chorus: 'chorus', refrein: 'chorus', refrain: 'chorus',
+  prechorus: 'pre_chorus', prerefrein: 'pre_chorus', prerefrain: 'pre_chorus',
+  bridge: 'bridge', brug: 'bridge',
+  intro: 'intro',
+  outro: 'outro', slot: 'outro',
+  tag: 'tag',
+  break: 'break', pauze: 'break'
+};
+
+// A bare group-label line with no brackets, e.g. "Refrein", "Couplet 1",
+// "Chorus:", "Verse1" - how worship leaders commonly type lyrics out,
+// as opposed to FreeShow's own "[Chorus]" bracket convention (still
+// recognized separately below). Anchored to the whole line so a genuine
+// lyric that happens to start with one of these words (e.g. "Chorus of
+// angels sang") is never mistaken for a label.
+const GROUP_LABEL_RE = /^(pre[\s-]?chorus|pre[\s-]?refrein|pre[\s-]?refrain|verse|vers|couplet|chorus|refrein|refrain|bridge|brug|intro|outro|slot|tag|break|pauze)\s*[\divxIVX]*\s*:?\s*$/i;
 
 export function createShowObject(show: any) {
   const now = Date.now();
@@ -38,25 +63,44 @@ export function createShowObject(show: any) {
 
   let activeGroupName: string | null = null;
   let activeGroupColor: string | null = null;
+  let activeGroupKey: string | null = null; // canonical FreeShow global-group id, when recognized
 
   textSections.forEach((section: string, idx: number) => {
     const slideId = generateId();
     let cleanSection = section;
 
     const groupMatch = section.match(/^\[(.*?)\]\s*\n?/);
+    let rawLabel: string | null = null;
     if (groupMatch) {
-      activeGroupName = groupMatch[1];
+      rawLabel = groupMatch[1];
       cleanSection = section.replace(groupMatch[0], '');
-      const lowerGroup = activeGroupName.toLowerCase();
-      activeGroupColor = null; 
-      for (const [key, color] of Object.entries(GROUP_COLORS)) {
-        if (lowerGroup.includes(key)) {
-          activeGroupColor = color as string;
-          break;
+    } else {
+      const sectionLines = section.split('\n');
+      const firstLine = (sectionLines[0] || '').trim();
+      const bareMatch = firstLine.match(GROUP_LABEL_RE);
+      if (bareMatch) {
+        rawLabel = firstLine.replace(/:\s*$/, '').trim();
+        cleanSection = sectionLines.slice(1).join('\n');
+      }
+    }
+
+    if (rawLabel) {
+      activeGroupName = rawLabel;
+      const normalizedKeyword = rawLabel.toLowerCase().replace(/[\s\d:-]/g, '');
+      activeGroupKey = GROUP_KEYWORDS[normalizedKeyword] || null;
+      activeGroupColor = activeGroupKey ? GROUP_COLORS[activeGroupKey] : null;
+      if (!activeGroupColor) {
+        const lowerGroup = rawLabel.toLowerCase();
+        for (const [key, color] of Object.entries(GROUP_COLORS)) {
+          if (lowerGroup.includes(key)) {
+            activeGroupColor = color as string;
+            break;
+          }
         }
       }
     } else if (!activeGroupName) {
       activeGroupName = "Verse 1";
+      activeGroupKey = "verse";
       activeGroupColor = GROUP_COLORS['verse'];
     }
 
@@ -165,7 +209,7 @@ export function createShowObject(show: any) {
           align: "",
           auto: false
         }],
-        globalGroup: activeGroupName ? activeGroupName.toLowerCase().replace(/\s+/g, '_') : null
+        globalGroup: activeGroupKey || (activeGroupName ? activeGroupName.toLowerCase().replace(/\s+/g, '_') : null)
       };
     }
 
