@@ -23,7 +23,8 @@ import {
   getLineStyle,
   getSegmentStyle,
   getTranslatedTitle,
-  getCategoryDisplayName
+  getCategoryDisplayName,
+  reconstructManualItemsFromProject
 } from '@/lib/freeshowUtils';
 export default function FreeshowGenerator() {
   const [lang, setLang] = useState<string>('nl');
@@ -1170,7 +1171,9 @@ export default function FreeshowGenerator() {
         setManualItems(data.state.manualItems || []);
         if (data.state.projectName) setProjectName(data.state.projectName);
         setUseTemplate(false);
-        setStatus("Project ingeladen!");
+        setStatus(data.reconstructed
+          ? `Project ingeladen (${data.state.manualItems.length} item(s) best-effort gereconstrueerd${data.skipped ? `, ${data.skipped} overgeslagen` : ''} - controleer voor gebruik).`
+          : "Project ingeladen!");
       } else {
         alert("Kan status niet inladen: " + (data.error || "Bestand is geen opgeslagen livestream project"));
       }
@@ -1230,26 +1233,40 @@ export default function FreeshowGenerator() {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(arrayBuffer);
-      const stateFile = zip.file("livestream_state.json");
-      if (!stateFile) {
-        alert("Dit .project bestand bevat geen 'livestream_state.json'. Het is waarschijnlijk niet met deze tool opgeslagen, of met een oudere versie.");
-        setLoading(false);
-        return;
-      }
-      const stateJsonStr = await stateFile.async("string");
-      const stateObj = JSON.parse(stateJsonStr);
-      if (!Array.isArray(stateObj.manualItems)) {
-        alert(stateObj.draftServiceDate
-          ? "Dit project is aangemaakt via de e-mail-automatisering en kan nog niet worden ingeladen in de handmatige Bouwer. Gebruik de reviewtab voor Diensten om dit project te bekijken of bij te werken."
-          : "Geen laadbare project-status (manualItems) gevonden in dit bestand.");
+
+      const dataJsonFile = zip.file("data.json");
+      if (!dataJsonFile) {
+        alert("Ongeldig .project bestand: geen data.json gevonden.");
         setLoading(false);
         e.target.value = "";
         return;
       }
-      setManualItems(stateObj.manualItems);
-      if (stateObj.projectName) setProjectName(stateObj.projectName);
+      const dataJson = JSON.parse(await dataJsonFile.async("string"));
+
+      let manualItemsToLoad: any[] | null = null;
+      const stateFile = zip.file("livestream_state.json");
+      if (stateFile) {
+        try {
+          const stateObj = JSON.parse(await stateFile.async("string"));
+          if (Array.isArray(stateObj.manualItems)) manualItemsToLoad = stateObj.manualItems;
+        } catch {}
+      }
+
+      let reconstructed = false;
+      let skipped = 0;
+      if (!manualItemsToLoad) {
+        const result = reconstructManualItemsFromProject(dataJson);
+        manualItemsToLoad = result.items;
+        skipped = result.skipped;
+        reconstructed = true;
+      }
+
+      setManualItems(manualItemsToLoad);
+      if (dataJson.project?.name) setProjectName(dataJson.project.name);
       setUseTemplate(false);
-      setStatus("Project succesvol ingeladen!");
+      setStatus(reconstructed
+        ? `Project ingeladen (${manualItemsToLoad.length} item(s) best-effort gereconstrueerd${skipped ? `, ${skipped} overgeslagen` : ''} - controleer voor gebruik).`
+        : "Project succesvol ingeladen!");
     } catch(err) {
       alert("Fout bij uitlezen ZIP-bestand: " + err);
     }

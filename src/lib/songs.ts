@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { getSettings } from '@/lib/settingsStore';
+import { extractShowSlideText } from '@/lib/freeshowUtils';
 
 export async function checkLocalSongExists(title: string, artist: string): Promise<boolean> {
   let songDir = process.env.FREESHOW_SONGS_DIR || path.join(process.cwd(), 'database', 'songs');
@@ -61,32 +62,7 @@ export async function getLocalSongText(title: string, artist: string): Promise<s
     // FreeShow .show files are typically an array [id, data]
     const showData = Array.isArray(rawData) ? rawData[1] : rawData;
 
-    // Extract text from slides
-    const lyricsParts: string[] = [];
-    if (showData && showData.slides) {
-      // Slides is an object with slide IDs as keys
-      Object.values(showData.slides).forEach((slide: any) => {
-        const slideTexts: string[] = [];
-        if (slide.items) {
-          slide.items.forEach((item: any) => {
-            if (item.lines) {
-              item.lines.forEach((line: any) => {
-                if (line.text) {
-                  line.text.forEach((t: any) => {
-                    if (t.value) slideTexts.push(t.value);
-                  });
-                }
-              });
-            }
-          });
-        }
-        if (slideTexts.length > 0) {
-          lyricsParts.push(slideTexts.join('\n'));
-        }
-      });
-    }
-
-    return lyricsParts.join('\n\n');
+    return extractShowSlideText(showData);
   } catch (err) {
     console.error("Local song text error:", err);
     return '';
