@@ -189,6 +189,10 @@ def main():
     delete_all_scriptures = "--delete-all-scriptures" in sys.argv
     if delete_all_scriptures:
         print("WIPE MODE: Direct deletion of ALL scripture shows requested.")
+
+    keep_on = "--keep-on" in sys.argv
+    if keep_on:
+        print("KEEP-ON MODE: Beamer PC / smart plug will be left on after this run.")
     
     # 1. Configuration Check
     mac_user = settings.get("sshUser", "admin")
@@ -227,7 +231,6 @@ def main():
         sys.exit(0)
     
     # 2. Power Management check
-    turned_on_by_script = False
     is_pc_online = test_ssh(mac_user, mac_host)
     
     if not is_pc_online:
@@ -244,7 +247,6 @@ def main():
             # Wait for host to boot and SSH to become available
             if wait_for_ssh(mac_user, mac_host):
                 print("[Power] Beamer PC successfully started!")
-                turned_on_by_script = True
                 # Give the PC a few seconds to stabilize
                 time.sleep(10)
             else:
@@ -657,17 +659,31 @@ def main():
     except Exception as e:
         print(f"ERROR: Failed to save sync state file: {e}")
     
-    # 5. Teardown / Shutdown sequence if booted by script
-    if turned_on_by_script:
-        print("\n--- STAP 3: BEAMER PC NETJES AFSLUITEN (Booted by script) ---")
-        print("Sturen van Windows-afsluitcommando naar Beamer PC...")
-        run_ssh_cmd(mac_user, mac_host, "shutdown /s /f /t 0")
+    # 5. Teardown / Shutdown sequence
+    # Previously this only ran when turned_on_by_script was True, i.e. only
+    # when THIS run was the one that switched the plug on. If the Beamer PC
+    # was already on for any other reason (left on from a previous
+    # incomplete run, used manually during the week, ...) the script skipped
+    # both the startup AND the shutdown sequence, leaving the plug on
+    # indefinitely - which is exactly the "still on after Wednesday" symptom.
+    # The whole point of this nightly job is wake -> sync -> power off, so it
+    # now always shuts down after a successful sync, regardless of who
+    # turned the PC on - pass --keep-on to skip this for a manual/debug run.
+    if keep_on:
+        print("\n--- STAP 3: AFSLUITEN OVERGESLAGEN (--keep-on) ---")
+    else:
+        print("\n--- STAP 3: BEAMER PC NETJES AFSLUITEN ---")
+        print(f"Sturen van afsluitcommando naar Beamer PC ({remote_os})...")
+        if remote_os == "windows":
+            run_ssh_cmd(mac_user, mac_host, "shutdown /s /f /t 0")
+        else:
+            run_ssh_cmd(mac_user, mac_host, "osascript -e 'tell application \"System Events\" to shut down'")
         print("Wachten op 15 seconden voor het veilig afsluiten...")
         time.sleep(15)
         print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
         subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
         print("[Power] Stroom succesvol afgesloten.")
-        
+
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === FREESHOW SYNC & CLEANUP VOLTOOID ===")
 
 if __name__ == "__main__":
