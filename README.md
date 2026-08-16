@@ -129,7 +129,7 @@ Dit script:
 #### OBS WebSocket
 ```json
 {
-  "obsHost": "192.168.1.100",
+  "obsHost": "192.0.2.100",
   "obsPort": 4455,
   "obsPassword": "your-websocket-password"
 }
@@ -138,7 +138,7 @@ Dit script:
 #### QLC+ DMX
 ```json
 {
-  "qlcHost": "192.168.1.101",
+  "qlcHost": "192.0.2.101",
   "qlcPort": 9999,
   "oscPort": 7700
 }
@@ -148,7 +148,7 @@ Dit script:
 ```json
 {
   "ledPanelEnabled": true,
-  "ledHost": "192.168.1.102",
+  "ledHost": "192.0.2.102",
   "sshUser": "pi",
   "ledPanelMac": "AA:BB:CC:DD:EE:FF",
   "ledTriggerSource": "youtube",
@@ -251,5 +251,5 @@ Proprietary - Ark Church
 
 ## Credits
 
-Ontwikkeld door Jeffrey Go voor Ark Church
+Ontwikkeld voor Ark Church
 Versie 2.2.0 (Augustus 2026)
