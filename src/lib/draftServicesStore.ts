@@ -8,10 +8,14 @@ const STORE_FILE = path.join(DATA_DIR, 'draftServices.json');
 export interface DraftSong {
   id: string;
   title: string;
+  artist?: string;
   category?: string;
   section: string;
   source: 'email';
   addedAt: string;
+  lyricsText?: string;
+  lyricsAttachmentName?: string;
+  lyricsFilePath?: string; // resolved by the caller once matched against real email attachments
 }
 
 export interface DraftScripture {
@@ -182,10 +186,14 @@ export function mergeParsedEmailIntoDraft(
         draft.songs.push({
           id: newId(),
           title: item.title,
+          artist: item.artist,
           category: item.category,
           section: item.section,
           source: 'email',
-          addedAt: now
+          addedAt: now,
+          lyricsText: item.lyricsText,
+          lyricsAttachmentName: item.lyricsAttachmentName,
+          lyricsFilePath: item.lyricsFilePath
         });
       }
     } else if (item.type === 'scripture') {

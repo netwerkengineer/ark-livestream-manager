@@ -46,6 +46,22 @@ export async function POST(req: NextRequest) {
     const stateJsonStr = await stateFile.async("string");
     const stateObj = JSON.parse(stateJsonStr);
 
+    // livestream_state.json has two different shapes depending on how the
+    // project was generated: {manualItems, projectName, useTemplate} from
+    // the manual Bouwer (createFreeShowProject in /api/generate), or
+    // {draftServiceDate} from the email-automation pipeline
+    // (draftProjectGenerator.ts). Only the former is loadable back into the
+    // Bouwer's playlist - without this check, an email-generated project
+    // "loads" successfully with an empty manualItems array and no
+    // explanation, which looks identical to a genuinely empty playlist.
+    if (!Array.isArray(stateObj.manualItems)) {
+      return NextResponse.json({
+        error: stateObj.draftServiceDate
+          ? "Dit project is aangemaakt via de e-mail-automatisering en kan nog niet worden ingeladen in de handmatige Bouwer. Gebruik de reviewtab voor Diensten om dit project te bekijken of bij te werken."
+          : "Geen laadbare project-status (manualItems) gevonden in dit bestand."
+      }, { status: 400 });
+    }
+
     return NextResponse.json({ success: true, state: stateObj });
 
   } catch (error: any) {

@@ -52,25 +52,35 @@ const sanitizeShowName = (name: string) => name.replace(/[\\/:*?"<>|]/g, ' ').tr
 // Mirrors /api/preview's song resolution: reuse the existing catalog show
 // verbatim if there's a match (preserving its styling). If there's no match,
 // this now auto-creates a real catalog entry (mirroring /api/save-show)
-// instead of only embedding transient content in the generated project -
-// worship leaders usually send just a title, so the new show gets either
-// internet-fetched lyrics or a placeholder slide, clearly flagged as such.
+// instead of only embedding transient content in the generated project.
+// Content priority: lyrics supplied in the mail itself (body block or a
+// .txt/.pdf/.docx attachment, already extracted into song.lyricsText by
+// email.ts) > internet lookup by title+artist > a placeholder slide -
+// worship leaders often send just a title, so that last case is common and
+// clearly flagged rather than silently left blank.
 async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: any; note?: string }> {
   const title = song.title;
-  const exists = await checkLocalSongExists(title, '');
+  const artist = song.artist || '';
+  const exists = await checkLocalSongExists(title, artist);
   let text = '';
   let fullData: { id: string; data: any } | null = null;
   let note: string | undefined;
 
   if (exists) {
-    text = (await getLocalSongText(title, '')) || '';
-    fullData = await getLocalShowData(title, '');
+    text = (await getLocalSongText(title, artist)) || '';
+    fullData = await getLocalShowData(title, artist);
   } else {
-    const fetchedLyrics = (await fetchLyricsFromInternet(title, '')) || '';
-    const hasLyrics = !!fetchedLyrics.trim();
-    text = hasLyrics ? fetchedLyrics : 'Tekst nog toevoegen';
+    const suppliedLyrics = song.lyricsText?.trim();
+    let hasLyrics = !!suppliedLyrics;
+    if (suppliedLyrics) {
+      text = suppliedLyrics;
+    } else {
+      const fetchedLyrics = (await fetchLyricsFromInternet(title, artist)) || '';
+      hasLyrics = !!fetchedLyrics.trim();
+      text = hasLyrics ? fetchedLyrics : 'Tekst nog toevoegen';
+    }
 
-    const cleanName = sanitizeShowName(title);
+    const cleanName = sanitizeShowName(`${title}${artist ? ' - ' + artist : ''}`);
 
     if (settings.freeshowPath) {
       try {
@@ -95,7 +105,7 @@ async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: 
         } else {
           // Collision safety net (e.g. created between the exists-check
           // above and here) - never clobber, just reuse what's on disk.
-          fullData = await getLocalShowData(title, '');
+          fullData = await getLocalShowData(title, artist);
         }
       } catch (err) {
         console.error(`[Project Generator] Nieuw lied "${cleanName}" opslaan mislukt:`, err);
@@ -112,7 +122,7 @@ async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: 
       type: 'song',
       targetSection: song.section,
       fullData: fullData || undefined,
-      data: { name: title, category: 'song', text }
+      data: { name: artist ? `${title} - ${artist}` : title, category: 'song', text }
     },
     note
   };

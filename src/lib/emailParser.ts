@@ -4,7 +4,11 @@ export interface ParsedSong {
   type: 'song';
   section: string;
   title: string;
+  artist?: string;
   category?: string;
+  lyricsText?: string;
+  lyricsAttachmentName?: string;
+  lyricsFilePath?: string; // resolved by the caller once matched against real email attachments
 }
 
 export interface ParsedScripture {
@@ -39,6 +43,16 @@ const SERVICE_DATE_RE = /^dienst\s*datum\s*:\s*(.+)$/i;
 const SONG_BLOCK_RE = /^liederen(?:\s*\(\s*categorie\s*:\s*(.+?)\s*\))?\s*:?\s*$/i;
 const SCRIPTURE_BLOCK_RE = /^bijbeltekst(en)?\s*:?\s*$/i;
 const MEDIA_BLOCK_RE = /^media\s*:?\s*$/i;
+// A song line optionally carries "(bijlage: bestand.ext)" for lyrics
+// supplied as a .txt/.pdf/.docx attachment, matched against real email
+// attachments by the caller (same convention as the Media block's own
+// "(bijlage: ...)" syntax, just inline on the song line instead of standalone).
+const SONG_LINE_RE = /^-\s*(.+?)(?:\s*\(\s*bijlage\s*:\s*(.+?)\s*\))?\s*$/i;
+// Inline lyrics for the song directly above: everything between these two
+// markers (blank lines included, to preserve verse/refrein spacing) becomes
+// that song's lyricsText instead of being split into further items.
+const LYRICS_START_RE = /^\[\s*tekst\s*\]$/i;
+const LYRICS_END_RE = /^\[\s*\/\s*tekst\s*\]$/i;
 const SCRIPTURE_LINE_RE = /^(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?\s*\(\s*([^)]+?)\s*\)\s*$/;
 const YOUTUBE_RE = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\/\S+)/i;
 const ATTACHMENT_RE = /^\(?\s*bijlage\s*:\s*(.+?)\s*\)?$/i;
@@ -75,16 +89,42 @@ export function parseServiceEmail(text: string): ParsedEmail {
   let currentSection = '';
   let currentBlock: BlockType = null;
   let currentSongCategory: string | undefined;
+  let lastSong: ParsedSong | null = null;
+  let lyricsCapture: { song: ParsedSong | null; buffer: string[] } | null = null;
   const items: ParsedItem[] = [];
   const notes: string[] = [];
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
+
+    // Inline lyrics block for the song mentioned just above - captured
+    // ahead of the blank-line-ends-block rule below, since verses/refrein
+    // are usually separated by blank lines and those must be preserved.
+    if (lyricsCapture) {
+      if (LYRICS_END_RE.test(line)) {
+        if (lyricsCapture.song) {
+          lyricsCapture.song.lyricsText = lyricsCapture.buffer.join('\n').trim();
+        }
+        lyricsCapture = null;
+      } else {
+        lyricsCapture.buffer.push(line);
+      }
+      continue;
+    }
+
     if (!line) {
       // A blank line ends the current block (paragraph), so trailing text
       // like a sign-off ("Groetjes, Jan") after a block isn't misclassified
       // as an unrecognized item within that block.
       currentBlock = null;
+      continue;
+    }
+
+    if (LYRICS_START_RE.test(line)) {
+      if (!lastSong) {
+        notes.push('Tekstblok [Tekst]...[/Tekst] gevonden zonder voorafgaand lied - genegeerd.');
+      }
+      lyricsCapture = { song: lastSong, buffer: [] };
       continue;
     }
 
@@ -121,13 +161,27 @@ export function parseServiceEmail(text: string): ParsedEmail {
     }
 
     if (currentBlock === 'song') {
-      if (line.startsWith('- ')) {
-        items.push({
-          type: 'song',
-          section: currentSection,
-          title: line.slice(2).trim(),
-          category: currentSongCategory
-        });
+      if (line.startsWith('-')) {
+        const m = line.match(SONG_LINE_RE);
+        if (m) {
+          // Same "Titel - Artiest" split convention used elsewhere in the
+          // app (e.g. the manual Bouwer's quick-add) - only the first
+          // " - " counts, so titles that themselves contain a hyphen still
+          // parse (just without a detected artist).
+          const [titlePart, artistPart] = m[1].split(/\s+-\s+/, 2);
+          const song: ParsedSong = {
+            type: 'song',
+            section: currentSection,
+            title: titlePart.trim(),
+            artist: artistPart?.trim() || undefined,
+            category: currentSongCategory,
+            lyricsAttachmentName: m[2]?.trim()
+          };
+          items.push(song);
+          lastSong = song;
+        } else {
+          notes.push(`Niet herkend als lied (verwacht "- Titel"): "${line}"`);
+        }
       } else {
         notes.push(`Niet herkend als lied (verwacht "- Titel"): "${line}"`);
       }

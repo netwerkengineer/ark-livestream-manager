@@ -5,9 +5,10 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getSettings } from '@/lib/settingsStore';
-import { parseServiceEmail, ParsedMedia } from '@/lib/emailParser';
+import { parseServiceEmail, ParsedMedia, ParsedSong } from '@/lib/emailParser';
 import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStore';
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
+import { extractTextFromDocument } from '@/lib/documentText';
 
 const execFilePromise = promisify(execFile);
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
@@ -54,6 +55,20 @@ function resolveAttachmentPaths(items: ParsedMedia[], saved: { filename: string;
       || saved.find(s => s.filename.toLowerCase().includes(wanted) || wanted.includes(s.filename.toLowerCase()));
     if (match) {
       item.filePath = match.path;
+    }
+  }
+}
+
+// Same matching as resolveAttachmentPaths, for a song's inline "(bijlage:
+// naam)" lyrics reference instead of a Media-block attachment.
+function resolveSongLyricsAttachments(items: ParsedSong[], saved: { filename: string; path: string }[]) {
+  for (const item of items) {
+    if (!item.lyricsAttachmentName) continue;
+    const wanted = item.lyricsAttachmentName.trim().toLowerCase();
+    const match = saved.find(s => s.filename.toLowerCase() === wanted)
+      || saved.find(s => s.filename.toLowerCase().includes(wanted) || wanted.includes(s.filename.toLowerCase()));
+    if (match) {
+      item.lyricsFilePath = match.path;
     }
   }
 }
@@ -286,6 +301,21 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
       const mediaItems = parsed.items.filter((i): i is ParsedMedia => i.type === 'media');
       resolveAttachmentPaths(mediaItems, saved);
       await resolveYoutubeDownloads(mediaItems, stagingDir);
+
+      const songItems = parsed.items.filter((i): i is ParsedSong => i.type === 'song');
+      resolveSongLyricsAttachments(songItems, saved);
+      for (const song of songItems) {
+        // Inline [Tekst]...[/Tekst] body text wins if a mail somehow supplied
+        // both - the attachment is only read when there's nothing already.
+        if (!song.lyricsText && song.lyricsFilePath) {
+          const extracted = await extractTextFromDocument(song.lyricsFilePath);
+          if (extracted.trim()) {
+            song.lyricsText = extracted;
+          } else {
+            console.error(`[Email Sync] Kon geen tekst uit bijlage "${song.lyricsAttachmentName}" halen voor lied "${song.title}".`);
+          }
+        }
+      }
 
       const draft = mergeParsedEmailIntoDraft(parsed, {
         messageId,

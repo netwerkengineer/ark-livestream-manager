@@ -4,8 +4,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 interface DraftSong {
   id: string;
   title: string;
+  artist?: string;
   category?: string;
   section: string;
+  lyricsText?: string;
+  lyricsAttachmentName?: string;
 }
 interface DraftScripture {
   id: string;
@@ -229,7 +232,10 @@ export default function DraftServicesReview() {
                       <div style={{ fontSize: '0.8rem', opacity: 0.4 }}>Nog niet aangeleverd</div>
                     ) : draft.songs.map(s => (
                       <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                        <span>{s.title}</span>
+                        <span>
+                          {s.title}{s.artist ? <span style={{ opacity: 0.5 }}> - {s.artist}</span> : ''}
+                          {(s.lyricsText || s.lyricsAttachmentName) && <span title="Tekst aangeleverd in de mail" style={{ marginLeft: '0.4rem' }}>📝</span>}
+                        </span>
                         {sectionBadge(s.section)}
                       </div>
                     ))}
