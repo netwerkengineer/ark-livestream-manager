@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
+import { reconstructManualItemsFromProject } from '@/lib/freeshowUtils';
 import fs from 'fs/promises';
 import path from 'path';
 import JSZip from 'jszip';
@@ -35,34 +36,50 @@ export async function POST(req: NextRequest) {
     const fileBuffer = await fs.readFile(filePath);
     const zip = await JSZip.loadAsync(fileBuffer);
 
-    // Zoek naar de state JSON file
-    const stateFile = zip.file("livestream_state.json");
-    if (!stateFile) {
-      return NextResponse.json({ 
-        error: "Geen laadbare project-status (livestream_state.json) gevonden in dit bestand. Alleen projecten die recent zijn opgeslagen met deze functie kunnen worden ingeladen." 
-      }, { status: 400 });
+    const dataJsonFile = zip.file("data.json");
+    if (!dataJsonFile) {
+      return NextResponse.json({ error: "Ongeldig .project bestand: geen data.json gevonden." }, { status: 400 });
     }
+    const dataJson = JSON.parse(await dataJsonFile.async("string"));
 
-    const stateJsonStr = await stateFile.async("string");
-    const stateObj = JSON.parse(stateJsonStr);
-
-    // livestream_state.json has two different shapes depending on how the
-    // project was generated: {manualItems, projectName, useTemplate} from
-    // the manual Bouwer (createFreeShowProject in /api/generate), or
+    // livestream_state.json (when present) has two different shapes
+    // depending on how the project was generated: {manualItems,
+    // projectName, useTemplate} from the manual Bouwer, or
     // {draftServiceDate} from the email-automation pipeline
-    // (draftProjectGenerator.ts). Only the former is loadable back into the
-    // Bouwer's playlist - without this check, an email-generated project
-    // "loads" successfully with an empty manualItems array and no
-    // explanation, which looks identical to a genuinely empty playlist.
-    if (!Array.isArray(stateObj.manualItems)) {
-      return NextResponse.json({
-        error: stateObj.draftServiceDate
-          ? "Dit project is aangemaakt via de e-mail-automatisering en kan nog niet worden ingeladen in de handmatige Bouwer. Gebruik de reviewtab voor Diensten om dit project te bekijken of bij te werken."
-          : "Geen laadbare project-status (manualItems) gevonden in dit bestand."
-      }, { status: 400 });
+    // (draftProjectGenerator.ts). Only the former is a ready-made Bouwer
+    // playlist - anything else (email-generated, or a project with no
+    // livestream_state.json at all because it was authored natively in
+    // FreeShow) falls back to reconstructing a best-effort playlist
+    // straight from the project's own show data instead of refusing to load
+    // at all.
+    let manualItems: any[] | null = null;
+    const stateFile = zip.file("livestream_state.json");
+    if (stateFile) {
+      try {
+        const stateObj = JSON.parse(await stateFile.async("string"));
+        if (Array.isArray(stateObj.manualItems)) {
+          manualItems = stateObj.manualItems;
+        }
+      } catch (err) {
+        console.error("Load project: livestream_state.json parse error:", err);
+      }
     }
 
-    return NextResponse.json({ success: true, state: stateObj });
+    let reconstructed = false;
+    let skipped = 0;
+    if (!manualItems) {
+      const result = reconstructManualItemsFromProject(dataJson);
+      manualItems = result.items;
+      skipped = result.skipped;
+      reconstructed = true;
+    }
+
+    return NextResponse.json({
+      success: true,
+      state: { manualItems, projectName: dataJson.project?.name, useTemplate: false },
+      reconstructed,
+      skipped
+    });
 
   } catch (error: any) {
     console.error("Load project error:", error);
