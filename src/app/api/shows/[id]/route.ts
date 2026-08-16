@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
+import { getItemType } from '@/lib/freeshowUtils';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const slide = showObj.slides[slideId];
         if (slide && slide.items && slide.items[0]) {
           const item = slide.items[0];
-          if (item.type === 'text') {
+          if (getItemType(item) === 'text') {
             const existingStyle = item.lines?.[0]?.text?.[0]?.style || "font-size: 100px;";
             item.lines = (newText as string).split('\n').map(lineStr => ({
               align: item.lines?.[0]?.align || "",

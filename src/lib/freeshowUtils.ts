@@ -498,3 +498,18 @@ export function reconstructManualItemsFromProject(dataFile: any): { items: any[]
 
   return { items, skipped };
 }
+
+// FreeShow itself doesn't always write an explicit `type` field on slide
+// items - a plain text item is frequently untyped (FreeShow's own renderer
+// treats a missing type as implicitly "text"). Confirmed against a real
+// native-FreeShow-authored scripture show: every item lacked `type`
+// entirely, which silently broke this app's preview (item.type === 'text'
+// was never true, so nothing rendered) - any code that branches on an
+// item's type must infer it from shape when the field is absent, not
+// assume FreeShow always wrote it.
+export function getItemType(item: any): 'text' | 'media' | 'unknown' {
+  if (item?.type === 'text' || item?.type === 'media') return item.type;
+  if (item?.src !== undefined) return 'media';
+  if (item?.lines !== undefined) return 'text';
+  return 'unknown';
+}

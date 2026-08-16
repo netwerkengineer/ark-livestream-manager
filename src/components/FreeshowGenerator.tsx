@@ -24,7 +24,8 @@ import {
   getSegmentStyle,
   getTranslatedTitle,
   getCategoryDisplayName,
-  reconstructManualItemsFromProject
+  reconstructManualItemsFromProject,
+  getItemType
 } from '@/lib/freeshowUtils';
 export default function FreeshowGenerator() {
   const [lang, setLang] = useState<string>('nl');
@@ -910,7 +911,7 @@ export default function FreeshowGenerator() {
     const s = updated[idx];
     if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
       const item = s.slideObj.items[0];
-      if (item.type === 'text') {
+      if (getItemType(item) === 'text') {
         const existingStyle = item.lines?.[0]?.text?.[0]?.style || "font-size: 100px; color: white;";
         item.lines = newText.split('\n').map((lineStr: string) => ({
           align: item.lines?.[0]?.align || "",
@@ -926,7 +927,7 @@ export default function FreeshowGenerator() {
     const s = updated[idx];
     if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
       const item = s.slideObj.items[0];
-      if (item.type === 'media') {
+      if (getItemType(item) === 'media') {
         item.src = newSrc;
       }
     }
@@ -938,7 +939,7 @@ export default function FreeshowGenerator() {
     const s = updated[idx];
     if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
       const item = s.slideObj.items[0];
-      if (item.type === 'text') {
+      if (getItemType(item) === 'text') {
         s.slideObj.items = [
           {
             type: "media",
@@ -2044,8 +2045,9 @@ export default function FreeshowGenerator() {
                     {showEditorSlides.map((slideItem: any, idx: number) => {
                       const slideObj = slideItem.slideObj;
                       const item = slideObj?.items?.[0] || { type: 'text' };
-                      const isText = item.type === 'text';
-                      const isMedia = item.type === 'media';
+                      const inferredType = getItemType(item);
+                      const isText = inferredType === 'text';
+                      const isMedia = inferredType === 'media';
                       
                       const groupLabel = slideObj?.group || `Slide ${idx + 1}`;
                       const groupColor = slideObj?.color || 'var(--primary)';

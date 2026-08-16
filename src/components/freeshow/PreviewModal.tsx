@@ -7,7 +7,8 @@ import {
   applyTemplateToSlide,
   getContainerStyle,
   getLineStyle,
-  getSegmentStyle
+  getSegmentStyle,
+  getItemType
 } from '@/lib/freeshowUtils';
 
 interface PreviewModalProps {
@@ -182,7 +183,8 @@ export default function PreviewModal({
                     {/* Slide items */}
                     <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
                       {slide.items && slide.items.map((item: any, itemIdx: number) => {
-                        if (item.type === 'media') {
+                        const itemType = getItemType(item);
+                        if (itemType === 'media') {
                           return (
                             <div key={item.id || itemIdx} style={getContainerStyle(item)}>
                               {item.src && (
@@ -196,7 +198,7 @@ export default function PreviewModal({
                           );
                         }
 
-                        if (item.type === 'text') {
+                        if (itemType === 'text') {
                           return (
                             <div key={item.id || itemIdx} style={getContainerStyle(item)}>
                               {item.lines && item.lines.map((line: any, lineIdx: number) => (
