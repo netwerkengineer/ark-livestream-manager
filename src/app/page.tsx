@@ -95,6 +95,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [scheduledStreams, setScheduledStreams] = useState<any[]>([]);
   const [loadingStreams, setLoadingStreams] = useState(false);
   const [errorStreams, setErrorStreams] = useState<string | null>(null);
+  const [youtubeQuota, setYoutubeQuota] = useState<{ unitsUsed: number; estimatedLimit: number; percentUsed: number } | null>(null);
 
   // Local Auth States
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -224,6 +225,24 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         });
     }
   }, [activeTab, isConnectedYoutube, settings?.defaultCategoryId]);
+
+  // Estimated YouTube Data API quota usage - polled while the planner tab is
+  // open so a medewerker sees it's getting close to the daily limit before
+  // hitting a quotaExceeded error, instead of only finding out that way.
+  useEffect(() => {
+    if (activeTab !== "planner" || !isConnectedYoutube) return;
+    const fetchQuota = () => {
+      fetch("/api/youtube/quota")
+        .then(res => res.json())
+        .then(data => {
+          if (typeof data.percentUsed === 'number') setYoutubeQuota(data);
+        })
+        .catch(() => {});
+    };
+    fetchQuota();
+    const interval = setInterval(fetchQuota, 60000);
+    return () => clearInterval(interval);
+  }, [activeTab, isConnectedYoutube]);
 
   useEffect(() => {
     if (settings) {
@@ -798,7 +817,22 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>YouTube Kanaal</span>
                 <span style={{ color: '#4ade80', fontSize: '0.9rem' }}>Gekoppeld ✓</span>
               </div>
-              <div style={{ 
+              {youtubeQuota && youtubeQuota.percentUsed >= 70 && (
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  background: youtubeQuota.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)',
+                  border: `1px solid ${youtubeQuota.percentUsed >= 90 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
+                  borderRadius: '8px', padding: '8px 12px', fontSize: '0.8rem'
+                }}>
+                  <span style={{ color: youtubeQuota.percentUsed >= 90 ? '#f87171' : '#fcd34d' }}>
+                    ⚠️ API-quota: {youtubeQuota.percentUsed}% gebruikt vandaag
+                  </span>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }} title="Schatting, gebaseerd op standaard Google-daglimiet">
+                    (schatting)
+                  </span>
+                </div>
+              )}
+              <div style={{
                 background: 'rgba(59, 130, 246, 0.08)', 
                 border: '1px solid rgba(59, 130, 246, 0.2)', 
                 borderRadius: '8px', 

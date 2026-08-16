@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getSettings } from "./settingsStore";
+import { recordYoutubeQuotaUsage } from "./youtubeQuota";
 
 const TOKEN_FILE = path.join(process.cwd(), "data", "tokens.json");
 
@@ -90,6 +91,7 @@ export async function youtubeFetch(url: string, init: RequestInit = {}): Promise
 
   // Perform initial fetch
   let res = await fetch(url, { ...init, headers });
+  recordYoutubeQuotaUsage(url, init.method || "GET");
 
   // If unauthorized (expired token), attempt refresh
   if (res.status === 401) {
@@ -99,6 +101,7 @@ export async function youtubeFetch(url: string, init: RequestInit = {}): Promise
       // Retry request with new token
       headers["Authorization"] = `Bearer ${newToken}`;
       res = await fetch(url, { ...init, headers });
+      recordYoutubeQuotaUsage(url, init.method || "GET");
     }
   }
 
