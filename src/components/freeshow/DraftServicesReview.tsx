@@ -73,6 +73,7 @@ export default function DraftServicesReview() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [conflictId, setConflictId] = useState<string | null>(null);
   const [genMessage, setGenMessage] = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
@@ -109,6 +110,24 @@ export default function DraftServicesReview() {
       setError(e.message);
     } finally {
       setChecking(false);
+    }
+  };
+
+  const deleteDraft = async (serviceDate: string) => {
+    if (!confirm(`Concept-dienst van ${formatDate(serviceDate)} verwijderen? Dit verwijdert alleen deze aanlevering uit de reviewtab - een al gegenereerd FreeShow-project op de NAS blijft gewoon staan.`)) return;
+    setDeletingId(serviceDate);
+    try {
+      const res = await fetch(`/api/email/drafts?serviceDate=${encodeURIComponent(serviceDate)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setDrafts(prev => prev.filter(d => d.serviceDate !== serviceDate));
+      } else {
+        setError(data.error || 'Kon concept-dienst niet verwijderen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -169,9 +188,19 @@ export default function DraftServicesReview() {
               <div key={draft.id} className="glass-card" style={{ padding: '1.2rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <h3 style={{ margin: 0, textTransform: 'capitalize' }}>{formatDate(draft.serviceDate)}</h3>
-                  <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>
-                    Laatst bijgewerkt: {new Date(draft.lastUpdatedAt).toLocaleString('nl-NL')} · {draft.sourceEmails.length} mail(s)
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>
+                      Laatst bijgewerkt: {new Date(draft.lastUpdatedAt).toLocaleString('nl-NL')} · {draft.sourceEmails.length} mail(s)
+                    </span>
+                    <button
+                      onClick={() => deleteDraft(draft.serviceDate)}
+                      disabled={deletingId === draft.serviceDate}
+                      title="Concept-dienst verwijderen"
+                      style={{ background: 'rgba(255,0,0,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer' }}
+                    >
+                      {deletingId === draft.serviceDate ? '...' : '🗑️'}
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>

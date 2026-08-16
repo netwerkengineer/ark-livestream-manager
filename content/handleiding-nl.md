@@ -262,6 +262,8 @@ Per dienst zie je:
 
 Onderaan, als aanwezig: **"Niet toegewezen mails"** — mail die niet aan een dienstdatum gekoppeld kon worden (bijvoorbeeld omdat de datumregel ontbreekt of niet goed leesbaar was), zodat je dit handmatig kunt oppakken.
 
+> ℹ️ Een concept-dienst blijft hier staan totdat je 'm zelf verwijdert met het 🗑️-icoon naast de datum (met bevestiging) — er is geen automatische opschoning na de dienstdatum. Verwijderen raakt alleen de aanlevering in deze reviewtab; een al gegenereerd FreeShow-project op de NAS blijft gewoon staan.
+
 ### 5.12 Nieuwe liederen automatisch aanmaken
 
 Staat een aangeleverd lied nog niet in de catalogus, dan maakt de app automatisch een nieuwe show aan:

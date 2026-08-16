@@ -106,6 +106,19 @@ export function getUnassignedEmails(): UnassignedEmailRecord[] {
   return readStore().unassigned;
 }
 
+// Draft services are otherwise kept indefinitely (no automatic expiry) - a
+// medewerker removes one manually once the service has passed and the
+// generated FreeShow project is no longer needed for reference. This only
+// removes the draft record itself, not any .project file already generated
+// from it on the NAS.
+export function deleteDraftService(serviceDate: string): boolean {
+  const store = readStore();
+  if (!store.services[serviceDate]) return false;
+  delete store.services[serviceDate];
+  writeStore(store);
+  return true;
+}
+
 function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
