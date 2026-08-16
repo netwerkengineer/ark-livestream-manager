@@ -404,8 +404,7 @@ export default function SettingsPanel({
                       <input className="input-field" placeholder="FreeShow IP" value={settings.freeShowHost} onChange={(e) => onSettingsChange({...settings, freeShowHost: e.target.value})} />
                       <input className="input-field" type="number" placeholder="Poort" value={settings.freeShowPort} onChange={(e) => onSettingsChange({...settings, freeShowPort: parseInt(e.target.value) || 5505})} />
                     </div>
-                    <input className="input-field" placeholder="Media Pad op NAS (bijv. /volume1/Media)" value={settings.mediaPath} onChange={(e) => onSettingsChange({...settings, mediaPath: e.target.value})} />
-                    <p className="text-[10px] text-muted">Dit pad wordt gebruikt om thumbnails van je beamer-presentaties te tonen.</p>
+                    <p className="text-[10px] text-muted">Het media-pad voor FreeShow stel je in bij het tabblad &quot;FreeShow&quot; (Media Map).</p>
                   </div>
                 </div>
 
