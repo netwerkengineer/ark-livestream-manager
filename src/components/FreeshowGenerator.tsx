@@ -1704,13 +1704,15 @@ export default function FreeshowGenerator() {
                       >
                         📂 Shows Catalogus & Editor
                       </button>
-                      <button 
-                        className="button" 
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'builder' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: builderSlides.length > 0 ? '1px solid var(--primary)' : 'none', fontSize: '0.75rem', padding: '0.6rem' }} 
-                        onClick={() => setDatabaseSubTab('builder')}
-                      >
-                        🛠️ Nieuwe Show {builderSlides.length > 0 ? `(${builderSlides.length})` : '(Builder)'}
-                      </button>
+                      {builderSlides.length > 0 && (
+                        <button
+                          className="button"
+                          style={{ justifyContent: 'flex-start', background: databaseSubTab === 'builder' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', fontSize: '0.75rem', padding: '0.6rem' }}
+                          onClick={() => setDatabaseSubTab('builder')}
+                        >
+                          🛠️ Bouwer-sessie ({builderSlides.length})
+                        </button>
+                      )}
                       <button
                         className="button"
                         style={{ justifyContent: 'flex-start', background: databaseSubTab === 'maintenance' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
@@ -1829,6 +1831,64 @@ export default function FreeshowGenerator() {
           )}
         </div>
 
+        {inputType === 'database' ? (
+          <DatabaseView
+            databaseSubTab={databaseSubTab}
+            showsSearch={showsSearch}
+            setShowsSearch={setShowsSearch}
+            showsCategoryFilter={showsCategoryFilter}
+            setShowsCategoryFilter={setShowsCategoryFilter}
+            showsSortOrder={showsSortOrder}
+            setShowsSortOrder={setShowsSortOrder}
+            loadingShows={loadingShows}
+            showsList={showsList}
+            uniqueCategories={uniqueCategories}
+            freeshowCategories={freeshowCategories}
+            builderSlides={builderSlides}
+            setBuilderSlides={setBuilderSlides}
+            builderTitle={builderTitle}
+            setBuilderTitle={setBuilderTitle}
+            targetSection={targetSection}
+            insertPosition={insertPosition}
+            manualItems={manualItems}
+            setManualItems={setManualItems}
+            setDatabaseSubTab={setDatabaseSubTab}
+            setStatus={setStatus}
+            fetchShows={fetchShows}
+            loadShowDetail={loadShowDetail}
+            openPreview={openPreview}
+            duplicateShow={duplicateShow}
+            deleteShowDirect={deleteShowDirect}
+            catalogSongs={catalogSongs}
+            loadingCatalog={loadingCatalog}
+            catalogSearch={catalogSearch}
+            setCatalogSearch={setCatalogSearch}
+            fetchCatalog={fetchCatalog}
+            deleteFromLibrary={deleteFromLibrary}
+            duplicateGroups={duplicateGroups}
+            scanDuplicates={scanDuplicates}
+            isScanning={isScanning}
+            deleteDuplicate={deleteDuplicate}
+            optimizeMediaPaths={optimizeMediaPaths}
+            isOptimizing={isOptimizing}
+            comparingPair={comparingPair}
+            setComparingPair={setComparingPair}
+            historyItems={historyItems}
+            loadingHistory={loadingHistory}
+            restoreItem={restoreItem}
+            selectedTrashIds={selectedTrashIds}
+            setSelectedTrashIds={setSelectedTrashIds}
+            loadHistory={loadHistory}
+            isSyncing={isSyncing}
+            setIsSyncing={setIsSyncing}
+            isDeletingScriptures={isDeletingScriptures}
+            setIsDeletingScriptures={setIsDeletingScriptures}
+            downloadBackup={downloadBackup}
+            restoreSelectedItems={restoreSelectedItems}
+            emptyTrash={emptyTrash}
+            t={t}
+          />
+        ) : (
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ fontSize: '1.2rem', margin: 0 }}>2. {t('items_playlist')} ({items.length})</h2>
@@ -1930,6 +1990,7 @@ export default function FreeshowGenerator() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* Maintenance Comparison Modal */}
@@ -2197,67 +2258,6 @@ export default function FreeshowGenerator() {
         setCurrentPreviewSlideIdx={setCurrentPreviewSlideIdx}
         onClose={() => setPreviewShow(null)}
       />
-
-      {/* Unified Database Dashboard & Manager View */}
-      {/* Unified Database Dashboard & Manager View */}
-      {inputType === 'database' && (
-        <DatabaseView
-          databaseSubTab={databaseSubTab}
-          showsSearch={showsSearch}
-          setShowsSearch={setShowsSearch}
-          showsCategoryFilter={showsCategoryFilter}
-          setShowsCategoryFilter={setShowsCategoryFilter}
-          showsSortOrder={showsSortOrder}
-          setShowsSortOrder={setShowsSortOrder}
-          loadingShows={loadingShows}
-          showsList={showsList}
-          uniqueCategories={uniqueCategories}
-          freeshowCategories={freeshowCategories}
-          builderSlides={builderSlides}
-          setBuilderSlides={setBuilderSlides}
-          builderTitle={builderTitle}
-          setBuilderTitle={setBuilderTitle}
-          targetSection={targetSection}
-          insertPosition={insertPosition}
-          manualItems={manualItems}
-          setManualItems={setManualItems}
-          setDatabaseSubTab={setDatabaseSubTab}
-          setStatus={setStatus}
-          fetchShows={fetchShows}
-          loadShowDetail={loadShowDetail}
-          openPreview={openPreview}
-          duplicateShow={duplicateShow}
-          deleteShowDirect={deleteShowDirect}
-          catalogSongs={catalogSongs}
-          loadingCatalog={loadingCatalog}
-          catalogSearch={catalogSearch}
-          setCatalogSearch={setCatalogSearch}
-          fetchCatalog={fetchCatalog}
-          deleteFromLibrary={deleteFromLibrary}
-          duplicateGroups={duplicateGroups}
-          scanDuplicates={scanDuplicates}
-          isScanning={isScanning}
-          deleteDuplicate={deleteDuplicate}
-          optimizeMediaPaths={optimizeMediaPaths}
-          isOptimizing={isOptimizing}
-          comparingPair={comparingPair}
-          setComparingPair={setComparingPair}
-          historyItems={historyItems}
-          loadingHistory={loadingHistory}
-          restoreItem={restoreItem}
-          selectedTrashIds={selectedTrashIds}
-          setSelectedTrashIds={setSelectedTrashIds}
-          loadHistory={loadHistory}
-          isSyncing={isSyncing}
-          setIsSyncing={setIsSyncing}
-          isDeletingScriptures={isDeletingScriptures}
-          setIsDeletingScriptures={setIsDeletingScriptures}
-          downloadBackup={downloadBackup}
-          restoreSelectedItems={restoreSelectedItems}
-          emptyTrash={emptyTrash}
-          t={t}
-        />
-      )}
 
       <datalist id="available-songs">
         {catalogSongs.filter(s => s.category !== 'presentation' && s.category !== 'scripture').map((song, i) => <option key={i} value={song.name} />)}
