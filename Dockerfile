@@ -26,7 +26,8 @@ RUN npm run build
 # Production image, copy all the files and run next
 FROM base AS runner
 RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl openssh-client zip tzdata && \
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    curl --fail --connect-timeout 15 --max-time 120 --retry 3 --retry-delay 5 --retry-connrefused \
+      -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp && \
     pip3 install --no-cache-dir --break-system-packages tinytuya
 WORKDIR /app

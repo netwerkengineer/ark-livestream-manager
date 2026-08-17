@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Add Massimo Callegari's QLC+ OBS repository and GPG key for Debian 12 (Bookworm)
 RUN echo 'deb http://download.opensuse.org/repositories/home:/mcallegari79/Debian_12/ /' > /etc/apt/sources.list.d/home-mcallegari79.list \
-    && curl -fsSL https://download.opensuse.org/repositories/home:mcallegari79/Debian_12/Release.key | gpg --dearmor > /etc/apt/trusted.gpg.d/home_mcallegari79.gpg
+    && curl -fsSL --connect-timeout 15 --max-time 60 --retry 3 --retry-delay 5 --retry-connrefused \
+      https://download.opensuse.org/repositories/home:mcallegari79/Debian_12/Release.key | gpg --dearmor > /etc/apt/trusted.gpg.d/home_mcallegari79.gpg
 
 # Install QLC+ (qt5 build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
