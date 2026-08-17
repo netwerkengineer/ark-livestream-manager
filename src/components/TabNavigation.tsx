@@ -5,7 +5,8 @@ import {
   ShieldAlert,
   Activity,
   Sun,
-  Layers
+  Layers,
+  type LucideIcon
 } from "lucide-react";
 
 type TabType = "planner" | "monitor" | "control" | "lights" | "freeshow";
@@ -17,6 +18,14 @@ interface TabNavigationProps {
   onTabChange: (tab: TabType) => void;
 }
 
+const TABS: { id: TabType; label: string; icon: LucideIcon }[] = [
+  { id: "planner", label: "Planner", icon: Calendar },
+  { id: "control", label: "Regie", icon: ShieldAlert },
+  { id: "monitor", label: "Monitor", icon: Activity },
+  { id: "lights", label: "Licht", icon: Sun },
+  { id: "freeshow", label: "FreeShow", icon: Layers },
+];
+
 export default function TabNavigation({
   activeTab,
   userRole,
@@ -24,52 +33,19 @@ export default function TabNavigation({
   onTabChange
 }: TabNavigationProps) {
   return (
-    <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-      {(userRole === "admin" || userPermissions.includes("planner")) && (
-        <button
-          onClick={() => onTabChange("planner")}
-          className={activeTab === "planner" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px' }}
-        >
-          <Calendar size={18} /> Stream Planner
-        </button>
-      )}
-      {(userRole === "admin" || userPermissions.includes("control")) && (
-        <button
-          onClick={() => onTabChange("control")}
-          className={activeTab === "control" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "control" ? 'none' : '1px solid rgba(248, 113, 113, 0.4)' }}
-        >
-          <ShieldAlert size={18} /> Control Center
-        </button>
-      )}
-      {(userRole === "admin" || userPermissions.includes("monitor")) && (
-        <button
-          onClick={() => onTabChange("monitor")}
-          className={activeTab === "monitor" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px' }}
-        >
-          <Activity size={18} /> Live Monitor
-        </button>
-      )}
-      {(userRole === "admin" || userPermissions.includes("lights")) && (
-        <button
-          onClick={() => onTabChange("lights")}
-          className={activeTab === "lights" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "lights" ? 'none' : '1px solid rgba(249, 115, 22, 0.4)' }}
-        >
-          <Sun size={18} /> Lichtregie
-        </button>
-      )}
-      {(userRole === "admin" || userPermissions.includes("freeshow")) && (
-        <button
-          onClick={() => onTabChange("freeshow")}
-          className={activeTab === "freeshow" ? "btn-primary" : "btn-outline"}
-          style={{ padding: '8px 20px', borderRadius: '12px', border: activeTab === "freeshow" ? 'none' : '1px solid rgba(56, 189, 248, 0.4)' }}
-        >
-          <Layers size={18} /> FreeShow Projecten
-        </button>
-      )}
+    <div className="tab-bar">
+      {TABS.filter(tab => userRole === "admin" || userPermissions.includes(tab.id)).map(tab => {
+        const Icon = tab.icon;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={`tab-item${activeTab === tab.id ? " active" : ""}`}
+          >
+            <Icon size={16} /> {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
