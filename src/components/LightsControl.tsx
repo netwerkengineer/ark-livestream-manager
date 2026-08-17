@@ -614,7 +614,7 @@ export default function LightsControl({ settings }: LightsControlProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* Main Grid Content */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "32px" }}>
+      <div className="lights-main-grid">
         {/* Left Side: Color Pickers & Scenes */}
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
           
@@ -820,7 +820,7 @@ export default function LightsControl({ settings }: LightsControlProps) {
               Kies een kleur om de stroboscoop te starten. Gebruik de schuifregelaar om de flitssnelheid aan te passen.
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "24px", alignItems: "center" }}>
+            <div className="strobe-grid">
               {/* Color Buttons */}
               <div className="colors-row" style={{ flexWrap: "wrap", gap: "10px" }}>
                 {[
@@ -997,6 +997,43 @@ export default function LightsControl({ settings }: LightsControlProps) {
       </AnimatePresence>
 
       <style jsx>{`
+        .lights-main-grid {
+          display: grid;
+          grid-template-columns: 1fr 340px;
+          gap: 32px;
+        }
+
+        .strobe-grid {
+          display: grid;
+          grid-template-columns: 1fr 240px;
+          gap: 24px;
+          align-items: center;
+        }
+
+        @media (max-width: 900px) {
+          .lights-main-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .strobe-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .faders-rack {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+          }
+
+          .fader-track {
+            height: 160px;
+          }
+
+          .fader-input {
+            height: 140px;
+          }
+        }
+
         .section-title {
           font-size: 1.15rem;
           margin-bottom: 24px;
