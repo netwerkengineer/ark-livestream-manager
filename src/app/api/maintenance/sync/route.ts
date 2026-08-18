@@ -88,11 +88,15 @@ export async function POST(req: NextRequest) {
         // --keep-on: a manual sync must never shut the Beamer PC down
         // afterward - that power-saving cycle is only for the unattended
         // scheduled sync.
-        const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+        // fs.createWriteStream() opens the file asynchronously, so its fd
+        // can still be null when passed to spawn() right after - openSync
+        // gives a ready-to-use fd with no race.
+        const logFd = fs.openSync(logPath, 'a');
         const child = spawn('python3', [scriptPath, '--keep-on'], {
           detached: true,
-          stdio: ['ignore', logStream, logStream]
+          stdio: ['ignore', logFd, logFd]
         });
+        fs.closeSync(logFd);
         child.unref();
 
         success = true;

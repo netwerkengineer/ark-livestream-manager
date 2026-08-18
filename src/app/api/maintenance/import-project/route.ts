@@ -37,11 +37,15 @@ export async function POST(req: NextRequest) {
     const logPath = path.join(dataDir, 'import_project.log');
     fs.appendFileSync(logPath, `\n--- MANUAL PROJECT IMPORT TRIGGERED AT ${new Date().toISOString()} ---\n`);
 
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+    // fs.createWriteStream() opens the file asynchronously, so its fd can
+    // still be null when passed to spawn() right after - openSync gives a
+    // ready-to-use fd with no race.
+    const logFd = fs.openSync(logPath, 'a');
     const child = spawn('python3', [scriptPath], {
       detached: true,
-      stdio: ['ignore', logStream, logStream]
+      stdio: ['ignore', logFd, logFd]
     });
+    fs.closeSync(logFd);
     child.unref();
 
     return NextResponse.json({ success: true, message: 'Laatste project wordt naar FreeShow gestuurd op de achtergrond' });
