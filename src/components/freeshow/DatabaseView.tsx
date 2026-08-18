@@ -449,9 +449,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                            const res = await fetch('/api/maintenance/sync', { method: 'POST' });
                            const data = await res.json();
                            if (res.ok) {
-                             setStatus('✅ Sync gestart: ' + (data.message || 'OK'));
-                             // Refresh catalog and history after a brief delay to allow sync to complete
-                             setTimeout(() => { fetchCatalog(); loadHistory(); scanDuplicates(); }, 3000);
+                             setStatus('✅ Sync gestart op de achtergrond: ' + (data.message || 'OK') + ' - dit kan enkele minuten duren.');
                            } else {
                              setStatus('❌ Sync fout: ' + (data.error || 'Onbekende fout'));
                            }
