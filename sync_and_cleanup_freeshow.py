@@ -275,6 +275,61 @@ def list_remote_files(user, host, remote_os, remote_dir):
                             pass
     return remote_files
 
+def list_remote_files_recursive(user, host, remote_os, remote_dir):
+    """
+    Like list_remote_files, but walks subdirectories too. Keys are
+    forward-slash-separated paths relative to `remote_dir` (e.g.
+    "events/2026/thema.jpg"), used for folders like Media that are
+    organised into subfolders.
+    """
+    remote_files = {}
+    if remote_os == "windows":
+        ps_script = f"""
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $path = '{remote_dir}'
+        if (Test-Path $path) {{
+            Get-ChildItem -Path $path -File -Recurse | ForEach-Object {{
+                $rel = $_.FullName.Substring($path.Length).TrimStart('\\','/') -replace '\\\\','/'
+                $rel + '|' + $_.Length + '|' + [datetimeoffset]::new($_.LastWriteTime).ToUnixTimeSeconds()
+            }}
+        }}
+        """
+        res_ps = run_ps_script(user, host, ps_script)
+        if res_ps.returncode == 0:
+            for line in res_ps.stdout.splitlines():
+                line = line.strip()
+                if line and "|" in line:
+                    parts = line.split("|")
+                    if len(parts) == 3:
+                        name, size_str, mtime_str = parts
+                        try:
+                            remote_files[name] = {"mtime": float(mtime_str), "size": int(size_str)}
+                        except ValueError:
+                            pass
+        else:
+            print(f"PowerShell error listing remote files in {remote_dir}: {res_ps.stderr}")
+    else:
+        cmd = (
+            "python3 -c \"import os; "
+            f"base = '{remote_dir}'; "
+            "[print(os.path.relpath(os.path.join(r, fn), base).replace(os.sep, '/') + '|' + "
+            "str(os.path.getsize(os.path.join(r, fn))) + '|' + str(os.path.getmtime(os.path.join(r, fn)))) "
+            "for r, d, files in os.walk(base) for fn in files]\""
+        )
+        res = run_ssh_cmd(user, host, cmd)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                line = line.strip()
+                if line and "|" in line:
+                    parts = line.split("|")
+                    if len(parts) == 3:
+                        name, size_str, mtime_str = parts
+                        try:
+                            remote_files[name] = {"mtime": float(mtime_str), "size": int(size_str)}
+                        except ValueError:
+                            pass
+    return remote_files
+
 def apply_safety_guard(label, deletions_a, deletions_b, known_count):
     """
     Refuses to trust a deletion batch that looks like "one side is
@@ -300,17 +355,30 @@ def apply_safety_guard(label, deletions_a, deletions_b, known_count):
         return [], [], True
     return deletions_a, deletions_b, False
 
+def _scan_local_tree(base_dir, matches):
+    """Recursively lists files under base_dir as {relative_path: info}, using
+    forward-slash-separated relative paths so keys line up with the remote
+    listing regardless of host OS."""
+    found = {}
+    for root, _dirs, files in os.walk(base_dir):
+        for fn in files:
+            full = os.path.join(root, fn)
+            rel = os.path.relpath(full, base_dir).replace(os.sep, "/")
+            if matches(rel):
+                found[rel] = {"path": full, "mtime": os.path.getmtime(full), "size": os.path.getsize(full)}
+    return found
+
 def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os, folder_state,
                         extensions=None, exclude_names=None):
     """
-    Two-way, deletion-safe sync of one plain folder (Media, Bibles,
-    Templates) between the NAS and the Beamer PC. Unlike the Shows sync
-    this has no scripture-expiry or shows.json-index handling - it just
-    mirrors files both ways and applies the same mass-deletion safety
-    guard as Shows.
+    Two-way, deletion-safe sync of one folder tree (Media, Bibles,
+    Templates), including subfolders, between the NAS and the Beamer PC.
+    Unlike the Shows sync this has no scripture-expiry or shows.json-index
+    handling - it just mirrors files both ways and applies the same
+    mass-deletion safety guard as Shows.
 
-    `folder_state` is the previous {name: {mtime, size}} state for this
-    folder (from sync_state.json). Returns (new_folder_state, stats).
+    `folder_state` is the previous {relative_path: {mtime, size}} state for
+    this folder (from sync_state.json). Returns (new_folder_state, stats).
     """
     exclude_names = exclude_names or set()
     stats = {"copied_to_nas": 0, "copied_to_remote": 0, "deleted_nas": 0, "deleted_remote": 0, "skipped": False}
@@ -326,21 +394,28 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
     # exist yet (it never auto-creates it) - Media/Bibles in particular
     # may not exist on a freshly pointed-at local FreeShow data folder.
     _ensure_remote_dir(mac_user, mac_host, remote_os, remote_dir)
+    ensured_remote_dirs = {remote_dir}
+
+    def ensure_remote_parent(relative_path):
+        parent = "/".join(relative_path.split("/")[:-1])
+        if not parent:
+            return
+        full_remote_parent = f"{remote_dir}/{parent}"
+        if full_remote_parent not in ensured_remote_dirs:
+            _ensure_remote_dir(mac_user, mac_host, remote_os, full_remote_parent)
+            ensured_remote_dirs.add(full_remote_parent)
 
     def matches(name):
-        if name in exclude_names:
+        base = name.rsplit("/", 1)[-1]
+        if base in exclude_names:
             return False
         if extensions is None:
             return True
-        return os.path.splitext(name)[1].lower() in extensions
+        return os.path.splitext(base)[1].lower() in extensions
 
-    nas_files = {}
-    for f in glob.glob(os.path.join(nas_dir, "*")):
-        name = os.path.basename(f)
-        if os.path.isfile(f) and matches(name):
-            nas_files[name] = {"path": f, "mtime": os.path.getmtime(f), "size": os.path.getsize(f)}
+    nas_files = _scan_local_tree(nas_dir, matches)
 
-    remote_files_all = list_remote_files(mac_user, mac_host, remote_os, remote_dir)
+    remote_files_all = list_remote_files_recursive(mac_user, mac_host, remote_os, remote_dir)
     remote_files = {name: info for name, info in remote_files_all.items() if matches(name)}
 
     print(f"[{label}] Aantal op NAS: {len(nas_files)}, aantal op Beamer PC: {len(remote_files)}")
@@ -394,6 +469,7 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
         remote_path = f"{remote_dir}/{name}"
         if name not in nas_files:
             dest_path = os.path.join(nas_dir, name)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             if sftp_transfer(mac_user, mac_host, dest_path, remote_path, "get"):
                 os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
                 stats["copied_to_nas"] += 1
@@ -410,6 +486,7 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
     for name, n_info in nas_files.items():
         remote_path = f"{remote_dir}/{name}"
         if name not in remote_files:
+            ensure_remote_parent(name)
             if sftp_transfer(mac_user, mac_host, n_info["path"], remote_path, "put"):
                 _touch_remote(mac_user, mac_host, remote_os, remote_path, n_info["mtime"])
                 stats["copied_to_remote"] += 1
@@ -417,6 +494,7 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
         else:
             r_info = remote_files[name]
             if n_info["mtime"] - r_info["mtime"] > 2.0:
+                ensure_remote_parent(name)
                 if sftp_transfer(mac_user, mac_host, n_info["path"], remote_path, "put"):
                     _touch_remote(mac_user, mac_host, remote_os, remote_path, n_info["mtime"])
                     stats["copied_to_remote"] += 1
@@ -427,11 +505,8 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
 
     # Fresh rescan for the saved state, so an aborted/guarded deletion
     # never gets "forgotten" from state despite the file still existing.
-    new_state = {}
-    for f in glob.glob(os.path.join(nas_dir, "*")):
-        name = os.path.basename(f)
-        if os.path.isfile(f) and matches(name):
-            new_state[name] = {"mtime": os.path.getmtime(f), "size": os.path.getsize(f)}
+    new_state = _scan_local_tree(nas_dir, matches)
+    new_state = {name: {"mtime": info["mtime"], "size": info["size"]} for name, info in new_state.items()}
 
     return new_state, stats
 
