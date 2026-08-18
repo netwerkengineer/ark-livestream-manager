@@ -84,12 +84,16 @@ export async function POST(req: NextRequest) {
         const logPath = path.join(dataDir, 'sync_cleanup.log');
         fs.appendFileSync(logPath, `\n--- DIRECT SCRIPTURE DELETION TRIGGERED AT ${new Date().toISOString()} ---\n`);
 
-        // Use spawn with array args to prevent command injection
-        const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+        // Use spawn with array args to prevent command injection.
+        // fs.createWriteStream() opens the file asynchronously, so its fd
+        // can still be null when passed to spawn() right after - openSync
+        // gives a ready-to-use fd with no race.
+        const logFd = fs.openSync(logPath, 'a');
         const child = spawn('python3', [scriptPath, '--delete-all-scriptures', '--local-only'], {
           detached: true,
-          stdio: ['ignore', logStream, logStream]
+          stdio: ['ignore', logFd, logFd]
         });
+        fs.closeSync(logFd);
         child.unref();
 
         success = true;
