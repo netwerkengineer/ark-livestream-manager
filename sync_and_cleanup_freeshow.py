@@ -352,16 +352,23 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
         for name in list(folder_state.keys()):
             if name not in nas_files:
                 deletions_on_remote.append(name)
-                if name in remote_files:
-                    del remote_files[name]
             elif name not in remote_files:
                 deletions_on_nas.append(name)
-                if name in nas_files:
-                    del nas_files[name]
 
         deletions_on_nas, deletions_on_remote, tripped = apply_safety_guard(
             label, deletions_on_nas, deletions_on_remote, len(folder_state)
         )
+
+        # Only now remove the confirmed deletions from the working sets, so
+        # that when the guard trips (deletions cleared) nas_files/
+        # remote_files stay fully intact and the copy step below still
+        # transfers everything normally instead of silently skipping it.
+        for name in deletions_on_remote:
+            if name in remote_files:
+                del remote_files[name]
+        for name in deletions_on_nas:
+            if name in nas_files:
+                del nas_files[name]
 
         for name in deletions_on_nas:
             dest_path = os.path.join(nas_dir, name)
@@ -682,32 +689,38 @@ def main():
 
     if sync_state["shows"]:
         print("\n--- OPSPOREN VAN HANDMATIGE VERWIJDERINGEN ---")
+        show_ids_by_name = {}
         for name, state_info in list(sync_state["shows"].items()):
             # Case A: Deleted from NAS
             if name not in nas_files:
                 print(f"Show '{name}' handmatig verwijderd van NAS. Propageren naar Beamer PC...")
                 deletions_on_remote.append(name)
-                show_id = state_info.get("id")
-                if show_id:
-                    remote_ids_to_remove.append(show_id)
-                if name in remote_files:
-                    del remote_files[name]
+                show_ids_by_name[name] = state_info.get("id")
 
             # Case B: Deleted from Beamer PC
             elif name not in remote_files:
                 print(f"Show '{name}' handmatig verwijderd van Beamer PC. Propageren naar NAS...")
                 deletions_on_nas.append(name)
-                show_id = state_info.get("id")
-                if show_id:
-                    remote_ids_to_remove.append(show_id)
-                if name in nas_files:
-                    del nas_files[name]
+                show_ids_by_name[name] = state_info.get("id")
 
         deletions_on_nas, deletions_on_remote, tripped = apply_safety_guard(
             "Shows", deletions_on_nas, deletions_on_remote, len(sync_state["shows"])
         )
-        if tripped:
-            remote_ids_to_remove = []
+
+        # Only now remove the confirmed deletions from the working sets, so
+        # that when the guard trips (deletions cleared) nas_files/
+        # remote_files stay fully intact and the copy step below still
+        # transfers everything normally instead of silently skipping it.
+        for name in deletions_on_remote:
+            if name in remote_files:
+                del remote_files[name]
+            if show_ids_by_name.get(name):
+                remote_ids_to_remove.append(show_ids_by_name[name])
+        for name in deletions_on_nas:
+            if name in nas_files:
+                del nas_files[name]
+            if show_ids_by_name.get(name):
+                remote_ids_to_remove.append(show_ids_by_name[name])
 
         # Voer verwijderingen op NAS uit
         for name in deletions_on_nas:
