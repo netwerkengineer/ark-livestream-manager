@@ -498,7 +498,28 @@ def main():
                     remote_ids_to_remove.append(show_id)
                 if name in nas_files:
                     del nas_files[name]
-                    
+
+        # Safety guard: if one side looks unexpectedly empty (a fresh
+        # install, an unmounted drive, a wrong dataPath, ...) it must never
+        # be interpreted as "everything was manually deleted" and wipe the
+        # other side. Require both an absolute minimum and a share of the
+        # previously known catalog before trusting a deletion batch.
+        total_deletions = len(deletions_on_nas) + len(deletions_on_remote)
+        SAFETY_MIN_COUNT = 5
+        SAFETY_MIN_RATIO = 0.3  # 30% of the previously known catalog
+
+        if total_deletions >= SAFETY_MIN_COUNT and total_deletions >= SAFETY_MIN_RATIO * len(sync_state):
+            print(f"\n!!! VEILIGHEIDSSTOP: {total_deletions} van de {len(sync_state)} bekende shows lijken "
+                  f"verwijderd (NAS: {len(deletions_on_nas)}, Beamer PC: {len(deletions_on_remote)}).")
+            print("Dit is te groot om automatisch te vertrouwen als een echte opschoning - het kan ook een "
+                  "lege/onbereikbare map zijn (bv. verkeerde dataPath, niet gemounte schijf). Er wordt deze "
+                  "run NIETS verwijderd; nieuwe/gewijzigde bestanden worden wel gewoon gesynchroniseerd.")
+            print("Los de oorzaak op en draai de sync opnieuw, of pas data/sync_state.json handmatig aan als "
+                  "dit toch de bedoeling was.")
+            deletions_on_nas = []
+            deletions_on_remote = []
+            remote_ids_to_remove = []
+
         # Voer verwijderingen op NAS uit
         for name in deletions_on_nas:
             dest_path = os.path.join(nas_shows_dir, name)
