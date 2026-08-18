@@ -187,10 +187,14 @@ class TuyaHandler(BaseHTTPRequestHandler):
             with open(log_path, 'a') as log_file:
                 log_file.write(f"\n--- MANUAL SYNC TRIGGERED AT {datetime.datetime.now()} ---\n")
             
-            # Start process in background, redirecting stdout/stderr to the log file
+            # Start process in background, redirecting stdout/stderr to the log file.
+            # --keep-on: a manual sync is triggered by someone actively at their
+            # machine - it must never shut the Beamer PC down afterward. The
+            # power-saving wake -> sync -> shutdown cycle is only for the
+            # unattended scheduled sync.
             log_file_handle = open(log_path, 'a')
             subprocess.Popen(
-                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py")],
+                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py"), "--keep-on"],
                 stdout=log_file_handle,
                 stderr=subprocess.STDOUT
             )
