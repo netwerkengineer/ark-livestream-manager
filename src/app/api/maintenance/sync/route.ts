@@ -84,9 +84,12 @@ export async function POST(req: NextRequest) {
         const logPath = path.join(dataDir, 'sync_cleanup.log');
         fs.appendFileSync(logPath, `\n--- DIRECT MANUAL SYNC TRIGGERED AT ${new Date().toISOString()} ---\n`);
 
-        // Use spawn with array args to prevent command injection
+        // Use spawn with array args to prevent command injection.
+        // --keep-on: a manual sync must never shut the Beamer PC down
+        // afterward - that power-saving cycle is only for the unattended
+        // scheduled sync.
         const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-        const child = spawn('python3', [scriptPath], {
+        const child = spawn('python3', [scriptPath, '--keep-on'], {
           detached: true,
           stdio: ['ignore', logStream, logStream]
         });
