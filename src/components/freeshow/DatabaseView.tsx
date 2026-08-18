@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
 import DraftServicesReview from './DraftServicesReview';
 
@@ -117,6 +117,8 @@ export default function DatabaseView(props: DatabaseViewProps) {
     t,
     freeshowCategories
   } = props;
+
+  const [isImportingProject, setIsImportingProject] = useState(false);
 
   return (
     <div className="database-dashboard-view" style={{ marginTop: '3rem' }}>
@@ -461,6 +463,34 @@ export default function DatabaseView(props: DatabaseViewProps) {
                        }}
                      >
                        {isSyncing ? t('syncing') : t('manual_sync')}
+                     </button>
+                   </div>
+
+                   <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                     <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Stuur het laatst gegenereerde project direct naar de Beamer PC en zet het klaar in FreeShow, zonder te wachten op een stekker-schema. Handig als de PC al aanstaat.</p>
+                     <button
+                       className="button"
+                       style={{ width: '100%', background: 'var(--primary)', color: '#020617', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700 }}
+                       disabled={isImportingProject}
+                       onClick={async () => {
+                         setIsImportingProject(true);
+                         setStatus('Project wordt klaargezet...');
+                         try {
+                           const res = await fetch('/api/maintenance/import-project', { method: 'POST' });
+                           const data = await res.json();
+                           if (res.ok) {
+                             setStatus('✅ ' + (data.message || 'OK'));
+                           } else {
+                             setStatus('❌ Fout: ' + (data.error || 'Onbekende fout'));
+                           }
+                         } catch (e: any) {
+                           setStatus('❌ Fout: ' + e.message);
+                         } finally {
+                           setIsImportingProject(false);
+                         }
+                       }}
+                     >
+                       {isImportingProject ? 'Bezig...' : 'Project nu klaarzetten'}
                      </button>
                    </div>
 
