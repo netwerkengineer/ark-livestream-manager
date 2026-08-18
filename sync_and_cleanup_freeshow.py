@@ -108,7 +108,48 @@ def detect_remote_os(user, host):
     stdout = res.stdout.decode('utf-8', errors='replace')
     if "windows" in stdout.lower():
         return "windows"
+
+    res_uname = subprocess.run(
+        ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "uname -s"],
+        capture_output=True
+    )
+    if res_uname.stdout.decode('utf-8', errors='replace').strip().lower().startswith("linux"):
+        return "linux"
     return "macos"
+
+def is_network_mount(user, host, remote_os, path):
+    """
+    Checks whether `path` on the remote host sits on a network-mounted
+    filesystem (SMB/CIFS/NFS/AFP) instead of the machine's own local disk.
+    Syncing a "local" directory that is actually a network mount against
+    the NAS would silently compare that share to itself and never protect
+    FreeShow from network latency, so this is used to fall back to a
+    genuinely local directory instead.
+    """
+    if remote_os == "windows":
+        lowered = path.lower()
+        return lowered.startswith("z:") or path.startswith("\\\\") or path.startswith("//")
+
+    if remote_os == "linux":
+        res = run_ssh_cmd(user, host, f"findmnt -no FSTYPE --target \"{path}\" 2>/dev/null")
+        fstype = res.stdout.strip().lower()
+        network_fs_types = {"cifs", "smb3", "smbfs", "nfs", "nfs3", "nfs4", "9p", "fuse.sshfs", "fuse.rclone"}
+        return fstype in network_fs_types
+
+    # macOS: `mount` lists each mounted filesystem with its type in
+    # parentheses, e.g. "//user@server/share on /Volumes/Projects (smbfs, ...)".
+    # A path is network-mounted if it equals or lives under one of those
+    # mount points.
+    res = run_ssh_cmd(user, host, "mount")
+    network_mount_points = []
+    for line in res.stdout.splitlines():
+        if "(smbfs" in line or "(afpfs" in line or "(nfs" in line:
+            if " on " in line:
+                mount_point = line.split(" on ", 1)[1].split(" (")[0].strip()
+                network_mount_points.append(mount_point.rstrip("/"))
+
+    normalized_path = path.rstrip("/")
+    return any(normalized_path == mp or normalized_path.startswith(mp + "/") for mp in network_mount_points)
 
 def run_ssh_cmd(user, host, cmd_str):
     res = subprocess.run(
@@ -269,6 +310,9 @@ def main():
     if remote_os == "windows":
         remote_app_data_dir = f"C:/Users/{mac_user}/AppData/Roaming/FreeShow"
         default_docs_dir = f"C:/Users/{mac_user}/Documents/FreeShow"
+    elif remote_os == "linux":
+        remote_app_data_dir = f"/home/{mac_user}/.config/freeshow"
+        default_docs_dir = f"/home/{mac_user}/Documents/FreeShow"
     else:
         remote_app_data_dir = f"/Users/{mac_user}/Library/Application Support/freeshow"
         default_docs_dir = f"/Users/{mac_user}/Documents/FreeShow"
@@ -290,10 +334,12 @@ def main():
         print("Warning: Could not download remote settings.json. Using default path.")
         remote_docs_dir = default_docs_dir
         
-    # If remote_docs_dir is a network share (e.g. Z:\FreeShow or \\NAS\FreeShow),
-    # use the local fallback directory for synchronization.
-    if remote_os == "windows" and (remote_docs_dir.lower().startswith("z:") or remote_docs_dir.startswith("\\\\")):
-        print(f"Detected network share dataPath: {remote_docs_dir}. Using local fallback Documents directory for sync: {default_docs_dir}/Shows")
+    # If remote_docs_dir is a network-mounted share (Windows drive letter/UNC
+    # path, a macOS smbfs/afpfs/nfs mount under /Volumes, or a Linux
+    # cifs/nfs mount), fall back to the local Documents directory for sync -
+    # otherwise we'd be comparing the NAS share against itself.
+    if is_network_mount(mac_user, mac_host, remote_os, remote_docs_dir):
+        print(f"Detected network-mounted dataPath: {remote_docs_dir}. Using local fallback Documents directory for sync: {default_docs_dir}/Shows")
         remote_shows_dir = f"{default_docs_dir}/Shows"
     else:
         remote_shows_dir = f"{remote_docs_dir}/Shows"
@@ -676,6 +722,8 @@ def main():
         print(f"Sturen van afsluitcommando naar Beamer PC ({remote_os})...")
         if remote_os == "windows":
             run_ssh_cmd(mac_user, mac_host, "shutdown /s /f /t 0")
+        elif remote_os == "linux":
+            run_ssh_cmd(mac_user, mac_host, "shutdown -h now")
         else:
             run_ssh_cmd(mac_user, mac_host, "osascript -e 'tell application \"System Events\" to shut down'")
         print("Wachten op 15 seconden voor het veilig afsluiten...")
