@@ -471,14 +471,14 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
             dest_path = os.path.join(nas_dir, name)
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             if sftp_transfer(mac_user, mac_host, dest_path, remote_path, "get"):
-                os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
+                _safe_utime(dest_path, r_info["mtime"])
                 stats["copied_to_nas"] += 1
                 print(f"[{label}] Nieuw op Beamer PC, gekopieerd naar NAS: {name}")
         else:
             n_info = nas_files[name]
             if r_info["mtime"] - n_info["mtime"] > 2.0:
                 if sftp_transfer(mac_user, mac_host, n_info["path"], remote_path, "get"):
-                    os.utime(n_info["path"], (r_info["mtime"], r_info["mtime"]))
+                    _safe_utime(n_info["path"], r_info["mtime"])
                     stats["copied_to_nas"] += 1
                     print(f"[{label}] Nieuwere versie op Beamer PC, bijgewerkt op NAS: {name}")
 
@@ -516,6 +516,22 @@ def _ensure_remote_dir(user, host, remote_os, remote_dir):
     else:
         run_ssh_cmd(user, host, f"mkdir -p '{remote_dir}'")
 
+def _safe_utime(path, mtime):
+    """
+    Sets a file's mtime, but never lets that fail the whole sync. NFS
+    (root-squashed or otherwise) can refuse utime() with EPERM for a file
+    this process doesn't own even when the file is world-writable - mtime
+    changes require real ownership on some servers, unlike a plain write.
+    The file's content still gets copied correctly either way; only the
+    cosmetic "matches the source's timestamp" property is lost for that
+    one file, which just means it may be re-compared (and safely re-copied,
+    not re-deleted) on the next run instead of being considered in sync.
+    """
+    try:
+        os.utime(path, (mtime, mtime))
+    except OSError as e:
+        print(f"Waarschuwing: kon wijzigingsdatum niet zetten op {path} ({e}) - bestand zelf is wel correct gekopieerd.")
+
 def _touch_remote(user, host, remote_os, remote_path, mtime):
     if remote_os == "windows":
         mtime_epoch = int(mtime)
@@ -523,6 +539,278 @@ def _touch_remote(user, host, remote_os, remote_path, mtime):
         run_ssh_cmd(user, host, set_mtime_cmd)
     else:
         run_ssh_cmd(user, host, f"touch -m -t {time.strftime('%Y%m%d%H%M.%S', time.localtime(mtime))} '{remote_path}'")
+
+def resolve_remote_freeshow_dirs(user, host, remote_os):
+    """
+    Resolves everything needed to sync against one FreeShow target: its own
+    app-data directory, its actual data root (read from ITS OWN settings.json
+    dataPath, falling back to the local Documents/FreeShow default and to a
+    network-mount-safe fallback), and the four folder paths derived from
+    that root. Self-contained per target so this can be called once per
+    target in a loop.
+    """
+    if remote_os == "windows":
+        remote_app_data_dir = f"C:/Users/{user}/AppData/Roaming/FreeShow"
+        default_docs_dir = f"C:/Users/{user}/Documents/FreeShow"
+    elif remote_os == "linux":
+        remote_app_data_dir = f"/home/{user}/.config/freeshow"
+        default_docs_dir = f"/home/{user}/Documents/FreeShow"
+    else:
+        remote_app_data_dir = f"/Users/{user}/Library/Application Support/freeshow"
+        default_docs_dir = f"/Users/{user}/Documents/FreeShow"
+
+    local_temp_settings = f"/tmp/remote_settings_sync_{host.replace('.', '_')}.json"
+    remote_docs_dir = default_docs_dir
+    if sftp_transfer(user, host, local_temp_settings, f"{remote_app_data_dir}/settings.json", "get"):
+        try:
+            with open(local_temp_settings, 'r', encoding='utf-8') as f:
+                remote_settings = json.load(f)
+                remote_docs_dir = remote_settings.get("dataPath", default_docs_dir)
+        except Exception as e:
+            print(f"Warning: Failed to parse remote settings.json ({e}). Using default path.")
+        finally:
+            if os.path.exists(local_temp_settings):
+                os.remove(local_temp_settings)
+    else:
+        print("Warning: Could not download remote settings.json. Using default path.")
+
+    if is_network_mount(user, host, remote_os, remote_docs_dir):
+        print(f"Detected network-mounted dataPath: {remote_docs_dir}. Using local fallback Documents directory for sync: {default_docs_dir}")
+        remote_root_dir = default_docs_dir
+    else:
+        remote_root_dir = remote_docs_dir
+
+    remote_shows_dir = f"{remote_root_dir}/Shows"
+    remote_media_dir = f"{remote_root_dir}/Media"
+    remote_bibles_dir = f"{remote_root_dir}/Bibles"
+    # .fstemplate files live directly in the FreeShow data root, not a
+    # dedicated subfolder.
+    remote_templates_dir = remote_root_dir
+
+    return remote_app_data_dir, remote_root_dir, remote_shows_dir, remote_media_dir, remote_bibles_dir, remote_templates_dir
+
+def delete_remote_show_file(user, host, remote_os, remote_shows_dir, show_file):
+    remote_file_path = f"{remote_shows_dir}/{show_file}"
+    if remote_os == "windows":
+        run_ssh_cmd(user, host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
+    else:
+        run_ssh_cmd(user, host, f"rm -f \"{remote_file_path}\"")
+
+def remove_ids_from_remote_shows_index(user, host, remote_app_data_dir, ids):
+    """Batched download-edit-upload of the remote FreeShow shows.json index,
+    dropping every id in `ids` that's present. No-op if `ids` is empty."""
+    ids = [i for i in ids if i]
+    if not ids:
+        return
+    print(f"Bijwerken van remote shows.json voor {len(ids)} verwijderde shows...")
+    local_temp_shows = f"/tmp/remote_shows_sync_{host.replace('.', '_')}.json"
+    if os.path.exists(local_temp_shows):
+        os.remove(local_temp_shows)
+    if sftp_transfer(user, host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "get"):
+        try:
+            with open(local_temp_shows, 'r', encoding='utf-8') as f:
+                shows_json_data = json.load(f)
+            modified_index = False
+            for s_id in ids:
+                if s_id in shows_json_data:
+                    del shows_json_data[s_id]
+                    modified_index = True
+            if modified_index:
+                with open(local_temp_shows, 'w', encoding='utf-8') as f:
+                    json.dump(shows_json_data, f)
+                sftp_transfer(user, host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "put")
+                print("Remote shows.json succesvol bijgewerkt.")
+        except Exception as e:
+            print(f"Fout bij bewerken van shows.json: {e}")
+        finally:
+            if os.path.exists(local_temp_shows):
+                os.remove(local_temp_shows)
+
+def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote_os,
+                       remote_app_data_dir, shows_state, now_ts, one_week_secs,
+                       delete_all_scriptures, expired_show_files):
+    """
+    Two-way, deletion-safe sync of the Shows folder for one target,
+    including scripture-expiry interception on copy and remote shows.json
+    index upkeep. Same self-contained contract as sync_simple_folder: does
+    its own NAS/remote scan, returns (new_shows_state, stats).
+
+    `expired_show_files` is the [(show_file, show_id), ...] list already
+    decided and removed from the NAS by STAP 1 (the NAS is and stays the
+    single source of truth for "is this expired"). This function just fans
+    that decision out to this target's remote - unconditionally, so it
+    works even the first time a target has no prior state yet - on top of
+    its own state-based Case A/B manual-deletion detection, which is what
+    actually needs `apply_safety_guard`.
+    """
+    print(f"\n--- SYNC: {label} (Shows) ---")
+    ids_to_remove = set()
+
+    for show_file, show_id in expired_show_files:
+        delete_remote_show_file(user, host, remote_os, remote_shows_dir, show_file)
+        if show_id:
+            ids_to_remove.add(show_id)
+
+    nas_files = {}
+    for f in glob.glob(os.path.join(nas_shows_dir, "*.show")):
+        name = os.path.basename(f)
+        nas_files[name] = {"path": f, "mtime": os.path.getmtime(f), "size": os.path.getsize(f)}
+
+    remote_files = {
+        name: info for name, info in list_remote_files(user, host, remote_os, remote_shows_dir).items()
+        if name.lower().endswith(".show")
+    }
+
+    print(f"[{label}] Aantal shows op NAS: {len(nas_files)}, aantal op doel: {len(remote_files)}")
+
+    if shows_state:
+        print(f"[{label}] --- OPSPOREN VAN HANDMATIGE VERWIJDERINGEN ---")
+        deletions_on_remote = []
+        deletions_on_nas = []
+        show_ids_by_name = {}
+        for name, state_info in list(shows_state.items()):
+            if name not in nas_files:
+                print(f"[{label}] Show '{name}' handmatig verwijderd van NAS. Propageren naar doel...")
+                deletions_on_remote.append(name)
+                show_ids_by_name[name] = state_info.get("id")
+            elif name not in remote_files:
+                print(f"[{label}] Show '{name}' handmatig verwijderd van doel. Propageren naar NAS...")
+                deletions_on_nas.append(name)
+                show_ids_by_name[name] = state_info.get("id")
+
+        deletions_on_nas, deletions_on_remote, _tripped = apply_safety_guard(
+            f"{label} - Shows", deletions_on_nas, deletions_on_remote, len(shows_state)
+        )
+
+        for name in deletions_on_remote:
+            if name in remote_files:
+                del remote_files[name]
+            if show_ids_by_name.get(name):
+                ids_to_remove.add(show_ids_by_name[name])
+        for name in deletions_on_nas:
+            if name in nas_files:
+                del nas_files[name]
+            if show_ids_by_name.get(name):
+                ids_to_remove.add(show_ids_by_name[name])
+
+        for name in deletions_on_nas:
+            dest_path = os.path.join(nas_shows_dir, name)
+            if os.path.exists(dest_path):
+                try:
+                    os.remove(dest_path)
+                    print(f"[{label}] Verwijderd van NAS: {name}")
+                except Exception as e:
+                    print(f"[{label}] Fout bij verwijderen van NAS {name}: {e}")
+
+        for name in deletions_on_remote:
+            print(f"[{label}] Verwijderen van doel: {name}...")
+            delete_remote_show_file(user, host, remote_os, remote_shows_dir, name)
+
+    # Doel -> NAS (nieuw of nieuwer op doel)
+    copied_to_nas = 0
+    for name, r_info in remote_files.items():
+        if name not in nas_files:
+            print(f"[{label}] Nieuwe show gedetecteerd op doel: '{name}'. Analyseren...")
+            temp_dest = f"/tmp/temp_sync_{host.replace('.', '_')}_{name}"
+            if os.path.exists(temp_dest):
+                os.remove(temp_dest)
+
+            if sftp_transfer(user, host, temp_dest, f"{remote_shows_dir}/{name}", "get"):
+                is_scripture = False
+                try:
+                    with open(temp_dest, 'r', encoding='utf-8') as f:
+                        show_data = json.load(f)
+                        if isinstance(show_data, list) and len(show_data) > 1:
+                            is_scripture = show_data[1].get("category") == "scripture"
+                except Exception as e:
+                    print(f"[{label}] Error checking category of remote show {name}: {e}")
+
+                if is_scripture and (delete_all_scriptures or (now_ts - r_info["mtime"] > one_week_secs)):
+                    print(f"[{label}] Intercepted remote scripture '{name}' (expired/wipe). Deleting from doel...")
+                    delete_remote_show_file(user, host, remote_os, remote_shows_dir, name)
+                    show_id = get_show_id_from_file(temp_dest)
+                    if show_id:
+                        ids_to_remove.add(show_id)
+                    if os.path.exists(temp_dest):
+                        os.remove(temp_dest)
+                else:
+                    dest_path = os.path.join(nas_shows_dir, name)
+                    if os.path.exists(dest_path):
+                        os.remove(dest_path)
+                    shutil.move(temp_dest, dest_path)
+                    _safe_utime(dest_path, r_info["mtime"])
+                    copied_to_nas += 1
+        else:
+            n_info = nas_files[name]
+            if r_info["mtime"] - n_info["mtime"] > 2.0:
+                print(f"[{label}] Nieuwere versie gedetecteerd op doel: '{name}'. Analyseren...")
+                temp_dest = f"/tmp/temp_sync_{host.replace('.', '_')}_{name}"
+                if os.path.exists(temp_dest):
+                    os.remove(temp_dest)
+
+                if sftp_transfer(user, host, temp_dest, f"{remote_shows_dir}/{name}", "get"):
+                    is_scripture = False
+                    try:
+                        with open(temp_dest, 'r', encoding='utf-8') as f:
+                            show_data = json.load(f)
+                            if isinstance(show_data, list) and len(show_data) > 1:
+                                is_scripture = show_data[1].get("category") == "scripture"
+                    except Exception as e:
+                        print(f"[{label}] Error checking category of remote show {name}: {e}")
+
+                    if is_scripture and (delete_all_scriptures or (now_ts - r_info["mtime"] > one_week_secs)):
+                        print(f"[{label}] Intercepted newer remote scripture '{name}' (expired/wipe). Deleting from both...")
+                        delete_remote_show_file(user, host, remote_os, remote_shows_dir, name)
+                        dest_path = os.path.join(nas_shows_dir, name)
+                        if os.path.exists(dest_path):
+                            os.remove(dest_path)
+                        show_id = get_show_id_from_file(temp_dest)
+                        if show_id:
+                            ids_to_remove.add(show_id)
+                        if os.path.exists(temp_dest):
+                            os.remove(temp_dest)
+                    else:
+                        dest_path = os.path.join(nas_shows_dir, name)
+                        if os.path.exists(dest_path):
+                            os.remove(dest_path)
+                        shutil.move(temp_dest, dest_path)
+                        _safe_utime(dest_path, r_info["mtime"])
+                        copied_to_nas += 1
+
+    # NAS -> doel (nieuw of nieuwer op NAS)
+    copied_to_remote = 0
+    for name, n_info in nas_files.items():
+        remote_path = f"{remote_shows_dir}/{name}"
+        if name not in remote_files:
+            print(f"[{label}] Nieuwe show gedetecteerd op NAS: '{name}'. Kopieren naar doel...")
+            if sftp_transfer(user, host, n_info["path"], remote_path, "put"):
+                _touch_remote(user, host, remote_os, remote_path, n_info["mtime"])
+                copied_to_remote += 1
+        else:
+            r_info = remote_files[name]
+            if n_info["mtime"] - r_info["mtime"] > 2.0:
+                print(f"[{label}] Nieuwere versie gedetecteerd op NAS: '{name}'. Updaten op doel...")
+                if sftp_transfer(user, host, n_info["path"], remote_path, "put"):
+                    _touch_remote(user, host, remote_os, remote_path, n_info["mtime"])
+                    copied_to_remote += 1
+
+    print(f"[{label}] Shows sync afgerond. Kopieren naar NAS: {copied_to_nas}, Kopieren naar doel: {copied_to_remote}")
+
+    remove_ids_from_remote_shows_index(user, host, remote_app_data_dir, list(ids_to_remove))
+
+    # Fresh rescan for the saved state - an aborted/guarded deletion must
+    # never be "forgotten" despite the file still existing.
+    new_shows_state = {}
+    for show_path in glob.glob(os.path.join(nas_shows_dir, "*.show")):
+        name = os.path.basename(show_path)
+        show_id = get_show_id_from_file(show_path)
+        new_shows_state[name] = {
+            "mtime": os.path.getmtime(show_path),
+            "size": os.path.getsize(show_path),
+            "id": show_id
+        }
+
+    return new_shows_state, {"copied_to_nas": copied_to_nas, "copied_to_remote": copied_to_remote}
 
 def main():
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === STARTING FREESHOW SYNC & CLEANUP AUTOMATION ===")
@@ -541,6 +829,10 @@ def main():
     if skip_media:
         print("SKIP-MEDIA MODE: Media-map wordt deze run overgeslagen (voor snellere, frequentere syncs).")
 
+    skip_additional_targets = "--skip-additional-targets" in sys.argv
+    if skip_additional_targets:
+        print("SKIP-ADDITIONAL-TARGETS MODE: Alleen het hoofd-doel wordt deze run gesynchroniseerd.")
+
     # 1. Configuration Check
     mac_user = settings.get("sshUser", "admin")
     mac_host = settings.get("freeShowHost", "192.168.2.101")
@@ -556,7 +848,7 @@ def main():
         print(f"ERROR: NAS Shows directory does not exist: {nas_shows_dir}")
         sys.exit(1)
 
-    print(f"Target PC: {mac_user}@{mac_host}")
+    print(f"Hoofd-doel: {mac_user}@{mac_host}")
     print(f"NAS Shows directory: {nas_shows_dir}")
 
     local_only = "--local-only" in sys.argv
@@ -576,16 +868,45 @@ def main():
             except Exception as e:
                 print(f"Error checking {show_path}: {e}")
         print(f"Local wipe complete. {deleted_count} scriptures removed.")
-        print("Note: These will be deleted from the Beamer PC during the next full sync.")
+        print("Note: These will be deleted from remote targets during the next full sync.")
         sys.exit(0)
 
-    # 2. Power Management check
+    # Build the target list: the primary Beamer PC (unchanged config/role,
+    # keeps all power-automation/shutdown), plus every enabled entry from
+    # freeshowAdditionalTargets (e.g. a Sunday-school PC) - those only ever
+    # get the catalog sync, no power automation, no project-import.
+    targets = [{
+        "key": "primary",
+        "label": f"Beamer PC ({mac_host})",
+        "host": mac_host,
+        "user": mac_user,
+        "is_primary": True,
+    }]
+    for t in (settings.get("freeshowAdditionalTargets") or []):
+        if t.get("enabled", True) is False:
+            continue
+        host = (t.get("host") or "").strip()
+        if not host:
+            continue
+        targets.append({
+            "key": t.get("id") or f"target_{host}",
+            "label": t.get("name") or host,
+            "host": host,
+            "user": (t.get("sshUser") or "").strip() or mac_user,
+            "is_primary": False,
+        })
+
+    if len(targets) > 1:
+        print(f"Doelen deze run: {', '.join(t['label'] for t in targets)}")
+
+    # 2. Power Management check (hoofd-doel only - extra doelen worden pas
+    # bereikbaarheid-gecheckt vlak voor hun eigen sync-stap, geen wek-poging)
+    primary_reachable = True
     is_pc_online = test_ssh(mac_user, mac_host)
 
     if not is_pc_online:
         print("Beamer PC is offline. Initiating remote startup sequence...")
 
-        # Check if plug_beamer is configured
         plugs = settings.get("tuyaPlugs", [])
         beamer_plug = next((p for p in plugs if p.get("id") == "plug_beamer"), None)
 
@@ -593,75 +914,27 @@ def main():
             print("[Power] Turning ON smart plug 'plug_beamer'...")
             subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", "plug_beamer"])
 
-            # Wait for host to boot and SSH to become available
             if wait_for_ssh(mac_user, mac_host):
                 print("[Power] Beamer PC successfully started!")
-                # Give the PC a few seconds to stabilize
                 time.sleep(10)
             else:
-                print("ERROR: Beamer PC did not respond to SSH after starting smart plug. Exiting.")
-                sys.exit(1)
+                print("WAARSCHUWING: Beamer PC reageerde niet na het aanzetten van de stekker. "
+                      "Hoofd-doel wordt deze run overgeslagen; extra doelen (indien geconfigureerd) gaan gewoon door.")
+                primary_reachable = False
         else:
-            print("ERROR: Beamer PC is offline and 'plug_beamer' is not configured in settings.json. Cannot perform sync.")
-            sys.exit(1)
+            print("WAARSCHUWING: Beamer PC is offline en 'plug_beamer' is niet geconfigureerd. "
+                  "Hoofd-doel wordt deze run overgeslagen; extra doelen (indien geconfigureerd) gaan gewoon door.")
+            primary_reachable = False
     else:
         print("Beamer PC is already online. Skipping startup sequence.")
 
-    # Detect remote OS
-    remote_os = detect_remote_os(mac_user, mac_host)
-    print(f"Remote OS: {remote_os}")
-
-    # Resolve remote paths
-    remote_app_data_dir = ""
-    remote_docs_dir = ""
-
-    if remote_os == "windows":
-        remote_app_data_dir = f"C:/Users/{mac_user}/AppData/Roaming/FreeShow"
-        default_docs_dir = f"C:/Users/{mac_user}/Documents/FreeShow"
-    elif remote_os == "linux":
-        remote_app_data_dir = f"/home/{mac_user}/.config/freeshow"
-        default_docs_dir = f"/home/{mac_user}/Documents/FreeShow"
-    else:
-        remote_app_data_dir = f"/Users/{mac_user}/Library/Application Support/freeshow"
-        default_docs_dir = f"/Users/{mac_user}/Documents/FreeShow"
-
-    # Download remote settings.json to get remote dataPath
-    local_temp_settings = "/tmp/remote_settings_sync.json"
-    if sftp_transfer(mac_user, mac_host, local_temp_settings, f"{remote_app_data_dir}/settings.json", "get"):
-        try:
-            with open(local_temp_settings, 'r', encoding='utf-8') as f:
-                remote_settings = json.load(f)
-                remote_docs_dir = remote_settings.get("dataPath", default_docs_dir)
-        except Exception as e:
-            print(f"Warning: Failed to parse remote settings.json ({e}). Using default path.")
-            remote_docs_dir = default_docs_dir
-        finally:
-            if os.path.exists(local_temp_settings):
-                os.remove(local_temp_settings)
-    else:
-        print("Warning: Could not download remote settings.json. Using default path.")
-        remote_docs_dir = default_docs_dir
-
-    # If remote_docs_dir is a network-mounted share (Windows drive letter/UNC
-    # path, a macOS smbfs/afpfs/nfs mount under /Volumes, or a Linux
-    # cifs/nfs mount), fall back to the local Documents directory for sync -
-    # otherwise we'd be comparing the NAS share against itself.
-    if is_network_mount(mac_user, mac_host, remote_os, remote_docs_dir):
-        print(f"Detected network-mounted dataPath: {remote_docs_dir}. Using local fallback Documents directory for sync: {default_docs_dir}")
-        remote_root_dir = default_docs_dir
-    else:
-        remote_root_dir = remote_docs_dir
-
-    remote_shows_dir = f"{remote_root_dir}/Shows"
-    remote_media_dir = f"{remote_root_dir}/Media"
-    remote_bibles_dir = f"{remote_root_dir}/Bibles"
-    # .fstemplate files live directly in the FreeShow data root, not a
-    # dedicated subfolder.
-    remote_templates_dir = remote_root_dir
-    print(f"Remote data root resolved: {remote_root_dir}")
-
-    # Load previous sync state. Old installs stored a flat {filename: info}
-    # dict covering Shows only - migrate that into the new per-folder shape.
+    # Load previous sync state. Migrates in two steps if needed:
+    # 1. oldest flat {filename: info} shape (Shows only) -> {"shows": ...}
+    # 2. pre-multi-target shape {"shows":..,"media":..,...} -> wrapped as
+    #    {"targets": {"primary": <that same dict, unmodified>}} - a pure
+    #    wrap, never a reset, so the primary's known-file counts (what
+    #    apply_safety_guard compares deletion batches against) survive the
+    #    upgrade byte-for-byte.
     state_file = os.path.join(SCRIPT_DIR, "data", "sync_state.json")
     if not os.path.exists(os.path.dirname(state_file)):
         os.makedirs(os.path.dirname(state_file), exist_ok=True)
@@ -671,22 +944,31 @@ def main():
         try:
             with open(state_file, 'r', encoding='utf-8') as f:
                 loaded_state = json.load(f)
-            if loaded_state and "shows" not in loaded_state:
+            if loaded_state and "shows" not in loaded_state and "targets" not in loaded_state:
                 print("Oude platte sync_state.json gedetecteerd (alleen Shows) - migreren naar nieuwe structuur.")
-                sync_state = {"shows": loaded_state}
-            else:
-                sync_state = loaded_state
-            print(f"Vorige sync state geladen. Shows in state: {len(sync_state.get('shows', {}))}")
+                loaded_state = {"shows": loaded_state}
+            if loaded_state and "targets" not in loaded_state:
+                print("Sync state van vóór meerdere-doelen-ondersteuning gedetecteerd - wikkelen als 'primary' doel.")
+                loaded_state = {"targets": {"primary": loaded_state}}
+            sync_state = loaded_state or {}
         except Exception as e:
             print(f"Warning: Failed to load sync state ({e}). Starting fresh.")
 
-    for key in ("shows", "media", "bibles", "templates"):
-        sync_state.setdefault(key, {})
+    sync_state.setdefault("targets", {})
+    for t in targets:
+        t_state = sync_state["targets"].setdefault(t["key"], {})
+        for folder in ("shows", "media", "bibles", "templates"):
+            t_state.setdefault(folder, {})
+
+    print(f"Vorige sync state geladen. Shows in state voor hoofd-doel: {len(sync_state['targets'].get('primary', {}).get('shows', {}))}")
 
     # 3. STAP 1: Oude Bijbelteksten (Scriptures) opschonen (> 7 dagen)
+    # De NAS blijft de enige bron van waarheid over wat verlopen is - dit
+    # draait één keer, ongeacht hoeveel doelen er zijn. De beslissing (welke
+    # bestanden) wordt hierna per doel gepropageerd.
     print("\n--- STAP 1: SCRIPTURE OPSCHONING (> 7 dagen oud) ---")
     nas_shows = glob.glob(os.path.join(nas_shows_dir, "*.show"))
-    deleted_ids = []
+    expired_show_files = []  # [(show_file, show_id), ...]
     now_ts = time.time()
     one_week_secs = 7 * 24 * 3600
 
@@ -704,7 +986,6 @@ def main():
                 if category == "scripture":
                     mtime = os.path.getmtime(show_path)
 
-                    # Fallback to internal modified timestamp if available
                     timestamps = show_info.get("timestamps", {})
                     internal_modified = timestamps.get("modified")
                     if internal_modified:
@@ -717,291 +998,87 @@ def main():
                             print(f"Scripture show '{show_info.get('name')}' opschonen (WIPE)...")
                         else:
                             print(f"Scripture show '{show_info.get('name')}' is {age_days:.1f} dagen oud. Opschonen...")
-                        # Delete local NAS file
                         os.remove(show_path)
-
-                        # Delete remote file
-                        remote_file_path = f"{remote_shows_dir}/{show_file}"
-                        if remote_os == "windows":
-                            run_ssh_cmd(mac_user, mac_host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
-                        else:
-                            run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
-
-                        deleted_ids.append(show_id)
-                        if show_file in sync_state["shows"]:
-                            del sync_state["shows"][show_file]
+                        expired_show_files.append((show_file, show_id))
         except Exception as e:
             print(f"Fout bij verwerken van show {show_file} voor cleanup: {e}")
 
-    # Note: remote shows.json index will be updated at the end of the script, after Step 2.
+    if expired_show_files:
+        print(f"{len(expired_show_files)} verlopen bijbeltekst(en) van de NAS verwijderd; wordt per doel gepropageerd.")
 
-    # 4. STAP 2: Twee-weg Synchronisatie van Shows
-    print("\n--- STAP 2: TWEE-WEG BIJWERKEN SHOWS (NAS <-> BEAMER PC) ---")
+    # 4. STAP 2+3 per doel: Shows, Bibles, Templates, (optioneel) Media
+    for target in targets:
+        label = target["label"]
 
-    # NAS files listing
-    nas_files = {}
-    for f in glob.glob(os.path.join(nas_shows_dir, "*.show")):
-        name = os.path.basename(f)
-        nas_files[name] = {
-            "path": f,
-            "mtime": os.path.getmtime(f),
-            "size": os.path.getsize(f)
-        }
+        if target["is_primary"]:
+            if not primary_reachable:
+                print(f"\n=== [{label}] Overgeslagen - hoofd-doel niet bereikbaar deze run ===")
+                continue
+        else:
+            if skip_additional_targets:
+                continue
+            if not test_ssh(target["user"], target["host"]):
+                print(f"\n=== [{label}] Overgeslagen - niet bereikbaar (offline of onjuist IP) ===")
+                continue
 
-    # Remote Beamer PC files listing
-    remote_files = {
-        name: info for name, info in list_remote_files(mac_user, mac_host, remote_os, remote_shows_dir).items()
-        if name.lower().endswith(".show")
-    }
+        print(f"\n=== SYNC DOEL: {label} ({target['user']}@{target['host']}) ===")
+        try:
+            remote_os = detect_remote_os(target["user"], target["host"])
+            print(f"[{label}] Remote OS: {remote_os}")
 
-    print(f"Aantal shows op NAS: {len(nas_files)}")
-    print(f"Aantal shows op Beamer PC: {len(remote_files)}")
+            (remote_app_data_dir, remote_root_dir, remote_shows_dir,
+             remote_media_dir, remote_bibles_dir, remote_templates_dir) = resolve_remote_freeshow_dirs(
+                target["user"], target["host"], remote_os
+            )
+            print(f"[{label}] Remote data root: {remote_root_dir}")
 
-    # Deletion Propagation logic based on previous sync_state
-    deletions_on_remote = []
-    deletions_on_nas = []
-    remote_ids_to_remove = []
+            t_state = sync_state["targets"][target["key"]]
 
-    if sync_state["shows"]:
-        print("\n--- OPSPOREN VAN HANDMATIGE VERWIJDERINGEN ---")
-        show_ids_by_name = {}
-        for name, state_info in list(sync_state["shows"].items()):
-            # Case A: Deleted from NAS
-            if name not in nas_files:
-                print(f"Show '{name}' handmatig verwijderd van NAS. Propageren naar Beamer PC...")
-                deletions_on_remote.append(name)
-                show_ids_by_name[name] = state_info.get("id")
+            t_state["shows"], _shows_stats = sync_shows_folder(
+                label, nas_shows_dir, remote_shows_dir, target["user"], target["host"], remote_os,
+                remote_app_data_dir, t_state["shows"], now_ts, one_week_secs, delete_all_scriptures,
+                expired_show_files
+            )
 
-            # Case B: Deleted from Beamer PC
-            elif name not in remote_files:
-                print(f"Show '{name}' handmatig verwijderd van Beamer PC. Propageren naar NAS...")
-                deletions_on_nas.append(name)
-                show_ids_by_name[name] = state_info.get("id")
-
-        deletions_on_nas, deletions_on_remote, tripped = apply_safety_guard(
-            "Shows", deletions_on_nas, deletions_on_remote, len(sync_state["shows"])
-        )
-
-        # Only now remove the confirmed deletions from the working sets, so
-        # that when the guard trips (deletions cleared) nas_files/
-        # remote_files stay fully intact and the copy step below still
-        # transfers everything normally instead of silently skipping it.
-        for name in deletions_on_remote:
-            if name in remote_files:
-                del remote_files[name]
-            if show_ids_by_name.get(name):
-                remote_ids_to_remove.append(show_ids_by_name[name])
-        for name in deletions_on_nas:
-            if name in nas_files:
-                del nas_files[name]
-            if show_ids_by_name.get(name):
-                remote_ids_to_remove.append(show_ids_by_name[name])
-
-        # Voer verwijderingen op NAS uit
-        for name in deletions_on_nas:
-            dest_path = os.path.join(nas_shows_dir, name)
-            if os.path.exists(dest_path):
-                try:
-                    os.remove(dest_path)
-                    print(f"Verwijderd van NAS: {name}")
-                except Exception as e:
-                    print(f"Fout bij verwijderen van NAS {name}: {e}")
-
-        # Voer verwijderingen op Beamer PC uit
-        for name in deletions_on_remote:
-            remote_file_path = f"{remote_shows_dir}/{name}"
-            print(f"Verwijderen van Beamer PC: {name}...")
-            if remote_os == "windows":
-                run_ssh_cmd(mac_user, mac_host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
+            t_state["bibles"], _ = sync_simple_folder(
+                f"{label} - Bibles", nas_bibles_dir, remote_bibles_dir, target["user"], target["host"], remote_os,
+                t_state["bibles"], extensions={".fsb"}
+            )
+            t_state["templates"], _ = sync_simple_folder(
+                f"{label} - Templates", nas_freeshow_path, remote_templates_dir, target["user"], target["host"], remote_os,
+                t_state["templates"], extensions={".fstemplate"}
+            )
+            if skip_media:
+                print(f"\n--- SYNC: {label} - Media --- OVERGESLAGEN (--skip-media)")
             else:
-                run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
+                t_state["media"], _ = sync_simple_folder(
+                    f"{label} - Media", nas_media_dir, remote_media_dir, target["user"], target["host"], remote_os,
+                    t_state["media"], exclude_names={".DS_Store", "Thumbs.db", "desktop.ini"}
+                )
 
-        # Update remote shows.json index voor de handmatige verwijderingen
-        if remote_ids_to_remove:
-            print(f"Bijwerken van remote shows.json voor {len(remote_ids_to_remove)} handmatig verwijderde shows...")
-            local_temp_shows = "/tmp/remote_shows_sync.json"
-            if sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "get"):
-                try:
-                    with open(local_temp_shows, 'r', encoding='utf-8') as f:
-                        shows_json_data = json.load(f)
+            sync_state["targets"][target["key"]] = t_state
 
-                    modified_index = False
-                    for s_id in remote_ids_to_remove:
-                        if s_id in shows_json_data:
-                            del shows_json_data[s_id]
-                            modified_index = True
-
-                    if modified_index:
-                        with open(local_temp_shows, 'w', encoding='utf-8') as f:
-                            json.dump(shows_json_data, f)
-                        sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "put")
-                        print("Remote shows.json succesvol bijgewerkt.")
-                except Exception as e:
-                    print(f"Fout bij bewerken van shows.json: {e}")
-                finally:
-                    if os.path.exists(local_temp_shows):
-                        os.remove(local_temp_shows)
-
-    # 1. Beamer PC -> NAS (new or newer on remote)
-    copied_to_nas = 0
-    for name, r_info in remote_files.items():
-        if name not in nas_files:
-            print(f"Nieuwe show gedetecteerd op Beamer PC: '{name}'. Analyseren...")
-            temp_dest = f"/tmp/temp_sync_{name}"
-            if os.path.exists(temp_dest):
-                os.remove(temp_dest)
-
-            if sftp_transfer(mac_user, mac_host, temp_dest, f"{remote_shows_dir}/{name}", "get"):
-                is_scripture = False
-                try:
-                    with open(temp_dest, 'r', encoding='utf-8') as f:
-                        show_data = json.load(f)
-                        if isinstance(show_data, list) and len(show_data) > 1:
-                            is_scripture = show_data[1].get("category") == "scripture"
-                except Exception as e:
-                    print(f"Error checking category of remote show {name}: {e}")
-
-                if is_scripture and (delete_all_scriptures or (now_ts - r_info["mtime"] > one_week_secs)):
-                    print(f"Intercepted remote scripture '{name}' (expired/wipe). Deleting from Beamer PC...")
-                    remote_file_path = f"{remote_shows_dir}/{name}"
-                    if remote_os == "windows":
-                        run_ssh_cmd(mac_user, mac_host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
-                    else:
-                        run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
-
-                    show_id = get_show_id_from_file(temp_dest)
-                    if show_id:
-                        deleted_ids.append(show_id)
-
-                    if os.path.exists(temp_dest):
-                        os.remove(temp_dest)
+            # STAP 4 (afsluiten/stroom uit) blijft exclusief voor het hoofd-doel.
+            if target["is_primary"]:
+                if keep_on:
+                    print("\n--- STAP 4: AFSLUITEN OVERGESLAGEN (--keep-on) ---")
                 else:
-                    dest_path = os.path.join(nas_shows_dir, name)
-                    if os.path.exists(dest_path):
-                        os.remove(dest_path)
-                    shutil.move(temp_dest, dest_path)
-                    os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
-                    copied_to_nas += 1
-        else:
-            n_info = nas_files[name]
-            if r_info["mtime"] - n_info["mtime"] > 2.0:
-                print(f"Nieuwere versie gedetecteerd op Beamer PC: '{name}'. Analyseren...")
-                temp_dest = f"/tmp/temp_sync_{name}"
-                if os.path.exists(temp_dest):
-                    os.remove(temp_dest)
-
-                if sftp_transfer(mac_user, mac_host, temp_dest, f"{remote_shows_dir}/{name}", "get"):
-                    is_scripture = False
-                    try:
-                        with open(temp_dest, 'r', encoding='utf-8') as f:
-                            show_data = json.load(f)
-                            if isinstance(show_data, list) and len(show_data) > 1:
-                                is_scripture = show_data[1].get("category") == "scripture"
-                    except Exception as e:
-                        print(f"Error checking category of remote show {name}: {e}")
-
-                    if is_scripture and (delete_all_scriptures or (now_ts - r_info["mtime"] > one_week_secs)):
-                        print(f"Intercepted newer remote scripture '{name}' (expired/wipe). Deleting from both...")
-                        remote_file_path = f"{remote_shows_dir}/{name}"
-                        if remote_os == "windows":
-                            run_ssh_cmd(mac_user, mac_host, f"cmd.exe /c del /f /q \"{remote_file_path}\"")
-                        else:
-                            run_ssh_cmd(mac_user, mac_host, f"rm -f \"{remote_file_path}\"")
-
-                        dest_path = os.path.join(nas_shows_dir, name)
-                        if os.path.exists(dest_path):
-                            os.remove(dest_path)
-
-                        show_id = get_show_id_from_file(temp_dest)
-                        if show_id:
-                            deleted_ids.append(show_id)
-
-                        if os.path.exists(temp_dest):
-                            os.remove(temp_dest)
+                    print("\n--- STAP 4: BEAMER PC NETJES AFSLUITEN ---")
+                    print(f"Sturen van afsluitcommando naar Beamer PC ({remote_os})...")
+                    if remote_os == "windows":
+                        run_ssh_cmd(target["user"], target["host"], "shutdown /s /f /t 0")
+                    elif remote_os == "linux":
+                        run_ssh_cmd(target["user"], target["host"], "shutdown -h now")
                     else:
-                        dest_path = os.path.join(nas_shows_dir, name)
-                        if os.path.exists(dest_path):
-                            os.remove(dest_path)
-                        shutil.move(temp_dest, dest_path)
-                        os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
-                        copied_to_nas += 1
+                        run_ssh_cmd(target["user"], target["host"], "osascript -e 'tell application \"System Events\" to shut down'")
+                    print("Wachten op 15 seconden voor het veilig afsluiten...")
+                    time.sleep(15)
+                    print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
+                    subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
+                    print("[Power] Stroom succesvol afgesloten.")
 
-    # 2. NAS -> Beamer PC (new or newer on NAS)
-    copied_to_remote = 0
-    for name, n_info in nas_files.items():
-        if name not in remote_files:
-            print(f"Nieuwe show gedetecteerd op NAS: '{name}'. Kopieren naar Beamer PC...")
-            if sftp_transfer(mac_user, mac_host, n_info["path"], f"{remote_shows_dir}/{name}", "put"):
-                _touch_remote(mac_user, mac_host, remote_os, f"{remote_shows_dir}/{name}", n_info["mtime"])
-                copied_to_remote += 1
-        else:
-            r_info = remote_files[name]
-            if n_info["mtime"] - r_info["mtime"] > 2.0:
-                print(f"Nieuwere versie gedetecteerd op NAS: '{name}'. Updaten op Beamer PC...")
-                if sftp_transfer(mac_user, mac_host, n_info["path"], f"{remote_shows_dir}/{name}", "put"):
-                    _touch_remote(mac_user, mac_host, remote_os, f"{remote_shows_dir}/{name}", n_info["mtime"])
-                    copied_to_remote += 1
-
-    print(f"Shows sync afgerond. Kopieren naar NAS: {copied_to_nas}, Kopieren naar Beamer PC: {copied_to_remote}")
-
-    # Update remote shows.json index for all deleted shows (if any)
-    if deleted_ids:
-        print(f"Bijwerken van remote shows.json voor {len(deleted_ids)} verwijderde shows...")
-        local_temp_shows = "/tmp/remote_shows_sync.json"
-        if os.path.exists(local_temp_shows):
-            os.remove(local_temp_shows)
-
-        if sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "get"):
-            try:
-                with open(local_temp_shows, 'r', encoding='utf-8') as f:
-                    shows_json_data = json.load(f)
-
-                modified_index = False
-                for s_id in deleted_ids:
-                    if s_id in shows_json_data:
-                        del shows_json_data[s_id]
-                        modified_index = True
-
-                if modified_index:
-                    with open(local_temp_shows, 'w', encoding='utf-8') as f:
-                        json.dump(shows_json_data, f)
-                    sftp_transfer(mac_user, mac_host, local_temp_shows, f"{remote_app_data_dir}/shows.json", "put")
-                    print("Remote shows.json index succesvol bijgewerkt.")
-            except Exception as e:
-                print(f"Fout bij bewerken van shows.json: {e}")
-            finally:
-                if os.path.exists(local_temp_shows):
-                    os.remove(local_temp_shows)
-
-    # Fresh rescan for the saved Shows state, same reasoning as the other
-    # folders: an aborted/guarded deletion must not be "forgotten".
-    new_shows_state = {}
-    for show_path in glob.glob(os.path.join(nas_shows_dir, "*.show")):
-        name = os.path.basename(show_path)
-        show_id = get_show_id_from_file(show_path)
-        new_shows_state[name] = {
-            "mtime": os.path.getmtime(show_path),
-            "size": os.path.getsize(show_path),
-            "id": show_id
-        }
-    sync_state["shows"] = new_shows_state
-
-    # 5. STAP 3: Bibles, Templates en (optioneel) Media
-    sync_state["bibles"], _ = sync_simple_folder(
-        "Bibles", nas_bibles_dir, remote_bibles_dir, mac_user, mac_host, remote_os,
-        sync_state["bibles"], extensions={".fsb"}
-    )
-    sync_state["templates"], _ = sync_simple_folder(
-        "Templates", nas_freeshow_path, remote_templates_dir, mac_user, mac_host, remote_os,
-        sync_state["templates"], extensions={".fstemplate"}
-    )
-    if skip_media:
-        print("\n--- SYNC: Media --- OVERGESLAGEN (--skip-media)")
-    else:
-        sync_state["media"], _ = sync_simple_folder(
-            "Media", nas_media_dir, remote_media_dir, mac_user, mac_host, remote_os,
-            sync_state["media"], exclude_names={".DS_Store", "Thumbs.db", "desktop.ini"}
-        )
+        except Exception as e:
+            print(f"[{label}] FOUT tijdens sync: {e} - doorgaan met volgende doel.")
 
     # Save the updated sync state
     try:
@@ -1010,33 +1087,6 @@ def main():
         print("\nSynchronisatiestate succesvol bijgewerkt en opgeslagen.")
     except Exception as e:
         print(f"ERROR: Failed to save sync state file: {e}")
-
-    # 6. Teardown / Shutdown sequence
-    # Previously this only ran when turned_on_by_script was True, i.e. only
-    # when THIS run was the one that switched the plug on. If the Beamer PC
-    # was already on for any other reason (left on from a previous
-    # incomplete run, used manually during the week, ...) the script skipped
-    # both the startup AND the shutdown sequence, leaving the plug on
-    # indefinitely - which is exactly the "still on after Wednesday" symptom.
-    # The whole point of this nightly job is wake -> sync -> power off, so it
-    # now always shuts down after a successful sync, regardless of who
-    # turned the PC on - pass --keep-on to skip this for a manual/debug run.
-    if keep_on:
-        print("\n--- STAP 4: AFSLUITEN OVERGESLAGEN (--keep-on) ---")
-    else:
-        print("\n--- STAP 4: BEAMER PC NETJES AFSLUITEN ---")
-        print(f"Sturen van afsluitcommando naar Beamer PC ({remote_os})...")
-        if remote_os == "windows":
-            run_ssh_cmd(mac_user, mac_host, "shutdown /s /f /t 0")
-        elif remote_os == "linux":
-            run_ssh_cmd(mac_user, mac_host, "shutdown -h now")
-        else:
-            run_ssh_cmd(mac_user, mac_host, "osascript -e 'tell application \"System Events\" to shut down'")
-        print("Wachten op 15 seconden voor het veilig afsluiten...")
-        time.sleep(15)
-        print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
-        subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
-        print("[Power] Stroom succesvol afgesloten.")
 
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === FREESHOW SYNC & CLEANUP VOLTOOID ===")
 
