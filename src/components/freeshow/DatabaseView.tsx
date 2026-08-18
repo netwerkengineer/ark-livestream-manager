@@ -437,7 +437,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
                  <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>{t('system_actions')}</h3>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                     <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Synchroniseer alle shows tussen de NAS en de Beamer PC. Dit is hetzelfde als de automatische wekelijkse sync, maar handmatig gestart.</p>
+                     <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Synchroniseer Shows, Bibles, Templates en Media tussen de NAS en de Beamer PC. Dit is hetzelfde als de automatische wekelijkse sync, maar handmatig gestart.</p>
                      <button
                        className="button"
                        style={{ width: '100%', background: 'var(--primary)', color: '#020617', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700 }}
