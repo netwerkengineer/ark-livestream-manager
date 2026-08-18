@@ -119,6 +119,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
   } = props;
 
   const [isImportingProject, setIsImportingProject] = useState(false);
+  const [importProjectStatus, setImportProjectStatus] = useState('');
 
   return (
     <div className="database-dashboard-view" style={{ marginTop: '3rem' }}>
@@ -474,17 +475,17 @@ export default function DatabaseView(props: DatabaseViewProps) {
                        disabled={isImportingProject}
                        onClick={async () => {
                          setIsImportingProject(true);
-                         setStatus('Project wordt klaargezet...');
+                         setImportProjectStatus('Project wordt klaargezet...');
                          try {
                            const res = await fetch('/api/maintenance/import-project', { method: 'POST' });
                            const data = await res.json();
                            if (res.ok) {
-                             setStatus('✅ ' + (data.message || 'OK'));
+                             setImportProjectStatus('✅ ' + (data.message || 'OK'));
                            } else {
-                             setStatus('❌ Fout: ' + (data.error || 'Onbekende fout'));
+                             setImportProjectStatus('❌ Fout: ' + (data.error || 'Onbekende fout'));
                            }
                          } catch (e: any) {
-                           setStatus('❌ Fout: ' + e.message);
+                           setImportProjectStatus('❌ Fout: ' + e.message);
                          } finally {
                            setIsImportingProject(false);
                          }
@@ -492,6 +493,9 @@ export default function DatabaseView(props: DatabaseViewProps) {
                      >
                        {isImportingProject ? 'Bezig...' : 'Project nu klaarzetten'}
                      </button>
+                     {importProjectStatus && (
+                       <p style={{ fontSize: '0.75rem', marginTop: '0.6rem', color: 'var(--primary)', textAlign: 'center' }}>{importProjectStatus}</p>
+                     )}
                    </div>
 
                    <div style={{ background: 'rgba(239,68,68,0.05)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.15)' }}>
