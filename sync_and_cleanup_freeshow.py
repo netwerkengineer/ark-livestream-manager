@@ -6,6 +6,7 @@ import time
 import base64
 import sys
 import glob
+import shutil
 
 # Helper to intercept subprocess.run for ssh, scp, and sftp to enforce correct key permissions
 def run_command_with_key(*args, **kwargs):
@@ -321,6 +322,11 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
 
     print(f"\n--- SYNC: {label} ---")
 
+    # SFTP's "put" fails outright if the destination directory doesn't
+    # exist yet (it never auto-creates it) - Media/Bibles in particular
+    # may not exist on a freshly pointed-at local FreeShow data folder.
+    _ensure_remote_dir(mac_user, mac_host, remote_os, remote_dir)
+
     def matches(name):
         if name in exclude_names:
             return False
@@ -421,6 +427,12 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
             new_state[name] = {"mtime": os.path.getmtime(f), "size": os.path.getsize(f)}
 
     return new_state, stats
+
+def _ensure_remote_dir(user, host, remote_os, remote_dir):
+    if remote_os == "windows":
+        run_ssh_cmd(user, host, f"cmd.exe /c if not exist \"{remote_dir}\" mkdir \"{remote_dir}\"")
+    else:
+        run_ssh_cmd(user, host, f"mkdir -p '{remote_dir}'")
 
 def _touch_remote(user, host, remote_os, remote_path, mtime):
     if remote_os == "windows":
@@ -779,7 +791,7 @@ def main():
                     dest_path = os.path.join(nas_shows_dir, name)
                     if os.path.exists(dest_path):
                         os.remove(dest_path)
-                    os.rename(temp_dest, dest_path)
+                    shutil.move(temp_dest, dest_path)
                     os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
                     copied_to_nas += 1
         else:
@@ -822,7 +834,7 @@ def main():
                         dest_path = os.path.join(nas_shows_dir, name)
                         if os.path.exists(dest_path):
                             os.remove(dest_path)
-                        os.rename(temp_dest, dest_path)
+                        shutil.move(temp_dest, dest_path)
                         os.utime(dest_path, (r_info["mtime"], r_info["mtime"]))
                         copied_to_nas += 1
 
