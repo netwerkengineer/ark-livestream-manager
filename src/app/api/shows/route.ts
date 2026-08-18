@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
+import { mapWithConcurrency } from '@/lib/concurrency';
 
 interface CachedShow {
   name: string;
@@ -87,70 +88,61 @@ export async function GET(req: NextRequest) {
 
     const files = await fs.readdir(showsDir);
     await loadCache();
-    
-    const shows: CachedShow[] = [];
+
+    const showFiles = files.filter(f => f.toLowerCase().endsWith('.show'));
     let cacheUpdated = false;
-    let processedCount = 0;
 
-    for (const file of files) {
-      if (file.toLowerCase().endsWith('.show')) {
-        const filePath = path.join(showsDir, file);
-        try {
-          const stats = await fs.stat(filePath);
-          const cached = memoryCache[file];
-          
-          if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
-            shows.push(cached);
-          } else {
-            const fullContentData = await fs.readFile(filePath, 'utf-8');
-            const showObj = JSON.parse(fullContentData);
-            
-            let category = 'song';
-            let slideCount = 0;
-            let name = file.replace(/\.show$/i, '');
-            
-            const showData = Array.isArray(showObj) && showObj[1] ? showObj[1] : showObj;
-            if (showData) {
-              category = showData.category || 'song';
-              slideCount = showData.slides ? Object.keys(showData.slides).length : 0;
-              if (showData.name) {
-                name = showData.name;
-              }
-            }
+    const shows: CachedShow[] = await mapWithConcurrency(showFiles, 16, async (file) => {
+      const filePath = path.join(showsDir, file);
+      try {
+        const stats = await fs.stat(filePath);
+        const cached = memoryCache[file];
 
-            const newShow: CachedShow = {
-              name,
-              filename: file,
-              category,
-              slideCount,
-              lastModified: stats.mtime.toISOString(),
-              size: stats.size,
-              mtimeMs: stats.mtimeMs
-            };
+        if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+          return cached;
+        }
 
-            memoryCache[file] = newShow;
-            shows.push(newShow);
-            cacheUpdated = true;
+        const fullContentData = await fs.readFile(filePath, 'utf-8');
+        const showObj = JSON.parse(fullContentData);
+
+        let category = 'song';
+        let slideCount = 0;
+        let name = file.replace(/\.show$/i, '');
+
+        const showData = Array.isArray(showObj) && showObj[1] ? showObj[1] : showObj;
+        if (showData) {
+          category = showData.category || 'song';
+          slideCount = showData.slides ? Object.keys(showData.slides).length : 0;
+          if (showData.name) {
+            name = showData.name;
           }
-        } catch (fileErr) {
-          shows.push({
-            name: file.replace(/\.show$/i, ''),
-            filename: file,
-            category: 'unknown',
-            slideCount: 0,
-            lastModified: new Date().toISOString(),
-            size: 0,
-            mtimeMs: 0
-          });
         }
 
-        processedCount++;
-        if (processedCount % 100 === 0) {
-          // Yield control back to the event loop so other network requests can be handled
-          await new Promise<void>(resolve => setImmediate(resolve));
-        }
+        const newShow: CachedShow = {
+          name,
+          filename: file,
+          category,
+          slideCount,
+          lastModified: stats.mtime.toISOString(),
+          size: stats.size,
+          mtimeMs: stats.mtimeMs
+        };
+
+        memoryCache[file] = newShow;
+        cacheUpdated = true;
+        return newShow;
+      } catch (fileErr) {
+        return {
+          name: file.replace(/\.show$/i, ''),
+          filename: file,
+          category: 'unknown',
+          slideCount: 0,
+          lastModified: new Date().toISOString(),
+          size: 0,
+          mtimeMs: 0
+        };
       }
-    }
+    });
 
     // Clean up cache of deleted files
     const fileSet = new Set(files);
