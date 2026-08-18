@@ -1364,6 +1364,130 @@ export default function SettingsPanel({
                 </label>
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                  <h3 style={{ fontSize: '1.1rem' }}>🖥️ Extra FreeShow Doelen (Sync)</h3>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: '8px' }}
+                    onClick={() => {
+                      const targets = settings.freeshowAdditionalTargets || [];
+                      const newTarget = {
+                        id: `target_${Date.now()}`,
+                        name: "Nieuw Doel",
+                        host: "",
+                        sshUser: "",
+                        enabled: true
+                      };
+                      onSettingsChange({ ...settings, freeshowAdditionalTargets: [...targets, newTarget] });
+                    }}
+                  >
+                    + Doel Toevoegen
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
+                  Deze doelen ontvangen dezelfde volledige catalogus (Shows, Media, Bibles, Templates) als de hoofd-Beamer PC hierboven, bijvoorbeeld voor een zondagsschool-systeem. Ze krijgen géén stroom-/opstart-automatisering en geen "Project nu klaarzetten" — dat blijft exclusief voor de hoofd-Beamer PC.
+                </p>
+
+                {(!settings.freeshowAdditionalTargets || settings.freeshowAdditionalTargets.length === 0) && (
+                  <p style={{ color: 'var(--muted)', fontSize: '0.85rem', fontStyle: 'italic', textAlign: 'center', padding: '20px 10px', background: 'rgba(255,255,255,0.01)', borderRadius: '12px' }}>
+                    Geen extra FreeShow-doelen geconfigureerd.
+                  </p>
+                )}
+
+                {(settings.freeshowAdditionalTargets || []).map((target: any, idx: number) => (
+                  <div
+                    key={target.id || idx}
+                    className="glass-card"
+                    style={{
+                      padding: '16px',
+                      background: 'rgba(255,255,255,0.01)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <input
+                        className="input-field"
+                        style={{ fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'transparent', padding: '4px 8px', flex: 1, minWidth: '200px' }}
+                        placeholder="Doel Naam (bijv. Zondagsschool PC)"
+                        value={target.name || ""}
+                        onChange={(e) => {
+                          const updated = [...settings.freeshowAdditionalTargets];
+                          updated[idx] = { ...target, name: e.target.value };
+                          onSettingsChange({ ...settings, freeshowAdditionalTargets: updated });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '0.8rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          color: '#ef4444',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          const updated = settings.freeshowAdditionalTargets.filter((_: any, i: number) => i !== idx);
+                          onSettingsChange({ ...settings, freeshowAdditionalTargets: updated });
+                        }}
+                      >
+                        Verwijderen
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Host / IP-adres</label>
+                        <input
+                          className="input-field"
+                          placeholder="Bijv. 192.168.2.130"
+                          value={target.host || ""}
+                          onChange={(e) => {
+                            const updated = [...settings.freeshowAdditionalTargets];
+                            updated[idx] = { ...target, host: e.target.value.trim() };
+                            onSettingsChange({ ...settings, freeshowAdditionalTargets: updated });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>SSH Gebruiker</label>
+                        <input
+                          className="input-field"
+                          placeholder="Leeg = zelfde als hoofd-doel"
+                          value={target.sshUser || ""}
+                          onChange={(e) => {
+                            const updated = [...settings.freeshowAdditionalTargets];
+                            updated[idx] = { ...target, sshUser: e.target.value.trim() };
+                            onSettingsChange({ ...settings, freeshowAdditionalTargets: updated });
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          id={`target-enabled-${target.id || idx}`}
+                          checked={target.enabled !== false}
+                          onChange={(e) => {
+                            const updated = [...settings.freeshowAdditionalTargets];
+                            updated[idx] = { ...target, enabled: e.target.checked };
+                            onSettingsChange({ ...settings, freeshowAdditionalTargets: updated });
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor={`target-enabled-${target.id || idx}`} style={{ fontSize: '0.8rem', cursor: 'pointer' }}>Actief</label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>📬 E-mail koppeling (concept-diensten)</h3>
               <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-12px' }}>
                 IMAP-postvak dat gecontroleerd wordt op liturgie-aanleveringen van worship leaders.

@@ -69,6 +69,7 @@ export interface AppSettings {
   freeshowMediaPath?: string;
   freeshowTrashPath?: string;
   freeshowClientPath?: string;
+  freeshowAdditionalTargets?: FreeShowSyncTarget[];
   autoSaveToNas?: boolean;
   defaultTemplate?: string;
   backupTarget?: string;
@@ -112,6 +113,14 @@ export interface TuyaPlug {
   localKey: string;
   version: number;
   hostIp?: string;
+}
+
+export interface FreeShowSyncTarget {
+  id: string;
+  name: string;
+  host: string;
+  sshUser?: string; // empty = falls back to the global settings.sshUser
+  enabled?: boolean; // default true
 }
 
 export interface TuyaSchedule {
@@ -227,6 +236,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   freeshowProjectPath: "/volume1/Beamer/FreeShow/projects",
   freeshowMediaPath: "/volume1/Beamer/FreeShow/Media",
   freeshowTrashPath: "/volume1/Beamer/FreeShow/.trash",
+  freeshowAdditionalTargets: [],
   autoSaveToNas: false,
   defaultTemplate: "template.project",
   backupTarget: "none",
@@ -275,7 +285,7 @@ export function getSettings(): AppSettings {
       // Self-healing: if the saved settings on disk are missing the new multi-plug array 
       // or scheduler properties, force write them back so they are persistent and visible 
       // to host python scripts.
-      let needsWrite = !saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules;
+      let needsWrite = !saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules || !saved.freeshowAdditionalTargets;
       
       // Initialize default users if empty
       if (!settings.users || settings.users.length === 0) {
