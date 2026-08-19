@@ -252,7 +252,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   imapPass: "",
   imapHost: "imap.gmail.com",
   imapPort: 993,
-  emailSubjectKeyword: "Liturgie",
+  emailSubjectKeyword: "Liturgie,Zondagsdienst",
   ledPanelEnabled: false,
   ledPanelMac: "",
   sshUser: "jeffreygo",

@@ -13,6 +13,24 @@ import { extractTextFromDocument } from '@/lib/documentText';
 const execFilePromise = promisify(execFile);
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 
+// Mailboxes checked on every sync, in order. Gmail's spam folder keeps this
+// exact English IMAP name regardless of the account's display language -
+// a legitimate liturgie-mail can land here by mistake (spam classification
+// is provider-side, outside this app's control), so it's worth a safety-net
+// scan alongside the inbox rather than only ever checking INBOX.
+const MAILBOXES_TO_SCAN = ['INBOX', '[Gmail]/Spam'];
+
+// Builds an IMAP search criterion matching any of the given subject
+// keywords, e.g. ['Liturgie', 'Zondagsdienst'] ->
+// ['OR', ['SUBJECT', 'Liturgie'], ['SUBJECT', 'Zondagsdienst']] - node-imap's
+// OR takes exactly two operands, so 3+ keywords nest left-to-right.
+function buildSubjectCriteria(keywords: string[]): any[] {
+  return keywords.slice(1).reduce(
+    (acc: any[], kw: string) => ['OR', acc, ['SUBJECT', kw]],
+    ['SUBJECT', keywords[0]]
+  );
+}
+
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
@@ -234,112 +252,125 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
 
   const touchedDrafts = new Map<string, DraftService>();
 
+  // For a shared/existing mailbox, restrict the IMAP-side search to subjects
+  // containing one of the configured keywords (comma-separated - defaults to
+  // "Liturgie,Zondagsdienst") so unrelated mail is never fetched or marked as
+  // read by this sync - only matching messages are touched at all. Leave
+  // empty to check every unread mail.
+  const subjectKeywords: string[] = (settings.emailSubjectKeyword ?? 'Liturgie,Zondagsdienst')
+    .split(',')
+    .map((k: string) => k.trim())
+    .filter(Boolean);
+  const searchCriteria: any[] = subjectKeywords.length
+    ? ['UNSEEN', buildSubjectCriteria(subjectKeywords)]
+    : ['UNSEEN'];
+
   try {
     const connection = await imaps.connect(config);
-    await connection.openBox('INBOX');
     const imap = (connection as any).imap;
 
-    // For a shared/existing mailbox, restrict the IMAP-side search to
-    // subjects containing the configured keyword so unrelated mail is never
-    // fetched or marked as read by this sync - only matching messages are
-    // touched at all. Leave the keyword empty to check every unread mail.
-    const subjectKeyword: string = (settings.emailSubjectKeyword ?? 'Liturgie').trim();
-    const searchCriteria: any[] = subjectKeyword
-      ? ['UNSEEN', ['SUBJECT', subjectKeyword]]
-      : ['UNSEEN'];
-    // Search only for matching UIDs here - body/attachment content is fetched
-    // separately below via rawFetch(), see its comment for why.
-    const uids: number[] = await connection.search(searchCriteria, { bodies: [] })
-      .then((results: any[]) => results.map(r => r.attributes.uid));
-    console.log(`[Email Sync] ${uids.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
-
-    for (const uid of uids) {
-      const fetched = await rawFetch(imap, [uid], { bodies: ['HEADER', 'TEXT'], struct: true });
-      if (fetched.length === 0) {
-        console.error(`[Email Sync] Kon bericht UID ${uid} niet ophalen, wordt overgeslagen.`);
-        continue;
-      }
-      const { parts, attributes } = fetched[0];
-      const textBody = parts['TEXT'];
-      if (!textBody) {
-        console.error(`[Email Sync] Geen tekstdeel in bericht UID ${uid}, onderdelen: ${JSON.stringify(Object.keys(parts))}`);
-        continue;
-      }
-
-      // Mark seen now that the message has been successfully fetched, so a
-      // failure further down (attachment fetch, store write) can't leave it
-      // permanently stuck as unread-and-unprocessable, but a message we
-      // never even got the text for is left unseen for a retry next sync.
+    for (const mailbox of MAILBOXES_TO_SCAN) {
       try {
-        await markSeen(imap, uid);
-      } catch (seenErr) {
-        console.error(`[Email Sync] Kon bericht UID ${uid} niet als gelezen markeren:`, seenErr);
+        await connection.openBox(mailbox);
+      } catch (boxErr: any) {
+        console.error(`[Email Sync] Kon mailbox "${mailbox}" niet openen, wordt overgeslagen: ${boxErr?.message || boxErr}`);
+        continue;
       }
 
-      const rawMessage = `${parts['HEADER'] || ''}\r\n${textBody}`;
-      const parsedMail = await simpleParser(rawMessage);
-      const content = parsedMail.text || textBody;
-      const messageId = parsedMail.messageId || `${uid}-${Date.now()}`;
-      const subject = parsedMail.subject || '(geen onderwerp)';
-      const receivedAt = (parsedMail.date || new Date()).toISOString();
+      // Search only for matching UIDs here - body/attachment content is fetched
+      // separately below via rawFetch(), see its comment for why.
+      const uids: number[] = await connection.search(searchCriteria, { bodies: [] })
+        .then((results: any[]) => results.map(r => r.attributes.uid));
+      console.log(`[Email Sync] [${mailbox}] ${uids.length} bericht(en) gevonden voor criteria ${JSON.stringify(searchCriteria)}.`);
 
-      const parsed = parseServiceEmail(content);
-
-      let attachments: { filename: string; content: Buffer }[] = [];
-      if (attributes?.struct) {
-        try {
-          attachments = await fetchAttachments(imap, uid, attributes.struct);
-        } catch (attErr) {
-          console.error('[Email Sync] Bijlagen ophalen mislukt:', attErr);
+      for (const uid of uids) {
+        const fetched = await rawFetch(imap, [uid], { bodies: ['HEADER', 'TEXT'], struct: true });
+        if (fetched.length === 0) {
+          console.error(`[Email Sync] Kon bericht UID ${uid} niet ophalen, wordt overgeslagen.`);
+          continue;
         }
-      }
-      const stagingDir = getMediaStagingDir(settings, messageId);
-      if (!stagingDir) {
-        console.error('[Email Sync] Geen freeshowMediaPath ingesteld - bijlagen/YouTube-video worden niet opgeslagen.');
-      }
-      const saved = saveAttachments(stagingDir, attachments);
-      const mediaItems = parsed.items.filter((i): i is ParsedMedia => i.type === 'media');
-      resolveAttachmentPaths(mediaItems, saved);
-      await resolveYoutubeDownloads(mediaItems, stagingDir);
+        const { parts, attributes } = fetched[0];
+        const textBody = parts['TEXT'];
+        if (!textBody) {
+          console.error(`[Email Sync] Geen tekstdeel in bericht UID ${uid}, onderdelen: ${JSON.stringify(Object.keys(parts))}`);
+          continue;
+        }
 
-      const songItems = parsed.items.filter((i): i is ParsedSong => i.type === 'song');
-      resolveSongLyricsAttachments(songItems, saved);
-      for (const song of songItems) {
-        // Inline [Tekst]...[/Tekst] body text wins if a mail somehow supplied
-        // both - the attachment is only read when there's nothing already.
-        if (!song.lyricsText && song.lyricsFilePath) {
-          const extracted = await extractTextFromDocument(song.lyricsFilePath);
-          if (extracted.trim()) {
-            song.lyricsText = extracted;
-          } else {
-            console.error(`[Email Sync] Kon geen tekst uit bijlage "${song.lyricsAttachmentName}" halen voor lied "${song.title}".`);
+        // Mark seen now that the message has been successfully fetched, so a
+        // failure further down (attachment fetch, store write) can't leave it
+        // permanently stuck as unread-and-unprocessable, but a message we
+        // never even got the text for is left unseen for a retry next sync.
+        try {
+          await markSeen(imap, uid);
+        } catch (seenErr) {
+          console.error(`[Email Sync] Kon bericht UID ${uid} niet als gelezen markeren:`, seenErr);
+        }
+
+        const rawMessage = `${parts['HEADER'] || ''}\r\n${textBody}`;
+        const parsedMail = await simpleParser(rawMessage);
+        const content = parsedMail.text || textBody;
+        const messageId = parsedMail.messageId || `${uid}-${Date.now()}`;
+        const subject = parsedMail.subject || '(geen onderwerp)';
+        const receivedAt = (parsedMail.date || new Date()).toISOString();
+
+        const parsed = parseServiceEmail(content);
+
+        let attachments: { filename: string; content: Buffer }[] = [];
+        if (attributes?.struct) {
+          try {
+            attachments = await fetchAttachments(imap, uid, attributes.struct);
+          } catch (attErr) {
+            console.error('[Email Sync] Bijlagen ophalen mislukt:', attErr);
+          }
+        }
+        const stagingDir = getMediaStagingDir(settings, messageId);
+        if (!stagingDir) {
+          console.error('[Email Sync] Geen freeshowMediaPath ingesteld - bijlagen/YouTube-video worden niet opgeslagen.');
+        }
+        const saved = saveAttachments(stagingDir, attachments);
+        const mediaItems = parsed.items.filter((i): i is ParsedMedia => i.type === 'media');
+        resolveAttachmentPaths(mediaItems, saved);
+        await resolveYoutubeDownloads(mediaItems, stagingDir);
+
+        const songItems = parsed.items.filter((i): i is ParsedSong => i.type === 'song');
+        resolveSongLyricsAttachments(songItems, saved);
+        for (const song of songItems) {
+          // Inline [Tekst]...[/Tekst] body text wins if a mail somehow supplied
+          // both - the attachment is only read when there's nothing already.
+          if (!song.lyricsText && song.lyricsFilePath) {
+            const extracted = await extractTextFromDocument(song.lyricsFilePath);
+            if (extracted.trim()) {
+              song.lyricsText = extracted;
+            } else {
+              console.error(`[Email Sync] Kon geen tekst uit bijlage "${song.lyricsAttachmentName}" halen voor lied "${song.title}".`);
+            }
+          }
+        }
+
+        const draft = mergeParsedEmailIntoDraft(parsed, {
+          messageId,
+          subject,
+          receivedAt,
+          excerpt: content.slice(0, 500)
+        });
+
+        if (draft) {
+          touchedDrafts.set(draft.serviceDate, draft);
+          // Best-effort: keep the FreeShow project in sync with every new
+          // mail automatically. A conflict (someone edited it directly in
+          // FreeShow) is left for a medewerker to resolve in the review tab
+          // rather than force-overwritten here.
+          try {
+            const result = await generateProjectForDraft(draft);
+            if (!result.success && !result.conflict) {
+              console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} mislukt: ${result.message}`);
+            }
+          } catch (genErr) {
+            console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} gaf een fout:`, genErr);
           }
         }
       }
-
-      const draft = mergeParsedEmailIntoDraft(parsed, {
-        messageId,
-        subject,
-        receivedAt,
-        excerpt: content.slice(0, 500)
-      });
-
-      if (draft) {
-        touchedDrafts.set(draft.serviceDate, draft);
-        // Best-effort: keep the FreeShow project in sync with every new
-        // mail automatically. A conflict (someone edited it directly in
-        // FreeShow) is left for a medewerker to resolve in the review tab
-        // rather than force-overwritten here.
-        try {
-          const result = await generateProjectForDraft(draft);
-          if (!result.success && !result.conflict) {
-            console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} mislukt: ${result.message}`);
-          }
-        } catch (genErr) {
-          console.error(`[Email Sync] Project genereren voor ${draft.serviceDate} gaf een fout:`, genErr);
-        }
-      }
-    }
+    } // end mailbox loop
 
     connection.end();
     return Array.from(touchedDrafts.values());
