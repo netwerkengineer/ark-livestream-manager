@@ -100,7 +100,11 @@ function looksLikeBlockItem(line: string, block: BlockType): boolean {
  * block is surfaced in `notes` rather than silently dropped or misfiled.
  */
 export function parseServiceEmail(text: string): ParsedEmail {
-  const lines = (text || '').split('\n');
+  // Strip plain-text quote markers ("> ", or nested "> > ") that mail
+  // clients add to forwarded/replied-to content, so a forwarded liturgie
+  // mail parses the same as an original one instead of every line failing
+  // to match because of a leading ">".
+  const lines = (text || '').split('\n').map(l => l.replace(/^(>\s*)+/, ''));
 
   let serviceDate: string | null = null;
   let currentSection = '';
