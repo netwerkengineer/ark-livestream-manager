@@ -204,6 +204,25 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"OK: Manual sync started in background")
             
+        elif path == '/import_project':
+            print("Received HTTP request: Trigger manual project import")
+            log_path = os.path.join(SCRIPT_DIR, "data", "import_project.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, 'a') as log_file:
+                log_file.write(f"\n--- MANUAL PROJECT IMPORT TRIGGERED (VIA HTTP) AT {datetime.datetime.now()} ---\n")
+
+            log_file_handle = open(log_path, 'a')
+            subprocess.Popen(
+                ["python3", os.path.join(SCRIPT_DIR, "import_project.py")],
+                stdout=log_file_handle,
+                stderr=subprocess.STDOUT
+            )
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b"OK: Project import started in background")
+
         elif path == '/delete_scriptures':
             print("Received HTTP request: Trigger manual scripture deletion & sync")
             log_path = os.path.join(SCRIPT_DIR, "data", "sync_cleanup.log")
