@@ -118,6 +118,14 @@ export default function DatabaseView(props: DatabaseViewProps) {
     freeshowCategories
   } = props;
 
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const show of showsList) {
+      counts[show.category] = (counts[show.category] || 0) + 1;
+    }
+    return counts;
+  }, [showsList]);
+
   const [isImportingProject, setIsImportingProject] = useState(false);
   const [importProjectStatus, setImportProjectStatus] = useState('');
 
@@ -126,7 +134,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
           {databaseSubTab === 'catalog' && (
             <div className="glass-card" style={{ padding: '2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h2 style={{ margin: 0 }}>📂 {t('tab_database')}</h2>
+                <h2 style={{ margin: 0 }}>📂 {t('tab_database')} <span style={{ fontSize: '0.85rem', opacity: 0.5, fontWeight: 'normal' }}>({showsList.length})</span></h2>
                 <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Search */}
                   <input 
@@ -144,10 +152,10 @@ export default function DatabaseView(props: DatabaseViewProps) {
                     onChange={e => setShowsCategoryFilter(e.target.value)} 
                     style={{ margin: 0, width: '150px' }}
                   >
-                    <option value="all">Alle Categorieën</option>
+                    <option value="all">Alle Categorieën ({showsList.length})</option>
                     {uniqueCategories.map(cat => (
                       <option key={cat} value={cat}>
-                        {getCategoryDisplayName(cat, freeshowCategories)}
+                        {getCategoryDisplayName(cat, freeshowCategories)} ({categoryCounts[cat] || 0})
                       </option>
                     ))}
                   </select>
