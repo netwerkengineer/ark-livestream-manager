@@ -1539,16 +1539,16 @@ export default function SettingsPanel({
               </div>
 
               <div className="input-group">
-                <label className="input-label">Verplicht woord in onderwerp</label>
+                <label className="input-label">Verplicht(e) woord(en) in onderwerp</label>
                 <input
                   type="text"
                   className="input-field"
-                  value={settings.emailSubjectKeyword ?? "Liturgie"}
+                  value={settings.emailSubjectKeyword ?? "Liturgie,Zondagsdienst"}
                   onChange={(e) => onSettingsChange({ ...settings, emailSubjectKeyword: e.target.value })}
-                  placeholder="Liturgie"
+                  placeholder="Liturgie,Zondagsdienst"
                 />
                 <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
-                  Alleen ongelezen mails waarvan het onderwerp dit woord bevat worden opgehaald en gemarkeerd als gelezen — andere mail in dit postvak wordt niet aangeraakt. Leeg laten om elke ongelezen mail te controleren.
+                  Alleen ongelezen mails waarvan het onderwerp één van deze woorden bevat (komma-gescheiden) worden opgehaald en gemarkeerd als gelezen — andere mail in dit postvak wordt niet aangeraakt. Leeg laten om elke ongelezen mail te controleren. Naast Postvak IN wordt ook de Spam-map van dit account gecontroleerd, als vangnet voor mails die daar per ongeluk in belanden.
                 </p>
               </div>
             </section>
