@@ -408,7 +408,9 @@ def import_project():
             
             # Copy individual .show files
             print("Uploading .show files...")
-            subprocess.run(f"scp {local_shows_dir}/* {mac_user}@{mac_host}:{remote_docs_dir}/Shows/", shell=True, check=True)
+            show_files = glob.glob(os.path.join(local_shows_dir, "*"))
+            if show_files:
+                subprocess.run(["scp"] + show_files + [f"{mac_user}@{mac_host}:{remote_docs_dir}/Shows/"], check=True)
             
             # Copy other extracted files (except config/metadata)
             for root, dirs, files in os.walk(temp_dir):
