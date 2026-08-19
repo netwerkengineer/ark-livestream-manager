@@ -151,6 +151,9 @@ export default function FreeshowGenerator() {
   const [showEditorSlides, setShowEditorSlides] = useState<any[]>([]); // Array of { id, nextTimer, slideObj }
   const [showEditorRawJson, setShowEditorRawJson] = useState('');
   const [showEditorMode, setShowEditorMode] = useState<'visual'|'raw'>('visual');
+  const [showPasteLyrics, setShowPasteLyrics] = useState(false);
+  const [pasteLyricsText, setPasteLyricsText] = useState('');
+  const [isParsingLyrics, setIsParsingLyrics] = useState(false);
   const [isSavingShow, setIsSavingShow] = useState(false);
 
   // Preview & Template States
@@ -904,6 +907,33 @@ export default function FreeshowGenerator() {
       nextTimer: 10,
       slideObj: newSlideObj
     }]);
+  };
+
+  const applyPastedLyrics = async () => {
+    if (!pasteLyricsText.trim()) return;
+    if (showEditorSlides.length > 0 && !confirm('Dit vervangt alle huidige slides in deze show door de geplakte tekst. Doorgaan?')) {
+      return;
+    }
+    setIsParsingLyrics(true);
+    try {
+      const res = await fetch('/api/parse-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: pasteLyricsText, category: showEditorCategory, name: showEditorTitle })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowEditorSlides(data.slides);
+        setPasteLyricsText('');
+        setShowPasteLyrics(false);
+      } else {
+        alert(data.error || 'Fout bij verwerken van de tekst');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Verbindingsfout bij verwerken van de tekst');
+    } finally {
+      setIsParsingLyrics(false);
+    }
   };
 
   const updateSlideText = (idx: number, newText: string) => {
@@ -2079,22 +2109,56 @@ export default function FreeshowGenerator() {
             </div>
 
             {/* Mode Selector */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem', borderRadius: '8px', width: 'fit-content' }}>
-              <button 
-                className="button" 
-                style={{ background: showEditorMode === 'visual' ? 'var(--primary)' : 'transparent', padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: '6px' }}
-                onClick={() => setShowEditorMode('visual')}
-              >
-                Visual Editor
-              </button>
-              <button 
-                className="button" 
-                style={{ background: showEditorMode === 'raw' ? 'var(--primary)' : 'transparent', padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: '6px' }}
-                onClick={() => setShowEditorMode('raw')}
-              >
-                Raw JSON Editor
-              </button>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.3rem', borderRadius: '8px', width: 'fit-content' }}>
+                <button
+                  className="button"
+                  style={{ background: showEditorMode === 'visual' ? 'var(--primary)' : 'transparent', padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                  onClick={() => setShowEditorMode('visual')}
+                >
+                  Visual Editor
+                </button>
+                <button
+                  className="button"
+                  style={{ background: showEditorMode === 'raw' ? 'var(--primary)' : 'transparent', padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                  onClick={() => setShowEditorMode('raw')}
+                >
+                  Raw JSON Editor
+                </button>
+              </div>
+              {showEditorMode === 'visual' && (
+                <button
+                  className="button"
+                  style={{ background: showPasteLyrics ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: showPasteLyrics ? '#020617' : '#fff', padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                  onClick={() => setShowPasteLyrics(!showPasteLyrics)}
+                >
+                  📋 Plak volledige tekst
+                </button>
+              )}
             </div>
+
+            {showEditorMode === 'visual' && showPasteLyrics && (
+              <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.5rem' }}>
+                  Plak hier de volledige songtekst (lege regel = nieuwe slide, "[Refrein]" of "Couplet 1" wordt herkend als groepslabel). Dit vervangt alle huidige slides.
+                </div>
+                <textarea
+                  className="input"
+                  style={{ height: '160px', fontFamily: 'monospace', fontSize: '0.85rem', margin: 0, marginBottom: '0.5rem' }}
+                  value={pasteLyricsText}
+                  onChange={e => setPasteLyricsText(e.target.value)}
+                  placeholder={'[Couplet 1]\nRegel 1\nRegel 2\n\n[Refrein]\nRegel 1\nRegel 2'}
+                />
+                <button
+                  className="button"
+                  style={{ background: 'var(--primary)', color: '#020617' }}
+                  onClick={applyPastedLyrics}
+                  disabled={isParsingLyrics || !pasteLyricsText.trim()}
+                >
+                  {isParsingLyrics ? 'Verwerken...' : 'Toepassen'}
+                </button>
+              </div>
+            )}
 
             {/* Editor Body */}
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', paddingRight: '0.5rem' }}>

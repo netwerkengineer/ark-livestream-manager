@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
 
 interface SongInputProps {
@@ -11,6 +11,8 @@ interface SongInputProps {
   freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
 }
 
+const RESULTS_LIMIT = 150;
+
 export default function SongInput({
   songInput,
   setSongInput,
@@ -19,9 +21,28 @@ export default function SongInput({
   t,
   freeshowCategories
 }: SongInputProps) {
-  const filteredSongs = catalogSongs.filter(
-    s => s.category !== 'presentation' &&
-         s.category !== 'scripture' &&
+  const searchableSongs = useMemo(
+    () => catalogSongs.filter(s => s.category !== 'presentation' && s.category !== 'scripture'),
+    [catalogSongs]
+  );
+
+  const availableCategories = useMemo(() => {
+    const cats = Array.from(new Set(searchableSongs.map(s => s.category)));
+    cats.sort((a, b) => getCategoryDisplayName(a, freeshowCategories).localeCompare(getCategoryDisplayName(b, freeshowCategories)));
+    return cats;
+  }, [searchableSongs, freeshowCategories]);
+
+  const [selectedCategories, setSelectedCategories] = useState<string[] | null>(null);
+  const activeCategories = selectedCategories ?? availableCategories;
+
+  const toggleCategory = (cat: string) => {
+    const current = selectedCategories ?? availableCategories;
+    const next = current.includes(cat) ? current.filter(c => c !== cat) : [...current, cat];
+    setSelectedCategories(next);
+  };
+
+  const filteredSongs = searchableSongs.filter(
+    s => activeCategories.includes(s.category) &&
          (!songInput || s.name.toLowerCase().includes(songInput.toLowerCase()))
   );
 
@@ -39,13 +60,32 @@ export default function SongInput({
         style={{ marginBottom: '0.5rem' }}
       />
 
+      {availableCategories.length > 1 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          {availableCategories.map(cat => (
+            <label
+              key={cat}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', opacity: activeCategories.includes(cat) ? 1 : 0.5, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={activeCategories.includes(cat)}
+                onChange={() => toggleCategory(cat)}
+                style={{ width: '14px', height: '14px' }}
+              />
+              {getCategoryDisplayName(cat, freeshowCategories)}
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="glass-card" style={{ padding: '0.8rem', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
         <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '0.5rem' }}>
-          {songInput ? `Zoekresultaten (${filteredSongs.length})` : 'Selecteer een lied uit de catalogus:'}
+          {songInput ? `Zoekresultaten (${filteredSongs.length})` : `Selecteer een lied uit de catalogus (${filteredSongs.length}):`}
         </span>
 
-        <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '4px' }}>
-          {filteredSongs.slice(0, 50).map((song, i) => (
+        <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '4px' }}>
+          {filteredSongs.slice(0, RESULTS_LIMIT).map((song, i) => (
             <div
               key={i}
               title={song.name}
@@ -73,6 +113,11 @@ export default function SongInput({
           {filteredSongs.length === 0 && (
             <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>
               Geen liederen gevonden. Typ hierboven om handmatig toe te voegen.
+            </div>
+          )}
+          {filteredSongs.length > RESULTS_LIMIT && (
+            <div style={{ padding: '0.5rem', textAlign: 'center', opacity: 0.6, fontSize: '0.7rem' }}>
+              +{filteredSongs.length - RESULTS_LIMIT} meer — typ om te zoeken of vink categorieën uit.
             </div>
           )}
         </div>
