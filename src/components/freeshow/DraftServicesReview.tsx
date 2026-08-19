@@ -131,6 +131,24 @@ export default function DraftServicesReview() {
     }
   };
 
+  const deleteUnassigned = async (messageId: string, subject?: string) => {
+    if (!confirm(`Mail "${subject || '(geen onderwerp)'}" verwijderen uit deze lijst? De mail zelf blijft gewoon in je mailbox staan.`)) return;
+    setDeletingId(messageId);
+    try {
+      const res = await fetch(`/api/email/drafts?messageId=${encodeURIComponent(messageId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setUnassigned(prev => prev.filter(u => u.messageId !== messageId));
+      } else {
+        setError(data.error || 'Kon mail niet verwijderen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const allNotes = (draft: DraftService) => draft.sourceEmails.flatMap(e => e.notes);
 
   const generateProject = async (serviceDate: string, force: boolean) => {
@@ -307,8 +325,20 @@ export default function DraftServicesReview() {
                 Deze mails konden niet aan een dienstdatum gekoppeld worden (geen of onleesbare &quot;Dienst datum:&quot;-regel). Controleer handmatig.
               </div>
               {unassigned.map((u, i) => (
-                <div key={i} style={{ padding: '0.6rem 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{u.subject}</div>
+                <div key={u.messageId || i} style={{ padding: '0.6rem 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{u.subject}</div>
+                    {u.messageId && (
+                      <button
+                        onClick={() => deleteUnassigned(u.messageId!, u.subject)}
+                        disabled={deletingId === u.messageId}
+                        title="Mail verwijderen uit deze lijst"
+                        style={{ background: 'rgba(255,0,0,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', flexShrink: 0 }}
+                      >
+                        {deletingId === u.messageId ? '...' : '🗑️'}
+                      </button>
+                    )}
+                  </div>
                   <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '0.3rem' }}>{new Date(u.receivedAt).toLocaleString('nl-NL')}</div>
                   <div style={{ fontSize: '0.75rem', opacity: 0.6, whiteSpace: 'pre-wrap' }}>{u.excerpt}</div>
                 </div>
