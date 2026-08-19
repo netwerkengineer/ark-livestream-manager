@@ -471,6 +471,7 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
             dest_path = os.path.join(nas_dir, name)
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             if sftp_transfer(mac_user, mac_host, dest_path, remote_path, "get"):
+                _safe_chmod(dest_path)
                 _safe_utime(dest_path, r_info["mtime"])
                 stats["copied_to_nas"] += 1
                 print(f"[{label}] Nieuw op Beamer PC, gekopieerd naar NAS: {name}")
@@ -478,6 +479,7 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
             n_info = nas_files[name]
             if r_info["mtime"] - n_info["mtime"] > 2.0:
                 if sftp_transfer(mac_user, mac_host, n_info["path"], remote_path, "get"):
+                    _safe_chmod(n_info["path"])
                     _safe_utime(n_info["path"], r_info["mtime"])
                     stats["copied_to_nas"] += 1
                     print(f"[{label}] Nieuwere versie op Beamer PC, bijgewerkt op NAS: {name}")
@@ -531,6 +533,23 @@ def _safe_utime(path, mtime):
         os.utime(path, (mtime, mtime))
     except OSError as e:
         print(f"Waarschuwing: kon wijzigingsdatum niet zetten op {path} ({e}) - bestand zelf is wel correct gekopieerd.")
+
+def _safe_chmod(path):
+    """
+    Makes a freshly pulled-in file world-writable, matching every other
+    file in this NAS-side tree. Without this, a file written while this
+    script runs as root (e.g. inside the tuya-control container) ends up
+    owner-only (rw-------), unreadable by the app's own container user
+    and by anyone SSHed in as a regular account - exactly the kind of
+    silent lockout that made a real sync run look like data loss. Best
+    effort only, same reasoning as _safe_utime: NFS can still refuse a
+    chmod for a file this process doesn't truly own even after writing
+    it, and that must never fail the sync itself.
+    """
+    try:
+        os.chmod(path, 0o666)
+    except OSError as e:
+        print(f"Waarschuwing: kon rechten niet zetten op {path} ({e}) - bestand zelf is wel correct gekopieerd.")
 
 def _touch_remote(user, host, remote_os, remote_path, mtime):
     if remote_os == "windows":
@@ -738,6 +757,7 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
                     if os.path.exists(dest_path):
                         os.remove(dest_path)
                     shutil.move(temp_dest, dest_path)
+                    _safe_chmod(dest_path)
                     _safe_utime(dest_path, r_info["mtime"])
                     copied_to_nas += 1
         else:
@@ -774,6 +794,7 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
                         if os.path.exists(dest_path):
                             os.remove(dest_path)
                         shutil.move(temp_dest, dest_path)
+                        _safe_chmod(dest_path)
                         _safe_utime(dest_path, r_info["mtime"])
                         copied_to_nas += 1
 

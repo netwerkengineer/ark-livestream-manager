@@ -203,9 +203,19 @@ def import_project():
         if remote_os == "windows":
             remote_app_data_dir = f"C:/Users/{mac_user}/AppData/Roaming/FreeShow"
             default_docs_dir = f"C:/Users/{mac_user}/Documents/FreeShow"
-            # Stop FreeShow on Windows
-            print("Stopping FreeShow on Windows PC if running...")
-            subprocess.run(["ssh", "-o", "ConnectTimeout=3", f"{mac_user}@{mac_host}", "taskkill /f /im FreeShow.exe 2>NUL || exit 0"])
+            # Stop FreeShow on Windows. A graceful close first (no /f) lets
+            # FreeShow save its own settings.json before exiting - a forced
+            # kill mid-autosave has left that file corrupted before, which
+            # makes FreeShow reset to defaults (lost outputs/styles) on its
+            # next launch and looks exactly like a fresh install. Only force
+            # -kill as a last resort if it's still around after a moment.
+            print("Stopping FreeShow on Windows PC if running (graceful)...")
+            stop_cmd = (
+                "taskkill /im FreeShow.exe 2>NUL & "
+                "powershell -Command \"Start-Sleep -Seconds 3; "
+                "if (Get-Process FreeShow -ErrorAction SilentlyContinue) { taskkill /f /im FreeShow.exe }\""
+            )
+            subprocess.run(["ssh", "-o", "ConnectTimeout=15", f"{mac_user}@{mac_host}", stop_cmd])
         else:
             remote_app_data_dir = f"/Users/{mac_user}/Library/Application Support/freeshow"
             default_docs_dir = f"/Users/{mac_user}/Documents/FreeShow"
