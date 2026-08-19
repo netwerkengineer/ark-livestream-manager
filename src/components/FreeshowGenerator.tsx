@@ -318,18 +318,20 @@ export default function FreeshowGenerator() {
   }, [templateItems, manualItems]);
 
   const uniqueCategories = React.useMemo(() => {
+    // Alleen categorieën met daadwerkelijk shows erin, plus de 3 kern-categorieën
+    // die altijd beschikbaar moeten blijven. Categorieën die alleen in FreeShow's
+    // config staan (bv. na het samenvoegen van een lege categorie) worden zo
+    // automatisch niet meer getoond.
     const categoriesFromShows = showsList.map(s => s.category).filter(Boolean);
     const categoriesFromCatalog = catalogSongs.map(s => s.category).filter(Boolean);
-    const categoriesFromConfig = Object.keys(freeshowCategories || {});
     return Array.from(new Set([
       'song',
       'presentation',
       'scripture',
-      ...categoriesFromConfig,
       ...categoriesFromShows,
       ...categoriesFromCatalog
     ])).filter(c => c !== 'all');
-  }, [showsList, catalogSongs, freeshowCategories]);
+  }, [showsList, catalogSongs]);
 
   const refreshCatalog = async () => {
     setLoading(true);
