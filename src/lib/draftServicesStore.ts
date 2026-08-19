@@ -119,6 +119,20 @@ export function deleteDraftService(serviceDate: string): boolean {
   return true;
 }
 
+// Dismisses one unassigned-mail entry (e.g. a test mail, or a genuinely
+// irrelevant mail that happened to match the subject keyword) from the
+// review tab. Doesn't touch the actual mailbox - the source email itself
+// was already marked \Seen when it was fetched, this only removes the
+// local record of it needing manual triage.
+export function deleteUnassignedEmail(messageId: string): boolean {
+  const store = readStore();
+  const before = store.unassigned.length;
+  store.unassigned = store.unassigned.filter(u => u.messageId !== messageId);
+  if (store.unassigned.length === before) return false;
+  writeStore(store);
+  return true;
+}
+
 function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
