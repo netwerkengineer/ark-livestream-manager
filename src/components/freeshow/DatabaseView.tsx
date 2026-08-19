@@ -129,6 +129,49 @@ export default function DatabaseView(props: DatabaseViewProps) {
   const [isImportingProject, setIsImportingProject] = useState(false);
   const [importProjectStatus, setImportProjectStatus] = useState('');
 
+  interface SyncTargetStatus { key: string; label?: string; status: 'pending' | 'running' | 'done' | 'skipped' | 'error' }
+  interface SyncStatus {
+    running: boolean;
+    started_at?: string;
+    finished_at?: string | null;
+    success?: boolean | null;
+    error?: string | null;
+    targets?: SyncTargetStatus[];
+  }
+  const [syncProgress, setSyncProgress] = useState<SyncStatus | null>(null);
+
+  // Polls the sync status file: on mount (to catch a sync started elsewhere,
+  // e.g. before the page was reopened) and continuously while running, so
+  // progress and the completion notification show up without a refresh.
+  // isSyncing is driven entirely by this poll rather than by the button
+  // click itself, since a manual sync keeps running long after the HTTP
+  // call that triggers it returns.
+  const pollSyncStatus = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/maintenance/sync/status', { cache: 'no-store' });
+      const data: SyncStatus = await res.json();
+      setSyncProgress(prev => {
+        if (prev?.running && !data.running) {
+          if (data.success === false) {
+            setStatus('❌ Sync mislukt: ' + (data.error || 'Onbekende fout'));
+          } else if (data.success === true) {
+            setStatus('✅ Sync voltooid.');
+          }
+        }
+        return data;
+      });
+      setIsSyncing(data.running);
+    } catch {
+      // Best-effort polling only - a failed check just gets retried
+    }
+  }, []);
+
+  React.useEffect(() => {
+    pollSyncStatus();
+    const interval = setInterval(pollSyncStatus, 5000);
+    return () => clearInterval(interval);
+  }, [pollSyncStatus]);
+
   return (
     <div className="database-dashboard-view" style={{ marginTop: '3rem' }}>
           {databaseSubTab === 'catalog' && (
@@ -461,18 +504,37 @@ export default function DatabaseView(props: DatabaseViewProps) {
                            const data = await res.json();
                            if (res.ok) {
                              setStatus('✅ Sync gestart op de achtergrond: ' + (data.message || 'OK') + ' - dit kan enkele minuten duren.');
+                             // Status file needs a moment to reflect the new run - poll
+                             // shortly after so progress shows up without waiting 5s.
+                             setTimeout(pollSyncStatus, 1500);
                            } else {
                              setStatus('❌ Sync fout: ' + (data.error || 'Onbekende fout'));
+                             setIsSyncing(false);
                            }
                          } catch (e: any) {
                            setStatus('❌ Sync fout: ' + e.message);
-                         } finally {
                            setIsSyncing(false);
                          }
                        }}
                      >
                        {isSyncing ? t('syncing') : t('manual_sync')}
                      </button>
+                     {isSyncing && syncProgress?.targets && syncProgress.targets.length > 0 && (
+                       <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                         {syncProgress.targets.map(target => {
+                           const icon = target.status === 'done' ? '✅'
+                             : target.status === 'error' ? '❌'
+                             : target.status === 'skipped' ? '⏭️'
+                             : target.status === 'running' ? '⏳'
+                             : '⏸️';
+                           return (
+                             <p key={target.key} style={{ fontSize: '0.72rem', opacity: 0.75, margin: 0 }}>
+                               {icon} {target.label || target.key}
+                             </p>
+                           );
+                         })}
+                       </div>
+                     )}
                    </div>
 
                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
