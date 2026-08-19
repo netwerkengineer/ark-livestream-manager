@@ -551,6 +551,60 @@ def _safe_chmod(path):
     except OSError as e:
         print(f"Waarschuwing: kon rechten niet zetten op {path} ({e}) - bestand zelf is wel correct gekopieerd.")
 
+def _status_path(script_dir):
+    return os.path.join(script_dir, "data", "sync_status.json")
+
+def _write_sync_status(script_dir, **fields):
+    """
+    Best-effort write of data/sync_status.json, merging the given top-level
+    fields into whatever is already there. Used by the app's UI to show sync
+    progress and a completion notification - never allowed to fail the sync
+    itself if the file can't be read/written for some reason.
+    """
+    path = _status_path(script_dir)
+    try:
+        current = {}
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    current = json.load(f)
+            except Exception:
+                current = {}
+        current.update(fields)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(current, f, indent=2)
+        os.replace(tmp, path)
+    except Exception as e:
+        print(f"Waarschuwing: kon sync_status.json niet bijwerken ({e}) - dit heeft geen invloed op de sync zelf.")
+
+def _update_target_status(script_dir, key, status):
+    """Best-effort update of a single target's status within sync_status.json."""
+    path = _status_path(script_dir)
+    try:
+        current = {}
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    current = json.load(f)
+            except Exception:
+                current = {}
+        found = False
+        for t in current.get("targets", []):
+            if t.get("key") == key:
+                t["status"] = status
+                found = True
+                break
+        if not found:
+            current.setdefault("targets", []).append({"key": key, "status": status})
+        tmp = path + ".tmp"
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(current, f, indent=2)
+        os.replace(tmp, path)
+    except Exception as e:
+        print(f"Waarschuwing: kon sync_status.json niet bijwerken voor doel '{key}' ({e}) - dit heeft geen invloed op de sync zelf.")
+
 def _touch_remote(user, host, remote_os, remote_path, mtime):
     if remote_os == "windows":
         mtime_epoch = int(mtime)
@@ -920,6 +974,17 @@ def main():
     if len(targets) > 1:
         print(f"Doelen deze run: {', '.join(t['label'] for t in targets)}")
 
+    _write_sync_status(
+        SCRIPT_DIR,
+        running=True,
+        started_at=time.strftime('%Y-%m-%d %H:%M:%S'),
+        finished_at=None,
+        success=None,
+        error=None,
+        pid=os.getpid(),
+        targets=[{"key": t["key"], "label": t["label"], "status": "pending"} for t in targets],
+    )
+
     # 2. Power Management check (hoofd-doel only - extra doelen worden pas
     # bereikbaarheid-gecheckt vlak voor hun eigen sync-stap, geen wek-poging)
     primary_reachable = True
@@ -1034,15 +1099,19 @@ def main():
         if target["is_primary"]:
             if not primary_reachable:
                 print(f"\n=== [{label}] Overgeslagen - hoofd-doel niet bereikbaar deze run ===")
+                _update_target_status(SCRIPT_DIR, target["key"], "skipped")
                 continue
         else:
             if skip_additional_targets:
+                _update_target_status(SCRIPT_DIR, target["key"], "skipped")
                 continue
             if not test_ssh(target["user"], target["host"]):
                 print(f"\n=== [{label}] Overgeslagen - niet bereikbaar (offline of onjuist IP) ===")
+                _update_target_status(SCRIPT_DIR, target["key"], "skipped")
                 continue
 
         print(f"\n=== SYNC DOEL: {label} ({target['user']}@{target['host']}) ===")
+        _update_target_status(SCRIPT_DIR, target["key"], "running")
         try:
             remote_os = detect_remote_os(target["user"], target["host"])
             print(f"[{label}] Remote OS: {remote_os}")
@@ -1098,8 +1167,10 @@ def main():
                     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
                     print("[Power] Stroom succesvol afgesloten.")
 
+            _update_target_status(SCRIPT_DIR, target["key"], "done")
         except Exception as e:
             print(f"[{label}] FOUT tijdens sync: {e} - doorgaan met volgende doel.")
+            _update_target_status(SCRIPT_DIR, target["key"], "error")
 
     # Save the updated sync state
     try:
@@ -1109,7 +1180,31 @@ def main():
     except Exception as e:
         print(f"ERROR: Failed to save sync state file: {e}")
 
+    _write_sync_status(
+        SCRIPT_DIR,
+        running=False,
+        finished_at=time.strftime('%Y-%m-%d %H:%M:%S'),
+        success=True,
+        error=None,
+    )
+
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === FREESHOW SYNC & CLEANUP VOLTOOID ===")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # Safety net: if main() got far enough to mark itself "running" and
+        # then crashed somewhere not already caught by its own per-target
+        # try/except (e.g. during STAP 1 or state-file handling), make sure
+        # the status file doesn't stay stuck on "running" forever - the two
+        # early sys.exit() paths in main() run before that point and are
+        # deliberately not caught here (SystemExit isn't an Exception).
+        _write_sync_status(
+            os.path.dirname(os.path.abspath(__file__)),
+            running=False,
+            finished_at=time.strftime('%Y-%m-%d %H:%M:%S'),
+            success=False,
+            error=str(e),
+        )
+        raise
