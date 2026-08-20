@@ -118,6 +118,16 @@ export function parseServiceEmail(text: string): ParsedEmail {
       continue;
     }
 
+    // Defensive: strip a matching */** wrap some mail clients still emit for
+    // bold/italic-formatted text even in their plain-text export, e.g.
+    // "*Dienst datum: 20-08-2026*" - independent of email.ts's own HTML
+    // conversion, which already avoids introducing these in the first place
+    // but can't help mail that never had an HTML part to begin with.
+    const boldWrap = line.match(/^(\*{1,2})(.+)\1$/);
+    if (boldWrap) {
+      line = boldWrap[2].trim();
+    }
+
     // Trailing comment on an otherwise real line, e.g.
     // "- Opw 717 - Heer U Doorgrondt En Kent Mij # in een lagere toonsoort".
     // Only a "#" preceded by whitespace counts, so this never fires inside

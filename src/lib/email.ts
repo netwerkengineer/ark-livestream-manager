@@ -13,6 +13,40 @@ import { extractTextFromDocument } from '@/lib/documentText';
 const execFilePromise = promisify(execFile);
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 
+// Turns a rich-text (HTML) mail body into plain text with real line breaks,
+// used instead of mailparser's own .text field whenever HTML is present.
+// Gmail's default (non-"platte tekst") compose mode sends worship-leader
+// mails that look fine to a human but, once boiled down to plain text by
+// Gmail itself or by mailparser's generic HTML fallback, can lose every
+// line break between list items (a whole "Liederen:" block collapsing onto
+// one line) and turn bold text into "*word*" - both silently break every
+// line-based pattern in parseServiceEmail(). Forcing every block-level tag
+// to become its own newline *before* stripping tags sidesteps that,
+// regardless of how the sender formatted the mail.
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<(br)\s*\/?>/gi, '\n')
+    // A real HTML bullet (<li>) carries no literal "-" in its text content
+    // at all - the bullet mark is pure CSS list-style. Without mapping it
+    // to this app's own "- item" convention, every song a worship leader
+    // adds via an actual bulleted list (very natural to create by pasting
+    // or using the toolbar in a rich-text compose window) would silently
+    // fail every "- Titel" pattern downstream.
+    .replace(/<li\b[^>]*>/gi, '\n- ')
+    .replace(/<\/li>/gi, '')
+    .replace(/<\/?(div|p|tr|table|ul|ol|h[1-6])\b[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;/gi, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Mailboxes checked on every sync, in order. Gmail's spam folder keeps this
 // exact English IMAP name regardless of the account's display language -
 // a legitimate liturgie-mail can land here by mistake (spam classification
@@ -308,7 +342,14 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
 
         const rawMessage = `${parts['HEADER'] || ''}\r\n${textBody}`;
         const parsedMail = await simpleParser(rawMessage);
-        const content = parsedMail.text || textBody;
+        // Prefer converting the HTML ourselves over parsedMail.text: Gmail's
+        // rich-text compose mode (the default, non-"platte tekst" one) can
+        // generate a text/plain alternative - or feed mailparser's own HTML
+        // fallback - that loses line breaks between list items. Converting
+        // from the fuller HTML source ourselves, with every block-level tag
+        // forced onto its own line, is what actually matches how the sender
+        // saw it on screen.
+        const content = parsedMail.html ? htmlToPlainText(parsedMail.html) : (parsedMail.text || textBody);
         const messageId = parsedMail.messageId || `${uid}-${Date.now()}`;
         const subject = parsedMail.subject || '(geen onderwerp)';
         const receivedAt = (parsedMail.date || new Date()).toISOString();
