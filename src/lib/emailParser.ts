@@ -99,11 +99,13 @@ export function parseServiceEmail(text: string): ParsedEmail {
   const notes: string[] = [];
 
   for (const rawLine of lines) {
-    const line = rawLine.trim();
+    let line = rawLine.trim();
 
     // Inline lyrics block for the song mentioned just above - captured
     // ahead of the blank-line-ends-block rule below, since verses/refrein
     // are usually separated by blank lines and those must be preserved.
+    // Comment-stripping below intentionally doesn't apply here either - a
+    // literal "#" in song lyrics (rare, but possible) must stay verbatim.
     if (lyricsCapture) {
       if (LYRICS_END_RE.test(line)) {
         if (lyricsCapture.song) {
@@ -114,6 +116,17 @@ export function parseServiceEmail(text: string): ParsedEmail {
         lyricsCapture.buffer.push(line);
       }
       continue;
+    }
+
+    // Trailing comment on an otherwise real line, e.g.
+    // "- Opw 717 - Heer U Doorgrondt En Kent Mij # in een lagere toonsoort".
+    // Only a "#" preceded by whitespace counts, so this never fires inside
+    // a URL's "#fragment" (never preceded by a space in a well-formed URL)
+    // or a chord like "F#" (no space before the "#" either) - just a plain
+    // trailing " #comment" gets cut off before any further matching below.
+    const trailingCommentIdx = line.indexOf(' #');
+    if (trailingCommentIdx !== -1) {
+      line = line.slice(0, trailingCommentIdx).trimEnd();
     }
 
     if (line.startsWith('#')) {
