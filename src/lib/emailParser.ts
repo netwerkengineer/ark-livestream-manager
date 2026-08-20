@@ -116,6 +116,15 @@ export function parseServiceEmail(text: string): ParsedEmail {
       continue;
     }
 
+    if (line.startsWith('#')) {
+      // Explicit comment marker - always ignored, everywhere, even mid-list
+      // inside an active block. Unlike stray unrecognized text (which is
+      // surfaced in `notes` rather than silently dropped, see below), a
+      // line the sender deliberately marked as a comment should never
+      // generate a note.
+      continue;
+    }
+
     if (!line) {
       // A blank line never ends the current block by itself - only a new
       // section/block header does (matched unconditionally below,
