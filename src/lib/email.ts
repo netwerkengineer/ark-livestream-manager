@@ -25,7 +25,12 @@ const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 // regardless of how the sender formatted the mail.
 export function htmlToPlainText(html: string): string {
   return html
-    .replace(/<(br)\s*\/?>/gi, '\n')
+    // Gmail commonly emits "<br clear=\"all\">" (a long-standing quirk) for
+    // a manual line break within a paragraph, not just a bare "<br>" - the
+    // stricter pattern this used to have silently deleted that whole tag
+    // (falling through to the generic tag-stripper below) instead of
+    // inserting a newline, flattening exactly the lines it appeared on.
+    .replace(/<br\b[^>]*>/gi, '\n')
     // A real HTML bullet (<li>) carries no literal "-" in its text content
     // at all - the bullet mark is pure CSS list-style. Without mapping it
     // to this app's own "- item" convention, every song a worship leader
