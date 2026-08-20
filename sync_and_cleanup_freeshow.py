@@ -312,9 +312,14 @@ def list_remote_files_recursive(user, host, remote_os, remote_dir):
         cmd = (
             "python3 -c \"import os; "
             f"base = '{remote_dir}'; "
+            # d.__setitem__ returns None (falsy), so pruning @eaDir out of d
+            # in-place as a side effect of the walrus-free "if not d.___" trick
+            # keeps this a single expression - a literal newline in this
+            # string would risk breaking the ssh quoting below.
             "[print(os.path.relpath(os.path.join(r, fn), base).replace(os.sep, '/') + '|' + "
             "str(os.path.getsize(os.path.join(r, fn))) + '|' + str(os.path.getmtime(os.path.join(r, fn)))) "
-            "for r, d, files in os.walk(base) for fn in files]\""
+            "for r, d, files in os.walk(base) if not d.__setitem__(slice(None), [x for x in d if x != '@eaDir']) "
+            "for fn in files]\""
         )
         res = run_ssh_cmd(user, host, cmd)
         if res.returncode == 0:
@@ -361,6 +366,12 @@ def _scan_local_tree(base_dir, matches):
     listing regardless of host OS."""
     found = {}
     for root, _dirs, files in os.walk(base_dir):
+        # @eaDir is Synology's own hidden thumbnail/index cache, regenerated
+        # by the NAS itself independently of any real content change - left
+        # unpruned, its mtimes keep looking "newer" forever and every sync
+        # re-transfers the same cache files pointlessly. Pruning _dirs
+        # in-place stops os.walk from descending into it at all.
+        _dirs[:] = [d for d in _dirs if d != "@eaDir"]
         for fn in files:
             full = os.path.join(root, fn)
             rel = os.path.relpath(full, base_dir).replace(os.sep, "/")
@@ -406,8 +417,11 @@ def sync_simple_folder(label, nas_dir, remote_dir, mac_user, mac_host, remote_os
             ensured_remote_dirs.add(full_remote_parent)
 
     def matches(name):
-        base = name.rsplit("/", 1)[-1]
+        parts = name.split("/")
+        base = parts[-1]
         if base in exclude_names:
+            return False
+        if "@eaDir" in parts:
             return False
         if extensions is None:
             return True
