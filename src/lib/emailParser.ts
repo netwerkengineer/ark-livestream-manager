@@ -77,23 +77,6 @@ function findBibleBook(name: string): string | null {
 
 type BlockType = 'song' | 'scripture' | 'media' | null;
 
-// Whether a (trimmed) line looks like an item that belongs to the given
-// block - used to decide if a blank line inside that block is just visual
-// spacing between items (very common from webmail clients) rather than the
-// end of the block.
-function looksLikeBlockItem(line: string, block: BlockType): boolean {
-  switch (block) {
-    case 'song':
-      return line.startsWith('-');
-    case 'scripture':
-      return SCRIPTURE_LINE_RE.test(line);
-    case 'media':
-      return YOUTUBE_RE.test(line) || ATTACHMENT_RE.test(line) || URL_RE.test(line);
-    default:
-      return false;
-  }
-}
-
 /**
  * Line-by-line, section-aware parser for the recommended service-email format.
  * Never guesses: anything it can't confidently classify inside a recognized
@@ -115,8 +98,8 @@ export function parseServiceEmail(text: string): ParsedEmail {
   const items: ParsedItem[] = [];
   const notes: string[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
 
     // Inline lyrics block for the song mentioned just above - captured
     // ahead of the blank-line-ends-block rule below, since verses/refrein
@@ -134,21 +117,16 @@ export function parseServiceEmail(text: string): ParsedEmail {
     }
 
     if (!line) {
-      // A blank line ends the current block (paragraph) UNLESS the next
-      // real content still belongs to it - webmail clients routinely put a
-      // blank line between a block's header and its first item, and between
-      // every item after that, so a single blank line must not blow away an
-      // entire list. Trailing text like a sign-off ("Groetjes, Jan") after
-      // the last item still correctly closes the block, since it won't
-      // look like an item of it.
-      if (currentBlock) {
-        let j = i + 1;
-        while (j < lines.length && !lines[j].trim()) j++;
-        const next = j < lines.length ? lines[j].trim() : '';
-        if (!next || !looksLikeBlockItem(next, currentBlock)) {
-          currentBlock = null;
-        }
-      }
+      // A blank line never ends the current block by itself - only a new
+      // section/block header does (matched unconditionally below,
+      // regardless of currentBlock). Webmail clients routinely put a blank
+      // line between a block's header and its first item, and between every
+      // item after that, so treating a blank line as "end of block" would
+      // silently drop every item that follows a stray comment line. Any
+      // trailing content that isn't a real header or item (a sign-off, a
+      // comment) still gets classified per-line below and surfaced as a
+      // note rather than silently ignored or allowed to kill the rest of
+      // the block - never guess, never drop.
       continue;
     }
 
