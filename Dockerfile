@@ -25,7 +25,11 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
-RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl openssh-client zip tzdata && \
+# deno: JS runtime yt-dlp needs to solve YouTube's signature/n-parameter
+# challenges (its own EJS component is bundled in the standalone binary
+# below, it just needs a runtime available on PATH). yt-dlp looks for deno
+# automatically - no extra --js-runtimes flag needed once it's installed.
+RUN apk add --no-cache alsa-lib ffmpeg python3 py3-pip curl openssh-client zip tzdata deno && \
     curl --fail --connect-timeout 15 --max-time 120 --retry 3 --retry-delay 5 --retry-connrefused \
       -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp && \
