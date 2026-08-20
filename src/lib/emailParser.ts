@@ -138,6 +138,15 @@ export function parseServiceEmail(text: string): ParsedEmail {
       }
     }
 
+    // The standard internet signature delimiter (RFC 3676): a line that's
+    // exactly "-- " (many mail clients insert this automatically before a
+    // signature block). Everything from here on is a signature, not
+    // liturgie content, so stop parsing entirely instead of flagging every
+    // signature line as "Niet herkend".
+    if (line === '--') {
+      break;
+    }
+
     // Defensive: strip a matching */** wrap some mail clients still emit for
     // bold/italic-formatted text even in their plain-text export, e.g.
     // "*Dienst datum: 20-08-2026*" - independent of email.ts's own HTML
