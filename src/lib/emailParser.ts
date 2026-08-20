@@ -112,10 +112,30 @@ export function parseServiceEmail(text: string): ParsedEmail {
           lyricsCapture.song.lyricsText = lyricsCapture.buffer.join('\n').trim();
         }
         lyricsCapture = null;
+        continue;
+      }
+      // Missing [/Tekst] is an easy mistake to make, and without this check
+      // it silently swallows everything that follows into the lyrics text -
+      // every later song, the scripture, the whole Media block - with zero
+      // trace of what happened. A genuine new section/block header (or a
+      // second "Dienst datum:") is never legitimate lyrics content, so it's
+      // treated as an implicit close instead, and flagged in `notes` so a
+      // medewerker knows the mail itself needs a fix for next time.
+      const looksLikeNewBlock =
+        SERVICE_DATE_RE.test(line) || SECTION_RE.test(line) ||
+        SONG_BLOCK_RE.test(line) || SCRIPTURE_BLOCK_RE.test(line) || MEDIA_BLOCK_RE.test(line);
+      if (looksLikeNewBlock) {
+        if (lyricsCapture.song) {
+          lyricsCapture.song.lyricsText = lyricsCapture.buffer.join('\n').trim();
+        }
+        notes.push(`Tekstblok [Tekst]...[/Tekst] voor "${lyricsCapture.song?.title ?? 'onbekend lied'}" mist een afsluitende [/Tekst] - automatisch afgesloten bij "${line}".`);
+        lyricsCapture = null;
+        // Falls through so this line is still processed normally below,
+        // instead of being lost along with the rest of the mail.
       } else {
         lyricsCapture.buffer.push(line);
+        continue;
       }
-      continue;
     }
 
     // Defensive: strip a matching */** wrap some mail clients still emit for
