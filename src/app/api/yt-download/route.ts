@@ -41,12 +41,16 @@ export async function POST(req: NextRequest) {
     await fs.mkdir(directory, { recursive: true });
 
     // 3. De echte download & muxing actie
-    // -f "bestvideo[height<=1080]+bestaudio/best" zorgt voor 1080p
+    // AV1 uitsluiten: FreeShow's Electron/Chromium-basis speelt AV1-video
+    // niet (betrouwbaar) af op de output - scherm blijft dan zwart terwijl
+    // het bestand zelf prima geldig is. VP9/H.264 worden wel overal
+    // ondersteund, dus die hebben voorrang; alleen als er letterlijk niets
+    // anders is valt dit terug op de oude, ongefilterde selector.
     // --merge-output-format mp4 zorgt voor de juiste container
     console.log(`Start yt-dlp download: ${videoTitle} (1080p)`);
 
     await execFilePromise('yt-dlp', [
-      '-f', 'bestvideo[height<=1080]+bestaudio/best',
+      '-f', 'bestvideo[height<=1080][vcodec!*=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best',
       '--merge-output-format', 'mp4',
       '-o', finalPath,
       url
