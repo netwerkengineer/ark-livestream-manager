@@ -89,6 +89,31 @@ export function parseServiceEmail(text: string): ParsedEmail {
   // to match because of a leading ">".
   const lines = (text || '').split('\n').map(l => l.replace(/^(>\s*)+/, ''));
 
+  // The standard internet signature delimiter (RFC 3676): a line that's
+  // exactly "-- " (many mail clients insert this automatically before a
+  // signature block). Normally on its own line, but a gap in some mail's
+  // HTML-to-text conversion can glue it onto the tail of the preceding
+  // content line instead (confirmed live: a YouTube link ending up as
+  // "...aN9--", corrupting the URL, while the real signature lines below
+  // it each got flagged as "Niet herkend" one by one). Handled once, up
+  // front, before the main line-by-line parse even starts: whichever line
+  // has this - exactly "--", or real content immediately followed by "--"
+  // at the end - marks where content stops. Everything from there on,
+  // including the "--" itself, is dropped.
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed === '--') {
+      lines.length = i;
+      break;
+    }
+    const trailingSig = trimmed.match(/^(.*\S)\s*--$/);
+    if (trailingSig) {
+      lines[i] = trailingSig[1];
+      lines.length = i + 1;
+      break;
+    }
+  }
+
   let serviceDate: string | null = null;
   let currentSection = '';
   let currentBlock: BlockType = null;
@@ -136,15 +161,6 @@ export function parseServiceEmail(text: string): ParsedEmail {
         lyricsCapture.buffer.push(line);
         continue;
       }
-    }
-
-    // The standard internet signature delimiter (RFC 3676): a line that's
-    // exactly "-- " (many mail clients insert this automatically before a
-    // signature block). Everything from here on is a signature, not
-    // liturgie content, so stop parsing entirely instead of flagging every
-    // signature line as "Niet herkend".
-    if (line === '--') {
-      break;
     }
 
     // Defensive: strip a matching */** wrap some mail clients still emit for
