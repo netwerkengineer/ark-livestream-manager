@@ -1,6 +1,6 @@
 # Handleiding — Ark Church Livestream Manager
 
-*Versie van dit document: bij app-versie 2.8.1*
+*Versie van dit document: bij app-versie 2.27.0*
 
 ## Inleiding
 
@@ -13,15 +13,15 @@ Het document bestaat uit twee delen:
 
 ### De vijf hoofdonderdelen
 
-Bovenin de app vind je (afhankelijk van je rechten) tot vijf tabbladen:
+Bovenin de app vind je (afhankelijk van je rechten) tot vijf tabbladen — de knoppen zelf zijn kort gelabeld, de volledige naam staat hieronder tussen haakjes:
 
 | Tabblad | Rechtennaam | Waarvoor |
 |---|---|---|
-| 📅 Stream Planner | `planner` | YouTube-uitzendingen inplannen |
-| 🎛️ Control Center | `control` | Live bediening: OBS, stroom, noodknoppen |
-| 📺 Live Monitor | `monitor` | Live status, statistieken, OBS-detailbediening |
-| 💡 Lichtregie | `lights` | QLC+ lichtbediening |
-| ⛪ FreeShow Projecten | `freeshow` | Liederen, Bijbelteksten en media tot een dienst samenstellen |
+| 📅 Planner (Stream Planner) | `planner` | YouTube-uitzendingen inplannen |
+| 🎛️ Regie (Control Center) | `control` | Live bediening: OBS, stroom, noodknoppen |
+| 📺 Monitor (Live Monitor) | `monitor` | Live status, statistieken, OBS-detailbediening |
+| 💡 Licht (Lichtregie) | `lights` | QLC+ lichtbediening |
+| ⛪ FreeShow (FreeShow Projecten) | `freeshow` | Liederen, Bijbelteksten en media tot een dienst samenstellen |
 
 Een **Administrator** ziet altijd alle vijf. Een **Operator** ziet alleen de tabbladen waarvoor hij/zij expliciet rechten heeft gekregen (zie hoofdstuk 1). Alleen een Administrator ziet het tandwiel-icoon rechtsboven naar Instellingen.
 
@@ -164,7 +164,7 @@ Als de FreeShow-paden nog niet zijn ingesteld (zie Instellingen → FreeShow, ho
 
 Zeven tabbladen bovenaan het toevoegpaneel:
 
-**🎵 Liederen** — zoek in de catalogus (typen filtert live), klik een resultaat om het direct te selecteren, of typ een titel (eventueel `Titel - Artiest`) en klik "Handmatig lied toevoegen" als het lied niet in de catalogus staat. Bestaat het lied al in de catalogus, dan wordt de originele lay-out hergebruikt; bestaat het nog niet, dan wordt automatisch geprobeerd de tekst via internet op te zoeken (zie ook 5.13 voor hoe dit via e-mail werkt).
+**🎵 Liederen** — zoek in de catalogus (typen filtert live), klik een resultaat om het direct te selecteren, of typ een titel (eventueel `Titel - Artiest`) en klik "Handmatig lied toevoegen" als het lied niet in de catalogus staat. Bestaat het lied al in de catalogus, dan wordt de originele lay-out hergebruikt; bestaat het nog niet, dan wordt automatisch geprobeerd de tekst via internet op te zoeken (zie ook 5.13 voor hoe dit via e-mail werkt). Zijn er meerdere categorieën, dan kun je met een rijtje aanvinkbare categorieën boven de zoekresultaten de zoekopdracht beperken tot bepaalde categorieën; het aantal resultaten staat erbij.
 
 **📊 Presentaties** — zelfde als Liederen, maar toont alleen catalogusitems met categorie "Presentatie".
 
@@ -176,11 +176,13 @@ Zeven tabbladen bovenaan het toevoegpaneel:
 
   Je kunt media ook koppelen aan een *bestaand* item in plaats van een nieuw item te maken: kies in de dropdown welk item, en gebruik dan "Koppelen" (vervangt de achtergrond van dat item) of "Voeg Slide Toe" (voegt een extra media-slide toe aan dat item, bijvoorbeeld voor een diashow). Items met gekoppelde media krijgen een 🎞️-icoontje in de Playlist.
 
-**🎥 YouTube** — plak een YouTube-URL en klik "Download & Toevoegen". De video wordt gedownload en als mediabestand toegevoegd.
+**🎥 YouTube** — plak een YouTube-URL en klik "Download & Toevoegen". De video wordt gedownload en automatisch op de voorgrond ingevoegd als een echte, losstaande show met geluid aan — zie de uitleg over de livestream-stijl hieronder.
 
 **📁 Sectie** — maak een nieuwe sectiekop aan met een titel en kleur. Secties worden direct aan de Playlist toegevoegd (gaan niet via de Staging Area).
 
-**🗃️ Shows & Database** — zie 5.9–5.12 hieronder.
+**🗃️ Shows & Database** — zie 5.9–5.12 hieronder (bereikbaar via "Item type → Database": Shows Catalogus & Editor, Bouwer-sessie, Database Onderhoud, Concept-diensten).
+
+> ℹ️ **Livestream-stijl schakelt automatisch mee.** Elk stuk media dat op de voorgrond wordt geplaatst (zowel via 📸 Media als 🎥 YouTube) krijgt automatisch een actie mee die, zodra het item afspeelt, de output voor de livestream omschakelt naar de stijl "Livestream Video fullscreen". Zodra daarna een lied of Bijbeltekst speelt, schakelt diezelfde output automatisch terug naar "Livestream Liederen" — dit gebeurt zowel bij nieuw gegenereerde projecten als bij elk bestaand lied in de catalogus, dat deze terugschakel-actie al standaard heeft. Je hoeft hier zelf niets voor te doen; dit werkt alleen als bij Instellingen → FreeShow het veld "Output-ID voor livestream-video-stijl" is ingevuld (zie 8.8) — zonder dat veld wordt het item gewoon aangemaakt, alleen zonder de automatische stijl-omschakeling.
 
 ### 5.3 Plaatsing: sectie + vóór/ná
 
@@ -199,7 +201,7 @@ Na het toevoegen van een lied/Bijbeltekst/media/YouTube-item verschijnt het in d
 
 ### 5.5 Bouwer — eigen presentaties samenstellen
 
-Via "🗃️ Shows & Database" → "🛠️ Nieuwe Show (Builder)" bouw je een presentatie van meerdere slides (bijvoorbeeld tekst + een paar foto's achter elkaar). Stuur items vanuit de Staging Area hierheen ("🛠️+ Bouwer"), geef de show een naam, en klik "Maak Show & Voeg Toe" om de complete presentatie als één item aan de Playlist toe te voegen.
+Bouw een presentatie van meerdere slides (bijvoorbeeld tekst + een paar foto's achter elkaar) door items vanuit de Staging Area hierheen te sturen ("🛠️+ Bouwer"). Zodra er minstens één slide is toegevoegd, verschijnt links het tabblad "🛠️ Bouwer-sessie" (met het aantal slides erbij) om verder te werken; geef de show een naam en klik "Maak Show & Voeg Toe" om de complete presentatie als één item aan de Playlist toe te voegen.
 
 ### 5.6 Project genereren
 
@@ -226,13 +228,15 @@ Meerdere items selecteren (vinkjes) en dan "🗑️ Wis" verwijdert ze in één 
 
 ### 5.9 Catalogus
 
-Doorzoek, filter (op categorie) en sorteer (naam / laatst gewijzigd) alle FreeShow-shows. Per show:
+Doorzoek, filter (op categorie, met het aantal shows per categorie erbij — categorieën zonder shows worden niet getoond) en sorteer (naam / laatst gewijzigd) alle FreeShow-shows. Per show:
 - **📝 Bewerken** — opent de show-editor (zie hieronder)
 - **👁️ Preview** — bekijk de slides, met optioneel een ander sjabloon eroverheen om te zien hoe het er dan uitziet
 - **👯 Dupliceren** — maakt een kopie onder een nieuwe naam
 - **🗑️ Verwijderen** — verplaatst naar de prullenbak op de NAS (niet direct definitief)
 
 **Show-editor**: kies tussen een **Visuele editor** (per slide tekst aanpassen, slides toevoegen/verwijderen/herordenen, type wisselen tussen tekst/media) of de **Raw JSON Editor** (de volledige showdata direct als tekst bewerken — alleen voor gevorderde gebruikers).
+
+In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de complete songtekst in één keer (lege regel = nieuwe slide, `[Refrein]` of `Couplet 1` wordt automatisch als groepslabel herkend) en klik "Toepassen" om alle bestaande slides in deze show in één keer te vervangen — handig om een lied snel over te typen/plakken in plaats van slide voor slide te bewerken. Had de show al slides, dan vraagt de app eerst om bevestiging, want dit is niet ongedaan te maken.
 
 ### 5.10 Onderhoud
 
@@ -243,7 +247,8 @@ Doorzoek, filter (op categorie) en sorteer (naam / laatst gewijzigd) alle FreeSh
 **Prullenbak** — verwijderde shows staan hier tijdelijk; "Herstellen" haalt ze terug, "Prullenbak Leegmaken" verwijdert ze definitief (kan niet ongedaan gemaakt worden).
 
 **Systeemacties**:
-- **Handmatige Sync Starten** — synchroniseert de showbibliotheek tussen de NAS en de Beamer-PC (gebeurt normaal ook automatisch elke nacht, zie hoofdstuk 9)
+- **Handmatige Sync Starten** — synchroniseert Shows, Media, Bibles én Templates (inclusief submappen) tussen de NAS en de Beamer-PC, en met elk extra geconfigureerd doel (zie 8.8) — gebeurt normaal ook automatisch elke nacht, zie hoofdstuk 9. Terwijl de sync loopt zie je per doel een statusregel (⏳ bezig, ✅ klaar, ❌ fout, ⏭️ overgeslagen); bij afronding verschijnt bovenin een melding ("✅ Sync voltooid." of "❌ Sync mislukt: ..."). Deze voortgang wordt ook getoond als een sync die al liep (bijvoorbeeld de automatische nachtelijke sync) nog bezig is wanneer je dit scherm opent.
+- **Project nu klaarzetten** — stuurt het laatst gegenereerde project direct naar de Beamer-PC en zet het klaar in FreeShow, zonder te wachten op het nachtelijke schema. Handig als de PC al aanstaat en je niet tot 's nachts wilt wachten. De status (✅/❌) verschijnt direct onder de knop.
 - **Wis Alle Bijbelteksten** (rode, destructieve actie) — verwijdert in één keer alle Bijbeltekst-shows van zowel de NAS als de Beamer-PC. Let op: dit kan niet ongedaan worden gemaakt.
 
 ### 5.11 Diensten — automatisch aangeleverd via e-mail
@@ -258,7 +263,7 @@ Per dienst zie je:
 
 > ⚠️ Als iemand het gegenereerde project rechtstreeks in FreeShow heeft aangepast sinds de laatste update, waarschuwt de app hiervoor in plaats van die wijziging stil te overschrijven — je moet dan expliciet op "Toch overschrijven" klikken.
 
-Onderaan, als aanwezig: **"Niet toegewezen mails"** — mail die niet aan een dienstdatum gekoppeld kon worden (bijvoorbeeld omdat de datumregel ontbreekt of niet goed leesbaar was), zodat je dit handmatig kunt oppakken.
+Onderaan, als aanwezig: **"Niet toegewezen mails"** — mail die niet aan een dienstdatum gekoppeld kon worden (bijvoorbeeld omdat de datumregel ontbreekt of niet goed leesbaar was), zodat je dit handmatig kunt oppakken. Met het 🗑️-icoon per mail haal je 'm uit dit lijstje (met bevestiging) — de mail zelf blijft gewoon in de mailbox staan, alleen de vermelding hier verdwijnt.
 
 > ℹ️ Een concept-dienst blijft hier staan totdat je 'm zelf verwijdert met het 🗑️-icoon naast de datum (met bevestiging) — er is geen automatische opschoning na de dienstdatum. Verwijderen raakt alleen de aanlevering in deze reviewtab; een al gegenereerd FreeShow-project op de NAS blijft gewoon staan.
 
@@ -270,7 +275,7 @@ Staat een aangeleverd lied nog niet in de catalogus, dan maakt de app automatisc
 
 ### 5.13 Bijlage: het e-mailformaat voor dienstaanlevering
 
-Worship leaders/vrijwilligers leveren de liturgie aan via e-mail, in een vast, door de app herkenbaar formaat. Het onderwerp van de mail moet het trefwoord bevatten dat bij Instellingen → FreeShow is ingesteld (standaard: **"Liturgie"**).
+Worship leaders/vrijwilligers leveren de liturgie aan via e-mail, in een vast, door de app herkenbaar formaat. Het onderwerp van de mail moet één van de trefwoorden bevatten die bij Instellingen → FreeShow zijn ingesteld (standaard: **"Liturgie"**; er mogen ook meerdere, kommagescheiden trefwoorden ingesteld worden). Naast Postvak IN wordt ook de Spam-map van het postvak gecontroleerd, als vangnet voor liturgie-mails die daar per ongeluk in terechtkomen.
 
 **Basisopbouw:**
 
@@ -319,6 +324,14 @@ https://youtu.be/xxxxxxxxxxx
 - `Bijbeltekst:` gevolgd door één of meer regels in het formaat `Boek Hoofdstuk:VersBegin-VersEind (VERTALING)`, bijvoorbeeld `Johannes 3:16-18 (NBV21)`.
 - `Media:` gevolgd door regels met een YouTube-link, een gewone link, of `(bijlage: bestandsnaam)` voor een bijgevoegde afbeelding/video/PowerPoint.
 - Een lege regel sluit het huidige blok af (behalve binnen een `[Tekst]...[/Tekst]`-blok, waar lege regels juist bewaard blijven voor couplet/refrein-scheiding).
+- **Commentaar**: een regel die begint met `#` wordt volledig genegeerd (bijvoorbeeld `# nog even nakijken`); een `#` verderop in een regel, met een spatie ervoor, negeert de rest van díe regel als toelichting, bijvoorbeeld:
+  ```
+  - Opw 717 - Heer U Doorgrondt En Kent Mij # in een lagere toonsoort
+  ```
+  Een `#` zonder voorafgaande spatie (zoals in een URL-fragment `#top` of een akkoord `F#`) wordt met rust gelaten.
+- Vergeet je een `[/Tekst]` af te sluiten, dan sluit de app het blok automatisch af zodra de volgende herkenbare regel begint (een nieuw lied, sectie, Bijbeltekst of media-blok) — je krijgt hier een opmerking over in de reviewtab, maar de rest van de mail wordt niet overgeslagen.
+- Een normale **e-mailhandtekening** (alles na een regel die begint met `-- `) wordt automatisch herkend en genegeerd, ook als de `--` per ongeluk aan het einde van de voorgaande regel is blijven plakken.
+- Zowel platte-tekst- als opgemaakte (HTML/rich-text) mails worden ondersteund, en een doorgestuurde mail met `>`-aanhalingstekens ervoor wordt ook herkend.
 - Alles wat niet herkend wordt, verschijnt zichtbaar als "niet herkende regel" in de reviewtab — er wordt nooit stilzwijgend geraden.
 
 ---
@@ -416,6 +429,7 @@ Zie hoofdstuk 7.
 | Prullenbak Map | Voor "verwijderde" shows (herstelbaar) |
 | Standaard Sjabloon | Welk `.project`-bestand als basis dient bij het genereren van een nieuw project |
 | Automatisch opslaan op NAS | Of gegenereerde projecten automatisch worden weggeschreven |
+| Output-ID voor livestream-video-stijl | De (per machine lokale) FreeShow-output-ID die automatisch omgeschakeld wordt tussen de stijlen "Livestream Video fullscreen" (bij voorgrond-media) en "Livestream Liederen" (bij een lied/Bijbeltekst) — zie de uitleg in 5.2. Klik **"Automatisch opzoeken"** om deze op te halen via SSH van de machine die momenteel als FreeShow-host is ingesteld; kies daarna de juiste output uit de lijst. Omdat dit ID lokaal is aan die ene machine, moet dit opnieuw opgezocht worden als de FreeShow-host ooit verandert. |
 
 **E-mailkoppeling (concept-diensten):**
 
@@ -423,9 +437,22 @@ Zie hoofdstuk 7.
 |---|---|
 | IMAP Host / Poort | Mailserver, bv. `imap.gmail.com` / `993` |
 | Gebruikersnaam / Wachtwoord | Inloggegevens van het postvak |
-| Verplicht woord in onderwerp | Alleen mail met dit woord in het onderwerp wordt gelezen (standaard "Liturgie") — voorkomt dat andere mail in hetzelfde postvak wordt aangeraakt |
+| Verplicht(e) woord(en) in onderwerp | Alleen ongelezen mail waarvan het onderwerp één van deze (kommagescheiden) woorden bevat wordt gelezen (standaard "Liturgie") — voorkomt dat andere mail in hetzelfde postvak wordt aangeraakt. Leeg laten controleert elke ongelezen mail. Naast Postvak IN wordt ook de Spam-map gecontroleerd. |
 
 > Zonder ingevulde gebruikersnaam/wachtwoord doet de achtergrondcontrole helemaal niets — er wordt zelfs geen verbinding geprobeerd.
+
+**🖥️ Extra FreeShow Doelen (Sync):**
+
+Naast de hoofd-Beamer-PC hierboven kun je hier extra machines toevoegen die dezelfde volledige catalogus (Shows, Media, Bibles, Templates) moeten ontvangen — bijvoorbeeld een systeem in de zondagsschool. Klik **"+ Doel Toevoegen"** en vul per doel in:
+
+| Veld | Uitleg |
+|---|---|
+| Naam | Herkenbare naam, bv. "Zondagsschool PC" |
+| Host / IP-adres | Netwerkadres van die machine |
+| SSH Gebruiker | Leeg laten = zelfde gebruiker als het hoofd-doel |
+| Actief | Zet een doel tijdelijk uit zonder de configuratie te verwijderen |
+
+Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "Project nu klaarzetten" (zie 5.10) — dat blijft exclusief voor de hoofd-Beamer-PC. Met **"Verwijderen"** haal je een doel weer weg.
 
 ### 8.9 Backup & Herstel
 
@@ -442,7 +469,7 @@ Zie hoofdstuk 7.
 Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 
 - **E-mailcontrole** — elke 10 minuten, mits IMAP-gegevens zijn ingesteld (zie 8.8).
-- **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert shows tweerichtingsverkeer tussen NAS en Beamer-PC, en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond.
+- **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert Shows, Media, Bibles en Templates (inclusief submappen) tweerichtingsverkeer tussen NAS en Beamer-PC en elk extra geconfigureerd doel (zie 8.8), en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond (extra doelen worden nooit automatisch aan/uit gezet). Een ingebouwde veiligheidsgrens voorkomt dat de sync in één keer een ongewoon groot aantal bestanden verwijdert (bijvoorbeeld door een tijdelijk onbereikbare map) — in dat geval wordt er die run niets verwijderd en verschijnt een waarschuwing in het synclog, zodat dit niet stilzwijgend tot dataverlies leidt.
 - **Thumbnail-synchronisatie** — elke 10 minuten wordt gecontroleerd of er een nieuwe eerstvolgende livestream is, en zo ja, de thumbnail lokaal bijgewerkt.
 
 ---
