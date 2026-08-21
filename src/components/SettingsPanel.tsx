@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Settings,
   X,
@@ -76,6 +77,29 @@ export default function SettingsPanel({
   setNewPermissions,
   setEditingUsername
 }: SettingsPanelProps) {
+  const [detectingOutputs, setDetectingOutputs] = useState(false);
+  const [detectedOutputs, setDetectedOutputs] = useState<{ id: string; name: string }[] | null>(null);
+  const [detectError, setDetectError] = useState('');
+
+  const detectLivestreamOutputs = async () => {
+    setDetectingOutputs(true);
+    setDetectError('');
+    setDetectedOutputs(null);
+    try {
+      const res = await fetch('/api/maintenance/detect-livestream-output', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setDetectedOutputs(data.outputs || []);
+      } else {
+        setDetectError(data.error || 'Onbekende fout');
+      }
+    } catch (e: any) {
+      setDetectError(e.message);
+    } finally {
+      setDetectingOutputs(false);
+    }
+  };
+
   return (
     <div className="glass-card" style={{ width: '100%', maxWidth: '1000px', padding: '40px', position: 'relative', height: '90vh', overflowY: 'hidden', display: 'flex', flexDirection: 'column', gap: '30px' }}>
       <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer', zIndex: 10 }}>
@@ -1366,16 +1390,52 @@ export default function SettingsPanel({
 
               <div className="input-group">
                 <label className="input-label">Output-ID voor livestream-video-stijl</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={settings.livestreamStyleOutputId || ""}
-                  onChange={(e) => onSettingsChange({ ...settings, livestreamStyleOutputId: e.target.value })}
-                  placeholder="bijv. eee96674a23"
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    style={{ margin: 0, flex: 1 }}
+                    value={settings.livestreamStyleOutputId || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, livestreamStyleOutputId: e.target.value })}
+                    placeholder="bijv. eee96674a23"
+                  />
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={detectingOutputs}
+                    onClick={detectLivestreamOutputs}
+                    style={{ padding: '0.5rem 0.9rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                  >
+                    {detectingOutputs ? 'Bezig...' : 'Automatisch opzoeken'}
+                  </button>
+                </div>
                 <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
-                  Het ID van de "Livestream"-output in FreeShow zelf (te vinden bij Outputs → rechtermuisknop/instellingen op de output). Dit ID is lokaal aan de machine waar FreeShow daadwerkelijk draait voor deze omgeving (de Beamer PC in productie) — <strong>niet</strong> hetzelfde als op een andere omgeving, en moet opnieuw ingevuld worden als de output ooit verwijderd/opnieuw aangemaakt wordt. Gebruikt om automatisch een YouTube-video bij het genereren van een project op deze output naar de stijl "Livestream Video fullscreen" te laten schakelen.
+                  Het ID van de "Livestream"-output in FreeShow zelf - dit ID staat nergens in FreeShow's eigen scherm, maar de knop hierboven haalt 'm rechtstreeks op via SSH bij de machine die nu als FreeShow-host is ingesteld. Dit ID is lokaal aan die machine (de Beamer PC in productie) — <strong>niet</strong> hetzelfde als op een andere omgeving, en verandert niet vanzelf; alleen opnieuw opzoeken als de output ooit verwijderd/opnieuw aangemaakt is. Gebruikt om automatisch een YouTube-video bij het genereren van een project op deze output naar de stijl "Livestream Video fullscreen" te laten schakelen.
                 </p>
+                {detectError && (
+                  <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '6px' }}>❌ {detectError}</p>
+                )}
+                {detectedOutputs && (
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {detectedOutputs.length === 0 ? (
+                      <p style={{ fontSize: '0.75rem', opacity: 0.6 }}>Geen outputs gevonden op die machine.</p>
+                    ) : detectedOutputs.map(o => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => onSettingsChange({ ...settings, livestreamStyleOutputId: o.id })}
+                        style={{
+                          textAlign: 'left', padding: '0.4rem 0.7rem', fontSize: '0.78rem', borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: settings.livestreamStyleOutputId === o.id ? 'rgba(248,113,113,0.15)' : 'rgba(255,255,255,0.03)',
+                          color: 'inherit', cursor: 'pointer'
+                        }}
+                      >
+                        <strong>{o.name}</strong> <span style={{ opacity: 0.5 }}>({o.id})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
