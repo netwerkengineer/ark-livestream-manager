@@ -7,6 +7,7 @@ import base64
 import sys
 import glob
 import shutil
+import shlex
 
 # Helper to intercept subprocess.run for ssh, scp, and sftp to enforce correct key permissions
 def run_command_with_key(*args, **kwargs):
@@ -530,7 +531,7 @@ def _ensure_remote_dir(user, host, remote_os, remote_dir):
     if remote_os == "windows":
         run_ssh_cmd(user, host, f"cmd.exe /c if not exist \"{remote_dir}\" mkdir \"{remote_dir}\"")
     else:
-        run_ssh_cmd(user, host, f"mkdir -p '{remote_dir}'")
+        run_ssh_cmd(user, host, f"mkdir -p {shlex.quote(remote_dir)}")
 
 def _safe_utime(path, mtime):
     """
@@ -620,12 +621,22 @@ def _update_target_status(script_dir, key, status):
         print(f"Waarschuwing: kon sync_status.json niet bijwerken voor doel '{key}' ({e}) - dit heeft geen invloed op de sync zelf.")
 
 def _touch_remote(user, host, remote_os, remote_path, mtime):
+    # remote_path carries a real show/media filename here, which regularly
+    # contains an apostrophe (very common in Dutch hymn titles - "'t",
+    # "'s", "'k"...). Naively wrapping it in single quotes for the remote
+    # shell/PowerShell breaks on the first embedded quote, splitting the
+    # command into several bogus arguments - which `touch`/Get-Item then
+    # happily create as separate empty junk files. shlex.quote() (POSIX
+    # shell) and doubling embedded quotes (PowerShell's own escape rule for
+    # a single-quoted string) are the actually-correct ways to embed an
+    # arbitrary filename here.
     if remote_os == "windows":
         mtime_epoch = int(mtime)
-        set_mtime_cmd = f"powershell -Command \"(Get-Item '{remote_path}').LastWriteTime = ([datetimeoffset]::FromUnixTimeSeconds({mtime_epoch})).DateTime\""
+        ps_safe_path = remote_path.replace("'", "''")
+        set_mtime_cmd = f"powershell -Command \"(Get-Item '{ps_safe_path}').LastWriteTime = ([datetimeoffset]::FromUnixTimeSeconds({mtime_epoch})).DateTime\""
         run_ssh_cmd(user, host, set_mtime_cmd)
     else:
-        run_ssh_cmd(user, host, f"touch -m -t {time.strftime('%Y%m%d%H%M.%S', time.localtime(mtime))} '{remote_path}'")
+        run_ssh_cmd(user, host, f"touch -m -t {time.strftime('%Y%m%d%H%M.%S', time.localtime(mtime))} {shlex.quote(remote_path)}")
 
 def resolve_remote_freeshow_dirs(user, host, remote_os):
     """
