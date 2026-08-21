@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath } from '@/lib/freeshowUtils';
+import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
 import fs from 'fs/promises';
@@ -16,6 +17,13 @@ export async function POST(req: NextRequest) {
     const { date, projectName, items, useTemplate, saveToNas, projectPath } = await req.json();
     const showsList: any[] = [];
     const settings = getSettings() as any;
+
+    // Resolved once per generation, same as the email-automation pipeline
+    // (draftProjectGenerator.ts) - foreground media switches the livestream
+    // output to the fullscreen video style, and a song switches it back.
+    const livestreamOutputId = (settings.livestreamStyleOutputId || '').trim();
+    const videoStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_VIDEO_STYLE_NAME) : null;
+    const songStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_SONG_STYLE_NAME) : null;
 
     // 1. Find the template path to use
     let DEFAULT_TEMPLATE_PATH = "";
@@ -81,7 +89,8 @@ export async function POST(req: NextRequest) {
             name: sanitizeName(`${item.title}${item.artist ? ' - ' + item.artist : ''}`),
             category: "song",
             text: item.text
-          }
+          },
+          ...(livestreamOutputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: livestreamOutputId } : {})
         });
       } else if (item.type === 'bible') {
         showsList.push({
@@ -89,6 +98,7 @@ export async function POST(req: NextRequest) {
           refData: item.bibleData,
           backgroundMedia: toClientPath(item.backgroundMedia),
           backgroundType: item.backgroundType,
+          ...(livestreamOutputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: livestreamOutputId } : {}),
           data: {
             name: sanitizeName(`${item.ref} - ${item.translation}`),
             category: "scripture",
@@ -102,11 +112,22 @@ export async function POST(req: NextRequest) {
           title: item.title
         });
       } else if (item.type === 'media') {
+        // item.layer was previously dropped here entirely, which silently
+        // made the Builder's foreground/background toggle a no-op server-
+        // side (isBackground in createMediaShowObject always saw undefined,
+        // i.e. always foreground). Forwarding it now also makes the
+        // style-switch action below only apply to genuine foreground media.
+        const isForeground = item.layer !== 'background' && item.layer !== 'direct';
         showsList.push({
           ...baseShow,
           filePath: toClientPath(item.filePath),
           metaType: item.metaType,
-          title: item.title
+          title: item.title,
+          layer: item.layer,
+          timer: item.timer,
+          loop: item.loop,
+          ...(isForeground && item.metaType === 'video' ? { muted: false } : {}),
+          ...(isForeground && livestreamOutputId && videoStyleId ? { livestreamStyleId: videoStyleId, livestreamOutputId } : {})
         });
       } else if (item.type === 'section') {
         showsList.push({

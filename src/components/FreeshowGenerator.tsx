@@ -1521,6 +1521,10 @@ export default function FreeshowGenerator() {
               <h4 style={{ marginBottom: '0.6rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span>🎥</span> {t('help_media_advanced_title')}</h4>
               <p style={{ opacity: 0.85 }}>{t('help_media_advanced_desc')}</p>
             </div>
+            <div>
+              <h4 style={{ marginBottom: '0.6rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span>🎬</span> {t('help_livestream_title')}</h4>
+              <p style={{ opacity: 0.85 }}>{t('help_livestream_desc')}</p>
+            </div>
           </div>
           <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '1.5rem', marginBottom: 0 }}>
             {t('full_manual_hint_prefix')} <strong>?</strong> {t('full_manual_hint_suffix')}
