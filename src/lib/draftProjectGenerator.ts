@@ -6,6 +6,7 @@ import { checkLocalSongExists, getLocalSongText, getLocalShowData, fetchLyricsFr
 import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
+import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
 
 export interface GenerateResult {
@@ -58,7 +59,7 @@ const sanitizeShowName = (name: string) => name.replace(/[\\/:*?"<>|]/g, ' ').tr
 // email.ts) > internet lookup by title+artist > a placeholder slide -
 // worship leaders often send just a title, so that last case is common and
 // clearly flagged rather than silently left blank.
-async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: any; note?: string }> {
+async function resolveSongItem(song: DraftSong, settings: any, outputId: string, songStyleId: string | null): Promise<{ item: any; note?: string }> {
   const title = song.title;
   const artist = song.artist || '';
   const exists = await checkLocalSongExists(title, artist);
@@ -122,7 +123,14 @@ async function resolveSongItem(song: DraftSong, settings: any): Promise<{ item: 
       type: 'song',
       targetSection: song.section,
       fullData: fullData || undefined,
-      data: { name: artist ? `${title} - ${artist}` : title, category: 'song', text }
+      data: { name: artist ? `${title} - ${artist}` : title, category: 'song', text },
+      // A song following foreground media (which switches the livestream
+      // output to the fullscreen-video style) needs to switch it back once
+      // it starts, or the output stays on the video style forever. See
+      // insertAtIndices in freeshow.ts for where this actually gets applied
+      // (only to the song's first slide, and only if that slide doesn't
+      // already carry a hand-set action).
+      ...(outputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: outputId } : {})
     },
     note
   };
@@ -179,7 +187,7 @@ function groupVersesForSlides(verses: { verse: string; text: string }[]): { vers
 
 // Mirrors /api/preview's bible resolution exactly (same chunking/text shape)
 // so the generated slides look identical to what the manual Builder makes.
-async function resolveScriptureItem(scripture: DraftScripture): Promise<any | null> {
+async function resolveScriptureItem(scripture: DraftScripture, outputId: string, songStyleId: string | null): Promise<any | null> {
   try {
     const verseEnd = scripture.verseEnd ?? scripture.verseStart;
     const bibleRes = await getBibleVerses(scripture.translation, scripture.book, scripture.chapter, scripture.verseStart, verseEnd);
@@ -204,7 +212,10 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
         verses: bibleRes.verses,
         chunks
       },
-      data: { name: `${ref} - ${scripture.translation}`, category: 'scripture', text: textMap }
+      data: { name: `${ref} - ${scripture.translation}`, category: 'scripture', text: textMap },
+      // Same reasoning as resolveSongItem: a bijbeltekst following foreground
+      // media also needs to switch the livestream output back.
+      ...(outputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: outputId } : {})
     };
   } catch (err) {
     console.error(`[Project Generator] Bijbeltekst ophalen mislukt voor ${scripture.book} ${scripture.chapter}:${scripture.verseStart}:`, err);
@@ -212,68 +223,40 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
   }
 }
 
-// Styles sync between environments via Config/settings_synced.json (unlike
-// outputs, which are local per-machine), so the "Livestream Video
-// fullscreen" style can be looked up by its stable name here instead of a
-// hardcoded ID that would only be valid on whichever machine it was copied
-// from.
-async function resolveLivestreamStyleId(settings: any): Promise<string | null> {
-  if (!settings.freeshowPath) return null;
-  try {
-    const configPath = path.join(settings.freeshowPath, 'Config', 'settings_synced.json');
-    const raw = await fs.readFile(configPath, 'utf-8');
-    const config = JSON.parse(raw);
-    const styles = config.styles || {};
-    for (const [sid, s] of Object.entries<any>(styles)) {
-      if (s?.name === 'Livestream Video fullscreen') return sid;
-    }
-  } catch (err) {
-    console.error('[Project Generator] Kon livestream-stijl niet opzoeken:', err);
-  }
-  return null;
-}
-
 // Only youtube downloads and image/video attachments can become a real
 // FreeShow media item today - PowerPoint attachments and generic links have
 // no conversion path in this codebase, so they're surfaced as a note for a
 // medewerker to add by hand instead of silently dropped.
 //
-// layer: 'direct' adds it as a standalone media item in the running order
-// (native FreeShow play/pause/stop controls) instead of wrapping it inside
-// a "presentation" show, which has no video transport controls at all.
-// A downloaded YouTube video specifically becomes a real show instead (not
-// 'direct'), with a slide action that switches the configured Livestream
-// output to the fullscreen video style when it plays - matching how this
-// is done by hand today, per a working reference show. The output ID is
-// local to whichever machine actually runs FreeShow for this environment
+// Every piece of media is placed in the foreground (layer: 'show', wrapped
+// in a "presentation" show with the file as a full-frame slide item) with a
+// slide action that switches the configured Livestream output to the
+// fullscreen video style when it plays - matching how this is done by hand
+// today, per a working reference show, and applying uniformly regardless of
+// media type (image or video) since the style itself is just about output
+// layout, not the underlying codec. The output ID is local to whichever
+// machine actually runs FreeShow for this environment
 // (settings.livestreamStyleOutputId), so without it configured the show is
 // still created, just without the auto style-switch action.
-async function resolveMediaItem(media: DraftMedia, settings: any): Promise<any | null> {
+async function resolveMediaItem(media: DraftMedia, settings: any, outputId: string, videoStyleId: string | null): Promise<any | null> {
   if (!media.filePath) return null;
   const metaType = inferMetaType(media.filePath);
   if (!metaType) return null;
-  const base = {
+  const base: any = {
     id: media.id,
     type: 'media',
     targetSection: media.section,
     filePath: toFreeShowClientPath(media.filePath, settings.freeshowPath, settings.freeshowClientPath),
     metaType,
-    title: media.attachmentName || path.basename(media.filePath)
+    title: media.attachmentName || path.basename(media.filePath),
+    layer: 'show'
   };
-
-  if (media.mediaType === 'youtube') {
-    const outputId = (settings.livestreamStyleOutputId || '').trim();
-    const styleId = outputId ? await resolveLivestreamStyleId(settings) : null;
-    return {
-      ...base,
-      layer: 'show',
-      muted: false,
-      livestreamStyleId: styleId || undefined,
-      livestreamOutputId: styleId ? outputId : undefined
-    };
+  if (metaType === 'video') base.muted = false;
+  if (outputId && videoStyleId) {
+    base.livestreamStyleId = videoStyleId;
+    base.livestreamOutputId = outputId;
   }
-
-  return { ...base, layer: 'direct' };
+  return base;
 }
 
 async function findTemplatePath(settings: any): Promise<string> {
@@ -340,13 +323,20 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
   const notes: string[] = [];
   const showsList: any[] = [];
 
+  // Resolved once per generation (not per item) - both style names live in
+  // the same synced Config/settings_synced.json, so re-reading it per song/
+  // media item would just repeat the same file read for no benefit.
+  const livestreamOutputId = (settings.livestreamStyleOutputId || '').trim();
+  const videoStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_VIDEO_STYLE_NAME) : null;
+  const songStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_SONG_STYLE_NAME) : null;
+
   for (const song of draft.songs) {
-    const { item, note } = await resolveSongItem(song, settings);
+    const { item, note } = await resolveSongItem(song, settings, livestreamOutputId, songStyleId);
     showsList.push(item);
     if (note) notes.push(note);
   }
   for (const scripture of draft.scriptures) {
-    const item = await resolveScriptureItem(scripture);
+    const item = await resolveScriptureItem(scripture, livestreamOutputId, songStyleId);
     if (item) {
       showsList.push(item);
     } else {
@@ -354,7 +344,7 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
   for (const media of draft.media) {
-    const item = await resolveMediaItem(media, settings);
+    const item = await resolveMediaItem(media, settings, livestreamOutputId, videoStyleId);
     if (item) {
       showsList.push(item);
     } else if (media.mediaType !== 'link') {

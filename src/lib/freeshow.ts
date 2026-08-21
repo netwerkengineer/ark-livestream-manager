@@ -560,6 +560,40 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
   return dataFile;
 }
 
+// Switches the livestream output back to the normal song style once a song
+// starts, undoing whatever style foreground media before it switched to.
+// Only touches the layout's first slide - once the output is on the song
+// style, later slides in the same song don't need to repeat the switch.
+// Clones rather than mutating in place: for a reused catalog song, showData
+// is the actual object read from that song's real .show file, and this
+// change must only ever affect the generated project's own embedded copy.
+// Skips a slide that already has a hand-set action, so a song someone has
+// specifically configured in FreeShow isn't silently overridden.
+function withRevertStyleAction(showData: any, outputId: string, styleId: string) {
+  const layoutId = showData?.settings?.activeLayout;
+  const layout = layoutId ? showData?.layouts?.[layoutId] : Object.values(showData?.layouts || {})[0];
+  const firstSlideRef = (layout as any)?.slides?.[0];
+  if (!firstSlideRef || firstSlideRef.actions?.slideActions?.length) return showData;
+
+  const cloned = JSON.parse(JSON.stringify(showData));
+  const clonedLayout = layoutId ? cloned.layouts[layoutId] : Object.values(cloned.layouts)[0];
+  (clonedLayout as any).slides[0].actions = {
+    slideActions: [{
+      id: generateId(),
+      name: 'Set style to livestream liederen',
+      triggers: ['change_output_style'],
+      actionValues: {
+        change_output_style: {
+          styleOutputs: { type: 'specific', outputs: { [outputId]: styleId } }
+        }
+      },
+      customActivation: '',
+      midiEnabled: false
+    }]
+  };
+  return cloned;
+}
+
 function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
   const showsToPush: any[] = [];
   newItems.forEach(item => {
@@ -605,7 +639,11 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
       // its own id, which is fine since there's no existing entry to match.
       const realId = item.fullData?.id || showId;
       showsToPush.push({ id: realId });
-      dataFile.shows[realId] = item.fullData?.data || createShowObject(item);
+      let showData = item.fullData?.data || createShowObject(item);
+      if ((item.type === 'song' || item.type === 'bible') && item.revertStyleId && item.revertOutputId) {
+        showData = withRevertStyleAction(showData, item.revertOutputId, item.revertStyleId);
+      }
+      dataFile.shows[realId] = showData;
     }
   });
   dataFile.project.shows.splice(startIdx, 0, ...showsToPush);
