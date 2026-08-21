@@ -957,44 +957,60 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
                 <X size={24} />
               </button>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                 <HelpCircle size={32} color="var(--primary)" />
                 <h1 style={{ fontSize: '1.75rem' }}>Hoe gebruik je de Manager?</h1>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', color: 'rgba(255,255,255,0.8)', fontSize: '1rem', lineHeight: '1.6' }}>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1rem', lineHeight: '1.6', marginBottom: '28px' }}>
+                De Ark Church Livestream Manager helpt je bij alles rond een dienst: uitzendingen inplannen op YouTube, live bediening tijdens de uitzending, het samenstellen van FreeShow-presentaties, lichtregie, en (voor beheerders) alle instellingen. Bovenin vind je tot vijf tabbladen — welke je ziet hangt af van je rechten:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', color: 'rgba(255,255,255,0.8)', fontSize: '1rem', lineHeight: '1.6' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: '16px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>1</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>📅</div>
                   <div>
-                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Inloggen</h3>
-                    <p>Log in met je YouTube account. Je ziet een groen vinkje als de verbinding actief is.</p>
+                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Planner</h3>
+                    <p>YouTube-uitzendingen inplannen: titel, beschrijving, tijdstip en thumbnail, en de lijst met geplande streams beheren.</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: '16px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>2</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>🎛️</div>
                   <div>
-                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Thumbnail maken</h3>
-                    <p>Klik op het thumbnail-vak of de "Open Editor" knop. Upload een foto, pas de tekst aan en klik op "Opslaan". De thumbnail wordt direct geupload naar YouTube en op de NAS opgeslagen voor OBS.</p>
+                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Regie</h3>
+                    <p>Het centrale bedieningspaneel tijdens een dienst: systeemstatus van alle gekoppelde diensten, slimme stekkers, en configureerbare noodknoppen.</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: '16px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>3</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>📺</div>
                   <div>
-                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Stream Gegevens</h3>
-                    <p>Vul de titel, beschrijving, datum en tijd in. De standaard waarden zijn al ingevuld op basis van de instellingen.</p>
+                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Monitor</h3>
+                    <p>Gedetailleerd inzicht in en bediening van OBS en de live YouTube-uitzending: statistieken, scènes, audiomixer en een configuratiecheck.</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: '16px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>4</div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>💡</div>
                   <div>
-                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Inplannen</h3>
-                    <p>Klik op "Plan Alles In". De manager maakt nu een evenement aan op YouTube. Vergeet niet om de stream handmatig op Facebook Live Producer in te plannen.</p>
+                    <h3 style={{ color: 'white', marginBottom: '4px' }}>Licht</h3>
+                    <p>QLC+ lichtbediening: hoofdscènes, lichtshows, kleurgroepen, stroboscoop en dimmers.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: '16px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>⛪</div>
+                  <div>
+                    <h3 style={{ color: 'white', marginBottom: '4px' }}>FreeShow</h3>
+                    <p>Liederen, Bijbelteksten en media samenstellen tot een compleet FreeShow-project voor de dienst — inclusief de automatische aanlevering per e-mail.</p>
                   </div>
                 </div>
               </div>
+
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginTop: '20px' }}>
+                Zie je niet alle vijf? Een Operator ziet alleen de tabbladen waarvoor een Administrator rechten heeft gegeven. Voor de details per onderdeel: zie de volledige handleiding hieronder.
+              </p>
 
               <div style={{ marginTop: '40px', padding: '20px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
                 <p style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>Tip voor OBS:</p>
