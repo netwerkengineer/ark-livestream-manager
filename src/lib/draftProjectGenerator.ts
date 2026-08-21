@@ -212,6 +212,27 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
   }
 }
 
+// Styles sync between environments via Config/settings_synced.json (unlike
+// outputs, which are local per-machine), so the "Livestream Video
+// fullscreen" style can be looked up by its stable name here instead of a
+// hardcoded ID that would only be valid on whichever machine it was copied
+// from.
+async function resolveLivestreamStyleId(settings: any): Promise<string | null> {
+  if (!settings.freeshowPath) return null;
+  try {
+    const configPath = path.join(settings.freeshowPath, 'Config', 'settings_synced.json');
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(raw);
+    const styles = config.styles || {};
+    for (const [sid, s] of Object.entries<any>(styles)) {
+      if (s?.name === 'Livestream Video fullscreen') return sid;
+    }
+  } catch (err) {
+    console.error('[Project Generator] Kon livestream-stijl niet opzoeken:', err);
+  }
+  return null;
+}
+
 // Only youtube downloads and image/video attachments can become a real
 // FreeShow media item today - PowerPoint attachments and generic links have
 // no conversion path in this codebase, so they're surfaced as a note for a
@@ -220,19 +241,39 @@ async function resolveScriptureItem(scripture: DraftScripture): Promise<any | nu
 // layer: 'direct' adds it as a standalone media item in the running order
 // (native FreeShow play/pause/stop controls) instead of wrapping it inside
 // a "presentation" show, which has no video transport controls at all.
-function resolveMediaItem(media: DraftMedia, settings: any): any | null {
+// A downloaded YouTube video specifically becomes a real show instead (not
+// 'direct'), with a slide action that switches the configured Livestream
+// output to the fullscreen video style when it plays - matching how this
+// is done by hand today, per a working reference show. The output ID is
+// local to whichever machine actually runs FreeShow for this environment
+// (settings.livestreamStyleOutputId), so without it configured the show is
+// still created, just without the auto style-switch action.
+async function resolveMediaItem(media: DraftMedia, settings: any): Promise<any | null> {
   if (!media.filePath) return null;
   const metaType = inferMetaType(media.filePath);
   if (!metaType) return null;
-  return {
+  const base = {
     id: media.id,
     type: 'media',
-    layer: 'direct',
     targetSection: media.section,
     filePath: toFreeShowClientPath(media.filePath, settings.freeshowPath, settings.freeshowClientPath),
     metaType,
     title: media.attachmentName || path.basename(media.filePath)
   };
+
+  if (media.mediaType === 'youtube') {
+    const outputId = (settings.livestreamStyleOutputId || '').trim();
+    const styleId = outputId ? await resolveLivestreamStyleId(settings) : null;
+    return {
+      ...base,
+      layer: 'show',
+      muted: false,
+      livestreamStyleId: styleId || undefined,
+      livestreamOutputId: styleId ? outputId : undefined
+    };
+  }
+
+  return { ...base, layer: 'direct' };
 }
 
 async function findTemplatePath(settings: any): Promise<string> {
@@ -313,7 +354,7 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
   for (const media of draft.media) {
-    const item = resolveMediaItem(media, settings);
+    const item = await resolveMediaItem(media, settings);
     if (item) {
       showsList.push(item);
     } else if (media.mediaType !== 'link') {

@@ -70,6 +70,13 @@ export interface AppSettings {
   freeshowTrashPath?: string;
   freeshowClientPath?: string;
   freeshowAdditionalTargets?: FreeShowSyncTarget[];
+  // Output ID (local to whichever machine actually runs FreeShow for this
+  // environment - the Beamer PC in production, the Mac when this app runs
+  // on Proxmox) to apply the "Livestream Video fullscreen" style to when a
+  // generated project auto-inserts a downloaded YouTube video as a show.
+  // Not portable between environments/machines by design - see the output
+  // ID lesson in AGENTS.md/session history (Collecte Givt binding bug).
+  livestreamStyleOutputId?: string;
   autoSaveToNas?: boolean;
   defaultTemplate?: string;
   backupTarget?: string;
@@ -237,6 +244,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   freeshowMediaPath: "/volume1/Beamer/FreeShow/Media",
   freeshowTrashPath: "/volume1/Beamer/FreeShow/.trash",
   freeshowAdditionalTargets: [],
+  livestreamStyleOutputId: "",
   autoSaveToNas: false,
   defaultTemplate: "template.project",
   backupTarget: "none",

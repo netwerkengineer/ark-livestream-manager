@@ -376,7 +376,7 @@ export function createMediaShowObject(item: any) {
     name: item.title,
     path: item.filePath,
     type: item.metaType || "video",
-    muted: true,
+    muted: item.muted !== false,
     loop: !!item.loop
   };
 
@@ -403,6 +403,31 @@ export function createMediaShowObject(item: any) {
   if (item.timer && item.timer > 0) {
     layoutSlide.nextTimer = item.timer;
     layoutSlide.end = true;
+  }
+  // Switches the configured output to the "Livestream Video fullscreen"
+  // style when this slide plays, matching how this is set up by hand today
+  // - only added when both a resolved style ID and a configured (per-
+  // machine local) output ID are available, see resolveMediaItem().
+  if (item.livestreamStyleId && item.livestreamOutputId) {
+    layoutSlide.actions = {
+      slideActions: [
+        {
+          id: generateId(),
+          name: "Set style to livestream video",
+          triggers: ["change_output_style"],
+          actionValues: {
+            change_output_style: {
+              styleOutputs: {
+                type: "specific",
+                outputs: { [item.livestreamOutputId]: item.livestreamStyleId }
+              }
+            }
+          },
+          customActivation: "",
+          midiEnabled: false
+        }
+      ]
+    };
   }
   layoutSlides.push(layoutSlide);
 
