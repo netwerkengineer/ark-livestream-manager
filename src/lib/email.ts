@@ -145,8 +145,11 @@ async function downloadYoutubeVideo(url: string, dir: string): Promise<{ filePat
     const fileName = `${videoTitle}.mp4`;
     const finalPath = path.join(dir, fileName);
 
+    // AV1 uitsluiten: FreeShow (Electron/Chromium) speelt AV1 niet
+    // betrouwbaar af op de output - zie src/app/api/yt-download/route.ts
+    // voor dezelfde fix en de uitleg erachter.
     await execFilePromise('yt-dlp', [
-      '-f', 'bestvideo[height<=1080]+bestaudio/best',
+      '-f', 'bestvideo[height<=1080][vcodec!*=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best',
       '--merge-output-format', 'mp4',
       '-o', finalPath,
       url
