@@ -1364,6 +1364,20 @@ export default function SettingsPanel({
                 </label>
               </div>
 
+              <div className="input-group">
+                <label className="input-label">Output-ID voor livestream-video-stijl</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.livestreamStyleOutputId || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, livestreamStyleOutputId: e.target.value })}
+                  placeholder="bijv. eee96674a23"
+                />
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Het ID van de "Livestream"-output in FreeShow zelf (te vinden bij Outputs → rechtermuisknop/instellingen op de output). Dit ID is lokaal aan de machine waar FreeShow daadwerkelijk draait voor deze omgeving (de Beamer PC in productie) — <strong>niet</strong> hetzelfde als op een andere omgeving, en moet opnieuw ingevuld worden als de output ooit verwijderd/opnieuw aangemaakt wordt. Gebruikt om automatisch een YouTube-video bij het genereren van een project op deze output naar de stijl "Livestream Video fullscreen" te laten schakelen.
+                </p>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
                   <h3 style={{ fontSize: '1.1rem' }}>🖥️ Extra FreeShow Doelen (Sync)</h3>
