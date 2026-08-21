@@ -570,8 +570,17 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
         if (m.path && !dataFile.files.includes(m.path)) dataFile.files.push(m.path);
       });
     } else {
-      showsToPush.push({ id: showId });
-      dataFile.shows[showId] = item.fullData?.data || createShowObject(item);
+      // For an existing catalog song, fullData carries its real show ID -
+      // using the draft item's own id instead (a timestamp-random string
+      // from draftServicesStore's newId(), unrelated to any real show)
+      // embeds the song under a brand-new, unrecognized ID. FreeShow then
+      // sees "no local show with this ID" and creates a fresh duplicate
+      // named "... 2" instead of recognizing the song already in the
+      // catalog. A genuinely new song (no fullData) still falls back to
+      // its own id, which is fine since there's no existing entry to match.
+      const realId = item.fullData?.id || showId;
+      showsToPush.push({ id: realId });
+      dataFile.shows[realId] = item.fullData?.data || createShowObject(item);
     }
   });
   dataFile.project.shows.splice(startIdx, 0, ...showsToPush);
