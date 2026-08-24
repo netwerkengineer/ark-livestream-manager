@@ -58,6 +58,7 @@ interface DatabaseViewProps {
   emptyTrash: () => void;
   t: (key: string) => string;
   freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
+  freeshowAdditionalTargets?: { id: string; name: string; host: string; enabled?: boolean }[];
 }
 
 export default function DatabaseView(props: DatabaseViewProps) {
@@ -115,7 +116,8 @@ export default function DatabaseView(props: DatabaseViewProps) {
     restoreSelectedItems,
     emptyTrash,
     t,
-    freeshowCategories
+    freeshowCategories,
+    freeshowAdditionalTargets
   } = props;
 
   const categoryCounts = React.useMemo(() => {
@@ -139,6 +141,19 @@ export default function DatabaseView(props: DatabaseViewProps) {
     targets?: SyncTargetStatus[];
   }
   const [syncProgress, setSyncProgress] = useState<SyncStatus | null>(null);
+
+  // Which targets the manual sync button will hit. Primary defaults on;
+  // additional targets (e.g. a Sunday-school PC) default off, since they're
+  // almost always powered off and should only sync when someone explicitly
+  // asks for it here.
+  const [selectedSyncTargets, setSelectedSyncTargets] = useState<Set<string>>(new Set(['primary']));
+  const toggleSyncTarget = (key: string) => {
+    setSelectedSyncTargets(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // Polls the sync status file: on mount (to catch a sync started elsewhere,
   // e.g. before the page was reopened) and continuously while running, so
@@ -492,15 +507,41 @@ export default function DatabaseView(props: DatabaseViewProps) {
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                      <p style={{ fontSize: '0.8rem', opacity: 0.6, marginBottom: '0.8rem' }}>Synchroniseer Shows, Bibles, Templates en Media tussen de NAS en de Beamer PC. Dit is hetzelfde als de automatische wekelijkse sync, maar handmatig gestart.</p>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.8rem' }}>
+                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                         <input
+                           type="checkbox"
+                           checked={selectedSyncTargets.has('primary')}
+                           onChange={() => toggleSyncTarget('primary')}
+                           style={{ width: '14px', height: '14px' }}
+                         />
+                         Beamer PC (hoofd-doel)
+                       </label>
+                       {(freeshowAdditionalTargets || []).filter(target => target.enabled !== false).map(target => (
+                         <label key={target.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', cursor: 'pointer' }}>
+                           <input
+                             type="checkbox"
+                             checked={selectedSyncTargets.has(target.id)}
+                             onChange={() => toggleSyncTarget(target.id)}
+                             style={{ width: '14px', height: '14px' }}
+                           />
+                           {target.name || target.host} <span style={{ opacity: 0.5 }}>({target.host})</span>
+                         </label>
+                       ))}
+                     </div>
                      <button
                        className="button"
                        style={{ width: '100%', background: 'var(--primary)', color: '#020617', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700 }}
-                       disabled={isSyncing}
+                       disabled={isSyncing || selectedSyncTargets.size === 0}
                        onClick={async () => {
                          setIsSyncing(true);
                          setStatus(t('syncing'));
                          try {
-                           const res = await fetch('/api/maintenance/sync', { method: 'POST' });
+                           const res = await fetch('/api/maintenance/sync', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ targetKeys: Array.from(selectedSyncTargets) })
+                           });
                            const data = await res.json();
                            if (res.ok) {
                              setStatus('✅ Sync gestart op de achtergrond: ' + (data.message || 'OK') + ' - dit kan enkele minuten duren.');

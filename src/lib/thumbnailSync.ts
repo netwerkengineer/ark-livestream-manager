@@ -1,5 +1,6 @@
 import { youtubeFetch } from "./tokenStore";
 import { getSettings } from "./settingsStore";
+import { triggerFreeShowSync } from "./syncTrigger";
 import fs from "fs";
 import path from "path";
 
@@ -45,6 +46,23 @@ async function syncThumbnailFromUrl(url: string) {
     }
     
     lastSyncedUrl = url;
+
+    // thema.jpg only lives on the NAS at this point - the Beamer PC's own
+    // FreeShow install reads media from its own local disk (confirmed:
+    // freeshowClientPath is a plain local Windows path, not a network
+    // share), so the "Welkom" show there won't see this update until a
+    // sync propagates it. Trigger one now instead of leaving it to the
+    // once-a-day scheduled sync or requiring the operator to remember.
+    // keepOn stays at its default (true/never-shutdown) here deliberately -
+    // this function also runs from a passive 10-minute background interval
+    // AND once on every app startup (initThumbnailSync()), neither of which
+    // reflects "the operator just scheduled a stream". Since lastSyncedUrl
+    // is only in-memory, it resets on every restart, so a keepOn:false here
+    // would fire an unattended shutdown-triggering sync on every deploy.
+    // targetKeys: ['primary'] - same reasoning as create/route.ts: this is
+    // an automated trigger, and additional targets only ever sync when
+    // someone explicitly picks them via the manual sync button.
+    triggerFreeShowSync({ targetKeys: ['primary'] }).catch(err => console.error("[Thumbnail Sync] Kon sync niet triggeren:", err));
   } catch (err) {
     console.error("[Thumbnail Sync] Error syncing thumbnail:", err);
   }

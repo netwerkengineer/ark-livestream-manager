@@ -181,20 +181,36 @@ class TuyaHandler(BaseHTTPRequestHandler):
                 print(f"[HTTP] Error writing /status_json response: {e}")
             
         elif path == '/sync':
-            print("Received HTTP request: Trigger manual FreeShow sync")
+            # keep_on defaults to '1' so any caller that doesn't pass it
+            # (e.g. an older cached frontend build) keeps the old
+            # never-shuts-down manual-button behavior.
+            keep_on = query_params.get('keep_on', ['1'])[0] != '0'
+            targets_param = query_params.get('targets', [''])[0].strip()
+            print(f"Received HTTP request: Trigger FreeShow sync (keep_on={keep_on}, targets={targets_param or 'all'})")
             log_path = os.path.join(SCRIPT_DIR, "data", "sync_cleanup.log")
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            trigger_label = "MANUAL" if keep_on else "AUTO (UNATTENDED)"
             with open(log_path, 'a') as log_file:
-                log_file.write(f"\n--- MANUAL SYNC TRIGGERED AT {datetime.datetime.now()} ---\n")
-            
+                log_file.write(f"\n--- {trigger_label} SYNC TRIGGERED AT {datetime.datetime.now()} ---\n")
+
             # Start process in background, redirecting stdout/stderr to the log file.
-            # --keep-on: a manual sync is triggered by someone actively at their
-            # machine - it must never shut the Beamer PC down afterward. The
-            # power-saving wake -> sync -> shutdown cycle is only for the
-            # unattended scheduled sync.
+            # --keep-on: someone actively at their machine (the manual sync
+            # button) must never have the Beamer PC shut down on them. An
+            # unattended auto-trigger (e.g. after scheduling a stream) omits
+            # the flag so the PC powers back down afterward, same as the
+            # nightly scheduled sync.
+            # targets: restricts this run to specific target keys (comma-
+            # separated) - used by the manual sync button's per-target
+            # checkboxes so additional devices (almost always powered off)
+            # are never touched unless someone explicitly selects them.
+            sync_args = ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py")]
+            if keep_on:
+                sync_args.append("--keep-on")
+            if targets_param:
+                sync_args.append(f"--only-targets={targets_param}")
             log_file_handle = open(log_path, 'a')
             subprocess.Popen(
-                ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py"), "--keep-on"],
+                sync_args,
                 stdout=log_file_handle,
                 stderr=subprocess.STDOUT
             )
@@ -202,7 +218,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'text/plain')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(b"OK: Manual sync started in background")
+            self.wfile.write(f"OK: Sync started in background (keep_on={keep_on})".encode())
             
         elif path == '/import_project':
             print("Received HTTP request: Trigger manual project import")

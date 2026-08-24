@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSettings } from '@/lib/settingsStore';
 import { isAuthorized } from "@/lib/authHelper";
-import { spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
+import { triggerFreeShowSync } from '@/lib/syncTrigger';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
@@ -12,109 +9,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
 
-  const settings = getSettings();
-  
-  const rawHosts = [];
-  if (settings.tuyaApiHost) {
-    rawHosts.push(settings.tuyaApiHost);
-  }
-  rawHosts.push('127.0.0.1');            
-  if (settings.companionHost) {
-    rawHosts.push(settings.companionHost);  
-  }
-  rawHosts.push('172.17.0.1');           
-
-  const hostsToTry = Array.from(new Set(rawHosts.filter(Boolean)));
-
-  console.log(`[SYNC API] Triggering manual sync. Hosts to try:`, hostsToTry);
-
-  let success = false;
-  let responseText = '';
-
-  // Try Tuya HTTP daemon first
-  for (const host of hostsToTry) {
-    if (!host) continue;
-    try {
-      const url = `http://${host}:8088/sync`;
-      console.log(`[SYNC API] Querying host: ${url}`);
-      const res = await fetch(url, { 
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000) 
-      });
-      if (res.ok) {
-        responseText = await res.text();
-        success = true;
-        console.log(`[SYNC API] Successfully triggered sync on host: ${host}. Response: ${responseText}`);
-        break;
-      } else {
-        console.log(`[SYNC API] Host ${host} returned non-ok status: ${res.status}`);
-      }
-    } catch (e: any) {
-      console.log(`[SYNC API] Failed to query host ${host}:`, e.message || e);
+  let targetKeys: string[] | undefined;
+  try {
+    const body = await req.json();
+    if (Array.isArray(body?.targetKeys) && body.targetKeys.length > 0) {
+      targetKeys = body.targetKeys.filter((k: unknown) => typeof k === 'string');
     }
+  } catch {
+    // No/empty body is fine - falls back to syncing every enabled target.
   }
 
-  // Fallback: execute Python script directly if daemon is unreachable
-  if (!success) {
-    console.log(`[SYNC API] Daemon unreachable. Attempting direct script execution...`);
-    
-    // Look for the script in multiple locations
-    const scriptCandidates = [
-      path.join(process.cwd(), 'sync_and_cleanup_freeshow.py'),
-      '/app/sync_and_cleanup_freeshow.py'
-    ];
-    
-    let scriptPath = '';
-    for (const candidate of scriptCandidates) {
-      if (fs.existsSync(candidate)) {
-        scriptPath = candidate;
-        break;
-      }
-    }
-    
-    if (scriptPath) {
-      try {
-        // Ensure data directory exists for log file
-        const dataDir = path.join(path.dirname(scriptPath), 'data');
-        if (!fs.existsSync(dataDir)) {
-          fs.mkdirSync(dataDir, { recursive: true });
-        }
-        
-        // Execute in background (fire and forget)
-        const logPath = path.join(dataDir, 'sync_cleanup.log');
-        fs.appendFileSync(logPath, `\n--- DIRECT MANUAL SYNC TRIGGERED AT ${new Date().toISOString()} ---\n`);
+  const result = await triggerFreeShowSync({ targetKeys });
 
-        // Use spawn with array args to prevent command injection.
-        // --keep-on: a manual sync must never shut the Beamer PC down
-        // afterward - that power-saving cycle is only for the unattended
-        // scheduled sync.
-        // fs.createWriteStream() opens the file asynchronously, so its fd
-        // can still be null when passed to spawn() right after - openSync
-        // gives a ready-to-use fd with no race.
-        const logFd = fs.openSync(logPath, 'a');
-        const child = spawn('python3', [scriptPath, '--keep-on'], {
-          detached: true,
-          stdio: ['ignore', logFd, logFd]
-        });
-        fs.closeSync(logFd);
-        child.unref();
-
-        success = true;
-        responseText = 'OK: Manual sync started via direct execution (no daemon)';
-        console.log(`[SYNC API] Direct execution started: ${scriptPath}`);
-      } catch (e: any) {
-        console.log(`[SYNC API] Direct execution failed:`, e.message || e);
-      }
-    } else {
-      console.log(`[SYNC API] Script not found in any expected location`);
-    }
-  }
-
-  if (!success) {
-    return NextResponse.json({ 
-      error: 'Could not connect to Tuya HTTP control server to trigger sync' 
+  if (!result.success) {
+    return NextResponse.json({
+      error: result.message || 'Could not connect to Tuya HTTP control server to trigger sync'
     }, { status: 502 });
   }
 
-  return NextResponse.json({ success: true, message: responseText });
+  return NextResponse.json({ success: true, message: result.message });
 }

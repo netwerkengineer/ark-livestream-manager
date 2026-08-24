@@ -54,7 +54,8 @@ export default function FreeshowGenerator() {
     ftpHost: '', ftpUser: '', ftpPass: '', ftpPort: 21,
     webdavUrl: '', webdavUser: '', webdavPass: '',
     defaultTemplate: '',
-    freeshowTrashPath: ''
+    freeshowTrashPath: '',
+    freeshowAdditionalTargets: [] as { id: string; name: string; host: string; enabled?: boolean }[]
   });
 
   const handlePathChange = (newPath: string) => {
@@ -1922,6 +1923,7 @@ export default function FreeshowGenerator() {
             downloadBackup={downloadBackup}
             restoreSelectedItems={restoreSelectedItems}
             emptyTrash={emptyTrash}
+            freeshowAdditionalTargets={settings.freeshowAdditionalTargets}
             t={t}
           />
         ) : (
