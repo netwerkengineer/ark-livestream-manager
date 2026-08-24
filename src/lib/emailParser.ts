@@ -32,16 +32,43 @@ export interface ParsedMedia {
 
 export type ParsedItem = ParsedSong | ParsedScripture | ParsedMedia;
 
+// A correction directive rather than something to add - matched against the
+// EXISTING items already on the draft service at merge time (the parser
+// itself has no access to the draft, so it can only capture what to look
+// for; draftServicesStore.mergeParsedEmailIntoDraft does the actual
+// matching and removal). Lets a worship leader send a short follow-up
+// mail fixing a mistake instead of the whole service having to be wiped
+// and re-sent.
+export interface ParsedRemoval {
+  type: 'song' | 'scripture' | 'media';
+  raw: string; // the text as typed, used for song/media matching and shown back in notes
+  book?: string; // scripture only, already resolved to the canonical BIBLE_BOOKS name
+  chapter?: number;
+  verseStart?: number;
+  verseEnd?: number;
+}
+
 export interface ParsedEmail {
   serviceDate: string | null; // ISO "YYYY-MM-DD"
   items: ParsedItem[];
+  removals: ParsedRemoval[];
   notes: string[];
 }
 
 const SECTION_RE = /^\[\s*sectie\s*:\s*(.+?)\s*\]$/i;
 const SERVICE_DATE_RE = /^dienst\s*datum\s*:\s*(.+)$/i;
+// Correction directives - recognized anywhere at top level (like SECTION_RE/
+// SERVICE_DATE_RE), regardless of the current block, so a short follow-up
+// mail can mix a removal with new items in one go.
+const REMOVE_SONG_RE = /^verwijder\s+lied\s*:\s*(.+)$/i;
+const REMOVE_SCRIPTURE_RE = /^verwijder\s+bijbeltekst\s*:\s*(.+)$/i;
+const REMOVE_MEDIA_RE = /^verwijder\s+media\s*:\s*(.+)$/i;
 const SONG_BLOCK_RE = /^liederen(?:\s*\(\s*categorie\s*:\s*(.+?)\s*\))?\s*:?\s*$/i;
-const SCRIPTURE_BLOCK_RE = /^bijbeltekst(en)?\s*:?\s*$/i;
+// The optional "(VERTALING)" here sets a default translation for every
+// line in the block below - lets a whole batch of references share one
+// translation instead of repeating it per line (mirrors the existing
+// "Liederen (categorie: X):" convention).
+const SCRIPTURE_BLOCK_RE = /^bijbeltekst(en)?(?:\s*\(\s*(.+?)\s*\))?\s*:?\s*$/i;
 const MEDIA_BLOCK_RE = /^media\s*:?\s*$/i;
 // A song line optionally carries "(bijlage: bestand.ext)" for lyrics
 // supplied as a .txt/.pdf/.docx attachment, matched against real email
@@ -53,7 +80,13 @@ const SONG_LINE_RE = /^-\s*(.+?)(?:\s*\(\s*bijlage\s*:\s*(.+?)\s*\))?\s*$/i;
 // that song's lyricsText instead of being split into further items.
 const LYRICS_START_RE = /^\[\s*tekst\s*\]$/i;
 const LYRICS_END_RE = /^\[\s*\/\s*tekst\s*\]$/i;
-const SCRIPTURE_LINE_RE = /^(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?\s*\(\s*([^)]+?)\s*\)\s*$/;
+// Book/chapter separator is \s* (not \s+) so a WhatsApp-style reference
+// pasted without a space before the chapter number, e.g. "2 Cor.12: 9",
+// still splits correctly - the leading (.+?) is non-greedy so it still
+// backtracks to the shortest valid book name either way. The trailing
+// "(VERTALING)" is optional here since a whole block can share one
+// translation via SCRIPTURE_BLOCK_RE instead (see currentScriptureTranslation).
+const SCRIPTURE_LINE_RE = /^(.+?)\s*(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?(?:\s*\(\s*([^)]+?)\s*\))?\s*$/;
 const YOUTUBE_RE = /(https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)\/\S+)/i;
 const ATTACHMENT_RE = /^\(?\s*bijlage\s*:\s*(.+?)\s*\)?$/i;
 const URL_RE = /^https?:\/\/\S+$/i;
@@ -69,10 +102,50 @@ function parseServiceDate(raw: string): string | null {
   return `${y}-${month}-${day}`;
 }
 
+// Common Dutch Bible book abbreviations, as actually used in the wild
+// (church WhatsApp groups, older printed liturgies) - keys are normalized
+// (lowercase, diacritics folded, no trailing period) and map to the exact
+// spelling used in BIBLE_BOOKS. Not exhaustive; findBibleBook() also falls
+// back to unambiguous-prefix matching for anything not listed here.
+const BIBLE_BOOK_ABBREVIATIONS: Record<string, string> = {
+  'gen': 'Genesis', 'ex': 'Exodus', 'exod': 'Exodus', 'lev': 'Leviticus', 'num': 'Numeri',
+  'deut': 'Deuteronomium', 'dt': 'Deuteronomium', 'joz': 'Jozua', 'recht': 'Rechters', 'ri': 'Rechters',
+  '1 sam': '1 Samuël', '2 sam': '2 Samuël', '1 kon': '1 Koningen', '2 kon': '2 Koningen',
+  '1 kron': '1 Kronieken', '2 kron': '2 Kronieken', 'neh': 'Nehemia', 'est': 'Esther',
+  'ps': 'Psalmen', 'psalm': 'Psalmen', 'spr': 'Spreuken', 'pred': 'Prediker', 'hoogl': 'Hooglied',
+  'jes': 'Jesaja', 'jer': 'Jeremia', 'klaagl': 'Klaagliederen', 'ez': 'Ezechiël', 'ezech': 'Ezechiël',
+  'dan': 'Daniël', 'hos': 'Hosea', 'joel': 'Joël', 'jl': 'Joël', 'am': 'Amos', 'ob': 'Obadja',
+  'mi': 'Micha', 'mich': 'Micha', 'nah': 'Nahum', 'hab': 'Habakuk', 'sef': 'Sefanja', 'hag': 'Haggaï',
+  'zach': 'Zacharia', 'mal': 'Maleachi',
+  'matt': 'Mattheüs', 'mt': 'Mattheüs', 'mark': 'Marcus', 'mc': 'Marcus', 'luk': 'Lukas', 'lc': 'Lukas',
+  'joh': 'Johannes', 'hand': 'Handelingen', 'rom': 'Romeinen',
+  '1 kor': '1 Korinthiërs', '1 cor': '1 Korinthiërs', '2 kor': '2 Korinthiërs', '2 cor': '2 Korinthiërs',
+  'gal': 'Galaten', 'ef': 'Efeziërs', 'fil': 'Filippenzen', 'kol': 'Kolossenzen',
+  '1 thess': '1 Thessalonicenzen', '2 thess': '2 Thessalonicenzen',
+  '1 tim': '1 Timotheüs', '2 tim': '2 Timotheüs', 'tit': 'Titus', 'filem': 'Filemon',
+  'hebr': 'Hebreeën', 'heb': 'Hebreeën', 'jak': 'Jakobus', '1 petr': '1 Petrus', '1 pe': '1 Petrus',
+  '2 petr': '2 Petrus', '2 pe': '2 Petrus', '1 joh': '1 Johannes', '2 joh': '2 Johannes',
+  '3 joh': '3 Johannes', 'jud': 'Judas', 'openb': 'Openbaring', 'op': 'Openbaring'
+};
+
 function findBibleBook(name: string): string | null {
-  const normalized = foldDiacritics(name.trim().toLowerCase());
-  const found = BIBLE_BOOKS.find(b => foldDiacritics(b.toLowerCase()) === normalized);
-  return found || null;
+  // Strip periods (abbreviations are typically written "Ef." or "1 Kor.")
+  // and collapse whitespace before comparing, so "Ef.", "Ef .", "Ef" all
+  // normalize the same way.
+  const normalized = foldDiacritics(name.trim().toLowerCase()).replace(/\./g, '').replace(/\s+/g, ' ').trim();
+
+  const exact = BIBLE_BOOKS.find(b => foldDiacritics(b.toLowerCase()) === normalized);
+  if (exact) return exact;
+
+  const abbreviated = BIBLE_BOOK_ABBREVIATIONS[normalized];
+  if (abbreviated) return abbreviated;
+
+  // Last resort: an unambiguous prefix match (e.g. "Efez" -> "Efeziërs")
+  // for anything not covered by the table above.
+  const prefixMatches = BIBLE_BOOKS.filter(b => foldDiacritics(b.toLowerCase()).startsWith(normalized));
+  if (prefixMatches.length === 1) return prefixMatches[0];
+
+  return null;
 }
 
 type BlockType = 'song' | 'scripture' | 'media' | null;
@@ -118,9 +191,11 @@ export function parseServiceEmail(text: string): ParsedEmail {
   let currentSection = '';
   let currentBlock: BlockType = null;
   let currentSongCategory: string | undefined;
+  let currentScriptureTranslation: string | undefined;
   let lastSong: ParsedSong | null = null;
   let lyricsCapture: { song: ParsedSong | null; buffer: string[] } | null = null;
   const items: ParsedItem[] = [];
+  const removals: ParsedRemoval[] = [];
   const notes: string[] = [];
 
   for (const rawLine of lines) {
@@ -224,6 +299,49 @@ export function parseServiceEmail(text: string): ParsedEmail {
       continue;
     }
 
+    // Correction directives - top-level, like the date/section headers
+    // above: recognized regardless of currentBlock so a removal and a new
+    // item can appear anywhere in the same follow-up mail. The actual
+    // matching against what's already on the draft happens later in
+    // draftServicesStore.mergeParsedEmailIntoDraft, which is the only place
+    // that has access to the existing service.
+    const removeSongMatch = line.match(REMOVE_SONG_RE);
+    if (removeSongMatch) {
+      removals.push({ type: 'song', raw: removeSongMatch[1].trim() });
+      continue;
+    }
+
+    const removeScriptureMatch = line.match(REMOVE_SCRIPTURE_RE);
+    if (removeScriptureMatch) {
+      const target = removeScriptureMatch[1].trim();
+      const m = target.match(SCRIPTURE_LINE_RE);
+      if (m) {
+        const [, bookRaw, chapter, verseStart, verseEnd] = m;
+        const book = findBibleBook(bookRaw);
+        if (book) {
+          removals.push({
+            type: 'scripture',
+            raw: target,
+            book,
+            chapter: Number(chapter),
+            verseStart: Number(verseStart),
+            verseEnd: verseEnd ? Number(verseEnd) : undefined
+          });
+        } else {
+          notes.push(`Bijbelboek niet herkend in verwijder-opdracht: "${bookRaw.trim()}" in "${line}"`);
+        }
+      } else {
+        notes.push(`Niet herkend als bijbeltekst om te verwijderen (verwacht "Boek H:V-V"): "${line}"`);
+      }
+      continue;
+    }
+
+    const removeMediaMatch = line.match(REMOVE_MEDIA_RE);
+    if (removeMediaMatch) {
+      removals.push({ type: 'media', raw: removeMediaMatch[1].trim() });
+      continue;
+    }
+
     const sectionMatch = line.match(SECTION_RE);
     if (sectionMatch) {
       currentSection = sectionMatch[1].trim();
@@ -237,8 +355,10 @@ export function parseServiceEmail(text: string): ParsedEmail {
       continue;
     }
 
-    if (SCRIPTURE_BLOCK_RE.test(line)) {
+    const scriptureBlockMatch = line.match(SCRIPTURE_BLOCK_RE);
+    if (scriptureBlockMatch) {
       currentBlock = 'scripture';
+      currentScriptureTranslation = scriptureBlockMatch[2]?.trim();
       continue;
     }
 
@@ -254,8 +374,28 @@ export function parseServiceEmail(text: string): ParsedEmail {
           // Same "Titel - Artiest" split convention used elsewhere in the
           // app (e.g. the manual Bouwer's quick-add) - only the first
           // " - " counts, so titles that themselves contain a hyphen still
-          // parse (just without a detected artist).
-          const [titlePart, artistPart] = m[1].split(/\s+-\s+/, 2);
+          // parse (just without a detected artist). Exception: the
+          // catalog's own naming convention for songbook-bundle categories
+          // (Opwekking, Johannes de Heer, etc., often but not always sent
+          // with "... OPS Pro ..." in the category name) is "Zangbundelnaam
+          // Nummer - Titel" instead (e.g. "Opw 643 - Al voor mijn leven is
+          // ontstaan") - the part after the hyphen there is the real title,
+          // not an artist. Detected two ways since a sender doesn't always
+          // bother typing the category: the category name itself, OR the
+          // shape of the text before the hyphen (a short code + number,
+          // nothing else - "Opw 643", "JdH 9062", "Bap 161", "Tien 69").
+          // Splitting it the normal way would mislabel the real title as an
+          // "artist" (shown dimmed in the reviewtab) and feed the wrong two
+          // strings to the internet lyrics lookup - catalog matching itself
+          // is unaffected either way (checkLocalSongExists does two order-
+          // agnostic substring checks), so this is purely about keeping the
+          // fields meaningful.
+          const [rawTitlePart, rawArtistPart] = m[1].split(/\s+-\s+/, 2);
+          const looksLikeSongbookCode = !!rawArtistPart && /^[a-zëïöü]+\.?\s*\d+$/i.test(rawTitlePart.trim());
+          const isSongbookCategory = !!currentSongCategory && /ops\s*pro/i.test(currentSongCategory);
+          const [titlePart, artistPart] = (isSongbookCategory || looksLikeSongbookCode)
+            ? [m[1], undefined]
+            : [rawTitlePart, rawArtistPart];
           const song: ParsedSong = {
             type: 'song',
             section: currentSection,
@@ -280,7 +420,12 @@ export function parseServiceEmail(text: string): ParsedEmail {
       if (m) {
         const [, bookRaw, chapter, verseStart, verseEnd, translation] = m;
         const book = findBibleBook(bookRaw);
-        if (book) {
+        const resolvedTranslation = translation?.trim() || currentScriptureTranslation;
+        if (!book) {
+          notes.push(`Bijbelboek niet herkend: "${bookRaw.trim()}" in "${line}"`);
+        } else if (!resolvedTranslation) {
+          notes.push(`Geen vertaling opgegeven voor "${line}" (zet 'm achter de regel tussen haakjes, of één keer achter "Bijbeltekst(en) (VERTALING):" voor het hele blok).`);
+        } else {
           items.push({
             type: 'scripture',
             section: currentSection,
@@ -288,13 +433,11 @@ export function parseServiceEmail(text: string): ParsedEmail {
             chapter: Number(chapter),
             verseStart: Number(verseStart),
             verseEnd: verseEnd ? Number(verseEnd) : undefined,
-            translation: translation.trim()
+            translation: resolvedTranslation
           });
-        } else {
-          notes.push(`Bijbelboek niet herkend: "${bookRaw.trim()}" in "${line}"`);
         }
       } else {
-        notes.push(`Niet herkend als bijbeltekst (verwacht "Boek H:V-V (VERTALING)"): "${line}"`);
+        notes.push(`Niet herkend als bijbeltekst (verwacht "Boek H:V-V" of "Boek H:V-V (VERTALING)"): "${line}"`);
       }
       continue;
     }
@@ -321,5 +464,5 @@ export function parseServiceEmail(text: string): ParsedEmail {
     // Line outside any recognized block (preamble/greeting/signature) - ignored silently.
   }
 
-  return { serviceDate, items, notes };
+  return { serviceDate, items, removals, notes };
 }

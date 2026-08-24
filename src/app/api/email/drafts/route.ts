@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
-import { getDraftServices, getUnassignedEmails, deleteDraftService, deleteUnassignedEmail } from '@/lib/draftServicesStore';
+import { getDraftServices, getUnassignedEmails, deleteDraftService, deleteUnassignedEmail, removeItemFromDraft } from '@/lib/draftServicesStore';
 
 // Read-only listing of accumulated draft services + emails that couldn't be
 // matched to a service date, for the drafts review tab.
@@ -30,14 +30,24 @@ export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const serviceDate = searchParams.get('serviceDate');
   const messageId = searchParams.get('messageId');
+  const itemType = searchParams.get('itemType') as 'song' | 'scripture' | 'media' | null;
+  const itemId = searchParams.get('itemId');
   if (!serviceDate && !messageId) {
     return NextResponse.json({ success: false, error: 'Geen serviceDate of messageId opgegeven' }, { status: 400 });
   }
 
   try {
-    const deleted = serviceDate ? deleteDraftService(serviceDate) : deleteUnassignedEmail(messageId!);
+    // serviceDate + itemType + itemId together = remove just that one item
+    // (the 🗑️ next to a single song/tekst/media row); serviceDate alone =
+    // remove the whole draft service.
+    const deleted = serviceDate && itemType && itemId
+      ? removeItemFromDraft(serviceDate, itemType, itemId)
+      : serviceDate
+        ? deleteDraftService(serviceDate)
+        : deleteUnassignedEmail(messageId!);
     if (!deleted) {
-      return NextResponse.json({ success: false, error: serviceDate ? 'Concept-dienst niet gevonden' : 'Mail niet gevonden' }, { status: 404 });
+      const notFoundMsg = itemType ? 'Item niet gevonden' : serviceDate ? 'Concept-dienst niet gevonden' : 'Mail niet gevonden';
+      return NextResponse.json({ success: false, error: notFoundMsg }, { status: 404 });
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {

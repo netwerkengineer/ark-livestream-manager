@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import type { ParsedEmail, ParsedItem } from './emailParser';
+import type { ParsedEmail, ParsedItem, ParsedRemoval } from './emailParser';
+import { foldDiacritics } from './freeshowUtils';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'draftServices.json');
@@ -133,6 +134,104 @@ export function deleteUnassignedEmail(messageId: string): boolean {
   return true;
 }
 
+// Removes one song/scripture/media item from a draft service by id, e.g.
+// from the 🗑️ button next to a single item in the review tab - lets a
+// mistake be corrected without wiping and re-sending the whole service.
+export function removeItemFromDraft(serviceDate: string, itemType: 'song' | 'scripture' | 'media', itemId: string): boolean {
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  if (!draft) return false;
+
+  let removed = false;
+  if (itemType === 'song') {
+    const before = draft.songs.length;
+    draft.songs = draft.songs.filter(s => s.id !== itemId);
+    removed = draft.songs.length !== before;
+  } else if (itemType === 'scripture') {
+    const before = draft.scriptures.length;
+    draft.scriptures = draft.scriptures.filter(s => s.id !== itemId);
+    removed = draft.scriptures.length !== before;
+  } else {
+    const before = draft.media.length;
+    draft.media = draft.media.filter(m => m.id !== itemId);
+    removed = draft.media.length !== before;
+  }
+
+  if (!removed) return false;
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return true;
+}
+
+function foldForMatch(s: string): string {
+  return foldDiacritics(s.trim().toLowerCase());
+}
+
+// Matches a "Verwijder lied: X" target against a song's title. Two shapes
+// are accepted, checked independently so this works regardless of whether
+// the song was originally stored split ("Titel"/"Artiest" in separate
+// fields) or as one opaque string (the "... OPS Pro ..." category case in
+// emailParser.ts, where "Zangbundelnaam - Titel" is deliberately kept
+// whole): (a) the raw text matches the song's reconstructed full display
+// name outright, or (b) split the same way a song ADD line would be, with
+// both title and (if given) artist matching. Either shape matching is
+// enough - a correction mail shouldn't have to know how the original
+// addition happened to store the name.
+function songMatchesRemoval(song: DraftSong, raw: string): boolean {
+  const fullName = song.artist ? `${song.title} - ${song.artist}` : song.title;
+  if (foldForMatch(fullName) === foldForMatch(raw)) return true;
+
+  const [titlePart, artistPart] = raw.split(/\s+-\s+/, 2);
+  if (foldForMatch(song.title) !== foldForMatch(titlePart)) return false;
+  if (artistPart && song.artist) return foldForMatch(song.artist) === foldForMatch(artistPart);
+  return true;
+}
+
+function mediaMatchesRemoval(media: DraftMedia, raw: string): boolean {
+  const target = foldForMatch(raw);
+  const candidate = foldForMatch(media.url || media.attachmentName || '');
+  if (!candidate) return false;
+  return candidate === target || candidate.includes(target) || target.includes(candidate);
+}
+
+// Applies every removal directive from one parsed email against a draft's
+// existing items, returning a Dutch note per directive (found-and-removed,
+// or not-found) so the outcome is always visible in the reviewtab - same
+// "never silently guess" principle as the rest of the parser.
+function applyRemovals(draft: DraftService, removals: ParsedRemoval[]): string[] {
+  const notes: string[] = [];
+  for (const removal of removals) {
+    if (removal.type === 'song') {
+      const before = draft.songs.length;
+      draft.songs = draft.songs.filter(s => !songMatchesRemoval(s, removal.raw));
+      const count = before - draft.songs.length;
+      notes.push(count > 0
+        ? `Lied "${removal.raw}" verwijderd${count > 1 ? ` (${count}x)` : ''}.`
+        : `Kon lied "${removal.raw}" niet verwijderen: geen match gevonden in deze dienst.`);
+    } else if (removal.type === 'scripture') {
+      const before = draft.scriptures.length;
+      draft.scriptures = draft.scriptures.filter(s => !(
+        s.book === removal.book &&
+        s.chapter === removal.chapter &&
+        s.verseStart === removal.verseStart &&
+        (s.verseEnd ?? null) === (removal.verseEnd ?? null)
+      ));
+      const count = before - draft.scriptures.length;
+      notes.push(count > 0
+        ? `Bijbeltekst "${removal.raw}" verwijderd${count > 1 ? ` (${count}x)` : ''}.`
+        : `Kon bijbeltekst "${removal.raw}" niet verwijderen: geen match gevonden in deze dienst.`);
+    } else {
+      const before = draft.media.length;
+      draft.media = draft.media.filter(m => !mediaMatchesRemoval(m, removal.raw));
+      const count = before - draft.media.length;
+      notes.push(count > 0
+        ? `Media "${removal.raw}" verwijderd${count > 1 ? ` (${count}x)` : ''}.`
+        : `Kon media "${removal.raw}" niet verwijderen: geen match gevonden in deze dienst.`);
+    }
+  }
+  return notes;
+}
+
 function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -174,11 +273,15 @@ export function mergeParsedEmailIntoDraft(
   const store = readStore();
 
   if (!parsed.serviceDate) {
+    const notes = [...parsed.notes];
+    if (parsed.removals.length > 0) {
+      notes.push('Deze mail bevatte verwijder-opdrachten, maar kon niet aan een dienst gekoppeld worden - controleer de dienstdatum en stuur de correctie opnieuw.');
+    }
     store.unassigned.push({
       messageId: emailMeta.messageId,
       subject: emailMeta.subject,
       receivedAt: emailMeta.receivedAt,
-      notes: parsed.notes,
+      notes,
       excerpt: emailMeta.excerpt
     });
     writeStore(store);
@@ -251,11 +354,13 @@ export function mergeParsedEmailIntoDraft(
     }
   }
 
+  const removalNotes = applyRemovals(draft, parsed.removals);
+
   draft.sourceEmails.push({
     messageId: emailMeta.messageId,
     subject: emailMeta.subject,
     receivedAt: emailMeta.receivedAt,
-    notes: parsed.notes
+    notes: [...parsed.notes, ...removalNotes]
   });
   draft.lastUpdatedAt = now;
 

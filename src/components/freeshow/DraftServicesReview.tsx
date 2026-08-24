@@ -149,6 +149,34 @@ export default function DraftServicesReview() {
     }
   };
 
+  // Removes one song/tekst/media row without touching the rest of the
+  // service - the 🗑️ next to a single item, as opposed to deleteDraft()
+  // above which wipes the whole service. No confirm() here: unlike
+  // deleteDraft (which loses every item + source-email history for the
+  // service), removing one item is small and easy to re-add via another
+  // email if it was a mistake.
+  const deleteItem = async (serviceDate: string, itemType: 'song' | 'scripture' | 'media', itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      const res = await fetch(`/api/email/drafts?serviceDate=${encodeURIComponent(serviceDate)}&itemType=${itemType}&itemId=${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setDrafts(prev => prev.map(d => d.serviceDate !== serviceDate ? d : {
+          ...d,
+          songs: itemType === 'song' ? d.songs.filter(s => s.id !== itemId) : d.songs,
+          scriptures: itemType === 'scripture' ? d.scriptures.filter(s => s.id !== itemId) : d.scriptures,
+          media: itemType === 'media' ? d.media.filter(m => m.id !== itemId) : d.media
+        }));
+      } else {
+        setError(data.error || 'Kon item niet verwijderen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const allNotes = (draft: DraftService) => draft.sourceEmails.flatMap(e => e.notes);
 
   const generateProject = async (serviceDate: string, force: boolean) => {
@@ -278,12 +306,22 @@ export default function DraftServicesReview() {
                     {draft.songs.length === 0 ? (
                       <div style={{ fontSize: '0.8rem', opacity: 0.4 }}>Nog niet aangeleverd</div>
                     ) : draft.songs.map(s => (
-                      <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                         <span>
                           {s.title}{s.artist ? <span style={{ opacity: 0.5 }}> - {s.artist}</span> : ''}
                           {(s.lyricsText || s.lyricsAttachmentName) && <span title="Tekst aangeleverd in de mail" style={{ marginLeft: '0.4rem' }}>📝</span>}
                         </span>
-                        {sectionBadge(s.section)}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {sectionBadge(s.section)}
+                          <button
+                            onClick={() => deleteItem(draft.serviceDate, 'song', s.id)}
+                            disabled={deletingId === s.id}
+                            title="Dit lied verwijderen"
+                            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.2rem' }}
+                          >
+                            {deletingId === s.id ? '...' : '🗑️'}
+                          </button>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -293,9 +331,19 @@ export default function DraftServicesReview() {
                     {draft.scriptures.length === 0 ? (
                       <div style={{ fontSize: '0.8rem', opacity: 0.4 }}>Nog niet aangeleverd</div>
                     ) : draft.scriptures.map(s => (
-                      <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                         <span>{s.book} {s.chapter}:{s.verseStart}{s.verseEnd ? `-${s.verseEnd}` : ''} ({s.translation})</span>
-                        {sectionBadge(s.section)}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {sectionBadge(s.section)}
+                          <button
+                            onClick={() => deleteItem(draft.serviceDate, 'scripture', s.id)}
+                            disabled={deletingId === s.id}
+                            title="Deze bijbeltekst verwijderen"
+                            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.2rem' }}
+                          >
+                            {deletingId === s.id ? '...' : '🗑️'}
+                          </button>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -305,11 +353,21 @@ export default function DraftServicesReview() {
                     {draft.media.length === 0 ? (
                       <div style={{ fontSize: '0.8rem', opacity: 0.4 }}>Nog niet aangeleverd</div>
                     ) : draft.media.map(m => (
-                      <div key={m.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div key={m.id} style={{ fontSize: '0.8rem', padding: '0.3rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                         <span title={m.url || m.attachmentName}>
                           {m.mediaType === 'youtube' ? '▶️ YouTube' : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : `🔗 Link`}
                         </span>
-                        {sectionBadge(m.section)}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {sectionBadge(m.section)}
+                          <button
+                            onClick={() => deleteItem(draft.serviceDate, 'media', m.id)}
+                            disabled={deletingId === m.id}
+                            title="Deze media verwijderen"
+                            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.2rem' }}
+                          >
+                            {deletingId === m.id ? '...' : '🗑️'}
+                          </button>
+                        </span>
                       </div>
                     ))}
                   </div>

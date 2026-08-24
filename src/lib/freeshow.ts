@@ -547,7 +547,13 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
     if (sectionName === 'Onderaan' || !useTemplate) {
       insertAtIndices(dataFile, itemsToInsert, dataFile.project.shows.length);
     } else {
-      const sectionIdx = dataFile.project.shows.findIndex((s: any) => s.type === 'section' && s.name === sectionName);
+      // Case/whitespace-insensitive: a section name typed in an email
+      // (e.g. "[Sectie: welkom]") almost never matches the template's exact
+      // casing ("Welkom") by coincidence, and an exact === match silently
+      // dumps the item at the very end of the project instead of erroring -
+      // a typo-triggered misplacement nobody would notice until too late.
+      const normalize = (s: string) => s.trim().toLowerCase();
+      const sectionIdx = dataFile.project.shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === normalize(sectionName));
       if (sectionIdx !== -1) {
         insertAtIndices(dataFile, itemsToInsert, sectionIdx + 1);
       } else {
