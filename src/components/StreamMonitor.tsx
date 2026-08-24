@@ -129,7 +129,7 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
 
   useEffect(() => {
     fetchOBSScreenshot();
-    const interval = setInterval(fetchOBSScreenshot, 3000);
+    const interval = setInterval(fetchOBSScreenshot, 1500);
     return () => clearInterval(interval);
   }, [fetchOBSScreenshot]);
 

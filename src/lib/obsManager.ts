@@ -120,6 +120,16 @@ export async function checkYouTubeLiveState(): Promise<boolean | null> {
   }
 }
 
+// lastStreamActiveState is only committed to a new value once the remote
+// SSH/SCP command to the physical panel actually confirms success (see
+// handleStreamStateChange's returned promise below). Committing it
+// optimistically before that was the original bug: a single transient SSH
+// failure (panel/Bluetooth host briefly unreachable) would still mark the
+// update as "done" internally, so the next poll saw no state change to
+// react to and never retried - leaving the physical panel stuck showing
+// whatever it last actually displayed, sometimes for the rest of the day.
+// Leaving it uncommitted on failure means the very next poll (10s later)
+// still sees a mismatch and tries again, until it truly succeeds.
 export async function updateLedState(isOBSActive: boolean) {
   const settings = getSettings();
   if (!settings.ledPanelEnabled) return;
@@ -128,16 +138,16 @@ export async function updateLedState(isOBSActive: boolean) {
 
   if (triggerSource === "obs") {
     if (lastStreamActiveState !== isOBSActive) {
-      lastStreamActiveState = isOBSActive;
-      handleStreamStateChange(isOBSActive);
+      const ok = await handleStreamStateChange(isOBSActive);
+      if (ok) lastStreamActiveState = isOBSActive;
     }
   } else {
     // YouTube trigger mode
     const isYtLive = await checkYouTubeLiveState();
     if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
-      lastStreamActiveState = isYtLive;
       console.log(`[LED Control] YouTube status changed to: ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}. Updating LED Sign Board...`);
-      handleStreamStateChange(isYtLive);
+      const ok = await handleStreamStateChange(isYtLive);
+      if (ok) lastStreamActiveState = isYtLive;
     }
   }
 }
@@ -151,17 +161,17 @@ function initYouTubeLivePolling() {
     if (triggerSource === "youtube") {
       const isYtLive = await checkYouTubeLiveState();
       if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
-        lastStreamActiveState = isYtLive;
         console.log(`[LED Control] Periodic YouTube check: status changed to ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}`);
-        handleStreamStateChange(isYtLive);
+        const ok = await handleStreamStateChange(isYtLive);
+        if (ok) lastStreamActiveState = isYtLive;
       }
     }
   }, 10000);
 }
 
-export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null) {
+export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null): Promise<boolean> {
   const settings = getSettings();
-  if (!settings.ledPanelEnabled) return;
+  if (!settings.ledPanelEnabled) return Promise.resolve(false);
 
   const remoteHost = settings.ledHost || settings.obsHost || '192.168.2.100';
   let remoteUser = 'jeffreygo';
@@ -199,52 +209,56 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
   const sanitizedColor = color ? sanitizeShellArg(color) : '';
 
   // Detect remote OS
-  execSshCommand(remoteUser, remoteHost, 'cmd.exe /c echo windows', (detectErr, detectStdout) => {
-    const isWindows = !detectErr && detectStdout.includes("windows");
-    console.log(`[LED Control] Remote host OS detected: ${isWindows ? 'Windows' : 'macOS/Linux'}`);
+  return new Promise<boolean>((resolve) => {
+    execSshCommand(remoteUser, remoteHost, 'cmd.exe /c echo windows', (detectErr, detectStdout) => {
+      const isWindows = !detectErr && detectStdout.includes("windows");
+      console.log(`[LED Control] Remote host OS detected: ${isWindows ? 'Windows' : 'macOS/Linux'}`);
 
-    const sanitizedUser = sanitizeShellArg(remoteUser);
-    const remoteScriptPath = isWindows
-      ? `C:/Users/${sanitizedUser}/AppData/Local/Temp/led_control.py`
-      : `/tmp/led_control.py`;
-    const localScriptPath = path.join(process.cwd(), 'led_control.py');
+      const sanitizedUser = sanitizeShellArg(remoteUser);
+      const remoteScriptPath = isWindows
+        ? `C:/Users/${sanitizedUser}/AppData/Local/Temp/led_control.py`
+        : `/tmp/led_control.py`;
+      const localScriptPath = path.join(process.cwd(), 'led_control.py');
 
-    // Copy script to remote host
-    execScpCommand(localScriptPath, remoteUser, remoteHost, remoteScriptPath, (err) => {
-      if (err) {
-        console.error(`[LED Control] scp copy failed: ${err.message}. Running remote script anyway...`);
-      }
-
-      // Build Python command arguments
-      const pythonArgs = ['--status', statusStr];
-      if (sanitizedMac) {
-        pythonArgs.push('--mac', sanitizedMac);
-      }
-      if (sanitizedText) {
-        pythonArgs.push('--text', sanitizedText);
-      }
-      if (sanitizedColor) {
-        pythonArgs.push('--color', sanitizedColor);
-      }
-
-      // Build remote command
-      let remoteCommand: string;
-      if (isWindows) {
-        remoteCommand = `python "${remoteScriptPath}" ${pythonArgs.join(' ')}`;
-      } else {
-        // Try multiple Python paths on Unix-like systems
-        const pyPath = remoteScriptPath;
-        const pyArgs = pythonArgs.join(' ');
-        remoteCommand = `if [ -f /opt/homebrew/bin/python3 ]; then /opt/homebrew/bin/python3 "${pyPath}" ${pyArgs}; elif [ -f /usr/local/bin/python3 ]; then /usr/local/bin/python3 "${pyPath}" ${pyArgs}; else python3 "${pyPath}" ${pyArgs}; fi`;
-      }
-
-      // Execute remote Python script
-      execSshCommand(remoteUser, remoteHost, remoteCommand, (errRun, stdoutRun, stderrRun) => {
-        if (errRun) {
-          console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
-        } else {
-          console.log(`[LED Control] Remote LED panel updated successfully: ${stdoutRun.trim()}`);
+      // Copy script to remote host
+      execScpCommand(localScriptPath, remoteUser, remoteHost, remoteScriptPath, (err) => {
+        if (err) {
+          console.error(`[LED Control] scp copy failed: ${err.message}. Running remote script anyway...`);
         }
+
+        // Build Python command arguments
+        const pythonArgs = ['--status', statusStr];
+        if (sanitizedMac) {
+          pythonArgs.push('--mac', sanitizedMac);
+        }
+        if (sanitizedText) {
+          pythonArgs.push('--text', sanitizedText);
+        }
+        if (sanitizedColor) {
+          pythonArgs.push('--color', sanitizedColor);
+        }
+
+        // Build remote command
+        let remoteCommand: string;
+        if (isWindows) {
+          remoteCommand = `python "${remoteScriptPath}" ${pythonArgs.join(' ')}`;
+        } else {
+          // Try multiple Python paths on Unix-like systems
+          const pyPath = remoteScriptPath;
+          const pyArgs = pythonArgs.join(' ');
+          remoteCommand = `if [ -f /opt/homebrew/bin/python3 ]; then /opt/homebrew/bin/python3 "${pyPath}" ${pyArgs}; elif [ -f /usr/local/bin/python3 ]; then /usr/local/bin/python3 "${pyPath}" ${pyArgs}; else python3 "${pyPath}" ${pyArgs}; fi`;
+        }
+
+        // Execute remote Python script
+        execSshCommand(remoteUser, remoteHost, remoteCommand, (errRun, stdoutRun, stderrRun) => {
+          if (errRun) {
+            console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
+            resolve(false);
+          } else {
+            console.log(`[LED Control] Remote LED panel updated successfully: ${stdoutRun.trim()}`);
+            resolve(true);
+          }
+        });
       });
     });
   });

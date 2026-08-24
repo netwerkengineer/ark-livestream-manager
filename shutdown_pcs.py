@@ -117,7 +117,7 @@ def shutdown_single_plug_sequence(plug, settings):
             cmd = "pmset sleepnow"
         else:
             cmd = "sudo /sbin/shutdown -h now"
-            
+
         print(f"[{name}] Sending remote shutdown command ({cmd}) to host ({host_ip})...")
         ssh_key_args = get_ssh_key_args()
         subprocess.run(
@@ -209,7 +209,7 @@ def main():
                 cmd = "pmset sleepnow"
             else:
                 cmd = "sudo /sbin/shutdown -h now"
-                
+
             print(f"[{name}] Initiating SSH command ({cmd}) for host ({host_ip})...")
             # Run SSH in background
             ssh_key_args = get_ssh_key_args()
