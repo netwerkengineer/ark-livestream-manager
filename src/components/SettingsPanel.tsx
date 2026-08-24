@@ -401,6 +401,12 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><ShieldAlert size={18} color="var(--primary)" /> <strong>Atem Mini Pro</strong></div>
+                  <input className="input-field" placeholder="IP Adres" value={settings.atemHost || ""} onChange={(e) => onSettingsChange({...settings, atemHost: e.target.value})} />
+                  <p className="text-[10px] text-muted" style={{ marginTop: '8px' }}>Wordt gebruikt om bij het opstarten van de OBS PC te wachten tot de Atem online is, vóórdat OBS start (anders herkent OBS de Atem-video-invoer niet).</p>
+                </div>
+
+                <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Sun size={18} color="#f97316" /> <strong>Lichtregie (QLC+)</strong></div>
                     <label className="switch" style={{ scale: '0.8' }}>

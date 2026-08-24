@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import net from 'net';
 import dgram from 'dgram';
+import { execFile } from 'child_process';
 import { getSettings } from '@/lib/settingsStore';
 import { getActiveMidiPeers } from '@/lib/midiBridge';
 import { isAuthorized } from "@/lib/authHelper";
@@ -47,6 +48,23 @@ async function checkUdp(port: number, host: string): Promise<boolean> {
   });
 }
 
+async function checkPing(host: string): Promise<boolean> {
+  // Plain UDP "did the send() call succeed" (see checkUdp above) can't
+  // actually tell whether a device is there - a send always succeeds
+  // regardless of whether anything is listening, since UDP is
+  // connectionless. Some devices (like the Atem) also don't answer an
+  // arbitrary probe packet even when genuinely online. A real ICMP ping
+  // is what actually confirms the device itself is reachable - same
+  // mechanism startup_pcs.py already uses to wait for the Atem before
+  // launching OBS.
+  if (!host) return false;
+  return new Promise((resolve) => {
+    execFile('ping', ['-c', '1', '-W', '2', host], (err) => {
+      resolve(!err);
+    });
+  });
+}
+
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req);
   if (!authSession) {
@@ -58,19 +76,23 @@ export async function GET(req: NextRequest) {
   const servicesToCheck = [
     { name: 'Companion', host: settings.companionHost, port: settings.companionPort, type: 'tcp' },
     { name: 'OBS', host: settings.obsHost, port: settings.obsPort, type: 'tcp' },
-    { name: 'X32', host: settings.x32Host, port: settings.x32Port, type: 'udp' },
+    { name: 'X32', host: settings.x32Host, port: settings.x32Port, type: 'ping' },
     { name: 'QLC+', host: settings.qlcHost, port: settings.qlcPort, type: 'udp' },
     { name: 'FreeShow', host: settings.freeShowHost, port: settings.freeShowPort, type: 'tcp' },
+    { name: 'Atem', host: settings.atemHost || '', port: 9910, type: 'ping' },
   ];
 
   const status = await Promise.all(
     servicesToCheck.map(async (service) => {
-      const isUp = service.type === 'tcp' 
+      const isUp = service.type === 'tcp'
         ? await checkTcp(service.port, service.host)
+        : service.type === 'ping'
+        ? await checkPing(service.host)
         : await checkUdp(service.port, service.host);
-        
+
       let statusLabel = isUp ? 'UP' : 'DOWN';
       if (isUp && service.type === 'udp') statusLabel = 'READY';
+      if (isUp && service.type === 'ping') statusLabel = 'READY';
 
       return { 
         name: service.name, 

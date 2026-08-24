@@ -111,6 +111,36 @@ class TuyaHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(f"OK: {res.stdout}".encode())
             
+        elif path == '/off_delayed':
+            try:
+                delay = float(query_params.get('delay', ['30'])[0])
+            except ValueError:
+                delay = 30.0
+            # Clamped so a bad/missing param can't turn this into either an
+            # instant cut (no time for Windows to actually finish writing
+            # to disk) or an effectively-forgotten one that never fires.
+            delay = max(5.0, min(delay, 120.0))
+            print(f"Received HTTP request: Turn OFF plug '{plug_id}' after a {delay}s delay")
+
+            def _delayed_off(plug_id, delay):
+                time.sleep(delay)
+                invalidate_cache(plug_id)
+                subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id])
+                print(f"[Delayed Off] Plug '{plug_id}' turned off after {delay}s delay.")
+
+            # Runs on this server's own clock, not the machine that's
+            # shutting down - a Windows PC's own scheduled task can't
+            # safely sleep through its own shutdown teardown (it can get
+            # force-killed mid-wait), but this process isn't shutting down
+            # at all, so the wait is reliable here. The PC just needs to
+            # fire this request at the very start of its shutdown, while
+            # its network stack is still up.
+            threading.Thread(target=_delayed_off, args=(plug_id, delay), daemon=True).start()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(f"OK: Plug '{plug_id}' will be turned off in {delay}s".encode())
+
         elif path == '/shutdown':
             print(f"Received HTTP request: Shutdown sequence for plug: {plug_id}")
             invalidate_cache(plug_id)
