@@ -1,6 +1,6 @@
 # Handleiding — Ark Church Livestream Manager
 
-*Versie van dit document: bij app-versie 2.27.0*
+*Versie van dit document: bij app-versie 2.31.4*
 
 ## Inleiding
 
@@ -67,6 +67,8 @@ Voordat je hier iets kunt inplannen moet het YouTube-kanaal gekoppeld zijn. Is d
 
 Klik op **"Plan Alles In"** om de uitzending aan te maken. Bij succes verschijnt een bevestiging die je er ook aan herinnert om Facebook Live handmatig in te plannen.
 
+> ℹ️ Nieuwe uitzendingen starten **niet** automatisch zodra er een videosignaal binnenkomt — je start de uitzending zelf handmatig in YouTube wanneer je klaar bent.
+
 ### Thumbnail
 
 Klik op de thumbnail-voorvertoning of "Open Editor" om een thumbnail-afbeelding te maken/bewerken. Deze wordt zowel naar YouTube geüpload als lokaal opgeslagen (o.a. als `thema.jpg` op de NAS) zodat OBS/FreeShow deze automatisch als beeld kunnen tonen vóór de uitzending begint.
@@ -86,11 +88,13 @@ Dit is het centrale bedieningspaneel tijdens een dienst.
 
 ### Systeemstatus
 
-Bovenaan zie je de status van alle gekoppelde diensten (Companion, OBS, X32, QLC+, FreeShow, Tuya) — groen/blauw = actief, rood = niet bereikbaar. Klik op het ververs-icoon om opnieuw te controleren.
+Bovenaan zie je de status van alle gekoppelde diensten (Companion, OBS, X32, QLC+, FreeShow, Atem, Tuya) — groen/blauw = actief, rood = niet bereikbaar. Klik op het ververs-icoon om opnieuw te controleren.
 
 ### Slimme stekkers
 
 Als er stekkers zijn ingesteld (Instellingen → Slimme Stekkers), zie je hier per stekker: naam, online/offline-status, aan/uit-status, en (indien online) spanning/stroom/vermogen. De status wordt elke 10 seconden automatisch ververst.
+
+> ℹ️ Voor de Beamer-PC en de OBS-PC geldt: zodra Windows daadwerkelijk wordt afgesloten — via de app, via een schema, óf gewoon handmatig door iemand die op de PC zelf op "Afsluiten" klikt — gaat de bijbehorende slimme stekker automatisch ná een korte vertraging uit (genoeg tijd om Windows echt te laten afsluiten voordat de stroom wordt verbroken). Dit geldt niet voor extra FreeShow-doelen (zie 8.8).
 
 ### rtpMIDI-deelnemers
 
@@ -247,7 +251,7 @@ In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de
 **Prullenbak** — verwijderde shows staan hier tijdelijk; "Herstellen" haalt ze terug, "Prullenbak Leegmaken" verwijdert ze definitief (kan niet ongedaan gemaakt worden).
 
 **Systeemacties**:
-- **Handmatige Sync Starten** — synchroniseert Shows, Media, Bibles én Templates (inclusief submappen) tussen de NAS en de Beamer-PC, en met elk extra geconfigureerd doel (zie 8.8) — gebeurt normaal ook automatisch elke nacht, zie hoofdstuk 9. Terwijl de sync loopt zie je per doel een statusregel (⏳ bezig, ✅ klaar, ❌ fout, ⏭️ overgeslagen); bij afronding verschijnt bovenin een melding ("✅ Sync voltooid." of "❌ Sync mislukt: ..."). Deze voortgang wordt ook getoond als een sync die al liep (bijvoorbeeld de automatische nachtelijke sync) nog bezig is wanneer je dit scherm opent.
+- **Handmatige Sync Starten** — synchroniseert Shows, Media, Bibles én Templates (inclusief submappen) tussen de NAS en de Beamer-PC en/of elk extra geconfigureerd doel (zie 8.8) — gebeurt voor de Beamer-PC normaal ook automatisch elke nacht, zie hoofdstuk 9. Vóór de knop staat per doel een aanvinkvakje (Beamer-PC staat standaard aan; extra doelen staan standaard uit, omdat die meestal toch niet aanstaan) — alleen aangevinkte doelen worden meegenomen in die run. Terwijl de sync loopt zie je per doel een statusregel (⏳ bezig, ✅ klaar, ❌ fout, ⏭️ overgeslagen); bij afronding verschijnt bovenin een melding ("✅ Sync voltooid." of "❌ Sync mislukt: ..."). Deze voortgang wordt ook getoond als een sync die al liep (bijvoorbeeld de automatische nachtelijke sync) nog bezig is wanneer je dit scherm opent.
 - **Project nu klaarzetten** — stuurt het laatst gegenereerde project direct naar de Beamer-PC en zet het klaar in FreeShow, zonder te wachten op het nachtelijke schema. Handig als de PC al aanstaat en je niet tot 's nachts wilt wachten. De status (✅/❌) verschijnt direct onder de knop.
 - **Wis Alle Bijbelteksten** (rode, destructieve actie) — verwijdert in één keer alle Bijbeltekst-shows van zowel de NAS als de Beamer-PC. Let op: dit kan niet ongedaan worden gemaakt.
 
@@ -256,7 +260,7 @@ In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de
 Onder "📬 Concept-diensten (mail)" zie je per herkende dienstdatum wat er tot nu toe via e-mail is aangeleverd. Klik **"🔄 Check nu"** om direct te controleren op nieuwe mail (dit gebeurt anders automatisch elke 10 minuten op de achtergrond).
 
 Per dienst zie je:
-- Liederen (met 📝-icoon als er ook tekst is meegestuurd), Bijbeltekst, Media — elk met een label van de sectie waar het naartoe gaat
+- Liederen (met 📝-icoon als er ook tekst is meegestuurd), Bijbeltekst, Media — elk met een label van de sectie waar het naartoe gaat, en een 🗑️-icoontje om dat ene item te verwijderen zonder de rest van de dienst kwijt te raken (bijvoorbeeld bij een verkeerd doorgegeven lied of vers)
 - **Niet herkende regels** (geel) — tekst in de mail die niet volgens het verwachte formaat was en dus met de hand nagekeken moet worden
 - **Opmerkingen bij het genereren** (blauw) — bijvoorbeeld dat een nieuw lied is aangemaakt, of in welke categorie
 - Een knop **"Project aanmaken"** of **"Project bijwerken"** — genereert/actualiseert het FreeShow-project voor die dienst automatisch
@@ -299,7 +303,7 @@ https://youtu.be/xxxxxxxxxxx
 **Onderdelen:**
 
 - `Dienst datum: DD-MM-YYYY` — verplicht, precies één keer, bepaalt bij welke dienst alles hoort.
-- `[Sectie: Naam]` — bepaalt in welk onderdeel van de dienst-orde de erop volgende items terechtkomen (moet overeenkomen met een sectienaam uit het gebruikte sjabloon, bijvoorbeeld Start/Worship/Collecte/Worship 2/Preek/Einde).
+- `[Sectie: Naam]` — bepaalt in welk onderdeel van de dienst-orde de erop volgende items terechtkomen (moet overeenkomen met een sectienaam uit het gebruikte sjabloon, bijvoorbeeld Start/Worship/Collecte/Worship 2/Preek/Einde). Hoofdletters en spaties maken niet uit — `[sectie: worship]` werkt net zo goed als `[Sectie: Worship]`.
 - `Liederen (categorie: X):` gevolgd door regels die beginnen met `- `. Per lied:
   - Alleen een titel: `- Way Maker`
   - Titel + artiest: `- Way Maker - Sinach` (de artiest helpt bij het opzoeken/matchen)
@@ -321,7 +325,59 @@ https://youtu.be/xxxxxxxxxxx
     - 10.000 Redenen (bijlage: 10000_redenen.pdf)
     ```
     (de bijlage moet dan ook daadwerkelijk aan de mail zijn toegevoegd, met exact die bestandsnaam)
-- `Bijbeltekst:` gevolgd door één of meer regels in het formaat `Boek Hoofdstuk:VersBegin-VersEind (VERTALING)`, bijvoorbeeld `Johannes 3:16-18 (NBV21)`.
+- `Bijbeltekst:` gevolgd door één of meer regels in het formaat `Boek Hoofdstuk:VersBegin-VersEind (VERTALING)`, bijvoorbeeld `Johannes 3:16-18 (NBV21)`. De vertaling mag ook één keer voor het hele blokje worden opgegeven in plaats van per regel: `Bijbeltekst (NBG):` — handig voor een lijstje zoals je die vanuit WhatsApp kopieert. Boeknamen mogen ook afgekort (`Ef.`, `Joh.`, `Ps.`, `2 Cor.`) en de spaties rondom zijn flexibel:
+  ```
+  Bijbeltekst (NBG):
+  Ef. 2:1-10
+  Joh. 3:15-18
+  Ps. 100:3
+  2 Cor.12:9
+  ```
+  Wordt een boeknaam of vertaling nergens herkend, dan verschijnt dat als "niet herkend" in de reviewtab in plaats van geraden te worden.
+
+  **Herkende afkortingen per Bijbelboek** (met of zonder punt; een niet-genoemde afkorting wordt ook herkend als hij eenduidig bij precies één boeknaam past, bijvoorbeeld "Efez"):
+
+  | Boek | Afk. | Boek | Afk. |
+  |---|---|---|---|
+  | Genesis | Gen. | Mattheüs | Matt. |
+  | Exodus | Ex. | Marcus | Mark. |
+  | Leviticus | Lev. | Lukas | Luk. |
+  | Numeri | Num. | Johannes | Joh. |
+  | Deuteronomium | Deut. | Handelingen | Hand. |
+  | Jozua | Joz. | Romeinen | Rom. |
+  | Rechters | Recht. | 1 Korinthiërs | 1 Kor. / 1 Cor. |
+  | Ruth | — | 2 Korinthiërs | 2 Kor. / 2 Cor. |
+  | 1 Samuël | 1 Sam. | Galaten | Gal. |
+  | 2 Samuël | 2 Sam. | Efeziërs | Ef. |
+  | 1 Koningen | 1 Kon. | Filippenzen | Fil. |
+  | 2 Koningen | 2 Kon. | Kolossenzen | Kol. |
+  | 1 Kronieken | 1 Kron. | 1 Thessalonicenzen | 1 Thess. |
+  | 2 Kronieken | 2 Kron. | 2 Thessalonicenzen | 2 Thess. |
+  | Ezra | — | 1 Timotheüs | 1 Tim. |
+  | Nehemia | Neh. | 2 Timotheüs | 2 Tim. |
+  | Esther | Est. | Titus | Tit. |
+  | Job | — | Filemon | Filem. |
+  | Psalmen | Ps. | Hebreeën | Hebr. |
+  | Spreuken | Spr. | Jakobus | Jak. |
+  | Prediker | Pred. | 1 Petrus | 1 Petr. |
+  | Hooglied | Hoogl. | 2 Petrus | 2 Petr. |
+  | Jesaja | Jes. | 1 Johannes | 1 Joh. |
+  | Jeremia | Jer. | 2 Johannes | 2 Joh. |
+  | Klaagliederen | Klaagl. | 3 Johannes | 3 Joh. |
+  | Ezechiël | Ez. | Judas | Jud. |
+  | Daniël | Dan. | Openbaring | Openb. |
+  | Hosea | Hos. | | |
+  | Joël | Jl. | | |
+  | Amos | Am. | | |
+  | Obadja | Ob. | | |
+  | Jona | — | | |
+  | Micha | Mi. | | |
+  | Nahum | Nah. | | |
+  | Habakuk | Hab. | | |
+  | Sefanja | Sef. | | |
+  | Haggaï | Hag. | | |
+  | Zacharia | Zach. | | |
+  | Maleachi | Mal. | | |
 - `Media:` gevolgd door regels met een YouTube-link, een gewone link, of `(bijlage: bestandsnaam)` voor een bijgevoegde afbeelding/video/PowerPoint.
 - Een lege regel sluit het huidige blok af (behalve binnen een `[Tekst]...[/Tekst]`-blok, waar lege regels juist bewaard blijven voor couplet/refrein-scheiding).
 - **Commentaar**: een regel die begint met `#` wordt volledig genegeerd (bijvoorbeeld `# nog even nakijken`); een `#` verderop in een regel, met een spatie ervoor, negeert de rest van díe regel als toelichting, bijvoorbeeld:
@@ -333,6 +389,24 @@ https://youtu.be/xxxxxxxxxxx
 - Een normale **e-mailhandtekening** (alles na een regel die begint met `-- `) wordt automatisch herkend en genegeerd, ook als de `--` per ongeluk aan het einde van de voorgaande regel is blijven plakken.
 - Zowel platte-tekst- als opgemaakte (HTML/rich-text) mails worden ondersteund, en een doorgestuurde mail met `>`-aanhalingstekens ervoor wordt ook herkend.
 - Alles wat niet herkend wordt, verschijnt zichtbaar als "niet herkende regel" in de reviewtab — er wordt nooit stilzwijgend geraden.
+
+**Een fout corrigeren via een vervolgmail.** Is er al een lied, Bijbeltekst of media-item aangeleverd dat toch niet klopt, dan hoeft niet de hele dienst opnieuw: stuur een korte vervolgmail (zelfde `Dienst datum:`) met een regel `Verwijder lied: ...`, `Verwijder bijbeltekst: ...` of `Verwijder media: ...`. Deze regels mogen overal in de mail staan, ook samen met nieuwe items in dezelfde mail:
+
+```
+Dienst datum: 23-08-2026
+
+Verwijder lied: Way Maker
+Verwijder bijbeltekst: Efeziërs 2:1-10
+
+[Sectie: Worship]
+Liederen:
+- Great Are You Lord
+```
+
+- `Verwijder lied: Titel` (optioneel `Titel - Artiest` om tussen twee gelijknamige liederen van verschillende artiesten te onderscheiden) verwijdert dat lied uit de dienst.
+- `Verwijder bijbeltekst: Boek H:V-V` (zelfde boeknaam-afkortingen als hierboven toegestaan) verwijdert die ene tekst.
+- `Verwijder media: ...` gevolgd door de YouTube-link, gewone link, of bijlagenaam verwijdert dat media-item.
+- Is er geen match gevonden, dan verschijnt dat als opmerking bij de dienst in de reviewtab in plaats van dat er iets fout gaat — er wordt nooit per ongeluk het verkeerde item verwijderd of stilzwijgend niets gedaan. Hetzelfde kan ook los, met het 🗑️-icoontje naast elk lied/tekst/media-item in de reviewtab zelf, zonder een e-mail te hoeven sturen.
 
 ---
 
@@ -388,6 +462,7 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
 - **OBS WebSocket** — IP, poort, wachtwoord (optioneel)
 - **Bitfocus Companion** — IP, poort
 - **Behringer X32 (OSC)** — IP, poort
+- **Atem Mini Pro** — IP-adres. Wordt gebruikt om bij het opstarten van de OBS-PC te wachten tot de Atem online is vóórdat OBS zelf start (anders herkent OBS de Atem-video-invoer niet), en om de status op de Regie-tab te tonen.
 - **Lichtregie (QLC+)** — aan/uit-schakelaar, IP, poort (standaard 7700)
 - **Presentatie (FreeShow)** — FreeShow IP, poort (standaard 5505). Het media-pad stel je in bij het tabblad **FreeShow** (`freeshowMediaPath`, zie 8.8).
 - **LED Paneel (BK-Light)** — aan/uit, doel-host (leeg = zelfde als FreeShow-host), SSH-gebruiker, Bluetooth MAC (optioneel, anders auto-detectie), tekst/kleur voor "actief" en "inactief"
@@ -452,7 +527,7 @@ Naast de hoofd-Beamer-PC hierboven kun je hier extra machines toevoegen die deze
 | SSH Gebruiker | Leeg laten = zelfde gebruiker als het hoofd-doel |
 | Actief | Zet een doel tijdelijk uit zonder de configuratie te verwijderen |
 
-Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "Project nu klaarzetten" (zie 5.10) — dat blijft exclusief voor de hoofd-Beamer-PC. Met **"Verwijderen"** haal je een doel weer weg.
+Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "Project nu klaarzetten" (zie 5.10) — dat blijft exclusief voor de hoofd-Beamer-PC. Ze syncen ook **nooit automatisch** mee (niet 's nachts, niet na het inplannen van een stream) — alleen wanneer je ze bij "Handmatige Sync Starten" (zie 5.10) zelf aanvinkt, aangezien zulke doelen meestal toch niet aanstaan. De sync naar een extra doel gaat bovendien maar één kant op (NAS → doel): een wijziging die iemand rechtstreeks op zo'n extra machine maakt, komt nooit terug in de hoofdcatalogus. Met **"Verwijderen"** haal je een doel weer weg.
 
 ### 8.9 Backup & Herstel
 
@@ -469,8 +544,11 @@ Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "P
 Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 
 - **E-mailcontrole** — elke 10 minuten, mits IMAP-gegevens zijn ingesteld (zie 8.8).
-- **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert Shows, Media, Bibles en Templates (inclusief submappen) tweerichtingsverkeer tussen NAS en Beamer-PC en elk extra geconfigureerd doel (zie 8.8), en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond (extra doelen worden nooit automatisch aan/uit gezet). Een ingebouwde veiligheidsgrens voorkomt dat de sync in één keer een ongewoon groot aantal bestanden verwijdert (bijvoorbeeld door een tijdelijk onbereikbare map) — in dat geval wordt er die run niets verwijderd en verschijnt een waarschuwing in het synclog, zodat dit niet stilzwijgend tot dataverlies leidt.
-- **Thumbnail-synchronisatie** — elke 10 minuten wordt gecontroleerd of er een nieuwe eerstvolgende livestream is, en zo ja, de thumbnail lokaal bijgewerkt.
+- **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert Shows, Media, Bibles en Templates (inclusief submappen) tweerichtingsverkeer tussen NAS en Beamer-PC, en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond. Extra FreeShow-doelen (zie 8.8) doen hier standaard niet aan mee — die syncen alleen als je ze zelf handmatig aanvinkt (zie 5.10). Een ingebouwde veiligheidsgrens voorkomt dat de sync in één keer een ongewoon groot aantal bestanden verwijdert (bijvoorbeeld door een tijdelijk onbereikbare map) — in dat geval wordt er die run niets verwijderd en verschijnt een waarschuwing in het synclog, zodat dit niet stilzwijgend tot dataverlies leidt.
+- **Sync na een nieuwe/gewijzigde thumbnail** — zodra er een nieuwe eerstvolgende livestream is (of de thumbnail daarvan verandert), wordt meteen een sync naar de Beamer-PC gestart (in plaats van te wachten tot 00:00 uur) — en de bijbehorende stekker gaat daarna, net als bij de nachtelijke sync, netjes uit.
+- **Thumbnail-synchronisatie** — elke 10 minuten wordt gecontroleerd of er een nieuwe eerstvolgende livestream is, en zo ja, de thumbnail lokaal bijgewerkt (zie hierboven).
+- **Wachten op de Atem vóór OBS start** — als er een Atem-IP is ingesteld (zie 8.2), wacht het opstartproces van de OBS-PC tot de Atem online is (reageert op ping) vóórdat OBS zelf wordt gestart. Start OBS namelijk vóór de Atem, dan herkent OBS de video-invoer van de Atem niet.
+- **Automatisch wegklikken van OBS' "niet netjes afgesloten"-melding** — als de OBS-PC ooit onverwacht is afgesloten (bijvoorbeeld een stroomonderbreking), toont OBS bij de volgende start een melding die vraagt om te kiezen tussen veilige en normale modus. Deze melding wordt automatisch weggeklikt (altijd "Starten in normale modus" — veilige modus zou de WebSocket-koppeling met deze app uitschakelen), zodat OBS niet blijft hangen wanneer niemand er fysiek bij zit.
 
 ---
 
