@@ -378,6 +378,7 @@ https://youtu.be/xxxxxxxxxxx
   | Haggaï | Hag. | | |
   | Zacharia | Zach. | | |
   | Maleachi | Mal. | | |
+
 - `Media:` gevolgd door regels met een YouTube-link, een gewone link, of `(bijlage: bestandsnaam)` voor een bijgevoegde afbeelding/video/PowerPoint.
 - Een lege regel sluit het huidige blok af (behalve binnen een `[Tekst]...[/Tekst]`-blok, waar lege regels juist bewaard blijven voor couplet/refrein-scheiding).
 - **Commentaar**: een regel die begint met `#` wordt volledig genegeerd (bijvoorbeeld `# nog even nakijken`); een `#` verderop in een regel, met een spatie ervoor, negeert de rest van díe regel als toelichting, bijvoorbeeld:
