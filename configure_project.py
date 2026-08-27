@@ -1,6 +1,9 @@
 import sys
+import os
 import re
 import argparse
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main():
     parser = argparse.ArgumentParser(description="Configure QLC+ project universes for Home (Unicast) or Church (Broadcast) environments.")
@@ -9,7 +12,7 @@ def main():
     parser.add_argument("--unicast", default="192.168.40.100", help="Unicast target IP address (only used in 'home' mode)")
     args = parser.parse_args()
 
-    file_path = "/Volumes/OWC-DISK/scripts/antigravity/livestream-manager/config/ark_church_lighting.qxw"
+    file_path = os.path.join(SCRIPT_DIR, "config", "ark_church_lighting.qxw")
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
