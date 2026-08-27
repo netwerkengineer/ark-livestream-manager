@@ -4,13 +4,39 @@ import { triggerFreeShowSync } from "./syncTrigger";
 import fs from "fs";
 import path from "path";
 
-let lastSyncedUrl = "";
+const DATA_DIR = path.join(process.cwd(), "data");
+const STATE_FILE = path.join(DATA_DIR, "thumbnail_sync_state.json");
+
+// Persisted to disk (not just an in-memory variable) so a container
+// restart - e.g. during a deploy - doesn't make initThumbnailSync() think
+// an already-synced thumbnail is new. See the keepOn comment below for why
+// that distinction matters: an unchanged thumbnail now correctly triggers
+// no sync at all after a restart, instead of one that leaves the Beamer PC
+// powered on unexpectedly.
+function readLastSyncedUrl(): string {
+  if (fs.existsSync(STATE_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
+      return parsed.lastSyncedUrl || "";
+    } catch (e) {
+      console.error("[Thumbnail Sync] Kon state-bestand niet lezen, start leeg:", e);
+    }
+  }
+  return "";
+}
+
+function writeLastSyncedUrl(url: string) {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  fs.writeFileSync(STATE_FILE, JSON.stringify({ lastSyncedUrl: url }));
+}
 
 async function syncThumbnailFromUrl(url: string) {
-  if (url === lastSyncedUrl) {
+  if (url === readLastSyncedUrl()) {
     return;
   }
-  
+
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -45,7 +71,7 @@ async function syncThumbnailFromUrl(url: string) {
       }
     }
     
-    lastSyncedUrl = url;
+    writeLastSyncedUrl(url);
 
     // thema.jpg only lives on the NAS at this point - the Beamer PC's own
     // FreeShow install reads media from its own local disk (confirmed:
@@ -56,9 +82,13 @@ async function syncThumbnailFromUrl(url: string) {
     // keepOn stays at its default (true/never-shutdown) here deliberately -
     // this function also runs from a passive 10-minute background interval
     // AND once on every app startup (initThumbnailSync()), neither of which
-    // reflects "the operator just scheduled a stream". Since lastSyncedUrl
-    // is only in-memory, it resets on every restart, so a keepOn:false here
-    // would fire an unattended shutdown-triggering sync on every deploy.
+    // reflects "the operator just scheduled a stream" the way create/route.ts's
+    // explicit keepOn:false trigger does. A genuinely new thumbnail spotted
+    // by this background check could happen at any time of day unrelated to
+    // stream prep, so an unattended shutdown here would be unsafe - that's
+    // still true even though lastSyncedUrl is now persisted to disk (see
+    // above) specifically to stop a restart alone from being mistaken for
+    // "new thumbnail" and firing this in the first place.
     // targetKeys: ['primary'] - same reasoning as create/route.ts: this is
     // an automated trigger, and additional targets only ever sync when
     // someone explicitly picks them via the manual sync button.
