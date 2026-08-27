@@ -26,12 +26,13 @@ services:
 
 
   companion:
-    image: companion-nas-v4-3-4:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.companion
     container_name: companion
     restart: always
     ports:
       - "8000:8000"
-      - "8001:8001"
       - "12321:12321/udp"
       - "9000:9000/udp"
       - "12322:12322/udp"
