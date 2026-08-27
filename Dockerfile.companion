@@ -1,1 +1,1 @@
-FROM ghcr.io/bitfocus/companion/companion:v4.3.4
+FROM ghcr.io/bitfocus/companion/companion:v5.0.4
