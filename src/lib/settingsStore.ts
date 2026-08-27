@@ -211,23 +211,16 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   // QLC+ Defaults
   qlcEnabled: false,
 
-  // Tuya Smart Plug Defaults
-  tuyaDeviceId: "REDACTED_TUYA_DEVICE_ID_1",
-  tuyaDeviceIp: "192.168.40.60",
-  tuyaLocalKey: "REDACTED_TUYA_LOCAL_KEY_1",
+  // Tuya Smart Plug Defaults - intentionally empty. Configure your own
+  // plugs at Instellingen -> Slimme Stekkers; nothing here should ever be
+  // a real device's credentials, since this file is committed to a public
+  // repo.
+  tuyaDeviceId: "",
+  tuyaDeviceIp: "",
+  tuyaLocalKey: "",
   tuyaVersion: 3.5,
   tuyaApiHost: "",
-  tuyaPlugs: [
-    {
-      id: "home_mac",
-      name: "Thuis Mac Mini Plug",
-      ip: "192.168.40.60",
-      deviceId: "REDACTED_TUYA_DEVICE_ID_1",
-      localKey: "REDACTED_TUYA_LOCAL_KEY_1",
-      version: 3.5,
-      hostIp: "192.168.2.20"
-    }
-  ],
+  tuyaPlugs: [],
   schedules: [],
 
   // Default Buttons
