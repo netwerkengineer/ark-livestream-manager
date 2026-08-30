@@ -336,8 +336,21 @@ export function getLineStyle(line: any, itemAlign: any): React.CSSProperties {
   return getAlignmentStyle(align);
 }
 
+// FreeShow shows created without ever touching per-line styling (e.g. some
+// imported/catalog songs) leave text style empty and rely entirely on
+// FreeShow's own active theme for font size. We don't have access to that
+// theme here, so without a fallback the text inherits the browser default
+// (16px) instead - reads fine in FreeShow itself, but shrinks to a few
+// pixels once our 1920x1080 preview canvas gets scaled down to fit its
+// container. 80px matches the size this app already assumes for full-box
+// lyrics/scripture text elsewhere (see SCRIPTURE_FONT_SIZE in
+// draftProjectGenerator.ts) - not a re-implementation of FreeShow's theme
+// engine, just a reasonable default so text isn't unreadable.
+const DEFAULT_TEXT_FONT_SIZE = '80px';
+
 export function getSegmentStyle(seg: any): React.CSSProperties {
-  return seg.style ? parseStyleString(seg.style) : {};
+  const style = seg.style ? parseStyleString(seg.style) : {};
+  return style.fontSize ? style : { fontSize: DEFAULT_TEXT_FONT_SIZE, ...style };
 }
 
 export function getTranslatedTitle(title: string): string {
