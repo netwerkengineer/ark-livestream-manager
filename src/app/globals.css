@@ -294,6 +294,22 @@ textarea.input-field {
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* <select>'s open option list is a native OS popup on most
+   browsers/platforms, not something the surrounding page paints - it
+   ignores our translucent .input/.input-field background (rgba(0,0,0,0.2))
+   and falls back to the OS's own opaque background, while still inheriting
+   our white text color. Some browsers (notably Chrome/Edge on Windows) then
+   render unselected options as white text on a white popup - invisible,
+   except for the one option the OS highlights on hover/selection. An
+   explicit opaque background directly on <option> fixes this everywhere,
+   since (unlike the <select> itself) options can't be given a translucent
+   background that depends on the page behind them. */
+.input option,
+.input-field option {
+  background-color: #0f172a;
+  color: #fff;
+}
+
 /* Custom Tooltips */
 .tooltip-container {
   position: relative;
