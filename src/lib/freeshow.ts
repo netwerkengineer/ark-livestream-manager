@@ -106,6 +106,17 @@ export function createShowObject(show: any) {
 
     const isBible = show.data.category === 'scripture';
 
+    // A section that was purely a group label (e.g. "Chorus" on its own
+    // line, blank line, then the actual lyrics as a *separate* section)
+    // has nothing left to show once the label's stripped off above - the
+    // label already updated activeGroupName/Color/Key for whichever
+    // section comes next, so there's no reason to also emit a slide with
+    // zero text items for it. Common when lyrics are pasted with the
+    // label on its own line rather than as the first line of the verse.
+    if (!isBible && rawLabel && cleanSection.split('\n').every(l => l.trim() === '')) {
+      return;
+    }
+
     if (isBible && show.refData && show.refData.chunks) {
       const chunk = show.refData.chunks[idx] || [];
       if (chunk.length === 0) return;
