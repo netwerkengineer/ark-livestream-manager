@@ -1,6 +1,20 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
+
+const CATEGORY_STORAGE_KEY = 'freeshow_song_search_categories';
+
+function loadStoredCategories(): string[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 interface SongInputProps {
   songInput: string;
@@ -32,8 +46,20 @@ export default function SongInput({
     return cats;
   }, [searchableSongs, freeshowCategories]);
 
-  const [selectedCategories, setSelectedCategories] = useState<string[] | null>(null);
+  // null = "alle categorieën" (het gedrag als de gebruiker nog nooit iets
+  // heeft uitgevinkt) - pas zodra iemand een categorie aan/uit klikt wordt
+  // dit een concrete lijst, die we vanaf dat moment onthouden.
+  const [selectedCategories, setSelectedCategories] = useState<string[] | null>(loadStoredCategories);
   const activeCategories = selectedCategories ?? availableCategories;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedCategories === null) {
+      localStorage.removeItem(CATEGORY_STORAGE_KEY);
+    } else {
+      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(selectedCategories));
+    }
+  }, [selectedCategories]);
 
   const toggleCategory = (cat: string) => {
     const current = selectedCategories ?? availableCategories;
