@@ -88,7 +88,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog">("general");
   const [availableTemplates, setAvailableTemplates] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [settings, setSettings] = useState<any>(null);

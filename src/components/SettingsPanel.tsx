@@ -15,16 +15,18 @@ import {
   Layers,
   MonitorPlay,
   Activity,
+  ScrollText,
   ShieldAlert,
   Monitor,
   Cpu,
   Tv
 } from "lucide-react";
 import BackupRestoreSettings from "@/components/BackupRestoreSettings";
+import ActivityLogPanel from "@/components/ActivityLogPanel";
 
 interface SettingsPanelProps {
   settings: any;
-  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup";
+  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog";
   userRole: "admin" | "operator" | null;
   localUsers: any[];
   availableTemplates: string[];
@@ -39,7 +41,7 @@ interface SettingsPanelProps {
   currentUser: string | null;
   onClose: () => void;
   onSettingsChange: (settings: any) => void;
-  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup") => void;
+  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog") => void;
   onSaveSettings: () => void;
   onSaveUser: (e: React.FormEvent) => void;
   onDeleteUser: (username: string) => void;
@@ -316,6 +318,30 @@ export default function SettingsPanel({
             <Save size={18} />
             <span>Backup & Herstel</span>
           </button>
+
+          {userRole === "admin" && (
+            <button
+              type="button"
+              onClick={() => onTabChange("activityLog")}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: settingsTab === "activityLog" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                color: settingsTab === "activityLog" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                fontWeight: settingsTab === "activityLog" ? 600 : 500,
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <ScrollText size={18} />
+              <span>Activiteitenlog</span>
+            </button>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1636,6 +1662,10 @@ export default function SettingsPanel({
 
           {settingsTab === "backup" && (
             <BackupRestoreSettings settings={settings} setSettings={onSettingsChange} />
+          )}
+
+          {settingsTab === "activityLog" && userRole === "admin" && (
+            <ActivityLogPanel />
           )}
 
         </div>

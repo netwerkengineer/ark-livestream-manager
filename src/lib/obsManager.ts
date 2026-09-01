@@ -9,6 +9,7 @@
 import OBSWebSocket from 'obs-websocket-js';
 import { getSettings } from './settingsStore';
 import { youtubeFetch } from './tokenStore';
+import { logActivity } from './activityLog';
 import { spawn } from 'child_process';
 import path from 'path';
 
@@ -253,9 +254,11 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
         execSshCommand(remoteUser, remoteHost, remoteCommand, (errRun, stdoutRun, stderrRun) => {
           if (errRun) {
             console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
+            logActivity('led', `LED-scherm bijwerken mislukt (${statusStr})`, { error: errRun.message, host: remoteHost });
             resolve(false);
           } else {
             console.log(`[LED Control] Remote LED panel updated successfully: ${stdoutRun.trim()}`);
+            logActivity('led', `LED-scherm bijgewerkt: "${text}"`, { status: statusStr, host: remoteHost });
             resolve(true);
           }
         });

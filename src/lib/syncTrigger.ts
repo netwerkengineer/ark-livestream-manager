@@ -1,4 +1,5 @@
 import { getSettings } from '@/lib/settingsStore';
+import { logActivity } from '@/lib/activityLog';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -55,6 +56,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
       if (res.ok) {
         const responseText = await res.text();
         console.log(`[Sync Trigger] Successfully triggered sync on host: ${host}. Response: ${responseText}`);
+        logActivity('sync', `Sync getriggerd (${keepOn ? 'handmatig/blijft aan' : 'automatisch'})`, { targets: targetKeys, host });
         return { success: true, message: responseText };
       }
       console.log(`[Sync Trigger] Host ${host} returned non-ok status: ${res.status}`);
@@ -72,6 +74,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
 
   if (!scriptPath) {
     console.log(`[Sync Trigger] Daemon unreachable and script not found in any expected location.`);
+    logActivity('error', 'Sync starten mislukt: daemon onbereikbaar en script niet gevonden');
     return { success: false, message: 'Kon geen sync starten (daemon onbereikbaar en script niet gevonden)' };
   }
 
@@ -97,9 +100,11 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
     child.unref();
 
     console.log(`[Sync Trigger] Direct execution started: ${scriptPath}`);
+    logActivity('sync', `Sync getriggerd via direct script (daemon onbereikbaar) (${keepOn ? 'blijft aan' : 'automatisch'})`, { targets: targetKeys });
     return { success: true, message: 'OK: sync started via direct execution (no daemon)' };
   } catch (e: any) {
     console.log(`[Sync Trigger] Direct execution failed:`, e.message || e);
+    logActivity('error', `Sync starten mislukt: ${e.message || e}`);
     return { success: false, message: e.message || 'Direct execution failed' };
   }
 }

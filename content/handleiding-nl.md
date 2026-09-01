@@ -1,6 +1,6 @@
 # Handleiding — Ark Church Livestream Manager
 
-*Versie van dit document: bij app-versie 2.32.0*
+*Versie van dit document: bij app-versie 2.33.0*
 
 ## Inleiding
 
@@ -539,6 +539,10 @@ Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "P
 **Nieuwe back-up maken**: kies wat wordt meegenomen (app-configuratie, QLC+, Companion, FreeShow-database — optioneel inclusief mediabestanden, wat groot kan worden) en klik **"Lokaal Downloaden"** of **"Verzenden naar Externe Opslag"**.
 
 **Herstellen**: upload een eerder gemaakte back-up-zip, kies welke onderdelen teruggezet moeten worden, en klik **"Herstel Geselecteerde Onderdelen"**. Er wordt automatisch eerst een veiligheidskopie van de huidige staat gemaakt voordat er iets wordt overschreven.
+
+### 8.10 Activiteitenlog
+
+Alleen zichtbaar voor beheerders. Overzicht van wat er is gebeurd: sync-runs (gestart/voltooid/fouten), stekkers aan/uit, LED-scherm-triggers, en instellingen-wijzigingen (met wie). Filterbaar op categorie, met een "Vernieuwen"-knop. Wordt automatisch beperkt tot de laatste ~5000 gebeurtenissen, zodat het geen onbeperkte schijfruimte inneemt.
 
 ---
 

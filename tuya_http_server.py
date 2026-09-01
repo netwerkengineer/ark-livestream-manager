@@ -8,6 +8,7 @@ import datetime
 import json
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from activity_log import log_activity
 
 # Global cache and lock for plug status to prevent flooding and improve performance
 status_cache = {}
@@ -95,6 +96,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
 
         if path == '/on':
             print(f"Received HTTP request: Turn ON for plug: {plug_id} (starting startup sequence in background)")
+            log_activity("plug", f"Stekker '{plug_id}' aangezet (handmatig)")
             invalidate_cache(plug_id)
             subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "startup_pcs.py"), plug_id])
             self.send_response(200)
@@ -104,6 +106,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
             
         elif path == '/off':
             print(f"Received HTTP request: Turn OFF for plug: {plug_id}")
+            log_activity("plug", f"Stekker '{plug_id}' uitgezet (handmatig)")
             invalidate_cache(plug_id)
             res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id], capture_output=True, text=True)
             self.send_response(200)
@@ -127,6 +130,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
                 invalidate_cache(plug_id)
                 subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id])
                 print(f"[Delayed Off] Plug '{plug_id}' turned off after {delay}s delay.")
+                log_activity("plug", f"Stekker '{plug_id}' uitgezet (na {delay:.0f}s vertraging, PC-afsluiting)")
 
             # Runs on this server's own clock, not the machine that's
             # shutting down - a Windows PC's own scheduled task can't
@@ -143,6 +147,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
 
         elif path == '/shutdown':
             print(f"Received HTTP request: Shutdown sequence for plug: {plug_id}")
+            log_activity("plug", f"Afsluitsequentie gestart voor '{plug_id}'")
             invalidate_cache(plug_id)
             # Run the shutdown sequence in the background so the HTTP response is sent immediately
             subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "shutdown_pcs.py"), plug_id])

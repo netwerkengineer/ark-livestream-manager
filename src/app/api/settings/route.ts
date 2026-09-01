@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, saveSettings } from "@/lib/settingsStore";
 import { isAuthorized } from "@/lib/authHelper";
+import { logActivity } from "@/lib/activityLog";
 
 export async function GET(req: NextRequest) {
   const settings = getSettings();
@@ -49,25 +50,28 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const currentSettings = getSettings();
-  
+
   // If setup is complete, verify admin role
+  let username = 'setup-wizard';
   if (currentSettings.isSetupComplete) {
     const authSession = await isAuthorized(req, "admin");
     if (!authSession) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }
+    username = authSession.username;
   }
 
   try {
     const newSettings = await req.json();
-    
+
     // Preserve users array (managed via /api/users)
     if (currentSettings.users) {
       newSettings.users = currentSettings.users;
     }
-    
+
     const updated = saveSettings(newSettings);
-    
+    logActivity('settings', `Instellingen opgeslagen door ${username}`);
+
     // Trigger a restart if API keys were updated, to reload NextAuth config
     if (newSettings.googleClientId) {
       console.log("API keys updated. Triggering server restart in 1s...");

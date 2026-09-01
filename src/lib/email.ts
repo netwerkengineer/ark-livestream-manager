@@ -9,6 +9,7 @@ import { parseServiceEmail, ParsedMedia, ParsedSong } from '@/lib/emailParser';
 import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStore';
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
 import { extractTextFromDocument } from '@/lib/documentText';
+import { logActivity } from '@/lib/activityLog';
 
 const execFilePromise = promisify(execFile);
 const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
@@ -437,12 +438,25 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
  * settings just log and retry next tick, same as an unconfigured YouTube
  * connection does elsewhere in this app.
  */
+function runEmailCheck() {
+  checkEmailsForProjects()
+    .then(drafts => {
+      if (drafts.length > 0) {
+        logActivity('sync', `E-mail-sync: ${drafts.length} dienst(en) bijgewerkt (${drafts.map(d => d.serviceDate).join(', ')})`);
+      }
+    })
+    .catch(err => {
+      console.error('[Email Sync] Check error:', err.message || err);
+      logActivity('error', `E-mail-sync mislukt: ${err.message || err}`);
+    });
+}
+
 export function initEmailSync() {
   console.log('[Email Sync] Initializing background email sync task...');
-  checkEmailsForProjects().catch(err => console.error('[Email Sync] Initial check error:', err.message || err));
+  runEmailCheck();
 
   setInterval(() => {
     console.log('[Email Sync] Running scheduled background check...');
-    checkEmailsForProjects().catch(err => console.error('[Email Sync] Scheduled check error:', err.message || err));
+    runEmailCheck();
   }, 10 * 60 * 1000);
 }

@@ -8,6 +8,7 @@ import sys
 import glob
 import shutil
 import shlex
+from activity_log import log_activity
 
 # Helper to intercept subprocess.run for ssh, scp, and sftp to enforce correct key permissions
 def run_command_with_key(*args, **kwargs):
@@ -1003,6 +1004,7 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
 
 def main():
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === STARTING FREESHOW SYNC & CLEANUP AUTOMATION ===")
+    log_activity("sync", f"Sync gestart ({'blijft aan' if '--keep-on' in sys.argv else 'automatisch, sluit af'})")
     settings = get_settings()
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1051,6 +1053,7 @@ def main():
 
     if not os.path.exists(nas_shows_dir):
         print(f"ERROR: NAS Shows directory does not exist: {nas_shows_dir}")
+        log_activity("error", f"Sync afgebroken: NAS Shows-map bestaat niet ({nas_shows_dir})")
         sys.exit(1)
 
     print(f"Hoofd-doel: {mac_user}@{mac_host}")
@@ -1141,6 +1144,7 @@ def main():
 
             if beamer_plug:
                 print("[Power] Turning ON smart plug 'plug_beamer'...")
+                log_activity("plug", "Stekker 'plug_beamer' aangezet (sync)")
                 subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", "plug_beamer"])
 
                 if wait_for_ssh(mac_user, mac_host):
@@ -1334,12 +1338,14 @@ def main():
                     print("Wachten op 15 seconden voor het veilig afsluiten...")
                     time.sleep(15)
                     print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
+                    log_activity("plug", "Stekker 'plug_beamer' uitgezet (na sync)")
                     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
                     print("[Power] Stroom succesvol afgesloten.")
 
             _update_target_status(SCRIPT_DIR, target["key"], "done")
         except Exception as e:
             print(f"[{label}] FOUT tijdens sync: {e} - doorgaan met volgende doel.")
+            log_activity("error", f"Sync-fout voor {label}: {e}")
             _update_target_status(SCRIPT_DIR, target["key"], "error")
 
     # Save the updated sync state
@@ -1358,6 +1364,7 @@ def main():
         success=True,
         error=None,
     )
+    log_activity("sync", "Sync voltooid")
 
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === FREESHOW SYNC & CLEANUP VOLTOOID ===")
 
@@ -1378,4 +1385,5 @@ if __name__ == "__main__":
             success=False,
             error=str(e),
         )
+        log_activity("error", f"Sync onverwacht gecrasht: {e}")
         raise
