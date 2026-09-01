@@ -1,7 +1,7 @@
 "use client";
 
 import { HelpCircle, Settings, LogOut } from "lucide-react";
-import { VERSION } from "@/lib/version";
+import { VERSION, GIT_SHA } from "@/lib/version";
 
 interface DashboardHeaderProps {
   userRole: "admin" | "operator" | null;
@@ -26,7 +26,7 @@ export default function DashboardHeader({
         <img src="/logo.png" alt="Ark Church Logo" />
         <div>
           <h1 style={{ fontSize: '1.5rem', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Ark Church Operations <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'normal', color: 'var(--primary)' }}>v{VERSION}</span>
+            Ark Church Operations <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'normal', color: 'var(--primary)' }}>v{VERSION}{GIT_SHA && GIT_SHA !== 'dev' ? ` (${GIT_SHA})` : ''}</span>
           </h1>
         </div>
       </div>

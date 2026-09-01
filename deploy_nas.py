@@ -167,11 +167,23 @@ def deploy():
     run_with_pty(master_cmd, "Beveiligde tunnel openen naar NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
     # 2. LOKAAL INPAKKEN
+    # Git-commit vastleggen voor de versie-badge in de app - .git zelf wordt
+    # niet meegepakt (zie --exclude ".git" hieronder), dus dit is de enige
+    # kans om de huidige commit vast te leggen voordat het archief gemaakt
+    # wordt. Na het inpakken zetten we het bestand terug naar de committede
+    # placeholder, zodat de repo geen losse lokale wijziging overhoudt.
+    git_sha_path = os.path.join(config['LOCAL_APP_PATH'], "src", "lib", "gitSha.generated.json")
+    git_sha = subprocess.check_output(["git", "-C", config['LOCAL_APP_PATH'], "rev-parse", "--short", "HEAD"]).decode().strip()
+    with open(git_sha_path, "w") as f:
+        f.write(f'{{\n  "sha": "{git_sha}"\n}}\n')
+
     print(f"\n>>> Lokaal: Project inpakken (exclusief node_modules en build data) ...")
     tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
     env = os.environ.copy()
     env["COPYFILE_DISABLE"] = "1"
     subprocess.check_call(tar_cmd, env=env)
+
+    subprocess.check_call(["git", "-C", config['LOCAL_APP_PATH'], "checkout", "--", "src/lib/gitSha.generated.json"])
 
     # 3. NAS MAP VOORBEREIDEN
     ssh_p = f"ssh -S {global_ssh_mux_socket}"
