@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import net from 'net';
-import dgram from 'dgram';
 import { execFile } from 'child_process';
 import { getSettings } from '@/lib/settingsStore';
 import { getActiveMidiPeers } from '@/lib/midiBridge';
@@ -26,37 +25,14 @@ async function checkTcp(port: number, host: string): Promise<boolean> {
   });
 }
 
-async function checkUdp(port: number, host: string): Promise<boolean> {
-  // In een Docker Bridge omgeving zal 'localhost' of '127.0.0.1' NOOIT werken naar de host.
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return false;
-  }
-
-  return new Promise((resolve) => {
-    const client = dgram.createSocket('udp4');
-    // UDP is connectionless, dus we kunnen alleen checken of het verzenden lukt.
-    // Voor een echte check zouden we een specifiek protocol-antwoord moeten verwachten.
-    client.send('ping', port, host, (err) => {
-      client.close();
-      if (err) {
-        resolve(false);
-      } else {
-        // We gaan ervan uit dat de route naar de host ok is
-        resolve(true); 
-      }
-    });
-  });
-}
-
 async function checkPing(host: string): Promise<boolean> {
-  // Plain UDP "did the send() call succeed" (see checkUdp above) can't
-  // actually tell whether a device is there - a send always succeeds
-  // regardless of whether anything is listening, since UDP is
-  // connectionless. Some devices (like the Atem) also don't answer an
-  // arbitrary probe packet even when genuinely online. A real ICMP ping
-  // is what actually confirms the device itself is reachable - same
-  // mechanism startup_pcs.py already uses to wait for the Atem before
-  // launching OBS.
+  // Plain UDP "did the send() call succeed" can't actually tell whether a
+  // device is there - a send always succeeds regardless of whether
+  // anything is listening, since UDP is connectionless. Some devices (like
+  // the Atem) also don't answer an arbitrary probe packet even when
+  // genuinely online. A real ICMP ping is what actually confirms the
+  // device itself is reachable - same mechanism startup_pcs.py already
+  // uses to wait for the Atem before launching OBS.
   if (!host) return false;
   return new Promise((resolve) => {
     execFile('ping', ['-c', '1', '-W', '2', host], (err) => {
@@ -77,7 +53,18 @@ export async function GET(req: NextRequest) {
     { name: 'Companion', host: settings.companionHost, port: settings.companionPort, type: 'tcp' },
     { name: 'OBS', host: settings.obsHost, port: settings.obsPort, type: 'tcp' },
     { name: 'X32', host: settings.x32Host, port: settings.x32Port, type: 'ping' },
-    { name: 'QLC+', host: settings.qlcHost, port: settings.qlcPort, type: 'udp' },
+    // The OSC port (settings.qlcPort) can't give a meaningful UP/DOWN signal:
+    // UDP has no handshake, so checkUdp can only report whether send()
+    // itself succeeded, which says nothing about anything actually
+    // listening - and it hard-codes false whenever the host is
+    // 127.0.0.1/localhost (assuming a Docker bridge network where that
+    // could never reach the real host), which is wrong now that qlcHost is
+    // deliberately 127.0.0.1 on every environment (see the qlcHost fix -
+    // QLC+ runs alongside this app with network_mode: host, so localhost is
+    // the correct, most reliable address). QLC+'s web server on 9999 is a
+    // real TCP service that's always up whenever QLC+ itself is running,
+    // regardless of which host string is configured.
+    { name: 'QLC+', host: settings.qlcHost, port: 9999, type: 'tcp' },
     { name: 'FreeShow', host: settings.freeShowHost, port: settings.freeShowPort, type: 'tcp' },
     { name: 'Atem', host: settings.atemHost || '', port: 9910, type: 'ping' },
   ];
@@ -86,12 +73,9 @@ export async function GET(req: NextRequest) {
     servicesToCheck.map(async (service) => {
       const isUp = service.type === 'tcp'
         ? await checkTcp(service.port, service.host)
-        : service.type === 'ping'
-        ? await checkPing(service.host)
-        : await checkUdp(service.port, service.host);
+        : await checkPing(service.host);
 
       let statusLabel = isUp ? 'UP' : 'DOWN';
-      if (isUp && service.type === 'udp') statusLabel = 'READY';
       if (isUp && service.type === 'ping') statusLabel = 'READY';
 
       return { 
