@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 import sys
+from activity_log import log_activity
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -154,6 +155,7 @@ def startup_single_plug(plug, settings):
     # 1. Turn on plug
     print(f"[{name}] Turning ON via control_plug.py...")
     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", plug_id])
+    log_activity("plug", f"Stekker '{plug_id}' aangezet (opstartsequentie)")
     
     # 2. If host IP is associated, wait for SSH and launch apps
     if host_ip and host_ip != "":

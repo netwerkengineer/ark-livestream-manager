@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 import sys
+from activity_log import log_activity
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -131,6 +132,7 @@ def shutdown_single_plug_sequence(plug, settings):
         
     print(f"[{name}] Turning off plug power...")
     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", plug_id])
+    log_activity("plug", f"Stekker '{plug_id}' uitgezet (afsluitsequentie voltooid)")
     print(f"✅ [{name}] Shutdown sequence completed.")
 
 def main():
@@ -239,6 +241,8 @@ def main():
         res = subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", p_id])
         if res.returncode != 0:
             overall_success = False
+        else:
+            log_activity("plug", f"Stekker '{p_id}' uitgezet (afsluitsequentie voltooid)")
             
     if overall_success:
         print("✅ Success: All shutdown sequences completed.")

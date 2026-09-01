@@ -96,7 +96,7 @@ class TuyaHandler(BaseHTTPRequestHandler):
 
         if path == '/on':
             print(f"Received HTTP request: Turn ON for plug: {plug_id} (starting startup sequence in background)")
-            log_activity("plug", f"Stekker '{plug_id}' aangezet (handmatig)")
+            log_activity("plug", f"Opstartsequentie gestart voor '{plug_id}' (handmatig)")
             invalidate_cache(plug_id)
             subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "startup_pcs.py"), plug_id])
             self.send_response(200)
