@@ -194,14 +194,19 @@ export async function GET(req: NextRequest) {
           const lFunc = typeof levenshtein === 'function' ? levenshtein : (levenshtein as any).levenshteinEditDistance;
           if (typeof lFunc === 'function') {
             const dist = lFunc(current.filename.toLowerCase(), target.filename.toLowerCase());
-            // Match if filename is very close (e.g. distance <= 5) and contains typical duplicate markers
-            const hasDuplicateMarker = 
-              current.filename.includes('(') || target.filename.includes('(') ||
-              current.filename.includes('-') || target.filename.includes('-') ||
-              current.filename.toLowerCase().includes('copy') || target.filename.toLowerCase().includes('copy') ||
-              current.filename.toLowerCase().includes('kopie') || target.filename.toLowerCase().includes('kopie') ||
-              /\d/.test(current.filename) || /\d/.test(target.filename);
-              
+            // Match if filename is very close (e.g. distance <= 5) AND one of
+            // the names actually looks like a copy of the other - an actual
+            // copy-marker right before the extension ("(2)", "copy", "v2",
+            // ...), not just "-" or any digit anywhere. Every catalog song
+            // is named "Titel - Artiest.show", so a plain "-" or a digit
+            // (song numbers like "Opwekking 623" are everywhere) matched on
+            // virtually every filename, making this check flag any two
+            // similar-length, same-artist songs as duplicates (e.g. "Fire -
+            // Cece Winans.show" vs "Worthy - Cece Winans.show", edit
+            // distance 5 purely from the shared " - Cece Winans.show" tail).
+            const COPY_MARKER_RE = /(\(\s*\d+\s*\)|\(\s*(copy|kopie)\s*\)|\bcopy\b|\bkopie\b|\bv\d+\b)\s*\.show$/i;
+            const hasDuplicateMarker = COPY_MARKER_RE.test(current.filename) || COPY_MARKER_RE.test(target.filename);
+
             if (dist <= 5 && hasDuplicateMarker) {
               isDuplicate = true;
             }
