@@ -17,6 +17,27 @@ interface LightsControlProps {
   settings: any;
 }
 
+// QLC+'s SpeedDial widget ("Color Fade Speed") displays its value
+// truncated to whole seconds instead of rounded (measured: sending 0.30 -
+// intended 3000ms - actually lands around 2980ms, which QLC+ shows as
+// "2s" instead of "3s"; 0.50/5000ms similarly shows as "4s"). The
+// underlying fade timing is accurate to within ~20-30ms either way -
+// imperceptible for a lighting fade - but the mismatch undermines using
+// QLC+'s own display as a sanity check, which matters since nobody
+// operating this remotely can see the physical fixtures. Each preset
+// carries a small deliberate overshoot (+50ms worth) so the actual value
+// lands safely past the next whole-second boundary rather than just
+// under it. Kept as one shared list so the OSC values sent here and the
+// "closest preset" matching in the SSE handler below can't drift apart.
+const FADE_PRESETS = [
+  { label: "Direct (0s)", value: 0.0 },
+  { label: "0.5s", value: 0.055 },
+  { label: "1s", value: 0.105 },
+  { label: "2s", value: 0.205 },
+  { label: "3s", value: 0.305 },
+  { label: "5s", value: 0.505 }
+];
+
 export default function LightsControl({ settings }: LightsControlProps) {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -88,8 +109,8 @@ export default function LightsControl({ settings }: LightsControlProps) {
           } else if (parts[0] === '99' && parts[1] === 'SPEED_STATE') {
             const ms = parseInt(parts[2]);
             const ratio = ms / 10000;
-            const presets = [0.0, 0.05, 0.10, 0.20, 0.30, 0.50];
-            const closest = presets.reduce((prev, curr) =>
+            const presetValues = FADE_PRESETS.map(p => p.value);
+            const closest = presetValues.reduce((prev, curr) =>
               Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
             );
             setActiveFade(closest);
@@ -699,14 +720,7 @@ export default function LightsControl({ settings }: LightsControlProps) {
             <div style={{ marginBottom: "24px", padding: "16px", background: "rgba(0,0,0,0.15)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.03)" }}>
               <p className="group-label" style={{ marginBottom: "12px", color: "var(--muted)" }}>Overgangstijd (Fade)</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {[
-                  { label: "Direct (0s)", value: 0.0 },
-                  { label: "0.5s", value: 0.05 },
-                  { label: "1s", value: 0.10 },
-                  { label: "2s", value: 0.20 },
-                  { label: "3s", value: 0.30 },
-                  { label: "5s", value: 0.50 }
-                ].map(p => (
+                {FADE_PRESETS.map(p => (
                   <button
                     key={p.value}
                     onClick={() => handleFadeChange(p.value)}
