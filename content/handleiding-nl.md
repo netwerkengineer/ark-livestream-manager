@@ -1,6 +1,6 @@
 # Handleiding — Ark Church Livestream Manager
 
-*Versie van dit document: bij app-versie 2.31.4*
+*Versie van dit document: bij app-versie 2.32.0*
 
 ## Inleiding
 
