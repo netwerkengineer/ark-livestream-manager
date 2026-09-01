@@ -240,6 +240,8 @@ Doorzoek, filter (op categorie, met het aantal shows per categorie erbij — cat
 
 **Show-editor**: kies tussen een **Visuele editor** (per slide tekst aanpassen, slides toevoegen/verwijderen/herordenen, type wisselen tussen tekst/media) of de **Raw JSON Editor** (de volledige showdata direct als tekst bewerken — alleen voor gevorderde gebruikers).
 
+In de Visuele editor staat bovenaan **"🖼️ Achtergrond (hele show)"**: kies hiermee een bestaande afbeelding of video uit de mediabibliotheek als achtergrond voor het hele lied — zoek op bestandsnaam, klik een resultaat om 'm meteen in te stellen, en klik daarna "Wijzigingen Opslaan". Staat er al een achtergrond, dan zie je een voorbeeld met "Wijzigen"/"Verwijderen"-knoppen. Dit is dezelfde blijvende wijziging als je in FreeShow zelf zou maken — handig voor medewerkers die doordeweeks niet bij de Beamer PC/FreeShow kunnen.
+
 In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de complete songtekst in één keer (lege regel = nieuwe slide, `[Refrein]` of `Couplet 1` wordt automatisch als groepslabel herkend) en klik "Toepassen" om alle bestaande slides in deze show in één keer te vervangen — handig om een lied snel over te typen/plakken in plaats van slide voor slide te bewerken. Had de show al slides, dan vraagt de app eerst om bevestiging, want dit is niet ongedaan te maken.
 
 ### 5.10 Onderhoud

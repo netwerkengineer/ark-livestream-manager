@@ -156,6 +156,15 @@ export default function FreeshowGenerator() {
   const [pasteLyricsText, setPasteLyricsText] = useState('');
   const [isParsingLyrics, setIsParsingLyrics] = useState(false);
   const [isSavingShow, setIsSavingShow] = useState(false);
+  // The show's background media (set on the first slide - same convention
+  // createShowObject already uses for freshly-generated songs), so editing
+  // an existing catalog show through this editor can attach one too
+  // without needing FreeShow itself or the Raw JSON Editor.
+  const [showEditorBackground, setShowEditorBackground] = useState<{ id: string; name: string; path: string; type: 'image'|'video' } | null>(null);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [mediaLibrary, setMediaLibrary] = useState<{ name: string; relativePath: string; absolutePath: string; type: 'image'|'video' }[] | null>(null);
+  const [isLoadingMediaLibrary, setIsLoadingMediaLibrary] = useState(false);
+  const [mediaLibrarySearch, setMediaLibrarySearch] = useState('');
 
   // Preview & Template States
   const [templates, setTemplates] = useState<any[]>([]);
@@ -757,6 +766,7 @@ export default function FreeshowGenerator() {
               slidesList.push({
                 id: slideId,
                 nextTimer: layoutSlide.nextTimer || 10,
+                background: layoutSlide.background || undefined,
                 slideObj: JSON.parse(JSON.stringify(slide))
               });
             }
@@ -773,11 +783,38 @@ export default function FreeshowGenerator() {
         setShowEditorSlides(slidesList);
         setShowEditorRawJson(JSON.stringify(fullShow, null, 2));
         setShowEditorMode('visual');
+
+        // The show's overall background - by convention (see
+        // createShowObject in freeshow.ts) only ever set on the first
+        // slide, referencing an entry in the show's own media dict.
+        const bgId = slidesList[0]?.background;
+        const bgMedia = bgId ? showObj.media?.[bgId] : null;
+        setShowEditorBackground(bgMedia ? { id: bgId, name: bgMedia.name, path: bgMedia.path, type: bgMedia.type === 'video' ? 'video' : 'image' } : null);
+        setShowBackgroundPicker(false);
+        setMediaLibrarySearch('');
       } else {
         alert(data.error || 'Fout bij laden show-details');
       }
     } catch (e: any) {
       alert(e.message || 'Verbindingsfout bij laden show-details');
+    }
+  };
+
+  const fetchMediaLibrary = async () => {
+    if (mediaLibrary) return; // already loaded this session - library rarely changes mid-edit
+    setIsLoadingMediaLibrary(true);
+    try {
+      const res = await fetch('/api/media/list');
+      const data = await res.json();
+      if (data.success) {
+        setMediaLibrary(data.media);
+      } else {
+        alert(data.error || 'Fout bij laden mediabibliotheek');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Verbindingsfout bij laden mediabibliotheek');
+    } finally {
+      setIsLoadingMediaLibrary(false);
     }
   };
 
@@ -803,14 +840,32 @@ export default function FreeshowGenerator() {
         showObj.settings = showObj.settings || {};
         showObj.settings.activeLayout = activeLayoutId;
 
+        showObj.media = showObj.media || {};
+        if (showEditorBackground) {
+          showObj.media[showEditorBackground.id] = {
+            name: showEditorBackground.name,
+            path: showEditorBackground.path,
+            type: showEditorBackground.type,
+            muted: true,
+            loop: true
+          };
+        }
+
         const layoutSlidesList: any[] = [];
 
-        showEditorSlides.forEach((s) => {
+        showEditorSlides.forEach((s, idx) => {
           newSlides[s.id] = s.slideObj;
-          layoutSlidesList.push({
-            id: s.id,
-            nextTimer: s.nextTimer || 10
-          });
+          const layoutEntry: any = { id: s.id, nextTimer: s.nextTimer || 10 };
+          // The background picker only manages the show's overall
+          // background (slide 0, same convention createShowObject uses) -
+          // any other slide's own background (rare, but possible if set
+          // some other way) is carried over unchanged.
+          if (idx === 0) {
+            if (showEditorBackground) layoutEntry.background = showEditorBackground.id;
+          } else if (s.background) {
+            layoutEntry.background = s.background;
+          }
+          layoutSlidesList.push(layoutEntry);
         });
 
         showObj.slides = newSlides;
@@ -2115,6 +2170,81 @@ export default function FreeshowGenerator() {
                 </select>
               </div>
             </div>
+
+            {/* Background media picker - only meaningful in the visual
+                editor; raw JSON edits bypass it entirely. */}
+            {showEditorMode === 'visual' && (
+              <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
+                <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.6rem' }}>🖼️ {t('show_background')}</label>
+                {showEditorBackground ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                    {showEditorBackground.type === 'image' ? (
+                      <img
+                        src={resolveMediaPath(showEditorBackground.path)}
+                        alt=""
+                        style={{ width: '64px', height: '36px', objectFit: 'cover', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}
+                      />
+                    ) : (
+                      <div style={{ width: '64px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}>🎬</div>
+                    )}
+                    <div style={{ flex: 1, fontSize: '0.85rem', minWidth: '120px' }}>{showEditorBackground.name}</div>
+                    <button className="button" style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem' }} onClick={() => { setShowBackgroundPicker(!showBackgroundPicker); fetchMediaLibrary(); }}>
+                      {t('change')}
+                    </button>
+                    <button className="button" style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'rgba(239,68,68,0.15)' }} onClick={() => setShowEditorBackground(null)}>
+                      🗑️ {t('remove')}
+                    </button>
+                  </div>
+                ) : (
+                  <button className="button" style={{ fontSize: '0.8rem' }} onClick={() => { setShowBackgroundPicker(!showBackgroundPicker); fetchMediaLibrary(); }}>
+                    + {t('choose_background')}
+                  </button>
+                )}
+
+                {showBackgroundPicker && (
+                  <div style={{ marginTop: '0.8rem' }}>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder={t('search_media_placeholder')}
+                      value={mediaLibrarySearch}
+                      onChange={e => setMediaLibrarySearch(e.target.value)}
+                      style={{ marginBottom: '0.5rem' }}
+                    />
+                    {isLoadingMediaLibrary ? (
+                      <div style={{ opacity: 0.5, fontSize: '0.85rem', padding: '0.5rem' }}>{t('loading')}</div>
+                    ) : (
+                      <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {(mediaLibrary || [])
+                          .filter(m => m.relativePath.toLowerCase().includes(mediaLibrarySearch.toLowerCase()))
+                          .slice(0, 150)
+                          .map(m => (
+                            <button
+                              key={m.relativePath}
+                              className="button"
+                              style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '0.4rem 0.6rem' }}
+                              onClick={() => {
+                                setShowEditorBackground({
+                                  id: `bg_${Date.now()}`,
+                                  name: m.name,
+                                  path: m.absolutePath,
+                                  type: m.type
+                                });
+                                setShowBackgroundPicker(false);
+                              }}
+                            >
+                              {m.type === 'video' ? '🎬' : '🖼️'} {m.relativePath}
+                            </button>
+                          ))}
+                        {mediaLibrary && mediaLibrary.filter(m => m.relativePath.toLowerCase().includes(mediaLibrarySearch.toLowerCase())).length === 0 && (
+                          <div style={{ opacity: 0.5, fontSize: '0.8rem', padding: '0.5rem' }}>{t('no_results')}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Mode Selector */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
