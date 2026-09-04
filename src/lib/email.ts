@@ -285,7 +285,11 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
       // (Gmail included) return a fallback/self-signed cert instead of the
       // real one, and the TLS handshake fails with "self-signed certificate".
       tlsOptions: { servername: imapHost },
-      authTimeout: 3000
+      // This is a background poll, not a user-facing request, so there's no
+      // cost to a generous timeout - 3000ms was too tight for real-world
+      // latency to Gmail from production and caused intermittent failures.
+      authTimeout: 15000,
+      connTimeout: 15000
     }
   };
 
