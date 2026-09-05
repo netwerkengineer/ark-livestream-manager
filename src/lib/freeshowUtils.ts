@@ -46,18 +46,21 @@ export function resolveMediaPath(filePath: string): string {
 
   const base = '/api/freeshow/media';
 
-  // Windows absolute paths (e.g. Z:\FreeShow\Media\...)
-  if (filePath.match(/^[A-Z]:\\/i)) {
-    // Remove drive letter (e.g. Z:\)
-    let pathWithoutDrive = filePath.replace(/^[A-Z]:\\/i, '');
-
-    // Remove FreeShow\Media\ prefix if present
-    pathWithoutDrive = pathWithoutDrive.replace(/^FreeShow[/\\]Media[/\\]/i, '');
-
-    // Convert backslashes to forward slashes
-    const normalizedPath = pathWithoutDrive.replace(/\\/g, '/');
-
-    return `${base}/${normalizedPath}`;
+  // Windows absolute paths (e.g. Z:\FreeShow\Media\... or C:/Users/.../Media/...
+  // - FreeShow running on Windows writes drive-letter paths with either
+  // separator, so the drive-letter check itself must not assume a backslash)
+  if (filePath.match(/^[A-Z]:[\\/]/i)) {
+    // Normalize to forward slashes first so a single /Media/ extraction
+    // (same approach as the Unix branch below) handles both separator styles.
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const mediaMatch = normalizedPath.match(/\/Media\/(.+)$/i);
+    if (mediaMatch) {
+      return `${base}/${mediaMatch[1]}`;
+    }
+    // Fallback: use filename only
+    const parts = normalizedPath.split('/');
+    const filename = parts[parts.length - 1];
+    return `${base}/${filename}`;
   }
 
   // Unix absolute paths
