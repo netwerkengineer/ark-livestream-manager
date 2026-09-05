@@ -48,6 +48,19 @@ export function htmlToPlainText(html: string): string {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#0?39;/gi, "'")
+    // Dutch Bible book names use ë/ï/ü (Samuël, Haggaï, Timotheüs, ...) -
+    // some mail clients HTML-encode these as named entities instead of
+    // sending raw UTF-8, which findBibleBook() then can't fold/match at
+    // all (confirmed live: "2 Timothe&uuml;s" left every other, accent-free
+    // reference in the same mail working while this one silently failed).
+    .replace(/&uuml;/g, 'ü').replace(/&Uuml;/g, 'Ü')
+    .replace(/&euml;/g, 'ë').replace(/&Euml;/g, 'Ë')
+    .replace(/&iuml;/g, 'ï').replace(/&Iuml;/g, 'Ï')
+    // Generic numeric character references (decimal &#123; / hex &#x7b;) -
+    // covers any other accented character a client encodes this way instead
+    // of a named entity, without needing to enumerate every one by hand.
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
