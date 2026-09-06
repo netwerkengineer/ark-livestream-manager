@@ -2,6 +2,24 @@ import { Client } from 'node-osc';
 import { getSettings } from './settingsStore';
 
 let qlcClient: Client | null = null;
+let qlcClientHost: string | null = null;
+let qlcClientPort: number | null = null;
+
+// A Client created for one host/port silently keeps sending there forever,
+// even after settings.qlcHost/qlcPort change later in the same process
+// lifetime (e.g. a live settings.json edit without a restart) - UDP send()
+// doesn't error on a wrong/unreachable destination, so this failed silently
+// in production for weeks after qlcHost was corrected. Recreating whenever
+// the target differs from what this client was built for closes that gap
+// without giving up reusing the same client across repeated calls.
+function getQlcClient(host: string, port: number): Client {
+  if (!qlcClient || qlcClientHost !== host || qlcClientPort !== port) {
+    qlcClient = new Client(host, port);
+    qlcClientHost = host;
+    qlcClientPort = port;
+  }
+  return qlcClient;
+}
 
 export function sendQlcScene(sceneId: number) {
   const settings = getSettings();
@@ -9,9 +27,7 @@ export function sendQlcScene(sceneId: number) {
   const port = settings.qlcPort || 7700;
 
   try {
-    if (!qlcClient) {
-      qlcClient = new Client(host, port);
-    }
+    const qlcClient = getQlcClient(host, port);
 
     console.log(`[QLC+] Sending scene ${sceneId} to ${host}:${port} as /ark/light/scene/${sceneId}`);
     
@@ -32,9 +48,7 @@ export function sendQlcOsc(path: string, value: number) {
   const port = settings.qlcPort || 7700;
 
   try {
-    if (!qlcClient) {
-      qlcClient = new Client(host, port);
-    }
+    const qlcClient = getQlcClient(host, port);
 
     console.log(`[QLC+] Sending OSC ${path} = ${value} to ${host}:${port}`);
     
