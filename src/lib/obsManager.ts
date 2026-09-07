@@ -206,7 +206,7 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
 
   // Sanitize inputs
   const sanitizedMac = macAddress ? sanitizeShellArg(macAddress) : '';
-  const sanitizedText = text ? text.replace(/["\\]/g, '') : '';  // Remove quotes and backslashes
+  const sanitizedText = text ? text.replace(/["\\$`]/g, '') : '';  // Remove quotes, backslashes and shell-expansion characters
   const sanitizedColor = color ? sanitizeShellArg(color) : '';
 
   // Detect remote OS
@@ -227,16 +227,23 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
           console.error(`[LED Control] scp copy failed: ${err.message}. Running remote script anyway...`);
         }
 
-        // Build Python command arguments
+        // Build Python command arguments. Values are shell-quoted here
+        // because the whole thing is joined into one command string sent
+        // over SSH - an unquoted "--text LIVESTREAM ON AIR" gets split by
+        // the remote shell into separate words, which argparse then
+        // rejects as unrecognized positional arguments (exit code 2) -
+        // confirmed live, every default text ("LIVESTREAM ON AIR"/
+        // "LIVESTREAM OFFLINE") has spaces and hit exactly this.
+        const quoteArg = (value: string) => `"${value}"`;
         const pythonArgs = ['--status', statusStr];
         if (sanitizedMac) {
-          pythonArgs.push('--mac', sanitizedMac);
+          pythonArgs.push('--mac', quoteArg(sanitizedMac));
         }
         if (sanitizedText) {
-          pythonArgs.push('--text', sanitizedText);
+          pythonArgs.push('--text', quoteArg(sanitizedText));
         }
         if (sanitizedColor) {
-          pythonArgs.push('--color', sanitizedColor);
+          pythonArgs.push('--color', quoteArg(sanitizedColor));
         }
 
         // Build remote command
