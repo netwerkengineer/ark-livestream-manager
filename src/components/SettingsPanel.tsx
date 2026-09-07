@@ -103,7 +103,7 @@ export default function SettingsPanel({
   };
 
   return (
-    <div className="glass-card" style={{ width: '100%', maxWidth: '1000px', padding: '40px', position: 'relative', height: '90vh', overflowY: 'hidden', display: 'flex', flexDirection: 'column', gap: '30px' }}>
+    <div className="glass-card settings-modal-card" style={{ position: 'relative' }}>
       <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer', zIndex: 10 }}>
         <X size={24} />
       </button>
@@ -113,13 +113,13 @@ export default function SettingsPanel({
           <Settings size={32} color="var(--primary)" />
         </div>
         <div>
-          <h2 style={{ fontSize: '2rem', marginBottom: '4px' }}>Systeem Instellingen</h2>
+          <h2 className="settings-title" style={{ fontSize: '2rem', marginBottom: '4px' }}>Systeem Instellingen</h2>
           <p style={{ color: 'var(--muted)' }}>Configureer livestreaming, verbindingen en apparaten.</p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, gap: '30px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '24px' }}>
-        <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '20px', flexShrink: 0 }}>
+      <div className="settings-body">
+        <div className="settings-sidebar">
           <button
             type="button"
             onClick={() => onTabChange("general")}
@@ -344,7 +344,7 @@ export default function SettingsPanel({
           )}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="settings-content">
 
           {settingsTab === "general" && (
             <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1680,6 +1680,85 @@ export default function SettingsPanel({
           <Save size={24} /> Wijzigingen Opslaan
         </button>
       </div>
+
+      <style jsx>{`
+        .settings-modal-card {
+          width: 100%;
+          max-width: 1000px;
+          padding: 40px;
+          height: 90vh;
+          overflow-y: hidden;
+          display: flex;
+          flex-direction: column;
+          gap: 30px;
+        }
+
+        .settings-body {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          gap: 30px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 24px;
+        }
+
+        .settings-sidebar {
+          width: 220px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          border-right: 1px solid rgba(255, 255, 255, 0.1);
+          padding-right: 20px;
+          flex-shrink: 0;
+          overflow-y: auto;
+        }
+
+        .settings-content {
+          flex: 1;
+          overflow-y: auto;
+          padding-right: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+
+        /* The sidebar/content split works as two side-by-side columns
+           down to about tablet width, but a 220px fixed sidebar next to
+           whatever's left on a phone (~375px) squeezes the content pane
+           into an unusable sliver - stack them instead below this point. */
+        @media (max-width: 768px) {
+          .settings-modal-card {
+            padding: 20px;
+            height: 95vh;
+            overflow-y: auto;
+          }
+
+          .settings-title {
+            font-size: 1.4rem !important;
+          }
+
+          .settings-body {
+            flex-direction: column;
+            gap: 16px;
+            padding-top: 16px;
+          }
+
+          .settings-sidebar {
+            width: 100%;
+            flex-direction: row;
+            flex-wrap: wrap;
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-right: 0;
+            padding-bottom: 16px;
+            max-height: none;
+          }
+
+          .settings-content {
+            padding-right: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
