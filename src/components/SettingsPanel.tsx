@@ -108,7 +108,7 @@ export default function SettingsPanel({
         <X size={24} />
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="settings-header" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div style={{ background: 'rgba(248, 113, 113, 0.15)', padding: '12px', borderRadius: '16px' }}>
           <Settings size={32} color="var(--primary)" />
         </div>
@@ -1731,6 +1731,10 @@ export default function SettingsPanel({
             padding: 20px;
             height: 95vh;
             overflow-y: auto;
+          }
+
+          .settings-header {
+            padding-right: 44px;
           }
 
           .settings-title {
