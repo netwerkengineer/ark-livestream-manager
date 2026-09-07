@@ -639,7 +639,7 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
                  <h2 style={{ margin: 0, fontSize: '1.2rem' }}>LED Sign Board Test</h2>
                </div>
                <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '16px' }}>
-                 Stuur handmatige signalen naar het LED-scherm via <strong>{settings.freeShowHost || '192.168.2.20'}</strong>.
+                 Stuur handmatige signalen naar het LED-scherm via <strong>{settings.ledHost || settings.obsHost || '192.168.2.100'}</strong>.
                </p>
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                  <button
