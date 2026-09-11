@@ -1,6 +1,6 @@
 # Ark Church Livestream Manager
 
-**v2.2.0** - Een all-in-one livestream management applicatie voor kerkdiensten, gebouwd met Next.js 16.
+**v2.34.0** - Een all-in-one livestream management applicatie voor kerkdiensten, gebouwd met Next.js 16.
 
 Deze applicatie centraliseert alle aspecten van livestream productie: van het genereren van presentaties en thumbnails tot het aansturen van lichtshows, LED-borden en OBS stream control. Speciaal ontwikkeld voor Ark Church om de gehele technische workflow van een livestream te stroomlijnen.
 
@@ -15,6 +15,7 @@ Deze applicatie centraliseert alle aspecten van livestream productie: van het ge
 - **LED Sign Board Control** - Automatische "ON AIR" indicator via SSH (YouTube of OBS trigger)
 
 ### Content Generatie
+- **Setlist-bouwer** - Worship leaders stellen liederen, Bijbelteksten en media rechtstreeks in de app samen tot een dienst (met songtekst-/akkoordvoorvertoning, sectie-indeling en automatische verwerking van liturgie-mails), en versturen die met één klik naar band en operator per e-mail (met bijlagen en een controlescherm vooraf) of via WhatsApp
 - **Thumbnail Generator** - Maak custom thumbnails met afbeelding upload en tekst overlay
 - **FreeShow Show Generator** - Genereer FreeShow presentaties vanuit Bijbelteksten (BGT, HSV, NBV21)
 - **Scripture Search** - Zoek en synchroniseer Bijbelteksten met fuzzy matching
