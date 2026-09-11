@@ -309,6 +309,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       });
       const data = await res.json();
       setSendMessage(data.success ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s)` : `❌ ${data.error}`);
+      if (data.success) await fetchDraft(serviceDate);
     } catch (e: any) {
       setSendMessage(`❌ ${e.message}`);
     } finally {

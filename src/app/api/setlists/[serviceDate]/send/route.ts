@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
-import { getDraftService } from '@/lib/draftServicesStore';
+import { getDraftService, updateSongInDraft, DraftSong } from '@/lib/draftServicesStore';
 import { getContacts } from '@/lib/contactsStore';
 import { buildSongTextFile, buildSongPdf } from '@/lib/songExport';
 import { sendSetlistEmail } from '@/lib/mailer';
+import { checkLocalSongExists, getLocalSongText, fetchLyricsFromInternet } from '@/lib/songs';
+
+// Songs parsed from a liturgie e-mail only ever get a title/artist - unlike
+// songs added through the setlist UI, they never went through the
+// catalog-lookup preview step. Fill the gap here (persisting it back to the
+// draft too) so "songtekst als bijlage" holds for e-mail-sourced songs as
+// well, not just manually-added ones.
+async function withLyricsFilledIn(serviceDate: string, song: DraftSong): Promise<DraftSong> {
+  if (song.lyricsText) return song;
+  const artist = song.artist || '';
+  let text = '';
+  try {
+    if (await checkLocalSongExists(song.title, artist)) {
+      text = await getLocalSongText(song.title, artist);
+    }
+    if (!text) {
+      text = await fetchLyricsFromInternet(song.title, artist);
+    }
+  } catch {
+    // Best-effort - the attachment falls back to "(geen songtekst toegevoegd)".
+  }
+  if (!text) return song;
+  updateSongInDraft(serviceDate, song.id, { lyricsText: text });
+  return { ...song, lyricsText: text };
+}
 
 function formatDateLabel(iso: string): string {
   try {
@@ -46,9 +71,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
 
     const attachments = [];
     for (const song of draft.songs) {
-      attachments.push(buildSongTextFile(song));
+      const songForExport = await withLyricsFilledIn(serviceDate, song);
+      attachments.push(buildSongTextFile(songForExport));
       if (includePdf) {
-        attachments.push(await buildSongPdf(song));
+        attachments.push(await buildSongPdf(songForExport));
       }
     }
 
