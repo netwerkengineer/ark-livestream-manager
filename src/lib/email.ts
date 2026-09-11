@@ -231,6 +231,40 @@ function markSeen(imap: any, uid: number): Promise<void> {
   });
 }
 
+const SETLIST_COPY_MAX_AGE_DAYS = 7;
+
+function deleteMessages(imap: any, uids: number[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    imap.addFlags(uids, '\\Deleted', (err: any) => {
+      if (err) return reject(err);
+      imap.expunge((expungeErr: any) => {
+        if (expungeErr) reject(expungeErr); else resolve();
+      });
+    });
+  });
+}
+
+// Every setlist e-mail sent from the app also lands a copy in this same
+// inbox (see mailer.ts - the BCC pattern needs a real "to" address, so it
+// uses the sender's own). Worth keeping around for a bit so someone can see
+// what went out, but not forever - this permanently deletes copies older
+// than SETLIST_COPY_MAX_AGE_DAYS, identified by the custom header rather
+// than the subject text (which a real, unrelated e-mail could coincidentally
+// also match).
+async function cleanupOldSetlistCopies(connection: any, imap: any): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - SETLIST_COPY_MAX_AGE_DAYS);
+  const searchCriteria: any[] = [
+    ['HEADER', 'X-Ark-Setlist-Copy', 'true'],
+    ['BEFORE', cutoff]
+  ];
+  const uids: number[] = await connection.search(searchCriteria, { bodies: [] })
+    .then((results: any[]) => results.map(r => r.attributes.uid));
+  if (uids.length === 0) return 0;
+  await deleteMessages(imap, uids);
+  return uids.length;
+}
+
 interface AttachmentPart {
   partID: string;
   filename: string;
@@ -335,6 +369,17 @@ export async function checkEmailsForProjects(): Promise<DraftService[]> {
       } catch (boxErr: any) {
         console.error(`[Email Sync] Kon mailbox "${mailbox}" niet openen, wordt overgeslagen: ${boxErr?.message || boxErr}`);
         continue;
+      }
+
+      if (mailbox === 'INBOX') {
+        try {
+          const cleaned = await cleanupOldSetlistCopies(connection, imap);
+          if (cleaned > 0) {
+            logActivity('setlist', `${cleaned} oude setlist-mail kopie${cleaned > 1 ? 'ën' : ''} opgeruimd (ouder dan ${SETLIST_COPY_MAX_AGE_DAYS} dagen)`);
+          }
+        } catch (cleanupErr: any) {
+          console.error('[Email Sync] Opruimen oude setlist-kopieën mislukt:', cleanupErr?.message || cleanupErr);
+        }
       }
 
       // Search only for matching UIDs here - body/attachment content is fetched

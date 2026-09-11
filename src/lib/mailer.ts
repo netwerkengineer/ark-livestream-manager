@@ -55,7 +55,12 @@ export async function sendSetlistEmail(opts: SendMailOptions): Promise<SendMailR
       bcc: opts.to,
       subject: opts.subject,
       text: opts.bodyText,
-      attachments: opts.attachments?.map(a => ({ filename: a.filename, content: a.content }))
+      attachments: opts.attachments?.map(a => ({ filename: a.filename, content: a.content })),
+      // Lets the IMAP cleanup in email.ts find and remove this self-addressed
+      // copy after it's been around long enough to be useful for reference,
+      // without relying on subject-text matching (which a real mail could
+      // coincidentally also match).
+      headers: { 'X-Ark-Setlist-Copy': 'true' }
     });
 
     logActivity('setlist', `Setlist-mail verstuurd: "${opts.subject}" naar ${opts.to.length} ontvanger(s)`, { recipients: opts.to.length });
