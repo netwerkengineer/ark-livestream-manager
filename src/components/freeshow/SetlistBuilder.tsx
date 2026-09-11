@@ -87,6 +87,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [sendPreview, setSendPreview] = useState<{ to: Array<{ name: string; email: string }>; subject: string; bodyText: string; attachments: string[] } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [checkMessage, setCheckMessage] = useState('');
   const [unassigned, setUnassigned] = useState<Array<{ messageId?: string; subject?: string; receivedAt: string; excerpt: string }>>([]);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [extraMessage, setExtraMessage] = useState('');
@@ -146,12 +147,20 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
 
   const checkNow = async () => {
     setChecking(true);
+    setCheckMessage('');
     try {
-      await fetch('/api/email');
+      const res = await fetch('/api/email');
+      const data = await res.json();
+      if (data.success) {
+        const count = data.updatedDrafts?.length || 0;
+        setCheckMessage(count > 0 ? `✅ ${count} dienst(en) bijgewerkt` : '✅ Gecontroleerd — geen nieuwe mails');
+      } else {
+        setCheckMessage(`❌ ${data.error || 'Onbekende fout'}`);
+      }
       await fetchDraft(serviceDate);
       await fetchUnassigned();
     } catch (e: any) {
-      setError(e.message);
+      setCheckMessage(`❌ ${e.message}`);
     } finally {
       setChecking(false);
     }
@@ -449,6 +458,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
           >
             {checking ? 'Bezig...' : '🔄 Check nu (mail)'}
           </button>
+          {checkMessage && <span style={{ fontSize: '0.75rem' }}>{checkMessage}</span>}
         </div>
       </div>
 

@@ -405,12 +405,6 @@ export function mergeParsedEmailIntoDraft(
   const now = new Date().toISOString();
   let draft = store.services[parsed.serviceDate];
 
-  // Safety net: if this exact message was already merged (e.g. re-synced
-  // after a transient error elsewhere), don't process it again.
-  if (draft && emailMeta.messageId && draft.sourceEmails.some(e => e.messageId === emailMeta.messageId)) {
-    return draft;
-  }
-
   if (!draft) {
     draft = {
       id: parsed.serviceDate,
@@ -469,13 +463,30 @@ export function mergeParsedEmailIntoDraft(
   }
 
   const removalNotes = applyRemovals(draft, parsed.removals);
+  const notes = [...parsed.notes, ...removalNotes];
 
-  draft.sourceEmails.push({
-    messageId: emailMeta.messageId,
-    subject: emailMeta.subject,
-    receivedAt: emailMeta.receivedAt,
-    notes: [...parsed.notes, ...removalNotes]
-  });
+  // A worship leader/operator's natural recovery move when something in an
+  // e-mail didn't come through right is to mark it unread and hit "Check nu"
+  // again - every item type above is already deduped per-item, so
+  // reprocessing the same message is safe and can pick up anything that
+  // failed the first time (e.g. a parser bug since fixed). Update the
+  // existing sourceEmails entry in place rather than skip it entirely (the
+  // old behavior) or append a second entry for the same message - that way
+  // the notes shown also refresh instead of staying stuck on a stale error.
+  const existingSourceEmail = emailMeta.messageId
+    ? draft.sourceEmails.find(e => e.messageId === emailMeta.messageId)
+    : undefined;
+  if (existingSourceEmail) {
+    existingSourceEmail.notes = notes;
+    existingSourceEmail.receivedAt = emailMeta.receivedAt;
+  } else {
+    draft.sourceEmails.push({
+      messageId: emailMeta.messageId,
+      subject: emailMeta.subject,
+      receivedAt: emailMeta.receivedAt,
+      notes
+    });
+  }
   draft.lastUpdatedAt = now;
 
   writeStore(store);
