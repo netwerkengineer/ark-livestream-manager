@@ -195,7 +195,7 @@ Deze modus is voor ad-hoc werk dat niet per se bij "de setlist van aankomende zo
 3. Kies waar het moet komen: bij welke sectie, en vóór of ná.
 4. Voeg het toe aan de **Playlist** (rechts) om het onderdeel te maken van het uiteindelijke project.
 
-#### 5.2.1 Item toevoegen
+### 5.2.1 Item toevoegen
 
 Zes tabbladen bovenaan het toevoegpaneel:
 
@@ -217,11 +217,11 @@ Zes tabbladen bovenaan het toevoegpaneel:
 
 > ℹ️ **Livestream-stijl schakelt automatisch mee.** Elk stuk media dat op de voorgrond wordt geplaatst (zowel via 📸 Media als 🎥 YouTube) krijgt automatisch een actie mee die, zodra het item afspeelt, de output voor de livestream omschakelt naar de stijl "Livestream Video fullscreen". Zodra daarna een lied of Bijbeltekst speelt, schakelt diezelfde output automatisch terug naar "Livestream Liederen" — dit gebeurt zowel bij nieuw gegenereerde projecten als bij elk bestaand lied in de catalogus, dat deze terugschakel-actie al standaard heeft. Je hoeft hier zelf niets voor te doen; dit werkt alleen als bij Instellingen → FreeShow het veld "Output-ID voor livestream-video-stijl" is ingevuld (zie 8.8) — zonder dat veld wordt het item gewoon aangemaakt, alleen zonder de automatische stijl-omschakeling.
 
-#### 5.2.2 Plaatsing: sectie + vóór/ná
+### 5.2.2 Plaatsing: sectie + vóór/ná
 
 Onder elk toevoegtabblad (behalve wanneer een item al in bewerking is) staat "📍 Plaatsing in sectie:" — kies bij welke sectie het nieuwe item moet komen, en of het er vóór of ná moet. Deze lijst bevat, anders dan bij de Setlist-modus, niet alleen de sectiekoppen zelf maar ook losse vaste items zoals "Welkom", "Collecte Givt", "Thema" of "Bedankt" als aparte ankerpunten — handig voor deze fijnmazige, ad-hoc manier van invoegen. Dit werkt zowel met sjabloon-secties (als je een template gebruikt) als met je eigen handmatig aangemaakte secties.
 
-#### 5.2.3 Staging Area
+### 5.2.3 Staging Area
 
 Na het toevoegen van een lied/Bijbeltekst/media/YouTube-item verschijnt het in de Staging Area, waar je:
 - de tekst kunt nalezen/aanpassen (bij liederen en Bijbelteksten),
@@ -232,11 +232,11 @@ Na het toevoegen van een lied/Bijbeltekst/media/YouTube-item verschijnt het in d
   - **💾 Alleen opslaan in bibliotheek** — slaat het lied/Bijbeltekst op in de FreeShow-catalogus zonder het aan de huidige planning of Bouwer toe te voegen
   - **Annuleren**
 
-#### 5.2.4 Bouwer — eigen presentaties samenstellen
+### 5.2.4 Bouwer — eigen presentaties samenstellen
 
 Bouw een presentatie van meerdere slides (bijvoorbeeld tekst + een paar foto's achter elkaar) door items vanuit de Staging Area hierheen te sturen ("🛠️+ Bouwer"). Zodra er minstens één slide is toegevoegd, verschijnt onder **🗃️ Beheer** het tabblad "🛠️ Bouwer-sessie" (met het aantal slides erbij) om verder te werken; geef de show een naam en klik "Maak Show & Voeg Toe" om de complete presentatie als één item aan de Playlist toe te voegen.
 
-#### 5.2.5 Project genereren
+### 5.2.5 Project genereren
 
 Onder "2. Project Genereren":
 - **"Template gebruiken (Playlist)"** — aan: de vaste onderdelen/secties van het gekozen sjabloon blijven staan en jouw items worden erin ingevoegd op de gekozen plek. Uit: alleen jouw eigen items, geen sjabloon.
@@ -244,7 +244,7 @@ Onder "2. Project Genereren":
 - **Download** — laadt het `.project`-bestand naar je eigen computer
 - **Stuur naar server** — slaat het project direct op in de FreeShow-projectenmap op de NAS
 
-#### 5.2.6 Bestaand project inladen
+### 5.2.6 Bestaand project inladen
 
 Onder "📂 Bestaand Project Inladen" zie je alle opgeslagen projecten op de server, of je kunt een `.project`-bestand vanaf je eigen computer uploaden. Klik "Inladen" om het terug te halen in de Bouwer.
 
@@ -252,7 +252,7 @@ Dit werkt voor **elk** `.project`-bestand — of het nu handmatig via deze app i
 
 > ⚠️ Als iemand het gegenereerde project rechtstreeks in FreeShow heeft aangepast sinds de laatste update (vanuit de Setlist-modus of hier), waarschuwt de app hiervoor in plaats van die wijziging stil te overschrijven — je moet dan expliciet op "Toch overschrijven" klikken.
 
-#### 5.2.7 Playlist beheren
+### 5.2.7 Playlist beheren
 
 Rechts zie je de complete, samengevoegde afspeellijst. Per item:
 - Pijl-omhoog / Pijl-omlaag om te verplaatsen
@@ -263,7 +263,7 @@ Meerdere items selecteren (vinkjes) en dan "🗑️ Wis" verwijdert ze in één 
 
 ### 5.3 Beheer — catalogus, onderhoud en team
 
-#### 5.3.1 Catalogus
+### 5.3.1 Catalogus
 
 Doorzoek, filter (op categorie, met het aantal shows per categorie erbij — categorieën zonder shows worden niet getoond) en sorteer (naam / laatst gewijzigd) alle FreeShow-shows. Per show:
 - **📝 Bewerken** — opent de show-editor (zie hieronder)
@@ -277,7 +277,7 @@ In de Visuele editor staat bovenaan **"🖼️ Achtergrond (hele show)"**: kies 
 
 In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de complete songtekst in één keer (lege regel = nieuwe slide, `[Refrein]` of `Couplet 1` wordt automatisch als groepslabel herkend) en klik "Toepassen" om alle bestaande slides in deze show in één keer te vervangen — handig om een lied snel over te typen/plakken in plaats van slide voor slide te bewerken. Had de show al slides, dan vraagt de app eerst om bevestiging, want dit is niet ongedaan te maken.
 
-#### 5.3.2 Onderhoud
+### 5.3.2 Onderhoud
 
 **Duplicaten** — "Start Scan" zoekt shows met (vrijwel) dezelfde naam/inhoud. Per gevonden paar: "Vergelijk" opent een scherm waarin je de twee versies naast elkaar ziet (inclusief gekoppelde achtergrondmedia) en met één klik kiest welke bewaard blijft; het andere wordt verwijderd.
 
@@ -290,7 +290,7 @@ In de Visuele editor staat de knop **"📋 Plak volledige tekst"**: plak hier de
 - **Project nu klaarzetten** — stuurt het laatst gegenereerde project direct naar de Beamer-PC en zet het klaar in FreeShow, zonder te wachten op het nachtelijke schema. Handig als de PC al aanstaat en je niet tot 's nachts wilt wachten. De status (✅/❌) verschijnt direct onder de knop.
 - **Wis Alle Bijbelteksten** (rode, destructieve actie) — verwijdert in één keer alle Bijbeltekst-shows van zowel de NAS als de Beamer-PC. Let op: dit kan niet ongedaan worden gemaakt.
 
-#### 5.3.3 Team
+### 5.3.3 Team
 
 Het adresboek voor "📤 Verstuur naar team" in de Setlist-modus (zie 5.1): per contactpersoon een naam, rol (Band / Beamer-operator / Overig), e-mailadres, en een "Actief"-vinkje om iemand tijdelijk te pauzeren zonder de gegevens kwijt te raken. Klik "+ Contact toevoegen" om een nieuwe regel te starten; wijzigingen worden per veld direct en automatisch opgeslagen (geen aparte "Opslaan"-knop, en los van de rest van de instellingen).
 
