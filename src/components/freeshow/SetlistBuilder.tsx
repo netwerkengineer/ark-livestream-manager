@@ -616,10 +616,10 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const parsingNotes = draft ? draft.sourceEmails.flatMap(e => e.notes) : [];
 
   return (
-    <div className="glass-card" style={{ padding: '2rem' }}>
+    <div className="glass-card setlist-builder" style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h2 style={{ margin: 0 }}>🎤 Setlist bouwen</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '0.75rem', opacity: 0.7 }}>Dienstdatum:</label>
           <input
             type="date"
@@ -692,23 +692,33 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>Laden...</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: '1.5rem' }}>
+        <div className="setlist-columns" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: '1.5rem' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>
               Standaard-sectie voor het volgende lied
             </label>
-            <input
-              type="text"
-              className="input"
-              list="setlist-sections"
-              value={section}
-              onChange={e => setSection(e.target.value)}
-              placeholder="bv. Worship"
-              style={{ marginBottom: '1rem' }}
-            />
-            <datalist id="setlist-sections">
-              {templateSections.map(s => <option key={s} value={s} />)}
-            </datalist>
+            {templateSections.length > 0 ? (
+              <select
+                className="input"
+                value={section}
+                onChange={e => setSection(e.target.value)}
+                style={{ marginBottom: '1rem' }}
+              >
+                {!templateSections.includes(section) && (
+                  <option value={section}>{section}</option>
+                )}
+                {templateSections.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            ) : (
+              <input
+                type="text"
+                className="input"
+                value={section}
+                onChange={e => setSection(e.target.value)}
+                placeholder="bv. Worship"
+                style={{ marginBottom: '1rem' }}
+              />
+            )}
 
             <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
               {([
@@ -1157,7 +1167,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       )}
 
       {sendPreview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div className="setlist-preview-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
           <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', background: '#0f172a', border: '1px solid rgba(56,189,248,0.3)' }}>
             <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>📧 Controleer voor je verstuurt</h3>
             <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '-0.6rem', marginBottom: '1rem' }}>
@@ -1210,6 +1220,20 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @media (max-width: 700px) {
+          .setlist-builder {
+            padding: 1.2rem !important;
+          }
+          .setlist-columns {
+            grid-template-columns: 1fr !important;
+          }
+          .setlist-preview-overlay {
+            padding: 0.75rem !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
