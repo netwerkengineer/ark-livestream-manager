@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
 
   const { serviceDate } = await params;
   try {
-    const { recipientIds, includePdf, message, dryRun } = await req.json();
+    const { recipientIds, includePdf, message, dryRun, subject: subjectOverride, bodyText: bodyTextOverride } = await req.json();
     if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen ontvangers geselecteerd' }, { status: 400 });
     }
@@ -92,7 +92,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       return NextResponse.json({ success: false, error: 'Geen van de geselecteerde contactpersonen heeft een e-mailadres' }, { status: 400 });
     }
 
-    const { subject, bodyText } = buildEmailContent(serviceDate, draft, message);
+    // subjectOverride/bodyTextOverride let the worship leader edit the
+    // preview before confirming - the real send then uses exactly what they
+    // reviewed instead of recomposing it fresh.
+    const composed = buildEmailContent(serviceDate, draft, message);
+    const subject = typeof subjectOverride === 'string' && subjectOverride.trim() ? subjectOverride : composed.subject;
+    const bodyText = typeof bodyTextOverride === 'string' && bodyTextOverride.trim() ? bodyTextOverride : composed.bodyText;
 
     // Preview only - no lyrics lookup, no PDF rendering, no e-mail sent.
     // Just enough to show the worship leader exactly what they're about to send.

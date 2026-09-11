@@ -69,10 +69,12 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [error, setError] = useState('');
   const [songInput, setSongInput] = useState('');
   const [section, setSection] = useState('Worship');
-  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; loading: boolean } | null>(null);
+  const [templateSections, setTemplateSections] = useState<string[]>([]);
+  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; section: string; loading: boolean } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editLyrics, setEditLyrics] = useState('');
   const [editChords, setEditChords] = useState('');
+  const [editSection, setEditSection] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -184,6 +186,21 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       .catch(() => {});
   }, []);
 
+  // The actual service structure (Welkom, Worship, Collecte, Worship 2,
+  // Preek, Einde, ...) lives in the FreeShow template project - reuse that
+  // instead of asking the worship leader to type section names from memory.
+  useEffect(() => {
+    fetch('/api/template')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data.shows)) {
+          const sections = data.shows.filter((s: any) => s.type === 'section').map((s: any) => s.title || s.name);
+          setTemplateSections(sections.filter(Boolean));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Same "title - artist" split FreeshowGenerator's ad-hoc song add uses, so
   // catalog songs (stored as "Title - Artist") preview/save consistently.
   const stageSong = async (title?: string) => {
@@ -194,7 +211,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     const songTitle = split[0]?.trim() || finalTitle;
     const artist = split[1]?.trim() || '';
     setSongInput('');
-    setStaging({ title: songTitle, artist, text: '', chords: '', loading: true });
+    setStaging({ title: songTitle, artist, text: '', chords: '', section, loading: true });
     try {
       const res = await fetch('/api/preview', {
         method: 'POST',
@@ -218,7 +235,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: staging.title, artist: staging.artist, section, lyricsText: staging.text, chordsText: staging.chords })
+        body: JSON.stringify({ title: staging.title, artist: staging.artist, section: staging.section, lyricsText: staging.text, chordsText: staging.chords })
       });
       const data = await res.json();
       if (data.success) {
@@ -236,6 +253,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     setExpandedId(song.id);
     setEditLyrics(song.lyricsText || '');
     setEditChords(song.chordsText || '');
+    setEditSection(song.section || '');
   };
 
   const saveEditing = async (songId: string) => {
@@ -244,7 +262,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lyricsText: editLyrics, chordsText: editChords })
+        body: JSON.stringify({ lyricsText: editLyrics, chordsText: editChords, section: editSection })
       });
       const data = await res.json();
       if (data.success) {
@@ -350,14 +368,23 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
 
   const cancelSendPreview = () => setSendPreview(null);
 
+  // Sends exactly what's shown in the (possibly edited) preview - subject
+  // and bodyText travel along so a tweak made in the review step is what
+  // actually goes out, not a freshly recomposed version.
   const confirmSend = async () => {
+    if (!sendPreview) return;
     setSending(true);
     setSendMessage('');
     try {
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf, message: extraMessage })
+        body: JSON.stringify({
+          recipientIds: selectedRecipientIds,
+          includePdf,
+          subject: sendPreview.subject,
+          bodyText: sendPreview.bodyText
+        })
       });
       const data = await res.json();
       setSendMessage(data.success ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s)` : `❌ ${data.error}`);
@@ -456,20 +483,48 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: '1.5rem' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>Sectie voor nieuw toegevoegde liederen</label>
+            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>
+              Standaard-sectie voor het volgende lied
+            </label>
             <input
               type="text"
               className="input"
+              list="setlist-sections"
               value={section}
               onChange={e => setSection(e.target.value)}
               placeholder="bv. Worship"
               style={{ marginBottom: '1rem' }}
             />
+            <datalist id="setlist-sections">
+              {templateSections.map(s => <option key={s} value={s} />)}
+            </datalist>
             {staging ? (
               <div className="glass-card" style={{ padding: '1rem', border: '2px solid var(--primary)', background: 'rgba(56,189,248,0.05)' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.8rem' }}>
                   {staging.title}{staging.artist ? <span style={{ opacity: 0.6 }}> - {staging.artist}</span> : ''}
                 </div>
+                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>Sectie</label>
+                {templateSections.length > 0 ? (
+                  <select
+                    className="input"
+                    value={staging.section}
+                    onChange={e => setStaging(prev => (prev ? { ...prev, section: e.target.value } : prev))}
+                    style={{ width: '100%', marginBottom: '0.8rem' }}
+                  >
+                    {!templateSections.includes(staging.section) && (
+                      <option value={staging.section}>{staging.section}</option>
+                    )}
+                    {templateSections.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="input"
+                    value={staging.section}
+                    onChange={e => setStaging(prev => (prev ? { ...prev, section: e.target.value } : prev))}
+                    style={{ width: '100%', marginBottom: '0.8rem' }}
+                  />
+                )}
                 {staging.loading ? (
                   <div style={{ padding: '1.5rem', textAlign: 'center', opacity: 0.6, fontSize: '0.85rem' }}>Songtekst ophalen...</div>
                 ) : (
@@ -633,6 +688,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                         <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {s.title}{s.artist ? <span style={{ opacity: 0.5 }}> - {s.artist}</span> : ''}
                         </span>
+                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--muted)', flexShrink: 0 }}>
+                          {s.section}
+                        </span>
                         {s.source === 'email' && <span title="Aangeleverd via e-mail" style={{ flexShrink: 0 }}>📬</span>}
                         {(s.lyricsText || s.chordsText) && <span title="Tekst/akkoorden toegevoegd" style={{ flexShrink: 0 }}>📝</span>}
                       </div>
@@ -648,6 +706,28 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
 
                     {expandedId === s.id && (
                       <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>Sectie</label>
+                        {templateSections.length > 0 ? (
+                          <select
+                            className="input"
+                            value={editSection}
+                            onChange={e => setEditSection(e.target.value)}
+                            style={{ width: '100%', marginBottom: '0.6rem' }}
+                          >
+                            {!templateSections.includes(editSection) && (
+                              <option value={editSection}>{editSection}</option>
+                            )}
+                            {templateSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            className="input"
+                            value={editSection}
+                            onChange={e => setEditSection(e.target.value)}
+                            style={{ width: '100%', marginBottom: '0.6rem' }}
+                          />
+                        )}
                         <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>Songtekst</label>
                         <textarea
                           className="input"
@@ -696,6 +776,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
           <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', background: '#0f172a', border: '1px solid rgba(56,189,248,0.3)' }}>
             <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>📧 Controleer voor je verstuurt</h3>
+            <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '-0.6rem', marginBottom: '1rem' }}>
+              Onderwerp en bericht zijn hieronder aan te passen — de wijzigingen worden meegestuurd.
+            </p>
 
             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Aan</div>
             <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>
@@ -703,15 +786,22 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
             </div>
 
             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Onderwerp</div>
-            <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>{sendPreview.subject}</div>
+            <input
+              type="text"
+              className="input"
+              value={sendPreview.subject}
+              onChange={e => setSendPreview(prev => (prev ? { ...prev, subject: e.target.value } : prev))}
+              style={{ marginBottom: '0.8rem' }}
+            />
 
             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Bericht</div>
-            <div style={{
-              fontSize: '0.85rem', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.3)', borderRadius: '8px',
-              padding: '0.8rem', marginBottom: '0.8rem', border: '1px solid rgba(255,255,255,0.06)'
-            }}>
-              {sendPreview.bodyText}
-            </div>
+            <textarea
+              className="input"
+              value={sendPreview.bodyText}
+              onChange={e => setSendPreview(prev => (prev ? { ...prev, bodyText: e.target.value } : prev))}
+              rows={12}
+              style={{ width: '100%', resize: 'vertical', marginBottom: '0.8rem' }}
+            />
 
             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Bijlagen ({sendPreview.attachments.length})</div>
             <div style={{ fontSize: '0.8rem', marginBottom: '1.2rem', opacity: 0.85 }}>
