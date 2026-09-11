@@ -313,7 +313,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     }
   };
 
-  const generateProject = async (force: boolean) => {
+  const generateProject = async (force: boolean): Promise<boolean> => {
     setGenerating(true);
     setGenMessage('');
     try {
@@ -326,11 +326,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       if (data.success) {
         setGenMessage('✅ ' + (data.message || 'Project bijgewerkt'));
         await fetchDraft(serviceDate);
+        return true;
       } else {
         setGenMessage('❌ ' + (data.message || data.error || 'Onbekende fout'));
+        return false;
       }
     } catch (e: any) {
       setGenMessage('❌ ' + e.message);
+      return false;
     } finally {
       setGenerating(false);
     }
@@ -387,8 +390,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
         })
       });
       const data = await res.json();
-      setSendMessage(data.success ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s)` : `❌ ${data.error}`);
-      if (data.success) await fetchDraft(serviceDate);
+      if (data.success) {
+        setSendMessage(`✅ Verstuurd naar ${data.sentTo} ontvanger(s) — project wordt bijgewerkt...`);
+        const projectOk = await generateProject(false);
+        setSendMessage(
+          projectOk
+            ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s), en project bijgewerkt`
+            : `✅ Verstuurd naar ${data.sentTo} ontvanger(s) — ⚠️ project bijwerken is mislukt, probeer dat los`
+        );
+      } else {
+        setSendMessage(`❌ ${data.error}`);
+      }
     } catch (e: any) {
       setSendMessage(`❌ ${e.message}`);
     } finally {
