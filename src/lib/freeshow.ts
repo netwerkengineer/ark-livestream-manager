@@ -566,13 +566,17 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
       const normalize = (s: string) => s.trim().toLowerCase();
       const sectionIdx = dataFile.project.shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === normalize(sectionName));
       if (sectionIdx !== -1) {
-        // Insert after everything already in this section (e.g. a pinned
-        // template show like "Thema" under Preek) instead of always right
-        // after the divider - otherwise newly-added items would land
-        // BEFORE existing pinned/previously-added content instead of after it.
+        // Most sections have their pinned template show(s) FIRST (e.g.
+        // "Thema" under Preek, "Welkom" under Start) - new items belong
+        // after those. "Einde" is the opposite: its pinned "Bedankt" show
+        // must always stay the very last thing in the service, so new items
+        // there go right after the divider instead, before any pinned content.
+        const sectionsWithTrailingPin = ['einde'];
         let insertIdx = sectionIdx + 1;
-        while (insertIdx < dataFile.project.shows.length && dataFile.project.shows[insertIdx].type !== 'section') {
-          insertIdx++;
+        if (!sectionsWithTrailingPin.includes(normalize(sectionName))) {
+          while (insertIdx < dataFile.project.shows.length && dataFile.project.shows[insertIdx].type !== 'section') {
+            insertIdx++;
+          }
         }
         insertAtIndices(dataFile, itemsToInsert, insertIdx);
       } else {
