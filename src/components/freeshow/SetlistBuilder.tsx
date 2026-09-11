@@ -83,6 +83,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [includePdf, setIncludePdf] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [sendPreview, setSendPreview] = useState<{ to: Array<{ name: string; email: string }>; subject: string; bodyText: string; attachments: string[] } | null>(null);
   const [checking, setChecking] = useState(false);
   const [unassigned, setUnassigned] = useState<Array<{ messageId?: string; subject?: string; receivedAt: string; excerpt: string }>>([]);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
@@ -320,7 +322,35 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     setSelectedRecipientIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
 
-  const sendEmail = async () => {
+  // "Verstuur e-mail" no longer sends straight away - it first asks the
+  // server (dryRun) for exactly what would be sent (recipients, subject,
+  // body, attachment filenames) so the worship leader can review it, then
+  // confirmSend fires the real send with the same parameters.
+  const openSendPreview = async () => {
+    setPreviewLoading(true);
+    setSendMessage('');
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf, message: extraMessage, dryRun: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSendPreview(data.preview);
+      } else {
+        setSendMessage(`❌ ${data.error}`);
+      }
+    } catch (e: any) {
+      setSendMessage(`❌ ${e.message}`);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const cancelSendPreview = () => setSendPreview(null);
+
+  const confirmSend = async () => {
     setSending(true);
     setSendMessage('');
     try {
@@ -336,6 +366,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       setSendMessage(`❌ ${e.message}`);
     } finally {
       setSending(false);
+      setSendPreview(null);
     }
   };
 
@@ -569,10 +600,10 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                       <button
                         className="button"
                         style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--primary)', color: '#020617' }}
-                        onClick={sendEmail}
-                        disabled={sending || selectedRecipientIds.length === 0}
+                        onClick={openSendPreview}
+                        disabled={previewLoading || selectedRecipientIds.length === 0}
                       >
-                        {sending ? 'Bezig...' : '✉️ Verstuur e-mail'}
+                        {previewLoading ? 'Voorbereiden...' : '✉️ Verstuur e-mail'}
                       </button>
                       <button
                         className="button"
@@ -657,6 +688,51 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {sendPreview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', background: '#0f172a', border: '1px solid rgba(56,189,248,0.3)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>📧 Controleer voor je verstuurt</h3>
+
+            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Aan</div>
+            <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+              {sendPreview.to.map(r => `${r.name} <${r.email}>`).join(', ')}
+            </div>
+
+            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Onderwerp</div>
+            <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>{sendPreview.subject}</div>
+
+            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Bericht</div>
+            <div style={{
+              fontSize: '0.85rem', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.3)', borderRadius: '8px',
+              padding: '0.8rem', marginBottom: '0.8rem', border: '1px solid rgba(255,255,255,0.06)'
+            }}>
+              {sendPreview.bodyText}
+            </div>
+
+            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Bijlagen ({sendPreview.attachments.length})</div>
+            <div style={{ fontSize: '0.8rem', marginBottom: '1.2rem', opacity: 0.85 }}>
+              {sendPreview.attachments.join(', ')}
+            </div>
+
+            {sendMessage && <div style={{ fontSize: '0.8rem', marginBottom: '0.8rem' }}>{sendMessage}</div>}
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={cancelSendPreview} disabled={sending}>
+                Annuleren
+              </button>
+              <button
+                className="button"
+                style={{ flex: 1, background: 'var(--primary)', color: '#020617' }}
+                onClick={confirmSend}
+                disabled={sending}
+              >
+                {sending ? 'Bezig met versturen...' : '✅ Akkoord, versturen'}
+              </button>
+            </div>
           </div>
         </div>
       )}

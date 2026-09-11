@@ -6,7 +6,7 @@ export interface ExportedFile {
   content: Buffer;
 }
 
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.\- ]/g, '_').trim() || 'lied';
 }
 

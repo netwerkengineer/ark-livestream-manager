@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
-import { getDraftService, updateSongInDraft, DraftSong } from '@/lib/draftServicesStore';
-import { getContacts } from '@/lib/contactsStore';
-import { buildSongTextFile, buildSongPdf } from '@/lib/songExport';
+import { getDraftService, updateSongInDraft, DraftSong, DraftService } from '@/lib/draftServicesStore';
+import { getContacts, Contact } from '@/lib/contactsStore';
+import { buildSongTextFile, buildSongPdf, sanitizeFilename } from '@/lib/songExport';
 import { sendSetlistEmail } from '@/lib/mailer';
 import { checkLocalSongExists, getLocalSongText, fetchLyricsFromInternet } from '@/lib/songs';
 
@@ -38,6 +38,29 @@ function formatDateLabel(iso: string): string {
   }
 }
 
+// Shared between the real send and the dry-run preview, so what the
+// worship leader sees in the preview is guaranteed to be exactly what goes
+// out - no separate client-side re-implementation to drift out of sync.
+function buildEmailContent(serviceDate: string, draft: DraftService, message?: string) {
+  const dateLabel = formatDateLabel(serviceDate);
+  const bodyLines = [`Setlist voor ${dateLabel}:`, ''];
+  draft.songs.forEach((s, i) => {
+    bodyLines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
+  });
+  bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
+  if (typeof message === 'string' && message.trim()) {
+    bodyLines.push('', message.trim());
+  }
+  return { subject: `Setlist ${dateLabel}`, bodyText: bodyLines.join('\n') };
+}
+
+function attachmentFilenames(draft: DraftService, includePdf: boolean): string[] {
+  return draft.songs.flatMap(s => {
+    const base = sanitizeFilename(s.title);
+    return includePdf ? [`${base}.txt`, `${base}.pdf`] : [`${base}.txt`];
+  });
+}
+
 // Sends the setlist (per-song text files, optionally PDFs) to a chosen set
 // of contacts by email. WhatsApp is deliberately not automated here - see
 // the "WhatsApp-samenvatting" button in the setlist UI, which reuses the
@@ -50,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
 
   const { serviceDate } = await params;
   try {
-    const { recipientIds, includePdf, message } = await req.json();
+    const { recipientIds, includePdf, message, dryRun } = await req.json();
     if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen ontvangers geselecteerd' }, { status: 400 });
     }
@@ -63,10 +86,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       return NextResponse.json({ success: false, error: 'Deze setlist heeft nog geen liederen' }, { status: 400 });
     }
 
-    const contacts = getContacts();
+    const contacts: Contact[] = getContacts();
     const recipients = contacts.filter(c => recipientIds.includes(c.id) && c.email);
     if (recipients.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen van de geselecteerde contactpersonen heeft een e-mailadres' }, { status: 400 });
+    }
+
+    const { subject, bodyText } = buildEmailContent(serviceDate, draft, message);
+
+    // Preview only - no lyrics lookup, no PDF rendering, no e-mail sent.
+    // Just enough to show the worship leader exactly what they're about to send.
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        preview: {
+          to: recipients.map(r => ({ name: r.name, email: r.email! })),
+          subject,
+          bodyText,
+          attachments: attachmentFilenames(draft, !!includePdf)
+        }
+      });
     }
 
     const attachments = [];
@@ -78,20 +117,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       }
     }
 
-    const dateLabel = formatDateLabel(serviceDate);
-    const bodyLines = [`Setlist voor ${dateLabel}:`, ''];
-    draft.songs.forEach((s, i) => {
-      bodyLines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
-    });
-    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
-    if (typeof message === 'string' && message.trim()) {
-      bodyLines.push('', message.trim());
-    }
-
     const result = await sendSetlistEmail({
       to: recipients.map(r => r.email!),
-      subject: `Setlist ${dateLabel}`,
-      bodyText: bodyLines.join('\n'),
+      subject,
+      bodyText,
       attachments
     });
 
