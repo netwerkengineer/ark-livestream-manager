@@ -1770,15 +1770,17 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px', paddingBottom: '20px' }}>
-        <button
-          className="btn-primary"
-          style={{ width: '100%', padding: '20px', fontSize: '1.25rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(248, 113, 113, 0.2)' }}
-          onClick={onSaveSettings}
-        >
-          <Save size={24} /> Wijzigingen Opslaan
-        </button>
-      </div>
+      {settingsTab !== "team" && settingsTab !== "backup" && settingsTab !== "activityLog" && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px', paddingBottom: '20px' }}>
+          <button
+            className="btn-primary"
+            style={{ width: '100%', padding: '20px', fontSize: '1.25rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(248, 113, 113, 0.2)' }}
+            onClick={onSaveSettings}
+          >
+            <Save size={24} /> Wijzigingen Opslaan
+          </button>
+        </div>
+      )}
 
       <style jsx>{`
         .settings-modal-card {

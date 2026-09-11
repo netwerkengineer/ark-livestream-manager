@@ -69,6 +69,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [error, setError] = useState('');
   const [songInput, setSongInput] = useState('');
   const [section, setSection] = useState('Worship');
+  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; loading: boolean } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editLyrics, setEditLyrics] = useState('');
   const [editChords, setEditChords] = useState('');
@@ -159,20 +160,46 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       .catch(() => {});
   }, []);
 
-  const addSong = async (title?: string) => {
-    const finalTitle = title || songInput;
-    if (!finalTitle.trim()) return;
+  // Same "title - artist" split FreeshowGenerator's ad-hoc song add uses, so
+  // catalog songs (stored as "Title - Artist") preview/save consistently.
+  const stageSong = async (title?: string) => {
+    const finalTitle = (title || songInput).trim();
+    if (!finalTitle) return;
+    setError('');
+    const split = finalTitle.split('-');
+    const songTitle = split[0]?.trim() || finalTitle;
+    const artist = split[1]?.trim() || '';
+    setSongInput('');
+    setStaging({ title: songTitle, artist, text: '', loading: true });
+    try {
+      const res = await fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [{ type: 'song', title: songTitle, artist }] })
+      });
+      const data = await res.json();
+      const text = data.success && data.items?.[0] ? data.items[0].text || '' : '';
+      setStaging(prev => (prev ? { ...prev, text, loading: false } : prev));
+    } catch {
+      setStaging(prev => (prev ? { ...prev, loading: false } : prev));
+    }
+  };
+
+  const cancelStaging = () => setStaging(null);
+
+  const confirmStagedSong = async () => {
+    if (!staging) return;
     setError('');
     try {
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: finalTitle.trim(), section })
+        body: JSON.stringify({ title: staging.title, artist: staging.artist, section, lyricsText: staging.text })
       });
       const data = await res.json();
       if (data.success) {
         setDraft(data.draft);
-        setSongInput('');
+        setStaging(null);
       } else {
         setError(data.error || 'Kon lied niet toevoegen');
       }
@@ -384,14 +411,56 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
               placeholder="bv. Worship"
               style={{ marginBottom: '1rem' }}
             />
-            <SongInput
-              songInput={songInput}
-              setSongInput={setSongInput}
-              catalogSongs={catalogSongs}
-              onAddSong={addSong}
-              t={t}
-              freeshowCategories={freeshowCategories}
-            />
+            {staging ? (
+              <div className="glass-card" style={{ padding: '1rem', border: '2px solid var(--primary)', background: 'rgba(56,189,248,0.05)' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '0.8rem' }}>
+                  {staging.title}{staging.artist ? <span style={{ opacity: 0.6 }}> - {staging.artist}</span> : ''}
+                </div>
+                {staging.loading ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', opacity: 0.6, fontSize: '0.85rem' }}>Songtekst ophalen...</div>
+                ) : (
+                  <>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>
+                      Songtekst — controleer voor je 'm toevoegt (je kunt 'm hier aanpassen)
+                    </label>
+                    {!staging.text && (
+                      <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.4rem' }}>
+                        Geen tekst gevonden in de catalogus — vul 'm hieronder zelf in, of laat leeg.
+                      </div>
+                    )}
+                    <textarea
+                      className="input"
+                      value={staging.text}
+                      onChange={e => setStaging(prev => (prev ? { ...prev, text: e.target.value } : prev))}
+                      rows={12}
+                      style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
+                    />
+                  </>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="button" style={{ flex: 1, background: 'rgba(255,255,255,0.1)' }} onClick={cancelStaging}>
+                    Annuleren
+                  </button>
+                  <button
+                    className="button"
+                    style={{ flex: 1, background: 'var(--primary)', color: '#020617' }}
+                    onClick={confirmStagedSong}
+                    disabled={staging.loading}
+                  >
+                    + Toevoegen aan setlist
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <SongInput
+                songInput={songInput}
+                setSongInput={setSongInput}
+                catalogSongs={catalogSongs}
+                onAddSong={stageSong}
+                t={t}
+                freeshowCategories={freeshowCategories}
+              />
+            )}
           </div>
 
           <div>
