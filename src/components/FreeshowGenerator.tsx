@@ -1621,7 +1621,13 @@ export default function FreeshowGenerator() {
       </div>
 
       {inputType === 'setlist' ? (
-        <SetlistBuilder catalogSongs={catalogSongs} freeshowCategories={freeshowCategories} t={t} />
+        <SetlistBuilder
+          catalogSongs={catalogSongs}
+          freeshowCategories={freeshowCategories}
+          availableBibles={catalog.bibles}
+          freeshowMediaPath={settings.freeshowMediaPath}
+          t={t}
+        />
       ) : inputType === 'database' ? (
         <>
         <div className="glass-card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

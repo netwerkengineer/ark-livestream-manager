@@ -228,6 +228,81 @@ export function addSongToDraft(
   return draft;
 }
 
+// Adds one Bible reading directly (not from a parsed email) - same
+// dedupe-by-reference behaviour as the email pipeline.
+export function addScriptureToDraft(
+  serviceDate: string,
+  scripture: { book: string; chapter: number; verseStart: number; verseEnd?: number; translation: string; section: string }
+): DraftService {
+  const store = readStore();
+  let draft = store.services[serviceDate];
+  if (!draft) {
+    draft = {
+      id: serviceDate,
+      serviceDate,
+      songs: [],
+      scriptures: [],
+      media: [],
+      sourceEmails: [],
+      lastUpdatedAt: new Date().toISOString()
+    };
+    store.services[serviceDate] = draft;
+  }
+
+  if (!isDuplicateScripture(draft.scriptures, scripture)) {
+    draft.scriptures.push({
+      id: newId(),
+      book: scripture.book,
+      chapter: scripture.chapter,
+      verseStart: scripture.verseStart,
+      verseEnd: scripture.verseEnd,
+      translation: scripture.translation,
+      section: scripture.section,
+      addedAt: new Date().toISOString()
+    });
+  }
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
+// Adds one media item directly (not from a parsed email) - same
+// dedupe-by-url/attachment behaviour as the email pipeline.
+export function addMediaToDraft(
+  serviceDate: string,
+  media: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; filePath?: string; section: string }
+): DraftService {
+  const store = readStore();
+  let draft = store.services[serviceDate];
+  if (!draft) {
+    draft = {
+      id: serviceDate,
+      serviceDate,
+      songs: [],
+      scriptures: [],
+      media: [],
+      sourceEmails: [],
+      lastUpdatedAt: new Date().toISOString()
+    };
+    store.services[serviceDate] = draft;
+  }
+
+  if (!isDuplicateMedia(draft.media, media)) {
+    draft.media.push({
+      id: newId(),
+      mediaType: media.mediaType,
+      url: media.url,
+      attachmentName: media.attachmentName,
+      filePath: media.filePath,
+      section: media.section,
+      addedAt: new Date().toISOString()
+    });
+  }
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
 // Edits an existing song in place (title/section/lyrics/chords/...) - there
 // was previously no update path, only add/remove, which meant a worship
 // leader couldn't fix a typo or paste in lyrics/chords after the fact
@@ -355,7 +430,7 @@ function dedupeSongTitle(existing: DraftSong[], title: string): boolean {
   return existing.some(s => s.title.trim().toLowerCase() === normalized);
 }
 
-function isDuplicateScripture(existing: DraftScripture[], item: Extract<ParsedItem, { type: 'scripture' }>): boolean {
+function isDuplicateScripture(existing: DraftScripture[], item: { book: string; chapter: number; verseStart: number; verseEnd?: number; translation: string }): boolean {
   return existing.some(s =>
     s.book === item.book &&
     s.chapter === item.chapter &&
@@ -365,7 +440,7 @@ function isDuplicateScripture(existing: DraftScripture[], item: Extract<ParsedIt
   );
 }
 
-function isDuplicateMedia(existing: DraftMedia[], item: Extract<ParsedItem, { type: 'media' }>): boolean {
+function isDuplicateMedia(existing: DraftMedia[], item: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string }): boolean {
   return existing.some(m => {
     if (m.mediaType !== item.mediaType) return false;
     if (item.url) return m.url === item.url;

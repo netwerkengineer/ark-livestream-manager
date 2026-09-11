@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
 import SongInput from './SongInput';
+import { BIBLE_BOOKS } from '@/lib/freeshowUtils';
 
 interface DraftSong {
   id: string;
@@ -75,6 +76,8 @@ const ROLE_LABELS: Record<Contact['role'], string> = {
 interface SetlistBuilderProps {
   catalogSongs: Array<{ name: string; category: string }>;
   freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
+  availableBibles: string[];
+  freeshowMediaPath: string;
   t: (key: string) => string;
 }
 
@@ -96,7 +99,7 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: SetlistBuilderProps) {
+export default function SetlistBuilder({ catalogSongs, freeshowCategories, availableBibles, freeshowMediaPath, t }: SetlistBuilderProps) {
   const [serviceDate, setServiceDate] = useState(upcomingSunday);
   const [draft, setDraft] = useState<DraftService | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +108,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [section, setSection] = useState('Worship');
   const [templateSections, setTemplateSections] = useState<string[]>([]);
   const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; section: string; loading: boolean } | null>(null);
+  const [addMode, setAddMode] = useState<'song' | 'bible' | 'media'>('song');
+  const [bibleTranslation, setBibleTranslation] = useState('');
+  const [bibleBook, setBibleBook] = useState('Genesis');
+  const [bibleChapter, setBibleChapter] = useState('');
+  const [bibleVerseStart, setBibleVerseStart] = useState('');
+  const [bibleVerseEnd, setBibleVerseEnd] = useState('');
+  const [addingBible, setAddingBible] = useState(false);
+  const [mediaType, setMediaType] = useState<'youtube' | 'attachment' | 'link'>('youtube');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [addingMedia, setAddingMedia] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editLyrics, setEditLyrics] = useState('');
   const [editChords, setEditChords] = useState('');
@@ -167,6 +181,12 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   }, []);
 
   useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
+
+  useEffect(() => {
+    if (!bibleTranslation && availableBibles.length > 0) {
+      setBibleTranslation(availableBibles[0]);
+    }
+  }, [availableBibles, bibleTranslation]);
 
   const fetchUnassigned = useCallback(async () => {
     try {
@@ -289,6 +309,101 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       }
     } catch (e: any) {
       setError(e.message);
+    }
+  };
+
+  // Matches FreeshowGenerator's own bible-add flow: availableBibles carries
+  // full labels like "Basisbijbel (BB)", but the code stored on a scripture
+  // (and what the e-mail pipeline stores) is just the short acronym in
+  // parentheses - falls back to the raw value for a translation with no
+  // parenthesized code at all.
+  const addBible = async () => {
+    if (!bibleBook || !bibleChapter || !bibleVerseStart) return;
+    setAddingBible(true);
+    setError('');
+    try {
+      const acronymMatch = bibleTranslation.match(/\((.*?)\)/);
+      const translation = acronymMatch ? acronymMatch[1] : bibleTranslation;
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/scriptures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          book: bibleBook,
+          chapter: Number(bibleChapter),
+          verseStart: Number(bibleVerseStart),
+          verseEnd: bibleVerseEnd ? Number(bibleVerseEnd) : undefined,
+          translation,
+          section
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDraft(data.draft);
+        setBibleChapter('');
+        setBibleVerseStart('');
+        setBibleVerseEnd('');
+      } else {
+        setError(data.error || 'Kon bijbeltekst niet toevoegen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setAddingBible(false);
+    }
+  };
+
+  const addMedia = async () => {
+    setError('');
+    if (mediaType === 'attachment' && !mediaFile) {
+      setError('Kies eerst een bestand');
+      return;
+    }
+    if (mediaType !== 'attachment' && !mediaUrl.trim()) {
+      setError('Vul een link in');
+      return;
+    }
+    setAddingMedia(true);
+    try {
+      let filePath: string | undefined;
+      let attachmentName: string | undefined;
+      if (mediaType === 'attachment' && mediaFile) {
+        const formData = new FormData();
+        formData.append('file', mediaFile);
+        formData.append('directory', freeshowMediaPath);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (!uploadData.success) {
+          setError(uploadData.error || 'Upload mislukt');
+          setAddingMedia(false);
+          return;
+        }
+        filePath = uploadData.filePath;
+        attachmentName = mediaFile.name;
+      }
+
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaType,
+          url: mediaType === 'attachment' ? undefined : mediaUrl.trim(),
+          attachmentName,
+          filePath,
+          section
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDraft(data.draft);
+        setMediaUrl('');
+        setMediaFile(null);
+      } else {
+        setError(data.error || 'Kon media niet toevoegen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setAddingMedia(false);
     }
   };
 
@@ -594,7 +709,126 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
             <datalist id="setlist-sections">
               {templateSections.map(s => <option key={s} value={s} />)}
             </datalist>
-            {staging ? (
+
+            <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+              {([
+                ['song', '🎵 Lied'],
+                ['bible', '📖 Bijbeltekst'],
+                ['media', '🎬 Media']
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  className="button"
+                  style={{ flex: 1, fontSize: '0.75rem', padding: '0.5rem', background: addMode === mode ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: addMode === mode ? '#020617' : '#fff' }}
+                  onClick={() => setAddMode(mode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {addMode === 'bible' && (
+              <div>
+                <select
+                  className="input"
+                  value={bibleTranslation}
+                  onChange={e => setBibleTranslation(e.target.value)}
+                  style={{ marginBottom: '0.5rem' }}
+                >
+                  {availableBibles.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <select
+                    className="input"
+                    value={bibleBook}
+                    onChange={e => setBibleBook(e.target.value)}
+                    style={{ flex: 2 }}
+                  >
+                    {BIBLE_BOOKS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Hfst"
+                    value={bibleChapter}
+                    onChange={e => setBibleChapter(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Vers vanaf"
+                    value={bibleVerseStart}
+                    onChange={e => setBibleVerseStart(e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Vers tot (optioneel)"
+                    value={bibleVerseEnd}
+                    onChange={e => setBibleVerseEnd(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="button"
+                  style={{ width: '100%', background: 'var(--primary)', color: '#020617' }}
+                  onClick={addBible}
+                  disabled={addingBible || !bibleBook || !bibleChapter || !bibleVerseStart}
+                >
+                  {addingBible ? 'Bezig...' : '+ Toevoegen aan setlist'}
+                </button>
+              </div>
+            )}
+
+            {addMode === 'media' && (
+              <div>
+                <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.6rem', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '6px' }}>
+                  {([
+                    ['youtube', 'YouTube'],
+                    ['attachment', 'Bestand'],
+                    ['link', 'Link']
+                  ] as const).map(([type, label]) => (
+                    <button
+                      key={type}
+                      onClick={() => setMediaType(type)}
+                      style={{ flex: 1, padding: '0.4rem', fontSize: '0.7rem', border: 'none', borderRadius: '4px', cursor: 'pointer', background: mediaType === type ? 'var(--primary)' : 'transparent', color: mediaType === type ? '#020617' : '#fff' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {mediaType === 'attachment' ? (
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    className="input"
+                    onChange={e => setMediaFile(e.target.files?.[0] || null)}
+                    style={{ marginBottom: '1rem' }}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder={mediaType === 'youtube' ? 'https://youtube.com/...' : 'https://...'}
+                    value={mediaUrl}
+                    onChange={e => setMediaUrl(e.target.value)}
+                    style={{ marginBottom: '1rem' }}
+                  />
+                )}
+                <button
+                  className="button"
+                  style={{ width: '100%', background: 'var(--primary)', color: '#020617' }}
+                  onClick={addMedia}
+                  disabled={addingMedia}
+                >
+                  {addingMedia ? 'Bezig...' : '+ Toevoegen aan setlist'}
+                </button>
+              </div>
+            )}
+
+            {addMode === 'song' && (staging ? (
               <div className="glass-card" style={{ padding: '1rem', border: '2px solid var(--primary)', background: 'rgba(56,189,248,0.05)' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.8rem' }}>
                   {staging.title}{staging.artist ? <span style={{ opacity: 0.6 }}> - {staging.artist}</span> : ''}
@@ -676,7 +910,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                 t={t}
                 freeshowCategories={freeshowCategories}
               />
-            )}
+            ))}
           </div>
 
           <div>
