@@ -140,6 +140,18 @@ function findBibleBook(name: string): string | null {
   const abbreviated = BIBLE_BOOK_ABBREVIATIONS[normalized];
   if (abbreviated) return abbreviated;
 
+  // Different Dutch translations spell the same book differently - older/
+  // traditional ones use "th" where newer ones (e.g. Basisbijbel) drop the
+  // h, and a sender copy-pasting straight from a translation's own text
+  // sends whichever spelling that translation uses ("1 Tessalonicenzen"
+  // failed to match "1 Thessalonicenzen" this way). Affects at least
+  // Thessalonicenzen, Timotheüs/Timoteüs, Mattheüs/Matteüs and
+  // Korinthiërs/Korintiërs, so this collapses "th"->"t" on both sides
+  // instead of listing every affected book by hand.
+  const collapseTh = (value: string) => value.replace(/th/g, 't');
+  const thCollapsed = BIBLE_BOOKS.find(b => collapseTh(foldDiacritics(b.toLowerCase())) === collapseTh(normalized));
+  if (thCollapsed) return thCollapsed;
+
   // Last resort: an unambiguous prefix match (e.g. "Efez" -> "Efeziërs")
   // for anything not covered by the table above.
   const prefixMatches = BIBLE_BOOKS.filter(b => foldDiacritics(b.toLowerCase()).startsWith(normalized));
