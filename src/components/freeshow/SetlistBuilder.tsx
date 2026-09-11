@@ -13,14 +13,49 @@ interface DraftSong {
   chordsText?: string;
 }
 
+interface DraftScripture {
+  id: string;
+  book: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd?: number;
+  translation: string;
+  section: string;
+}
+
+interface DraftMedia {
+  id: string;
+  mediaType: 'youtube' | 'attachment' | 'link';
+  url?: string;
+  attachmentName?: string;
+  filePath?: string;
+  section: string;
+}
+
+interface SourceEmailRecord {
+  messageId?: string;
+  subject?: string;
+  receivedAt: string;
+  notes: string[];
+}
+
 interface DraftService {
   id: string;
   serviceDate: string;
   songs: DraftSong[];
-  scriptures: any[];
-  media: any[];
+  scriptures: DraftScripture[];
+  media: DraftMedia[];
+  sourceEmails: SourceEmailRecord[];
   lastGeneratedAt?: string;
   lastGenerationNotes?: string[];
+}
+
+function sectionBadge(section: string) {
+  return (
+    <span style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(56,189,248,0.12)', color: 'var(--primary)', fontWeight: 600, flexShrink: 0 }}>
+      {section || 'Overig'}
+    </span>
+  );
 }
 
 interface Contact {
@@ -303,6 +338,30 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     }
   };
 
+  // Scripture/media items only ever came from the e-mail pipeline (there's
+  // no manual add-flow for them in this UI), so this reuses the existing
+  // drafts route rather than adding a second delete endpoint for them.
+  const removeItem = async (itemType: 'scripture' | 'media', itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      const res = await fetch(`/api/email/drafts?serviceDate=${encodeURIComponent(serviceDate)}&itemType=${itemType}&itemId=${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success && draft) {
+        setDraft({
+          ...draft,
+          scriptures: itemType === 'scripture' ? draft.scriptures.filter(s => s.id !== itemId) : draft.scriptures,
+          media: itemType === 'media' ? draft.media.filter(m => m.id !== itemId) : draft.media
+        });
+      } else if (!data.success) {
+        setError(data.error || 'Kon item niet verwijderen');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const moveSong = async (index: number, direction: -1 | 1) => {
     if (!draft) return;
     const target = index + direction;
@@ -436,6 +495,11 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     return acc;
   }, {});
 
+  // Lines from a liturgie-mail the parser couldn't make sense of (e.g. an
+  // unrecognized Bijbelboek spelling) - surfaced here so "Check nu" showing
+  // a count isn't the only signal of whether an import actually succeeded.
+  const parsingNotes = draft ? draft.sourceEmails.flatMap(e => e.notes) : [];
+
   return (
     <div className="glass-card" style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -489,6 +553,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                 </button>
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {parsingNotes.length > 0 && (
+        <div style={{ padding: '0.8rem 1rem', marginBottom: '1.5rem', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fcd34d', marginBottom: '0.3rem' }}>
+            ⚠️ Niet herkende regels uit de mail — handmatig controleren:
+          </div>
+          {parsingNotes.map((n, i) => (
+            <div key={i} style={{ fontSize: '0.8rem', opacity: 0.85 }}>• {n}</div>
           ))}
         </div>
       )}
@@ -787,6 +862,60 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {draft && (draft.scriptures.length > 0 || draft.media.length > 0) && (
+              <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                {draft.scriptures.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem' }}>📖 Bijbelteksten ({draft.scriptures.length})</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {draft.scriptures.map(s => (
+                        <div key={s.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.8rem' }}>{s.book} {s.chapter}:{s.verseStart}{s.verseEnd ? `-${s.verseEnd}` : ''} ({s.translation})</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                            {sectionBadge(s.section)}
+                            <button
+                              onClick={() => removeItem('scripture', s.id)}
+                              disabled={deletingId === s.id}
+                              title="Deze bijbeltekst verwijderen"
+                              style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}
+                            >
+                              {deletingId === s.id ? '...' : '🗑️'}
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {draft.media.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem' }}>🎬 Media ({draft.media.length})</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {draft.media.map(m => (
+                        <div key={m.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.8rem' }} title={m.url || m.attachmentName}>
+                            {m.mediaType === 'youtube' ? '▶️ YouTube' : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                            {sectionBadge(m.section)}
+                            <button
+                              onClick={() => removeItem('media', m.id)}
+                              disabled={deletingId === m.id}
+                              title="Deze media verwijderen"
+                              style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}
+                            >
+                              {deletingId === m.id ? '...' : '🗑️'}
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
