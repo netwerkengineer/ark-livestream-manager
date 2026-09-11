@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 export interface Contact {
   id: string;
@@ -35,8 +35,18 @@ export default function TeamSettings() {
       .finally(() => setLoading(false));
   }, []);
 
-  const save = async (next: Contact[]) => {
-    setContacts(next);
+  // Debounced so a whole e-mail address typed letter-by-letter doesn't fire
+  // one request per keystroke - the reverse proxy's WAF rate-limits/bans on
+  // exactly that pattern (see the "bad behavior" ban this caused live).
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
+  const persist = async (next: Contact[]) => {
     setSaving(true);
     setStatus('');
     try {
@@ -54,6 +64,13 @@ export default function TeamSettings() {
     }
   };
 
+  const save = (next: Contact[]) => {
+    setContacts(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    persist(next);
+  };
+
   const addContact = () => {
     const contact: Contact = { id: `contact_${Date.now()}`, name: 'Nieuw contact', role: 'band', active: true };
     save([...contacts, contact]);
@@ -62,7 +79,13 @@ export default function TeamSettings() {
   const updateContact = (idx: number, patch: Partial<Contact>) => {
     const next = [...contacts];
     next[idx] = { ...next[idx], ...patch };
-    save(next);
+    setContacts(next);
+    setStatus('');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      persist(next);
+    }, 700);
   };
 
   const removeContact = (idx: number) => {
