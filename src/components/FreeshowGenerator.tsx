@@ -134,7 +134,7 @@ export default function FreeshowGenerator() {
   const [isDeletingScriptures, setIsDeletingScriptures] = useState(false);
 
   // Shows Database Dashboard geconsolideerde states
-  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'>('catalog');
+  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'team'>('catalog');
   const [showsList, setShowsList] = useState<any[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsSearch, setShowsSearch] = useState('');
@@ -1647,6 +1647,13 @@ export default function FreeshowGenerator() {
             onClick={() => setDatabaseSubTab('maintenance')}
           >
             🧹 Database Onderhoud
+          </button>
+          <button
+            className="button"
+            style={{ justifyContent: 'flex-start', background: databaseSubTab === 'team' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem 1rem' }}
+            onClick={() => setDatabaseSubTab('team')}
+          >
+            👥 Team
           </button>
         </div>
         <DatabaseView

@@ -1,8 +1,9 @@
 "use client";
 import React, { useState } from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
+import TeamSettings from '../TeamSettings';
 interface DatabaseViewProps {
-  databaseSubTab: 'catalog' | 'builder' | 'maintenance';
+  databaseSubTab: 'catalog' | 'builder' | 'maintenance' | 'team';
   showsSearch: string;
   setShowsSearch: (value: string) => void;
   showsCategoryFilter: string;
@@ -20,7 +21,7 @@ interface DatabaseViewProps {
   insertPosition: 'before' | 'after';
   manualItems: any[];
   setManualItems: (items: any[]) => void;
-  setDatabaseSubTab: (tab: 'catalog' | 'builder' | 'maintenance') => void;
+  setDatabaseSubTab: (tab: 'catalog' | 'builder' | 'maintenance' | 'team') => void;
   setStatus: (status: string) => void;
   fetchShows: () => void;
   loadShowDetail: (filename: string) => void;
@@ -641,6 +642,12 @@ export default function DatabaseView(props: DatabaseViewProps) {
                  </div>
                </div>
               </div>
+          )}
+
+          {databaseSubTab === 'team' && (
+            <div className="glass-card" style={{ padding: '1.5rem' }}>
+              <TeamSettings />
+            </div>
           )}
 
     </div>

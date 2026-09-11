@@ -6,7 +6,6 @@ export interface Contact {
   name: string;
   role: 'band' | 'operator' | 'other';
   email?: string;
-  phone?: string;
   active?: boolean;
 }
 
@@ -165,15 +164,6 @@ export default function TeamSettings() {
                   placeholder="naam@voorbeeld.nl"
                   value={contact.email || ''}
                   onChange={e => updateContact(idx, { email: e.target.value.trim() })}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Telefoon (voor WhatsApp)</label>
-                <input
-                  className="input-field"
-                  placeholder="06-12345678"
-                  value={contact.phone || ''}
-                  onChange={e => updateContact(idx, { phone: e.target.value.trim() })}
                 />
               </div>
             </div>

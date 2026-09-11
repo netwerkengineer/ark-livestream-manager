@@ -28,7 +28,6 @@ interface Contact {
   name: string;
   role: 'band' | 'operator' | 'other';
   email?: string;
-  phone?: string;
   active?: boolean;
 }
 

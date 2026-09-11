@@ -9,7 +9,6 @@ export interface Contact {
   name: string;
   role: 'band' | 'operator' | 'other';
   email?: string;
-  phone?: string; // free text, used to build a wa.me deep link
   active?: boolean; // soft-disable without deleting (someone leaves the team temporarily)
 }
 

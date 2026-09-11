@@ -19,16 +19,14 @@ import {
   ShieldAlert,
   Monitor,
   Cpu,
-  Tv,
-  Users
+  Tv
 } from "lucide-react";
 import BackupRestoreSettings from "@/components/BackupRestoreSettings";
 import ActivityLogPanel from "@/components/ActivityLogPanel";
-import TeamSettings from "@/components/TeamSettings";
 
 interface SettingsPanelProps {
   settings: any;
-  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "team" | "backup" | "activityLog";
+  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog";
   userRole: "admin" | "operator" | null;
   localUsers: any[];
   availableTemplates: string[];
@@ -43,7 +41,7 @@ interface SettingsPanelProps {
   currentUser: string | null;
   onClose: () => void;
   onSettingsChange: (settings: any) => void;
-  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "team" | "backup" | "activityLog") => void;
+  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog") => void;
   onSaveSettings: () => void;
   onSaveUser: (e: React.FormEvent) => void;
   onDeleteUser: (username: string) => void;
@@ -297,28 +295,6 @@ export default function SettingsPanel({
           >
             <Layers size={18} />
             <span>FreeShow</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onTabChange("team")}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: settingsTab === "team" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
-              color: settingsTab === "team" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
-              fontWeight: settingsTab === "team" ? 600 : 500,
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            <Users size={18} />
-            <span>Team</span>
           </button>
 
           <button
@@ -1757,8 +1733,6 @@ export default function SettingsPanel({
             </section>
           )}
 
-          {settingsTab === "team" && <TeamSettings />}
-
           {settingsTab === "backup" && (
             <BackupRestoreSettings settings={settings} setSettings={onSettingsChange} />
           )}
@@ -1770,7 +1744,7 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {settingsTab !== "team" && settingsTab !== "backup" && settingsTab !== "activityLog" && (
+      {settingsTab !== "backup" && settingsTab !== "activityLog" && (
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px', paddingBottom: '20px' }}>
           <button
             className="btn-primary"
