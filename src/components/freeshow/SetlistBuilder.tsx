@@ -114,7 +114,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     setSavingId(songId);
     try {
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lyricsText: editLyrics, chordsText: editChords })
       });

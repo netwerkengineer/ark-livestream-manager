@@ -4,7 +4,13 @@ import { updateSongInDraft, removeItemFromDraft } from '@/lib/draftServicesStore
 
 // Edits one song already on the setlist (title/section/lyrics/chords) -
 // there was previously no update path in draftServicesStore, only add/remove.
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ serviceDate: string; songId: string }> }) {
+// Deliberately POST, not PATCH: the reverse proxy in front of the Proxmox
+// test environment (nginx, via Nginx Proxy Manager) returns a bare 405 for
+// PATCH before the request ever reaches this app - confirmed live, GET/
+// POST/DELETE all pass through fine. Production sits behind a different
+// proxy (Synology's own), so rather than depend on either proxy's method
+// allowlist this just avoids PATCH entirely.
+export async function POST(req: NextRequest, { params }: { params: Promise<{ serviceDate: string; songId: string }> }) {
   const authSession = await isAuthorized(req, undefined, 'freeshow');
   if (!authSession) {
     return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
