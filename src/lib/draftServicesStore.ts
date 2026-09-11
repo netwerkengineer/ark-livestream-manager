@@ -12,11 +12,12 @@ export interface DraftSong {
   artist?: string;
   category?: string;
   section: string;
-  source: 'email';
+  source: 'email' | 'manual';
   addedAt: string;
   lyricsText?: string;
   lyricsAttachmentName?: string;
   lyricsFilePath?: string; // resolved by the caller once matched against real email attachments
+  chordsText?: string; // free-text, hand-entered by a worship leader - never parsed/rendered as ChordPro
 }
 
 export interface DraftScripture {
@@ -161,6 +162,119 @@ export function removeItemFromDraft(serviceDate: string, itemType: 'song' | 'scr
   draft.lastUpdatedAt = new Date().toISOString();
   writeStore(store);
   return true;
+}
+
+// Creates the draft for a service date if it doesn't exist yet, otherwise
+// returns the existing one untouched - shared by the email pipeline
+// (mergeParsedEmailIntoDraft) and the worship-leader-facing setlist builder,
+// so a service that started life from a liturgie mail and one built by hand
+// end up as the exact same kind of record either way.
+export function createOrGetDraftService(serviceDate: string): DraftService {
+  const store = readStore();
+  let draft = store.services[serviceDate];
+  if (!draft) {
+    draft = {
+      id: serviceDate,
+      serviceDate,
+      songs: [],
+      scriptures: [],
+      media: [],
+      sourceEmails: [],
+      lastUpdatedAt: new Date().toISOString()
+    };
+    store.services[serviceDate] = draft;
+    writeStore(store);
+  }
+  return draft;
+}
+
+// Adds one song directly (not from a parsed email) - used by the setlist
+// builder UI. Same dedupe-by-title behaviour as the email pipeline so
+// re-adding a song already on the list is a no-op rather than a duplicate row.
+export function addSongToDraft(
+  serviceDate: string,
+  song: { title: string; artist?: string; category?: string; section: string; lyricsText?: string; chordsText?: string }
+): DraftService {
+  const store = readStore();
+  let draft = store.services[serviceDate];
+  if (!draft) {
+    draft = {
+      id: serviceDate,
+      serviceDate,
+      songs: [],
+      scriptures: [],
+      media: [],
+      sourceEmails: [],
+      lastUpdatedAt: new Date().toISOString()
+    };
+    store.services[serviceDate] = draft;
+  }
+
+  if (!dedupeSongTitle(draft.songs, song.title)) {
+    draft.songs.push({
+      id: newId(),
+      title: song.title,
+      artist: song.artist,
+      category: song.category,
+      section: song.section,
+      source: 'manual',
+      addedAt: new Date().toISOString(),
+      lyricsText: song.lyricsText,
+      chordsText: song.chordsText
+    });
+  }
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
+// Edits an existing song in place (title/section/lyrics/chords/...) - there
+// was previously no update path, only add/remove, which meant a worship
+// leader couldn't fix a typo or paste in lyrics/chords after the fact
+// without deleting and re-adding the song (losing its position in the list).
+export function updateSongInDraft(
+  serviceDate: string,
+  songId: string,
+  patch: Partial<Pick<DraftSong, 'title' | 'artist' | 'category' | 'section' | 'lyricsText' | 'chordsText'>>
+): DraftService | null {
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  if (!draft) return null;
+
+  const song = draft.songs.find(s => s.id === songId);
+  if (!song) return null;
+
+  Object.assign(song, patch);
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
+// Reorders songs to match orderedIds exactly - any id from the current list
+// that's missing from orderedIds is dropped to the end (defensive; the
+// caller is expected to pass every song's id, but a stale client shouldn't
+// be able to silently delete songs via a partial reorder request).
+export function reorderSongsInDraft(serviceDate: string, orderedIds: string[]): DraftService | null {
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  if (!draft) return null;
+
+  const byId = new Map(draft.songs.map(s => [s.id, s]));
+  const reordered: DraftSong[] = [];
+  for (const id of orderedIds) {
+    const song = byId.get(id);
+    if (song) {
+      reordered.push(song);
+      byId.delete(id);
+    }
+  }
+  // Anything not mentioned in orderedIds keeps its relative order, appended.
+  reordered.push(...byId.values());
+
+  draft.songs = reordered;
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
 }
 
 function foldForMatch(s: string): string {

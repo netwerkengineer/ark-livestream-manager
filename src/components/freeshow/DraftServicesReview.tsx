@@ -7,6 +7,7 @@ interface DraftSong {
   artist?: string;
   category?: string;
   section: string;
+  source?: 'email' | 'manual';
   lyricsText?: string;
   lyricsAttachmentName?: string;
 }
@@ -310,6 +311,7 @@ export default function DraftServicesReview() {
                         <span>
                           {s.title}{s.artist ? <span style={{ opacity: 0.5 }}> - {s.artist}</span> : ''}
                           {(s.lyricsText || s.lyricsAttachmentName) && <span title="Tekst aangeleverd in de mail" style={{ marginLeft: '0.4rem' }}>📝</span>}
+                          {s.source === 'manual' && <span title="Handmatig toegevoegd in de setlist-bouwer" style={{ marginLeft: '0.3rem' }}>🎤</span>}
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           {sectionBadge(s.section)}

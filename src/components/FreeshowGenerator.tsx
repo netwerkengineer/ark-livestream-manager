@@ -133,7 +133,7 @@ export default function FreeshowGenerator() {
   const [isDeletingScriptures, setIsDeletingScriptures] = useState(false);
 
   // Shows Database Dashboard geconsolideerde states
-  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'drafts'>('catalog');
+  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'drafts'|'setlist'>('catalog');
   const [showsList, setShowsList] = useState<any[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsSearch, setShowsSearch] = useState('');
@@ -1818,6 +1818,13 @@ export default function FreeshowGenerator() {
                         onClick={() => setDatabaseSubTab('drafts')}
                       >
                         📬 Concept-diensten (mail)
+                      </button>
+                      <button
+                        className="button"
+                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'setlist' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
+                        onClick={() => setDatabaseSubTab('setlist')}
+                      >
+                        🎤 Setlist
                       </button>
                     </div>
                   </div>

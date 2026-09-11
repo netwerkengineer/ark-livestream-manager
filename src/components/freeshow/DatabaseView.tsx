@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { getCategoryDisplayName } from '@/lib/freeshowUtils';
 import DraftServicesReview from './DraftServicesReview';
+import SetlistBuilder from './SetlistBuilder';
 
 interface DatabaseViewProps {
-  databaseSubTab: 'catalog' | 'builder' | 'maintenance' | 'drafts';
+  databaseSubTab: 'catalog' | 'builder' | 'maintenance' | 'drafts' | 'setlist';
   showsSearch: string;
   setShowsSearch: (value: string) => void;
   showsCategoryFilter: string;
@@ -646,6 +647,10 @@ export default function DatabaseView(props: DatabaseViewProps) {
           )}
 
           {databaseSubTab === 'drafts' && <DraftServicesReview />}
+
+          {databaseSubTab === 'setlist' && (
+            <SetlistBuilder catalogSongs={catalogSongs} freeshowCategories={freeshowCategories} t={t} />
+          )}
     </div>
   );
 }
