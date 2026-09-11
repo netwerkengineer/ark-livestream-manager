@@ -93,6 +93,18 @@ export interface AppSettings {
   imapHost?: string;
   imapPort?: number;
   emailSubjectKeyword?: string;
+  // SMTP is a deliberately separate credential set from the IMAP fields
+  // above, even though in practice one Gmail app-password can serve both -
+  // receiving and sending are logically distinct capabilities, and this
+  // keeps a future switch to a dedicated send-only address a settings
+  // change instead of a code change.
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpSecure?: boolean;
+  smtpFromName?: string;
+  smtpFromEmail?: string;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
   sshUser?: string;
@@ -255,6 +267,13 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   imapHost: "imap.gmail.com",
   imapPort: 993,
   emailSubjectKeyword: "Liturgie,Zondagsdienst",
+  smtpHost: "smtp.gmail.com",
+  smtpPort: 465,
+  smtpUser: "",
+  smtpPass: "",
+  smtpSecure: true,
+  smtpFromName: "Ark Church Livestream Manager",
+  smtpFromEmail: "",
   ledPanelEnabled: false,
   ledPanelMac: "",
   sshUser: "jeffreygo",
@@ -288,7 +307,7 @@ export function getSettings(): AppSettings {
       // Self-healing: if the saved settings on disk are missing the new multi-plug array 
       // or scheduler properties, force write them back so they are persistent and visible 
       // to host python scripts.
-      let needsWrite = !saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules || !saved.freeshowAdditionalTargets;
+      let needsWrite = !saved.tuyaPlugs || !saved.tuyaDeviceId || !saved.schedules || !saved.freeshowAdditionalTargets || !saved.smtpHost;
       
       // Initialize default users if empty
       if (!settings.users || settings.users.length === 0) {

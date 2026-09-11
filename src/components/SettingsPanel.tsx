@@ -19,14 +19,16 @@ import {
   ShieldAlert,
   Monitor,
   Cpu,
-  Tv
+  Tv,
+  Users
 } from "lucide-react";
 import BackupRestoreSettings from "@/components/BackupRestoreSettings";
 import ActivityLogPanel from "@/components/ActivityLogPanel";
+import TeamSettings from "@/components/TeamSettings";
 
 interface SettingsPanelProps {
   settings: any;
-  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog";
+  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "team" | "backup" | "activityLog";
   userRole: "admin" | "operator" | null;
   localUsers: any[];
   availableTemplates: string[];
@@ -41,7 +43,7 @@ interface SettingsPanelProps {
   currentUser: string | null;
   onClose: () => void;
   onSettingsChange: (settings: any) => void;
-  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog") => void;
+  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "team" | "backup" | "activityLog") => void;
   onSaveSettings: () => void;
   onSaveUser: (e: React.FormEvent) => void;
   onDeleteUser: (username: string) => void;
@@ -295,6 +297,28 @@ export default function SettingsPanel({
           >
             <Layers size={18} />
             <span>FreeShow</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onTabChange("team")}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: settingsTab === "team" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+              color: settingsTab === "team" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+              fontWeight: settingsTab === "team" ? 600 : 500,
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Users size={18} />
+            <span>Team</span>
           </button>
 
           <button
@@ -1657,8 +1681,83 @@ export default function SettingsPanel({
                   Alleen ongelezen mails waarvan het onderwerp één van deze woorden bevat (komma-gescheiden) worden opgehaald en gemarkeerd als gelezen — andere mail in dit postvak wordt niet aangeraakt. Leeg laten om elke ongelezen mail te controleren. Naast Postvak IN wordt ook de Spam-map van dit account gecontroleerd, als vangnet voor mails die daar per ongeluk in belanden.
                 </p>
               </div>
+
+              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>📤 SMTP (uitgaande mail voor setlists)</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-12px' }}>
+                Los van de IMAP-instellingen hierboven — dit is voor het versturen van setlists naar het team. Hetzelfde Gmail-account met app-wachtwoord werkt meestal voor beide.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                <div className="input-group">
+                  <label className="input-label">SMTP Host</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.smtpHost || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpHost: e.target.value })}
+                    placeholder="smtp.gmail.com"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Poort</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={settings.smtpPort || 465}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpPort: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="input-group">
+                  <label className="input-label">Gebruikersnaam</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.smtpUser || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpUser: e.target.value })}
+                    placeholder="liturgie@arkchurch.nl"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Wachtwoord</label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    value={settings.smtpPass || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpPass: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="input-group">
+                  <label className="input-label">Afzendernaam</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.smtpFromName || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpFromName: e.target.value })}
+                    placeholder="Ark Church Livestream Manager"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Afzenderadres (optioneel, anders gebruikersnaam)</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={settings.smtpFromEmail || ""}
+                    onChange={(e) => onSettingsChange({ ...settings, smtpFromEmail: e.target.value })}
+                    placeholder="liturgie@arkchurch.nl"
+                  />
+                </div>
+              </div>
             </section>
           )}
+
+          {settingsTab === "team" && <TeamSettings />}
 
           {settingsTab === "backup" && (
             <BackupRestoreSettings settings={settings} setSettings={onSettingsChange} />

@@ -23,6 +23,21 @@ interface DraftService {
   lastGenerationNotes?: string[];
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  role: 'band' | 'operator' | 'other';
+  email?: string;
+  phone?: string;
+  active?: boolean;
+}
+
+const ROLE_LABELS: Record<Contact['role'], string> = {
+  band: 'Band',
+  operator: 'Beamer-operator',
+  other: 'Overig'
+};
+
 interface SetlistBuilderProps {
   catalogSongs: Array<{ name: string; category: string }>;
   freeshowCategories?: Record<string, { name: string; icon?: string; default?: boolean }>;
@@ -61,6 +76,12 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genMessage, setGenMessage] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [sendPanelOpen, setSendPanelOpen] = useState(false);
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [includePdf, setIncludePdf] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState('');
 
   const fetchDraft = useCallback(async (date: string) => {
     setLoading(true);
@@ -81,6 +102,19 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   }, []);
 
   useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
+
+  useEffect(() => {
+    fetch('/api/contacts')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const active: Contact[] = (data.contacts || []).filter((c: Contact) => c.active !== false);
+          setContacts(active);
+          setSelectedRecipientIds(active.map(c => c.id));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const addSong = async (title?: string) => {
     const finalTitle = title || songInput;
@@ -190,6 +224,47 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     }
   };
 
+  const toggleRecipient = (id: string) => {
+    setSelectedRecipientIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
+  };
+
+  const sendEmail = async () => {
+    setSending(true);
+    setSendMessage('');
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf })
+      });
+      const data = await res.json();
+      setSendMessage(data.success ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s)` : `❌ ${data.error}`);
+    } catch (e: any) {
+      setSendMessage(`❌ ${e.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Deliberately not automated (see the plan's no-cloud constraint - true
+  // automated WhatsApp sending needs a cloud API like WhatsApp Business/
+  // Twilio) - reuses the same wa.me deep-link pattern already used
+  // elsewhere in this app (src/app/page.tsx), which just opens WhatsApp's
+  // own share sheet for a human to pick a recipient and send.
+  const sendWhatsAppSummary = () => {
+    if (!draft) return;
+    const lines = [`Setlist ${formatDate(serviceDate)}:`, ''];
+    draft.songs.forEach((s, i) => {
+      lines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
+    });
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
+  };
+
+  const contactsByRole = contacts.reduce<Record<string, Contact[]>>((acc, c) => {
+    (acc[c.role] = acc[c.role] || []).push(c);
+    return acc;
+  }, {});
+
   return (
     <div className="glass-card" style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -247,6 +322,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                 {genMessage && <span style={{ fontSize: '0.75rem' }}>{genMessage}</span>}
                 <button
                   className="button"
+                  style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.08)' }}
+                  onClick={() => setSendPanelOpen(open => !open)}
+                  disabled={!draft?.songs.length}
+                >
+                  📤 Verstuur naar team
+                </button>
+                <button
+                  className="button"
                   style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--primary)', color: '#020617' }}
                   onClick={() => generateProject(false)}
                   disabled={generating || !draft?.songs.length}
@@ -255,6 +338,61 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                 </button>
               </div>
             </div>
+
+            {sendPanelOpen && draft && (
+              <div className="glass-card" style={{ padding: '1rem', marginBottom: '1rem', background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '8px' }}>
+                {contacts.length === 0 ? (
+                  <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: 0 }}>
+                    Nog geen teamleden ingesteld — voeg ze toe bij Instellingen → Team.
+                  </p>
+                ) : (
+                  <>
+                    {(['band', 'operator', 'other'] as const).map(role => contactsByRole[role]?.length ? (
+                      <div key={role} style={{ marginBottom: '0.6rem' }}>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.3rem', fontWeight: 600 }}>{ROLE_LABELS[role]}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          {contactsByRole[role].map(c => (
+                            <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', opacity: c.email ? 1 : 0.4, cursor: c.email ? 'pointer' : 'default' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedRecipientIds.includes(c.id)}
+                                onChange={() => toggleRecipient(c.id)}
+                                disabled={!c.email}
+                              />
+                              {c.name}{!c.email && ' (geen e-mail)'}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null)}
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
+                      <input type="checkbox" checked={includePdf} onChange={e => setIncludePdf(e.target.checked)} />
+                      Ook als PDF bijvoegen (naast tekstbestand)
+                    </label>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="button"
+                        style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--primary)', color: '#020617' }}
+                        onClick={sendEmail}
+                        disabled={sending || selectedRecipientIds.length === 0}
+                      >
+                        {sending ? 'Bezig...' : '✉️ Verstuur e-mail'}
+                      </button>
+                      <button
+                        className="button"
+                        style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'rgba(37,211,102,0.15)', border: '1px solid rgba(37,211,102,0.4)', color: '#25d366' }}
+                        onClick={sendWhatsAppSummary}
+                      >
+                        📱 WhatsApp-samenvatting
+                      </button>
+                      {sendMessage && <span style={{ fontSize: '0.75rem' }}>{sendMessage}</span>}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {!draft || draft.songs.length === 0 ? (
               <div style={{ fontSize: '0.85rem', opacity: 0.5, padding: '2rem', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>

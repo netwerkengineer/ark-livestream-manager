@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 
 interface ActivityEntry {
   ts: string;
-  category: "sync" | "plug" | "led" | "error" | "settings" | "system";
+  category: "sync" | "plug" | "led" | "error" | "settings" | "system" | "setlist";
   message: string;
   details?: Record<string, unknown>;
 }
@@ -15,7 +15,8 @@ const CATEGORY_LABELS: Record<ActivityEntry["category"], string> = {
   led: "LED-scherm",
   error: "Fout",
   settings: "Instellingen",
-  system: "Systeem"
+  system: "Systeem",
+  setlist: "Setlist"
 };
 
 const CATEGORY_COLORS: Record<ActivityEntry["category"], string> = {
@@ -24,7 +25,8 @@ const CATEGORY_COLORS: Record<ActivityEntry["category"], string> = {
   led: "#fb923c",
   error: "#f87171",
   settings: "#4ade80",
-  system: "#94a3b8"
+  system: "#94a3b8",
+  setlist: "#f472b6"
 };
 
 export default function ActivityLogPanel() {

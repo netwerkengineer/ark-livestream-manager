@@ -10,7 +10,7 @@ const LOG_FILE = path.join(DATA_DIR, 'activity_log.jsonl');
 const TRIM_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const MAX_ENTRIES = 5000;
 
-export type ActivityCategory = 'sync' | 'plug' | 'led' | 'error' | 'settings' | 'system';
+export type ActivityCategory = 'sync' | 'plug' | 'led' | 'error' | 'settings' | 'system' | 'setlist';
 
 export interface ActivityEntry {
   ts: string;
