@@ -10,6 +10,7 @@ import BibleInput from './freeshow/BibleInput';
 import YoutubeInput from './freeshow/YoutubeInput';
 import MediaInput from './freeshow/MediaInput';
 import DatabaseView from './freeshow/DatabaseView';
+import SetlistBuilder from './freeshow/SetlistBuilder';
 import {
   BIBLE_BOOKS,
   resolveMediaPath,
@@ -40,7 +41,7 @@ export default function FreeshowGenerator() {
     return translations[lang]?.[key] || translations['en']?.[key] || key;
   };
   
-   const [inputType, setInputType] = useState<'song'|'presentation'|'bible'|'media'|'youtube'|'section'|'database'>('song');
+   const [inputType, setInputType] = useState<'song'|'presentation'|'bible'|'media'|'youtube'|'section'|'database'|'setlist'>('setlist');
 
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState({
@@ -133,7 +134,7 @@ export default function FreeshowGenerator() {
   const [isDeletingScriptures, setIsDeletingScriptures] = useState(false);
 
   // Shows Database Dashboard geconsolideerde states
-  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'drafts'|'setlist'>('catalog');
+  const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'>('catalog');
   const [showsList, setShowsList] = useState<any[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsSearch, setShowsSearch] = useState('');
@@ -1595,6 +1596,118 @@ export default function FreeshowGenerator() {
         {filteredAvailableSongs.map((song, i) => <option key={i} value={song.name} />)}
       </datalist>
 
+      <div className="glass-card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <button
+          className="button"
+          style={{ flex: '1 0 auto', padding: '0.7rem 1rem', fontWeight: 600, background: inputType === 'setlist' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: inputType === 'setlist' ? '#020617' : '#fff' }}
+          onClick={() => setInputType('setlist')}
+        >
+          🎤 Setlist
+        </button>
+        <button
+          className="button"
+          style={{ flex: '1 0 auto', padding: '0.7rem 1rem', fontWeight: 600, background: inputType !== 'setlist' && inputType !== 'database' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: inputType !== 'setlist' && inputType !== 'database' ? '#020617' : '#fff' }}
+          onClick={() => setInputType('song')}
+        >
+          ➕ Snel toevoegen
+        </button>
+        <button
+          className="button"
+          style={{ flex: '1 0 auto', padding: '0.7rem 1rem', fontWeight: 600, background: inputType === 'database' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: inputType === 'database' ? '#020617' : '#fff' }}
+          onClick={() => { setInputType('database'); setDatabaseSubTab('catalog'); }}
+        >
+          🗃️ Beheer
+        </button>
+      </div>
+
+      {inputType === 'setlist' ? (
+        <SetlistBuilder catalogSongs={catalogSongs} freeshowCategories={freeshowCategories} t={t} />
+      ) : inputType === 'database' ? (
+        <>
+        <div className="glass-card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            className="button"
+            style={{ justifyContent: 'flex-start', background: databaseSubTab === 'catalog' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem 1rem' }}
+            onClick={() => setDatabaseSubTab('catalog')}
+          >
+            📂 Shows Catalogus & Editor
+          </button>
+          {builderSlides.length > 0 && (
+            <button
+              className="button"
+              style={{ justifyContent: 'flex-start', background: databaseSubTab === 'builder' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', fontSize: '0.75rem', padding: '0.6rem 1rem' }}
+              onClick={() => setDatabaseSubTab('builder')}
+            >
+              🛠️ Bouwer-sessie ({builderSlides.length})
+            </button>
+          )}
+          <button
+            className="button"
+            style={{ justifyContent: 'flex-start', background: databaseSubTab === 'maintenance' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem 1rem' }}
+            onClick={() => setDatabaseSubTab('maintenance')}
+          >
+            🧹 Database Onderhoud
+          </button>
+        </div>
+        <DatabaseView
+          databaseSubTab={databaseSubTab}
+          showsSearch={showsSearch}
+          setShowsSearch={setShowsSearch}
+          showsCategoryFilter={showsCategoryFilter}
+          setShowsCategoryFilter={setShowsCategoryFilter}
+          showsSortOrder={showsSortOrder}
+          setShowsSortOrder={setShowsSortOrder}
+          loadingShows={loadingShows}
+          showsList={showsList}
+          uniqueCategories={uniqueCategories}
+          freeshowCategories={freeshowCategories}
+          builderSlides={builderSlides}
+          setBuilderSlides={setBuilderSlides}
+          builderTitle={builderTitle}
+          setBuilderTitle={setBuilderTitle}
+          targetSection={targetSection}
+          insertPosition={insertPosition}
+          manualItems={manualItems}
+          setManualItems={setManualItems}
+          setDatabaseSubTab={setDatabaseSubTab}
+          setStatus={setStatus}
+          fetchShows={fetchShows}
+          loadShowDetail={loadShowDetail}
+          openPreview={openPreview}
+          duplicateShow={duplicateShow}
+          deleteShowDirect={deleteShowDirect}
+          catalogSongs={catalogSongs}
+          loadingCatalog={loadingCatalog}
+          catalogSearch={catalogSearch}
+          setCatalogSearch={setCatalogSearch}
+          fetchCatalog={fetchCatalog}
+          deleteFromLibrary={deleteFromLibrary}
+          duplicateGroups={duplicateGroups}
+          scanDuplicates={scanDuplicates}
+          isScanning={isScanning}
+          deleteDuplicate={deleteDuplicate}
+          optimizeMediaPaths={optimizeMediaPaths}
+          isOptimizing={isOptimizing}
+          comparingPair={comparingPair}
+          setComparingPair={setComparingPair}
+          historyItems={historyItems}
+          loadingHistory={loadingHistory}
+          restoreItem={restoreItem}
+          selectedTrashIds={selectedTrashIds}
+          setSelectedTrashIds={setSelectedTrashIds}
+          loadHistory={loadHistory}
+          isSyncing={isSyncing}
+          setIsSyncing={setIsSyncing}
+          isDeletingScriptures={isDeletingScriptures}
+          setIsDeletingScriptures={setIsDeletingScriptures}
+          downloadBackup={downloadBackup}
+          restoreSelectedItems={restoreSelectedItems}
+          emptyTrash={emptyTrash}
+          freeshowAdditionalTargets={settings.freeshowAdditionalTargets}
+          t={t}
+        />
+        </>
+      ) : (
       <div className="content-grid">
         <div className="sticky-col">
           {draftItem ? (
@@ -1674,10 +1787,10 @@ export default function FreeshowGenerator() {
                 <h2>{t('add_items_total')}</h2>
                 
                 <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                  {['song', 'presentation', 'bible', 'media', 'youtube', 'section', 'database'].map(tab => {
+                  {['song', 'presentation', 'bible', 'media', 'youtube', 'section'].map(tab => {
                     const icons: Record<string, string> = {
                       song: '🎵', presentation: '📊', bible: '📖', media: '📸',
-                      youtube: '🎥', section: '📁', database: '🗃️'
+                      youtube: '🎥', section: '📁'
                     };
                     const labels: Record<string, string> = {
                       song: t('tab_song'),
@@ -1685,31 +1798,24 @@ export default function FreeshowGenerator() {
                       bible: t('tab_bible'),
                       media: t('tab_media'),
                       youtube: t('tab_youtube'),
-                      section: t('tab_section'),
-                      database: t('tab_database')
+                      section: t('tab_section')
                     };
                     return (
                       <div key={tab} className="tooltip-container" style={{ flex: '1 0 auto', display: 'flex' }}>
-                        <button className="button" 
-                          style={{ 
-                            width: '100%', fontSize: '0.7rem', padding: '0.5rem', 
-                            background: inputType === tab ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                            border: tab === 'database' && builderSlides.length > 0 ? '1px solid var(--primary)' : 'none'
-                          }} 
+                        <button className="button"
+                          style={{
+                            width: '100%', fontSize: '0.7rem', padding: '0.5rem',
+                            background: inputType === tab ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
+                          }}
                           onClick={() => setInputType(tab as any)}
                         >
-                          {tab === 'database' && builderSlides.length > 0 ? `🗃️ (${builderSlides.length})` : icons[tab]}
+                          {icons[tab]}
                         </button>
                         <span className="tooltip-text">{labels[tab]}</span>
                       </div>
                     );
                   })}
                 </div>
-                {inputType === 'database' && databaseSubTab === 'maintenance' && (
-                  <button className="button" style={{ width: '100%', marginBottom: '1rem', background: 'rgba(255,255,255,0.05)' }} onClick={() => { loadHistory(); scanDuplicates(); }}>
-                    {t('refresh_maintenance')}
-                  </button>
-                )}
 
 
 
@@ -1783,52 +1889,6 @@ export default function FreeshowGenerator() {
                   />
                 )}
                 
-                {inputType === 'database' && (
-                  <div style={{ padding: '0.5rem 0' }}>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '1.2rem', lineHeight: '1.4' }}>
-                      Beheer de FreeShow database remote vanaf hier. Kies een weergave hieronder om aan de slag te gaan.
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <button 
-                        className="button" 
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'catalog' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }} 
-                        onClick={() => setDatabaseSubTab('catalog')}
-                      >
-                        📂 Shows Catalogus & Editor
-                      </button>
-                      {builderSlides.length > 0 && (
-                        <button
-                          className="button"
-                          style={{ justifyContent: 'flex-start', background: databaseSubTab === 'builder' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', fontSize: '0.75rem', padding: '0.6rem' }}
-                          onClick={() => setDatabaseSubTab('builder')}
-                        >
-                          🛠️ Bouwer-sessie ({builderSlides.length})
-                        </button>
-                      )}
-                      <button
-                        className="button"
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'maintenance' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
-                        onClick={() => setDatabaseSubTab('maintenance')}
-                      >
-                        🧹 Database Onderhoud
-                      </button>
-                      <button
-                        className="button"
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'drafts' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
-                        onClick={() => setDatabaseSubTab('drafts')}
-                      >
-                        📬 Concept-diensten (mail)
-                      </button>
-                      <button
-                        className="button"
-                        style={{ justifyContent: 'flex-start', background: databaseSubTab === 'setlist' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', fontSize: '0.75rem', padding: '0.6rem' }}
-                        onClick={() => setDatabaseSubTab('setlist')}
-                      >
-                        🎤 Setlist
-                      </button>
-                    </div>
-                  </div>
-                )}
 
 
                 {inputType === 'youtube' && (
@@ -1930,65 +1990,6 @@ export default function FreeshowGenerator() {
           )}
         </div>
 
-        {inputType === 'database' ? (
-          <DatabaseView
-            databaseSubTab={databaseSubTab}
-            showsSearch={showsSearch}
-            setShowsSearch={setShowsSearch}
-            showsCategoryFilter={showsCategoryFilter}
-            setShowsCategoryFilter={setShowsCategoryFilter}
-            showsSortOrder={showsSortOrder}
-            setShowsSortOrder={setShowsSortOrder}
-            loadingShows={loadingShows}
-            showsList={showsList}
-            uniqueCategories={uniqueCategories}
-            freeshowCategories={freeshowCategories}
-            builderSlides={builderSlides}
-            setBuilderSlides={setBuilderSlides}
-            builderTitle={builderTitle}
-            setBuilderTitle={setBuilderTitle}
-            targetSection={targetSection}
-            insertPosition={insertPosition}
-            manualItems={manualItems}
-            setManualItems={setManualItems}
-            setDatabaseSubTab={setDatabaseSubTab}
-            setStatus={setStatus}
-            fetchShows={fetchShows}
-            loadShowDetail={loadShowDetail}
-            openPreview={openPreview}
-            duplicateShow={duplicateShow}
-            deleteShowDirect={deleteShowDirect}
-            catalogSongs={catalogSongs}
-            loadingCatalog={loadingCatalog}
-            catalogSearch={catalogSearch}
-            setCatalogSearch={setCatalogSearch}
-            fetchCatalog={fetchCatalog}
-            deleteFromLibrary={deleteFromLibrary}
-            duplicateGroups={duplicateGroups}
-            scanDuplicates={scanDuplicates}
-            isScanning={isScanning}
-            deleteDuplicate={deleteDuplicate}
-            optimizeMediaPaths={optimizeMediaPaths}
-            isOptimizing={isOptimizing}
-            comparingPair={comparingPair}
-            setComparingPair={setComparingPair}
-            historyItems={historyItems}
-            loadingHistory={loadingHistory}
-            restoreItem={restoreItem}
-            selectedTrashIds={selectedTrashIds}
-            setSelectedTrashIds={setSelectedTrashIds}
-            loadHistory={loadHistory}
-            isSyncing={isSyncing}
-            setIsSyncing={setIsSyncing}
-            isDeletingScriptures={isDeletingScriptures}
-            setIsDeletingScriptures={setIsDeletingScriptures}
-            downloadBackup={downloadBackup}
-            restoreSelectedItems={restoreSelectedItems}
-            emptyTrash={emptyTrash}
-            freeshowAdditionalTargets={settings.freeshowAdditionalTargets}
-            t={t}
-          />
-        ) : (
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ fontSize: '1.2rem', margin: 0 }}>2. {t('items_playlist')} ({items.length})</h2>
@@ -2090,8 +2091,8 @@ export default function FreeshowGenerator() {
             ))}
           </div>
         </div>
-        )}
       </div>
+      )}
 
       {/* Maintenance Comparison Modal */}
       {comparingPair && (

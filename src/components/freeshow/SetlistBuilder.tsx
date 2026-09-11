@@ -82,6 +82,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [includePdf, setIncludePdf] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [unassigned, setUnassigned] = useState<Array<{ messageId?: string; subject?: string; receivedAt: string; excerpt: string }>>([]);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
 
   const fetchDraft = useCallback(async (date: string) => {
     setLoading(true);
@@ -102,6 +105,46 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   }, []);
 
   useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
+
+  const fetchUnassigned = useCallback(async () => {
+    try {
+      const res = await fetch('/api/email/drafts');
+      const data = await res.json();
+      if (data.success) setUnassigned(data.unassigned || []);
+    } catch {
+      // Non-critical - this is just a convenience notice, not the main setlist data.
+    }
+  }, []);
+
+  useEffect(() => { fetchUnassigned(); }, [fetchUnassigned]);
+
+  const checkNow = async () => {
+    setChecking(true);
+    try {
+      await fetch('/api/email');
+      await fetchDraft(serviceDate);
+      await fetchUnassigned();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const dismissUnassigned = async (messageId: string) => {
+    setDismissingId(messageId);
+    try {
+      const res = await fetch(`/api/email/drafts?messageId=${encodeURIComponent(messageId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setUnassigned(prev => prev.filter(u => u.messageId !== messageId));
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDismissingId(null);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/contacts')
@@ -278,12 +321,48 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
             onChange={e => setServiceDate(e.target.value)}
             style={{ padding: '0.4rem 0.6rem' }}
           />
+          <button
+            className="button"
+            style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.08)' }}
+            onClick={checkNow}
+            disabled={checking}
+            title="Nieuwe liturgie-mails ophalen"
+          >
+            {checking ? 'Bezig...' : '🔄 Check nu (mail)'}
+          </button>
         </div>
       </div>
 
       <p style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: '1.2rem' }}>
         Bouw hier de setlist voor <strong style={{ textTransform: 'capitalize' }}>{formatDate(serviceDate)}</strong> — dezelfde setlist waar ook een liturgie-mail voor deze datum in terechtkomt, dus een e-mail en handmatig toevoegen kunnen prima samen.
       </p>
+
+      {unassigned.length > 0 && (
+        <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.04)' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>⚠️ Niet-toegewezen mails ({unassigned.length})</div>
+          <p style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.6rem' }}>
+            Deze mails konden niet aan een dienstdatum gekoppeld worden (geen of onleesbare &quot;Dienst datum:&quot;-regel).
+          </p>
+          {unassigned.map((u, i) => (
+            <div key={u.messageId || i} style={{ padding: '0.5rem 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>{u.subject}</div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>{new Date(u.receivedAt).toLocaleString('nl-NL')}</div>
+              </div>
+              {u.messageId && (
+                <button
+                  onClick={() => dismissUnassigned(u.messageId!)}
+                  disabled={dismissingId === u.messageId}
+                  title="Verwijderen uit deze lijst"
+                  style={{ background: 'rgba(255,0,0,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  {dismissingId === u.messageId ? '...' : '🗑️'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: '0.8rem 1rem', marginBottom: '1.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem' }}>
