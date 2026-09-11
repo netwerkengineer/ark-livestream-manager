@@ -69,7 +69,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [error, setError] = useState('');
   const [songInput, setSongInput] = useState('');
   const [section, setSection] = useState('Worship');
-  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; loading: boolean } | null>(null);
+  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; loading: boolean } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editLyrics, setEditLyrics] = useState('');
   const [editChords, setEditChords] = useState('');
@@ -86,6 +86,28 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
   const [checking, setChecking] = useState(false);
   const [unassigned, setUnassigned] = useState<Array<{ messageId?: string; subject?: string; receivedAt: string; excerpt: string }>>([]);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [extraMessage, setExtraMessage] = useState('');
+
+  // Remembered per browser (not per service) - a worship leader's dresscode
+  // note or sign-off ("God bless, Jeffrey") tends to stay the same week to
+  // week, so don't make them retype it every time.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('setlist_extra_message');
+      if (saved) setExtraMessage(saved);
+    } catch {
+      // localStorage can throw in some contexts (private mode, blocked) - not fatal.
+    }
+  }, []);
+
+  const updateExtraMessage = (value: string) => {
+    setExtraMessage(value);
+    try {
+      localStorage.setItem('setlist_extra_message', value);
+    } catch {
+      // best-effort, see above
+    }
+  };
 
   const fetchDraft = useCallback(async (date: string) => {
     setLoading(true);
@@ -170,7 +192,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
     const songTitle = split[0]?.trim() || finalTitle;
     const artist = split[1]?.trim() || '';
     setSongInput('');
-    setStaging({ title: songTitle, artist, text: '', loading: true });
+    setStaging({ title: songTitle, artist, text: '', chords: '', loading: true });
     try {
       const res = await fetch('/api/preview', {
         method: 'POST',
@@ -194,7 +216,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: staging.title, artist: staging.artist, section, lyricsText: staging.text })
+        body: JSON.stringify({ title: staging.title, artist: staging.artist, section, lyricsText: staging.text, chordsText: staging.chords })
       });
       const data = await res.json();
       if (data.success) {
@@ -305,7 +327,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf })
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf, message: extraMessage })
       });
       const data = await res.json();
       setSendMessage(data.success ? `✅ Verstuurd naar ${data.sentTo} ontvanger(s)` : `❌ ${data.error}`);
@@ -436,6 +458,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                       rows={12}
                       style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
                     />
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>
+                      Akkoorden (vrije tekst, optioneel)
+                    </label>
+                    <textarea
+                      className="input"
+                      value={staging.chords}
+                      onChange={e => setStaging(prev => (prev ? { ...prev, chords: e.target.value } : prev))}
+                      rows={5}
+                      placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
+                      style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
+                    />
                   </>
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -514,6 +547,18 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, t }: 
                         </div>
                       </div>
                     ) : null)}
+
+                    <label style={{ display: 'block', marginTop: '0.6rem', marginBottom: '0.3rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                      Extra bericht (optioneel) — bijv. dresscode, een opmerking, of een groet
+                    </label>
+                    <textarea
+                      className="input"
+                      value={extraMessage}
+                      onChange={e => updateExtraMessage(e.target.value)}
+                      rows={3}
+                      placeholder={'bv.\nLet op: aankomende zondag is het smart casual.\nGod bless, Jeffrey'}
+                      style={{ width: '100%', resize: 'vertical', marginBottom: '0.6rem' }}
+                    />
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
                       <input type="checkbox" checked={includePdf} onChange={e => setIncludePdf(e.target.checked)} />

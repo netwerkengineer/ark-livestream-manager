@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
 
   const { serviceDate } = await params;
   try {
-    const { recipientIds, includePdf } = await req.json();
+    const { recipientIds, includePdf, message } = await req.json();
     if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen ontvangers geselecteerd' }, { status: 400 });
     }
@@ -84,6 +84,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       bodyLines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
     });
     bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
+    if (typeof message === 'string' && message.trim()) {
+      bodyLines.push('', message.trim());
+    }
 
     const result = await sendSetlistEmail({
       to: recipients.map(r => r.email!),
