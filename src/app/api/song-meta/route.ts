@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, artist, chordsText, youtubeUrl } = body;
+    const { title, artist, chordsText, chordsFileName, chordsFilePath, youtubeUrl } = body;
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ success: false, error: 'Titel is verplicht' }, { status: 400 });
     }
-    const meta = setSongMeta(title, artist, { chordsText, youtubeUrl });
+    const meta = setSongMeta(title, artist, { chordsText, chordsFileName, chordsFilePath, youtubeUrl });
     return NextResponse.json({ success: true, meta });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

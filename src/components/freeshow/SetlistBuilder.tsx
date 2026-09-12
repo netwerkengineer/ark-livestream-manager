@@ -12,6 +12,8 @@ interface DraftSong {
   source: 'email' | 'manual';
   lyricsText?: string;
   chordsText?: string;
+  chordsFileName?: string;
+  chordsFilePath?: string;
 }
 
 interface DraftScripture {
@@ -107,7 +109,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [songInput, setSongInput] = useState('');
   const [section, setSection] = useState('Worship');
   const [templateSections, setTemplateSections] = useState<string[]>([]);
-  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; youtubeUrl?: string; section: string; loading: boolean } | null>(null);
+  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; chordsFileName?: string; chordsFilePath?: string; youtubeUrl?: string; section: string; loading: boolean } | null>(null);
+  const [stagingChordsUploading, setStagingChordsUploading] = useState(false);
   const [addMode, setAddMode] = useState<'song' | 'bible' | 'media'>('song');
   const [bibleTranslation, setBibleTranslation] = useState('');
   const [bibleBook, setBibleBook] = useState('Genesis');
@@ -122,6 +125,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editLyrics, setEditLyrics] = useState('');
   const [editChords, setEditChords] = useState('');
+  const [editChordsFileName, setEditChordsFileName] = useState('');
+  const [editChordsFilePath, setEditChordsFilePath] = useState('');
+  const [editChordsUploading, setEditChordsUploading] = useState(false);
   const [editSection, setEditSection] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -133,6 +139,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [replyToIds, setReplyToIds] = useState<string[]>([]);
   const [includeText, setIncludeText] = useState(true);
   const [includePdf, setIncludePdf] = useState(false);
+  const [includeChords, setIncludeChords] = useState(false);
+  const [includeYoutube, setIncludeYoutube] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -277,6 +285,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     const artist = split[1]?.trim() || '';
     setSongInput('');
     setStaging({ title: songTitle, artist, text: '', chords: '', section, loading: true });
+    setStagingChordsUploading(false);
     try {
       const [previewRes, metaRes] = await Promise.all([
         fetch('/api/preview', {
@@ -294,13 +303,61 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const text = previewData.success && previewData.items?.[0] ? previewData.items[0].text || '' : '';
       const metaData = await metaRes.json().catch(() => null);
       const meta = metaData?.success ? metaData.meta : null;
-      setStaging(prev => (prev ? { ...prev, text, chords: meta?.chordsText || prev.chords, youtubeUrl: meta?.youtubeUrl, loading: false } : prev));
+      setStaging(prev => (prev ? {
+        ...prev,
+        text,
+        chords: meta?.chordsText || prev.chords,
+        chordsFileName: meta?.chordsFileName,
+        chordsFilePath: meta?.chordsFilePath,
+        youtubeUrl: meta?.youtubeUrl,
+        loading: false
+      } : prev));
     } catch {
       setStaging(prev => (prev ? { ...prev, loading: false } : prev));
     }
   };
 
   const cancelStaging = () => setStaging(null);
+
+  // Shared by the staging panel and the per-song edit panel - a band's
+  // existing chord chart (txt/pdf) gets attached to the setlist mail
+  // verbatim later, rather than making the worship leader retype it as
+  // free text.
+  const uploadChordsFile = async (file: File): Promise<{ filePath: string; fileName: string } | null> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/chords-upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!data.success) {
+      setError(data.error || 'Upload van akkoordbestand mislukt');
+      return null;
+    }
+    return { filePath: data.filePath, fileName: data.fileName };
+  };
+
+  const stagingChordsFileSelected = async (file: File | null) => {
+    if (!file) return;
+    setStagingChordsUploading(true);
+    setError('');
+    const uploaded = await uploadChordsFile(file);
+    if (uploaded) {
+      setStaging(prev => (prev ? { ...prev, chordsFileName: uploaded.fileName, chordsFilePath: uploaded.filePath, chords: '' } : prev));
+    }
+    setStagingChordsUploading(false);
+  };
+
+  const editChordsFileSelected = async (file: File | null) => {
+    if (!file) return;
+    setEditChordsUploading(true);
+    setError('');
+    const uploaded = await uploadChordsFile(file);
+    if (uploaded) {
+      setEditChordsFileName(uploaded.fileName);
+      setEditChordsFilePath(uploaded.filePath);
+      setEditChords('');
+    }
+    setEditChordsUploading(false);
+  };
 
   const confirmStagedSong = async () => {
     if (!staging) return;
@@ -309,7 +366,15 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: staging.title, artist: staging.artist, section: staging.section, lyricsText: staging.text, chordsText: staging.chords })
+        body: JSON.stringify({
+          title: staging.title,
+          artist: staging.artist,
+          section: staging.section,
+          lyricsText: staging.text,
+          chordsText: staging.chords,
+          chordsFileName: staging.chordsFileName,
+          chordsFilePath: staging.chordsFilePath
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -318,11 +383,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         // this one service) so the next time this song comes up - in any
         // setlist - the chords are already there. Best-effort: a failure
         // here shouldn't block the song actually being added to the setlist.
-        if (staging.chords.trim()) {
+        if (staging.chordsFilePath || staging.chords.trim()) {
           fetch('/api/song-meta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: staging.title, artist: staging.artist, chordsText: staging.chords })
+            body: JSON.stringify({
+              title: staging.title,
+              artist: staging.artist,
+              chordsText: staging.chords,
+              chordsFileName: staging.chordsFileName,
+              chordsFilePath: staging.chordsFilePath
+            })
           }).catch(() => {});
         }
         setStaging(null);
@@ -433,6 +504,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     setExpandedId(song.id);
     setEditLyrics(song.lyricsText || '');
     setEditChords(song.chordsText || '');
+    setEditChordsFileName(song.chordsFileName || '');
+    setEditChordsFilePath(song.chordsFilePath || '');
     setEditSection(song.section || '');
   };
 
@@ -442,7 +515,13 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lyricsText: editLyrics, chordsText: editChords, section: editSection })
+        body: JSON.stringify({
+          lyricsText: editLyrics,
+          chordsText: editChords,
+          chordsFileName: editChordsFileName,
+          chordsFilePath: editChordsFilePath,
+          section: editSection
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -451,11 +530,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         // database (data/songMeta.json) in sync so an edit here also helps
         // next time this song comes up.
         const editedSong = draft?.songs.find(s => s.id === songId);
-        if (editedSong && editChords.trim()) {
+        if (editedSong && (editChordsFilePath || editChords.trim())) {
           fetch('/api/song-meta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: editedSong.title, artist: editedSong.artist, chordsText: editChords })
+            body: JSON.stringify({
+              title: editedSong.title,
+              artist: editedSong.artist,
+              chordsText: editChords,
+              chordsFileName: editChordsFileName,
+              chordsFilePath: editChordsFilePath
+            })
           }).catch(() => {});
         }
         setExpandedId(null);
@@ -573,7 +658,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: selectedRecipientIds, replyToIds, includeText, includePdf, message: extraMessage, dryRun: true })
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, replyToIds, includeText, includePdf, includeChords, includeYoutube, message: extraMessage, dryRun: true })
       });
       const data = await res.json();
       if (data.success) {
@@ -606,6 +691,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
           replyToIds,
           includeText,
           includePdf,
+          includeChords,
+          includeYoutube,
           subject: sendPreview.subject,
           bodyText: sendPreview.bodyText
         })
@@ -924,16 +1011,42 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
                     />
                     <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>
-                      Akkoorden (vrije tekst, optioneel) — wordt bewaard bij dit lied voor de volgende keer
+                      Akkoorden (optioneel) — wordt bewaard bij dit lied voor de volgende keer
                     </label>
-                    <textarea
-                      className="input"
-                      value={staging.chords}
-                      onChange={e => setStaging(prev => (prev ? { ...prev, chords: e.target.value } : prev))}
-                      rows={5}
-                      placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
-                      style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
-                    />
+                    {staging.chordsFilePath ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.5rem 0.7rem' }}>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {staging.chordsFileName}</span>
+                        <button
+                          type="button"
+                          onClick={() => setStaging(prev => (prev ? { ...prev, chordsFilePath: undefined, chordsFileName: undefined } : prev))}
+                          title="Bestand verwijderen"
+                          style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          className="input"
+                          value={staging.chords}
+                          onChange={e => setStaging(prev => (prev ? { ...prev, chords: e.target.value } : prev))}
+                          rows={5}
+                          placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
+                          style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.4rem' }}
+                        />
+                        <label style={{ display: 'inline-block', fontSize: '0.7rem', opacity: 0.7, marginBottom: '0.8rem', cursor: 'pointer' }}>
+                          {stagingChordsUploading ? '⏳ Bezig met uploaden...' : '📎 of upload een akkoordenbestand (.txt/.pdf)'}
+                          <input
+                            type="file"
+                            accept=".txt,.pdf"
+                            onChange={e => stagingChordsFileSelected(e.target.files?.[0] || null)}
+                            disabled={stagingChordsUploading}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </>
+                    )}
                     {staging.youtubeUrl && (
                       <div style={{ fontSize: '0.75rem', marginBottom: '0.8rem' }}>
                         🎥 <a href={staging.youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>
@@ -1050,7 +1163,15 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
                       <input type="checkbox" checked={includePdf} onChange={e => setIncludePdf(e.target.checked)} />
-                      Ook als PDF bijvoegen
+                      PDF bijvoegen
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
+                      <input type="checkbox" checked={includeChords} onChange={e => setIncludeChords(e.target.checked)} />
+                      Akkoorden bijvoegen
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
+                      <input type="checkbox" checked={includeYoutube} onChange={e => setIncludeYoutube(e.target.checked)} />
+                      YouTube bijvoegen
                     </label>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -1138,15 +1259,41 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                           rows={5}
                           style={{ width: '100%', marginBottom: '0.6rem', fontFamily: 'inherit', resize: 'vertical' }}
                         />
-                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>Akkoorden (vrije tekst, optioneel)</label>
-                        <textarea
-                          className="input"
-                          value={editChords}
-                          onChange={e => setEditChords(e.target.value)}
-                          rows={5}
-                          placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
-                          style={{ width: '100%', marginBottom: '0.6rem', fontFamily: 'monospace', resize: 'vertical' }}
-                        />
+                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>Akkoorden (optioneel)</label>
+                        {editChordsFilePath ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.5rem 0.7rem' }}>
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {editChordsFileName}</span>
+                            <button
+                              type="button"
+                              onClick={() => { setEditChordsFilePath(''); setEditChordsFileName(''); }}
+                              title="Bestand verwijderen"
+                              style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem' }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <textarea
+                              className="input"
+                              value={editChords}
+                              onChange={e => setEditChords(e.target.value)}
+                              rows={5}
+                              placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
+                              style={{ width: '100%', marginBottom: '0.4rem', fontFamily: 'monospace', resize: 'vertical' }}
+                            />
+                            <label style={{ display: 'inline-block', fontSize: '0.7rem', opacity: 0.7, marginBottom: '0.6rem', cursor: 'pointer' }}>
+                              {editChordsUploading ? '⏳ Bezig met uploaden...' : '📎 of upload een akkoordenbestand (.txt/.pdf)'}
+                              <input
+                                type="file"
+                                accept=".txt,.pdf"
+                                onChange={e => editChordsFileSelected(e.target.files?.[0] || null)}
+                                disabled={editChordsUploading}
+                                style={{ display: 'none' }}
+                              />
+                            </label>
+                          </>
+                        )}
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
                             className="button"

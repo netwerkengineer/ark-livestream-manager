@@ -11,22 +11,33 @@ export function sanitizeFilename(name: string): string {
 }
 
 // Always generated, no dependency - the plain-text fallback every song
-// attachment gets, with or without a PDF alongside it.
+// attachment gets, with or without a PDF alongside it. Lyrics only - chords
+// are their own independently-toggleable attachment (buildChordsTextFile,
+// or the band's own uploaded chord chart), not embedded here.
 export function buildSongTextFile(song: DraftSong): ExportedFile {
   const lines = [song.artist ? `${song.title} - ${song.artist}` : song.title, ''];
   lines.push(song.lyricsText || '(geen songtekst toegevoegd)');
-  if (song.chordsText) {
-    lines.push('', '--- Akkoorden ---', song.chordsText);
-  }
   return {
     filename: `${sanitizeFilename(song.title)}.txt`,
     content: Buffer.from(lines.join('\n'), 'utf-8')
   };
 }
 
-// One page per song - title, artist, lyrics, and (if present) a monospace
-// chords block. Pure-JS via pdfkit, no headless browser, so it runs fine in
-// the existing self-hosted Docker setup with no extra system dependency.
+// A chords-only .txt attachment generated from free-text chords - used only
+// when the song has no uploaded chord-chart file (that gets attached
+// verbatim instead, under its own original extension).
+export function buildChordsTextFile(song: DraftSong): ExportedFile {
+  const lines = [song.artist ? `${song.title} - ${song.artist}` : song.title, '', song.chordsText || ''];
+  return {
+    filename: `${sanitizeFilename(song.title)} (akkoorden).txt`,
+    content: Buffer.from(lines.join('\n'), 'utf-8')
+  };
+}
+
+// One page per song - title, artist, and lyrics. Pure-JS via pdfkit, no
+// headless browser, so it runs fine in the existing self-hosted Docker setup
+// with no extra system dependency. Lyrics only, same as buildSongTextFile -
+// chords are their own attachment.
 export function buildSongPdf(song: DraftSong): Promise<ExportedFile> {
   return new Promise((resolve, reject) => {
     try {
@@ -47,13 +58,6 @@ export function buildSongPdf(song: DraftSong): Promise<ExportedFile> {
       doc.fillColor('#000').fontSize(12).font('Helvetica').text(song.lyricsText || '(geen songtekst toegevoegd)', {
         lineGap: 4
       });
-
-      if (song.chordsText) {
-        doc.moveDown();
-        doc.fontSize(12).font('Helvetica-Bold').text('Akkoorden');
-        doc.moveDown(0.3);
-        doc.font('Courier').fontSize(11).text(song.chordsText, { lineGap: 2 });
-      }
 
       doc.end();
     } catch (err) {

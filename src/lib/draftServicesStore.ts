@@ -18,6 +18,8 @@ export interface DraftSong {
   lyricsAttachmentName?: string;
   lyricsFilePath?: string; // resolved by the caller once matched against real email attachments
   chordsText?: string; // free-text, hand-entered by a worship leader - never parsed/rendered as ChordPro
+  chordsFileName?: string; // original filename of an uploaded chord chart (txt/pdf), e.g. a band's own scanned sheet
+  chordsFilePath?: string; // where that upload was saved - attached verbatim rather than retyped into chordsText
 }
 
 export interface DraftScripture {
@@ -193,7 +195,7 @@ export function createOrGetDraftService(serviceDate: string): DraftService {
 // re-adding a song already on the list is a no-op rather than a duplicate row.
 export function addSongToDraft(
   serviceDate: string,
-  song: { title: string; artist?: string; category?: string; section: string; lyricsText?: string; chordsText?: string }
+  song: { title: string; artist?: string; category?: string; section: string; lyricsText?: string; chordsText?: string; chordsFileName?: string; chordsFilePath?: string }
 ): DraftService {
   const store = readStore();
   let draft = store.services[serviceDate];
@@ -220,7 +222,9 @@ export function addSongToDraft(
       source: 'manual',
       addedAt: new Date().toISOString(),
       lyricsText: song.lyricsText,
-      chordsText: song.chordsText
+      chordsText: song.chordsText,
+      chordsFileName: song.chordsFileName,
+      chordsFilePath: song.chordsFilePath
     });
   }
   draft.lastUpdatedAt = new Date().toISOString();
@@ -310,7 +314,7 @@ export function addMediaToDraft(
 export function updateSongInDraft(
   serviceDate: string,
   songId: string,
-  patch: Partial<Pick<DraftSong, 'title' | 'artist' | 'category' | 'section' | 'lyricsText' | 'chordsText'>>
+  patch: Partial<Pick<DraftSong, 'title' | 'artist' | 'category' | 'section' | 'lyricsText' | 'chordsText' | 'chordsFileName' | 'chordsFilePath'>>
 ): DraftService | null {
   const store = readStore();
   const draft = store.services[serviceDate];

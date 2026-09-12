@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readFile } from 'fs/promises';
+import path from 'path';
 import { isAuthorized } from '@/lib/authHelper';
 import { getDraftService, updateSongInDraft, DraftSong, DraftService } from '@/lib/draftServicesStore';
 import { getContacts, Contact } from '@/lib/contactsStore';
-import { buildSongTextFile, buildSongPdf, sanitizeFilename } from '@/lib/songExport';
+import { buildSongTextFile, buildSongPdf, buildChordsTextFile, sanitizeFilename } from '@/lib/songExport';
 import { sendSetlistEmail } from '@/lib/mailer';
 import { checkLocalSongExists, getLocalSongText, fetchLyricsFromInternet } from '@/lib/songs';
+import { getSongMeta } from '@/lib/songMetaStore';
 
 // Songs parsed from a liturgie e-mail only ever get a title/artist - unlike
 // songs added through the setlist UI, they never went through the
@@ -38,21 +41,58 @@ function formatDateLabel(iso: string): string {
   }
 }
 
+// A song's chords attachment is either its uploaded chord chart (verbatim,
+// original extension) or a generated text file from free-text chords -
+// mutually exclusive, whichever is set on the song (see songMetaStore's
+// "uploading a file clears free-text chords" rule).
+function chordsAttachmentFilename(song: DraftSong): string | null {
+  if (song.chordsFilePath) {
+    const ext = song.chordsFileName ? path.extname(song.chordsFileName) : path.extname(song.chordsFilePath);
+    return `${sanitizeFilename(song.title)} (akkoorden)${ext || '.pdf'}`;
+  }
+  if (song.chordsText) {
+    return `${sanitizeFilename(song.title)} (akkoorden).txt`;
+  }
+  return null;
+}
+
 // Shared between the real send and the dry-run preview, so what the
 // worship leader sees in the preview is guaranteed to be exactly what goes
 // out - no separate client-side re-implementation to drift out of sync.
-function buildEmailContent(serviceDate: string, draft: DraftService, message: string | undefined, includeText: boolean, includePdf: boolean) {
+function buildEmailContent(
+  serviceDate: string,
+  draft: DraftService,
+  message: string | undefined,
+  includeText: boolean,
+  includePdf: boolean,
+  includeChords: boolean,
+  includeYoutube: boolean
+) {
   const dateLabel = formatDateLabel(serviceDate);
   const bodyLines = [`Setlist voor ${dateLabel}:`, ''];
   draft.songs.forEach((s, i) => {
     bodyLines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
   });
   if (includeText && includePdf) {
-    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als tekstbestand en pdf bijgevoegd.');
+    bodyLines.push('', 'De songteksten staan als tekstbestand en pdf bijgevoegd.');
   } else if (includeText) {
-    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
+    bodyLines.push('', 'De songteksten staan als bijlage.');
   } else if (includePdf) {
-    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als pdf bijgevoegd.');
+    bodyLines.push('', 'De songteksten staan als pdf bijgevoegd.');
+  }
+  if (includeChords) {
+    bodyLines.push('', 'De akkoorden staan (indien toegevoegd) als aparte bijlage per lied.');
+  }
+  if (includeYoutube) {
+    const withYoutube = draft.songs
+      .map(s => ({ song: s, url: getSongMeta(s.title, s.artist)?.youtubeUrl }))
+      .filter((x): x is { song: DraftSong; url: string } => !!x.url);
+    if (withYoutube.length > 0) {
+      bodyLines.push('', '🎥 YouTube-referenties:');
+      withYoutube.forEach(({ song, url }) => {
+        bodyLines.push(`${song.title}${song.artist ? ` - ${song.artist}` : ''}: ${url}`);
+      });
+    }
   }
   if (typeof message === 'string' && message.trim()) {
     bodyLines.push('', message.trim());
@@ -60,12 +100,16 @@ function buildEmailContent(serviceDate: string, draft: DraftService, message: st
   return { subject: `Setlist ${dateLabel}`, bodyText: bodyLines.join('\n') };
 }
 
-function attachmentFilenames(draft: DraftService, includeText: boolean, includePdf: boolean): string[] {
+function attachmentFilenames(draft: DraftService, includeText: boolean, includePdf: boolean, includeChords: boolean): string[] {
   return draft.songs.flatMap(s => {
     const base = sanitizeFilename(s.title);
     const names: string[] = [];
     if (includeText) names.push(`${base}.txt`);
     if (includePdf) names.push(`${base}.pdf`);
+    if (includeChords) {
+      const chordsName = chordsAttachmentFilename(s);
+      if (chordsName) names.push(chordsName);
+    }
     return names;
   });
 }
@@ -87,6 +131,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       replyToIds,
       includePdf,
       includeText: includeTextRaw,
+      includeChords,
+      includeYoutube,
       message,
       dryRun,
       subject: subjectOverride,
@@ -123,7 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
     // subjectOverride/bodyTextOverride let the worship leader edit the
     // preview before confirming - the real send then uses exactly what they
     // reviewed instead of recomposing it fresh.
-    const composed = buildEmailContent(serviceDate, draft, message, includeText, !!includePdf);
+    const composed = buildEmailContent(serviceDate, draft, message, includeText, !!includePdf, !!includeChords, !!includeYoutube);
     const subject = typeof subjectOverride === 'string' && subjectOverride.trim() ? subjectOverride : composed.subject;
     const bodyText = typeof bodyTextOverride === 'string' && bodyTextOverride.trim() ? bodyTextOverride : composed.bodyText;
 
@@ -137,7 +183,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
           replyTo: replyToContacts.map(r => ({ name: r.name, email: r.email! })),
           subject,
           bodyText,
-          attachments: attachmentFilenames(draft, includeText, !!includePdf)
+          attachments: attachmentFilenames(draft, includeText, !!includePdf, !!includeChords)
         }
       });
     }
@@ -148,6 +194,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
         const songForExport = await withLyricsFilledIn(serviceDate, song);
         if (includeText) attachments.push(buildSongTextFile(songForExport));
         if (includePdf) attachments.push(await buildSongPdf(songForExport));
+      }
+    }
+    if (includeChords) {
+      for (const song of draft.songs) {
+        if (song.chordsFilePath) {
+          try {
+            const content = await readFile(song.chordsFilePath);
+            const filename = chordsAttachmentFilename(song);
+            if (filename) attachments.push({ filename, content });
+          } catch {
+            // Uploaded file went missing on disk - skip rather than fail the whole send.
+          }
+        } else if (song.chordsText) {
+          attachments.push(buildChordsTextFile(song));
+        }
       }
     }
 

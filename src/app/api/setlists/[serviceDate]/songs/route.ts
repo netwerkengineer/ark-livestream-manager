@@ -14,14 +14,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
   const { serviceDate } = await params;
   try {
     const body = await req.json();
-    const { title, artist, category, section, lyricsText, chordsText } = body;
+    const { title, artist, category, section, lyricsText, chordsText, chordsFileName, chordsFilePath } = body;
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ success: false, error: 'Titel is verplicht' }, { status: 400 });
     }
     if (!section || typeof section !== 'string' || !section.trim()) {
       return NextResponse.json({ success: false, error: 'Sectie is verplicht' }, { status: 400 });
     }
-    const draft = addSongToDraft(serviceDate, { title: title.trim(), artist, category, section, lyricsText, chordsText });
+    const draft = addSongToDraft(serviceDate, { title: title.trim(), artist, category, section, lyricsText, chordsText, chordsFileName, chordsFilePath });
     return NextResponse.json({ success: true, draft });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

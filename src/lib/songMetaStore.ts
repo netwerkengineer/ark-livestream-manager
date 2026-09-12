@@ -6,6 +6,8 @@ const STORE_FILE = path.join(DATA_DIR, 'songMeta.json');
 
 export interface SongMeta {
   chordsText?: string;
+  chordsFileName?: string; // original filename of an uploaded chord chart (txt/pdf)
+  chordsFilePath?: string; // where that upload lives on disk - attached verbatim rather than retyped
   youtubeUrl?: string;
   updatedAt: string;
 }
@@ -64,7 +66,7 @@ export function getSongMeta(title: string, artist?: string): SongMeta | null {
 export function setSongMeta(
   title: string,
   artist: string | undefined,
-  patch: { chordsText?: string; youtubeUrl?: string }
+  patch: { chordsText?: string; chordsFileName?: string; chordsFilePath?: string; youtubeUrl?: string }
 ): SongMeta {
   const store = readStore();
   const key = songKey(title, artist);
@@ -74,13 +76,26 @@ export function setSongMeta(
   if (patch.chordsText !== undefined) {
     if (patch.chordsText.trim()) next.chordsText = patch.chordsText; else delete next.chordsText;
   }
+  if (patch.chordsFilePath !== undefined) {
+    // An uploaded chord chart replaces free-text chords as the "current"
+    // chords for this song (whichever was set most recently wins) - the two
+    // aren't meant to coexist as separate things for the same song.
+    if (patch.chordsFilePath) {
+      next.chordsFilePath = patch.chordsFilePath;
+      next.chordsFileName = patch.chordsFileName;
+      delete next.chordsText;
+    } else {
+      delete next.chordsFilePath;
+      delete next.chordsFileName;
+    }
+  }
   if (patch.youtubeUrl !== undefined) {
     if (patch.youtubeUrl.trim()) next.youtubeUrl = patch.youtubeUrl; else delete next.youtubeUrl;
   }
 
-  // Nothing left worth keeping (both fields cleared) - drop the entry
-  // entirely rather than leaving an empty stub behind.
-  if (!next.chordsText && !next.youtubeUrl) {
+  // Nothing left worth keeping - drop the entry entirely rather than
+  // leaving an empty stub behind.
+  if (!next.chordsText && !next.chordsFilePath && !next.youtubeUrl) {
     delete store[key];
   } else {
     store[key] = next;
