@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
-import { getSongMeta, setSongMeta } from '@/lib/songMetaStore';
+import { getSongMeta, getAllSongMeta, setSongMeta } from '@/lib/songMetaStore';
 
 // Chords/YouTube-link lookup for one song, by title+artist - used to
 // pre-fill the setlist builder's staging panel and the show editor's
 // Akkoorden/YouTube-link fields when a song already has these saved.
+// Called with no `title` at all, it instead returns the whole store in one
+// go - used by the catalog list to show a YouTube/akkoorden button per show
+// card without a lookup per card.
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, 'freeshow');
   if (!authSession) {
@@ -14,11 +17,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const title = searchParams.get('title');
   const artist = searchParams.get('artist') || undefined;
-  if (!title) {
-    return NextResponse.json({ success: false, error: 'Titel is verplicht' }, { status: 400 });
-  }
 
   try {
+    if (!title) {
+      return NextResponse.json({ success: true, all: getAllSongMeta() });
+    }
     const meta = getSongMeta(title, artist);
     return NextResponse.json({ success: true, meta });
   } catch (error: any) {

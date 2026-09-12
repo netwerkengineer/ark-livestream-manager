@@ -63,6 +63,13 @@ export function getSongMeta(title: string, artist?: string): SongMeta | null {
   return store[songKey(title, artist)] || null;
 }
 
+// For the catalog list, which needs to know at a glance (per show card)
+// whether a youtube link/chords exist at all - one bulk read instead of a
+// lookup per card.
+export function getAllSongMeta(): StoreShape {
+  return readStore();
+}
+
 export function setSongMeta(
   title: string,
   artist: string | undefined,

@@ -12,6 +12,7 @@ interface DatabaseViewProps {
   setShowsSortOrder: (value: 'name' | 'modified') => void;
   loadingShows: boolean;
   showsList: any[];
+  songMetaMap: Record<string, { youtubeUrl?: string; chordsText?: string; chordsFileName?: string; chordsFilePath?: string }>;
   uniqueCategories: string[];
   builderSlides: any[];
   setBuilderSlides: (slides: any[]) => void;
@@ -71,6 +72,7 @@ export default function DatabaseView(props: DatabaseViewProps) {
     setShowsSortOrder,
     loadingShows,
     showsList,
+    songMetaMap,
     uniqueCategories,
     builderSlides,
     setBuilderSlides,
@@ -248,7 +250,18 @@ export default function DatabaseView(props: DatabaseViewProps) {
                       }
                       return a.name.localeCompare(b.name);
                     })
-                    .map((show, i) => (
+                    .map((show, i) => {
+                      // Same "Title - Artist" split used everywhere else a song's
+                      // identity is looked up (SetlistBuilder, show editor) - so
+                      // this resolves to the same songMeta entry.
+                      const nameSplit = (show.name || '').split('-');
+                      const metaTitle = nameSplit[0]?.trim();
+                      const metaArtist = nameSplit[1]?.trim();
+                      const meta = metaTitle ? songMetaMap[`${metaTitle.toLowerCase()}|${(metaArtist || '').toLowerCase()}`] : undefined;
+                      const hasYoutube = !!meta?.youtubeUrl;
+                      const hasChords = !!(meta?.chordsFilePath || meta?.chordsText);
+                      const disabledStyle = { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.25)', cursor: 'default' } as const;
+                      return (
                       <div key={i} className="glass-card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
                         <div>
                           <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={show.name}>
@@ -266,34 +279,75 @@ export default function DatabaseView(props: DatabaseViewProps) {
                             🕒 {new Date(show.lastModified).toLocaleString('nl-NL')}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                          <div className="tooltip-container" style={{ flex: 2 }}>
-                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'var(--primary)', color: '#020617' }} onClick={() => loadShowDetail(show.filename)}>
-                              📝 Bewerken
-                            </button>
-                            <span className="tooltip-text">Show bewerken</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'var(--primary)', color: '#020617' }} onClick={() => loadShowDetail(show.filename)}>
+                                📝 Bewerken
+                              </button>
+                              <span className="tooltip-text">Show bewerken</span>
+                            </div>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.15)', color: '#fff' }} onClick={() => openPreview(show.filename)}>
+                                👁️ Preview
+                              </button>
+                              <span className="tooltip-text">Slide preview bekijken</span>
+                            </div>
                           </div>
-                          <div className="tooltip-container" style={{ flex: 2 }}>
-                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.15)', color: '#fff' }} onClick={() => openPreview(show.filename)}>
-                              👁️ Preview
-                            </button>
-                            <span className="tooltip-text">Slide preview bekijken</span>
-                          </div>
-                          <div className="tooltip-container" style={{ flex: 1 }}>
-                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)' }} onClick={() => duplicateShow(show.filename)}>
-                              👯
-                            </button>
-                            <span className="tooltip-text">Show dupliceren</span>
-                          </div>
-                          <div className="tooltip-container" style={{ flex: 1 }}>
-                            <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,0,0,0.15)', color: '#ef4444' }} onClick={() => deleteShowDirect(show.filename)}>
-                              🗑️
-                            </button>
-                            <span className="tooltip-text">Verwijderen naar prullenbak</span>
+                          <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              {hasYoutube ? (
+                                <a
+                                  href={meta!.youtubeUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="button"
+                                  style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,0,0,0.15)', color: '#f87171', display: 'block', textAlign: 'center', boxSizing: 'border-box' }}
+                                >
+                                  🎥
+                                </a>
+                              ) : (
+                                <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', ...disabledStyle }} disabled>
+                                  🎥
+                                </button>
+                              )}
+                              <span className="tooltip-text">{hasYoutube ? 'YouTube-referentie openen' : 'Geen YouTube-link opgeslagen'}</span>
+                            </div>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              {hasChords ? (
+                                <a
+                                  href={`/api/chords-file?title=${encodeURIComponent(metaTitle)}&artist=${encodeURIComponent(metaArtist || '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="button"
+                                  style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(56,189,248,0.15)', color: 'var(--primary)', display: 'block', textAlign: 'center', boxSizing: 'border-box' }}
+                                >
+                                  🎸
+                                </a>
+                              ) : (
+                                <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', ...disabledStyle }} disabled>
+                                  🎸
+                                </button>
+                              )}
+                              <span className="tooltip-text">{hasChords ? 'Akkoorden openen' : 'Geen akkoorden opgeslagen'}</span>
+                            </div>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)' }} onClick={() => duplicateShow(show.filename)}>
+                                👯
+                              </button>
+                              <span className="tooltip-text">Show dupliceren</span>
+                            </div>
+                            <div className="tooltip-container" style={{ flex: 1 }}>
+                              <button className="button" style={{ width: '100%', padding: '0.4rem', fontSize: '0.75rem', background: 'rgba(255,0,0,0.15)', color: '#ef4444' }} onClick={() => deleteShowDirect(show.filename)}>
+                                🗑️
+                              </button>
+                              <span className="tooltip-text">Verwijderen naar prullenbak</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   }
                 </div>
               )}

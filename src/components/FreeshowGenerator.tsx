@@ -136,6 +136,7 @@ export default function FreeshowGenerator() {
   // Shows Database Dashboard geconsolideerde states
   const [databaseSubTab, setDatabaseSubTab] = useState<'catalog'|'builder'|'maintenance'|'team'>('catalog');
   const [showsList, setShowsList] = useState<any[]>([]);
+  const [songMetaMap, setSongMetaMap] = useState<Record<string, { youtubeUrl?: string; chordsText?: string; chordsFileName?: string; chordsFilePath?: string }>>({});
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsSearch, setShowsSearch] = useState('');
   const [showsCategoryFilter, setShowsCategoryFilter] = useState('all');
@@ -250,6 +251,7 @@ export default function FreeshowGenerator() {
   useEffect(() => {
     if (inputType === 'database' && databaseSubTab === 'catalog') {
       fetchShows();
+      fetchSongMetaMap();
     } else if (inputType === 'database' && databaseSubTab === 'maintenance') {
       fetchCatalog();
       loadHistory();
@@ -747,6 +749,19 @@ export default function FreeshowGenerator() {
       setErrorMessage(e.message || 'Verbindingsfout bij inladen shows');
     } finally {
       setLoadingShows(false);
+    }
+  };
+
+  // One bulk fetch of the whole chords/YouTube store, so the catalog list
+  // can show a lit-up or greyed-out button per show card without a lookup
+  // per card.
+  const fetchSongMetaMap = async () => {
+    try {
+      const res = await fetch('/api/song-meta');
+      const data = await res.json();
+      if (data.success) setSongMetaMap(data.all || {});
+    } catch {
+      // Non-critical - the catalog list just falls back to greyed-out buttons.
     }
   };
 
@@ -1752,6 +1767,7 @@ export default function FreeshowGenerator() {
           setShowsSortOrder={setShowsSortOrder}
           loadingShows={loadingShows}
           showsList={showsList}
+          songMetaMap={songMetaMap}
           uniqueCategories={uniqueCategories}
           freeshowCategories={freeshowCategories}
           builderSlides={builderSlides}
