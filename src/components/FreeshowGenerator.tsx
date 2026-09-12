@@ -2389,14 +2389,27 @@ export default function FreeshowGenerator() {
                   </>
                 )}
                 <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎥 YouTube-link (referentie, optioneel)</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={showEditorYoutubeUrl}
-                  onChange={e => setShowEditorYoutubeUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                  style={{ margin: 0 }}
-                />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    value={showEditorYoutubeUrl}
+                    onChange={e => setShowEditorYoutubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    style={{ margin: 0, flex: 1 }}
+                  />
+                  {showEditorYoutubeUrl && (
+                    <a
+                      href={showEditorYoutubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Openen in nieuw tabblad"
+                      style={{ flexShrink: 0, fontSize: '0.8rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}
+                    >
+                      ▶ Openen
+                    </a>
+                  )}
+                </div>
               </div>
             )}
 
