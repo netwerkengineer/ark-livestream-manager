@@ -1622,7 +1622,10 @@ export default function FreeshowGenerator() {
             </div>
           </div>
           <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '1.5rem', marginBottom: 0 }}>
-            {t('full_manual_hint_prefix')} <strong>?</strong> {t('full_manual_hint_suffix')}
+            {t('full_manual_hint_prefix')}{' '}
+            <a href="/manual/nl" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+              {t('full_manual_hint_link')}
+            </a>
           </p>
         </div>
       )}
