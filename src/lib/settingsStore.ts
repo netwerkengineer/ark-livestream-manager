@@ -115,6 +115,33 @@ export interface AppSettings {
   ledInactiveColor?: string;
   ledTriggerSource?: "youtube" | "obs";
   atemHost?: string;
+
+  // Team-SSO: login + rights via an external identity provider (Authentik
+  // on the Proxmox test environment, Synology SSO Server in production)
+  // instead of maintaining a second user list in this app. The local
+  // username/password system (LocalUser, above) is kept as emergency
+  // access, not replaced.
+  ssoEnabled?: boolean;
+  ssoProviderName?: string; // label on the login button, e.g. "Inloggen met Authentik"
+  ssoIssuerUrl?: string;
+  ssoClientId?: string;
+  ssoClientSecret?: string;
+  ssoGroupClaim?: string; // ID-token claim holding the user's groups, default "groups"
+  // Group name (as it appears in the claim) -> role/permissions this app
+  // grants on login. A group not listed here grants nothing - a valid SSO
+  // login without any recognized group is functionally locked out, no
+  // separate "may not log in" rule needed.
+  ssoGroupPermissions?: Record<string, { role?: "admin" | "operator"; permissions?: string[] }>;
+
+  // Team-contact sync: pulls a directory group's members (name + email)
+  // into contacts.json on a schedule, independent of ssoGroupPermissions -
+  // most band members never log in to this app at all, but still need to
+  // receive the setlist mail.
+  ssoContactSyncEnabled?: boolean;
+  ssoContactSyncGroup?: string;
+  ssoContactSyncIntervalMinutes?: number;
+  ssoDirectoryMode?: "authentik-api" | "synology-ldap" | "synology-api";
+  ssoDirectoryApiToken?: string; // Authentik API token, or the Synology LDAP bind password
 }
 
 export interface LocalUser {
@@ -283,7 +310,21 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ledInactiveText: "LIVESTREAM OFFLINE",
   ledInactiveColor: "#00ff00",
   ledTriggerSource: "youtube",
-  atemHost: ""
+  atemHost: "",
+
+  // SSO Defaults - disabled until an issuer/client is actually configured
+  ssoEnabled: false,
+  ssoProviderName: "Team-login",
+  ssoIssuerUrl: "",
+  ssoClientId: "",
+  ssoClientSecret: "",
+  ssoGroupClaim: "groups",
+  ssoGroupPermissions: {},
+  ssoContactSyncEnabled: false,
+  ssoContactSyncGroup: "",
+  ssoContactSyncIntervalMinutes: 360,
+  ssoDirectoryMode: "authentik-api",
+  ssoDirectoryApiToken: ""
 };
 
 // Ensure data directory exists

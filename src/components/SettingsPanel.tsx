@@ -26,7 +26,7 @@ import ActivityLogPanel from "@/components/ActivityLogPanel";
 
 interface SettingsPanelProps {
   settings: any;
-  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog";
+  settingsTab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "sso" | "backup" | "activityLog";
   userRole: "admin" | "operator" | null;
   localUsers: any[];
   availableTemplates: string[];
@@ -41,7 +41,7 @@ interface SettingsPanelProps {
   currentUser: string | null;
   onClose: () => void;
   onSettingsChange: (settings: any) => void;
-  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "backup" | "activityLog") => void;
+  onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "sso" | "backup" | "activityLog") => void;
   onSaveSettings: () => void;
   onSaveUser: (e: React.FormEvent) => void;
   onDeleteUser: (username: string) => void;
@@ -273,6 +273,29 @@ export default function SettingsPanel({
             >
               <User size={18} />
               <span>Gebruikersbeheer</span>
+            </button>
+          )}
+          {userRole === "admin" && (
+            <button
+              type="button"
+              onClick={() => onTabChange("sso")}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: settingsTab === "sso" ? 'rgba(248, 113, 113, 0.15)' : 'transparent',
+                color: settingsTab === "sso" ? 'var(--primary)' : 'rgba(255,255,255,0.7)',
+                fontWeight: settingsTab === "sso" ? 600 : 500,
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <User size={18} />
+              <span>Team-login (SSO)</span>
             </button>
           )}
           <button
@@ -1730,6 +1753,232 @@ export default function SettingsPanel({
                   />
                 </div>
               </div>
+            </section>
+          )}
+
+          {settingsTab === "sso" && userRole === "admin" && (
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>🔑 Team-login via SSO</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
+                Laat teamleden inloggen met hun bestaande account bij Authentik (test) of de Synology NAS (productie), in plaats van een los wachtwoord in deze app. Het gewone gebruikersnaam/wachtwoord-inloggen (Gebruikersbeheer) blijft daarnaast werken als noodtoegang.
+              </p>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                <input
+                  type="checkbox"
+                  checked={!!settings.ssoEnabled}
+                  onChange={(e) => onSettingsChange({ ...settings, ssoEnabled: e.target.checked })}
+                />
+                SSO-login inschakelen
+              </label>
+
+              {settings.ssoEnabled && (
+                <>
+                  <div className="input-group">
+                    <label className="input-label">Knoptekst op het inlogscherm</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={settings.ssoProviderName || ""}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoProviderName: e.target.value })}
+                      placeholder="Inloggen met Authentik"
+                    />
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label">Issuer-URL (OpenID Connect)</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={settings.ssoIssuerUrl || ""}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoIssuerUrl: e.target.value })}
+                      placeholder="https://authentik.voorbeeld.nl/application/o/livestream-manager/"
+                    />
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                      Endpoints worden automatisch opgehaald via {'<issuer>/.well-known/openid-configuration'} — werkt zo voor zowel Authentik als Synology's SSO Server-pakket.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Client ID</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={settings.ssoClientId || ""}
+                        onChange={(e) => onSettingsChange({ ...settings, ssoClientId: e.target.value })}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Client Secret</label>
+                      <input
+                        type="password"
+                        className="input-field"
+                        value={settings.ssoClientSecret || ""}
+                        onChange={(e) => onSettingsChange({ ...settings, ssoClientSecret: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label">Groepen-claim in het ID-token</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ maxWidth: '220px' }}
+                      value={settings.ssoGroupClaim || "groups"}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoGroupClaim: e.target.value })}
+                    />
+                  </div>
+
+                  <h4 style={{ fontSize: '0.95rem', marginTop: '8px', marginBottom: 0 }}>Rechten per groep</h4>
+                  <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px' }}>
+                    Een groep die hier niet in staat krijgt geen enkele permissie — iemand kan dan wel inloggen, maar ziet nergens toegang tot.
+                  </p>
+                  {(Object.entries(settings.ssoGroupPermissions || {}) as [string, { role?: "admin" | "operator"; permissions?: string[] }][]).map(([groupName, entry], i) => (
+                    <div key={i} className="glass-card" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(255,255,255,0.03)' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ flex: 1 }}
+                          value={groupName}
+                          placeholder="Groepsnaam (exact zoals in Authentik/Synology)"
+                          onChange={(e) => {
+                            const map = { ...(settings.ssoGroupPermissions || {}) };
+                            const value = map[groupName];
+                            delete map[groupName];
+                            map[e.target.value] = value;
+                            onSettingsChange({ ...settings, ssoGroupPermissions: map });
+                          }}
+                        />
+                        <select
+                          className="input-field"
+                          style={{ width: '140px' }}
+                          value={entry.role || "operator"}
+                          onChange={(e) => {
+                            const map = { ...(settings.ssoGroupPermissions || {}) };
+                            map[groupName] = { ...entry, role: e.target.value as "admin" | "operator" };
+                            onSettingsChange({ ...settings, ssoGroupPermissions: map });
+                          }}
+                        >
+                          <option value="operator">Operator</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const map = { ...(settings.ssoGroupPermissions || {}) };
+                            delete map[groupName];
+                            onSettingsChange({ ...settings, ssoGroupPermissions: map });
+                          }}
+                          style={{ background: 'rgba(255,0,0,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer' }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                      {entry.role !== "admin" && (
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                          {["freeshow", "control", "planner", "lights", "monitor"].map(perm => (
+                            <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input
+                                type="checkbox"
+                                checked={(entry.permissions || []).includes(perm)}
+                                onChange={(e) => {
+                                  const map = { ...(settings.ssoGroupPermissions || {}) };
+                                  const current = new Set(entry.permissions || []);
+                                  if (e.target.checked) current.add(perm); else current.delete(perm);
+                                  map[groupName] = { ...entry, permissions: Array.from(current) };
+                                  onSettingsChange({ ...settings, ssoGroupPermissions: map });
+                                }}
+                              />
+                              {perm}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const map = { ...(settings.ssoGroupPermissions || {}) };
+                      let name = "Nieuwe groep";
+                      let n = 2;
+                      while (map[name]) { name = `Nieuwe groep ${n++}`; }
+                      map[name] = { role: "operator", permissions: [] };
+                      onSettingsChange({ ...settings, ssoGroupPermissions: map });
+                    }}
+                    style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', alignSelf: 'flex-start' }}
+                  >
+                    + Groep toevoegen
+                  </button>
+
+                  <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>👥 Teamcontacten automatisch synchroniseren</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
+                    Haalt periodiek de leden van een groep op (naam + e-mail) voor de setlist-mail — ook mensen die zelf nooit op de app inloggen. Handmatig toegevoegde contacten (Beheer → Team) blijven altijd gewoon staan.
+                  </p>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!settings.ssoContactSyncEnabled}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoContactSyncEnabled: e.target.checked })}
+                    />
+                    Contactsync inschakelen
+                  </label>
+                  {settings.ssoContactSyncEnabled && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+                        <div className="input-group">
+                          <label className="input-label">Groep om te synchroniseren</label>
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={settings.ssoContactSyncGroup || ""}
+                            onChange={(e) => onSettingsChange({ ...settings, ssoContactSyncGroup: e.target.value })}
+                            placeholder="Band"
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Bron</label>
+                          <select
+                            className="input-field"
+                            value={settings.ssoDirectoryMode || "authentik-api"}
+                            onChange={(e) => onSettingsChange({ ...settings, ssoDirectoryMode: e.target.value as any })}
+                          >
+                            <option value="authentik-api">Authentik (API)</option>
+                            <option value="synology-ldap">Synology (LDAP)</option>
+                            <option value="synology-api">Synology (DSM-API)</option>
+                          </select>
+                        </div>
+                        <div className="input-group">
+                          <label className="input-label">Interval (minuten)</label>
+                          <input
+                            type="number"
+                            className="input-field"
+                            value={settings.ssoContactSyncIntervalMinutes || 360}
+                            onChange={(e) => onSettingsChange({ ...settings, ssoContactSyncIntervalMinutes: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label">API-token / bind-wachtwoord</label>
+                        <input
+                          type="password"
+                          className="input-field"
+                          value={settings.ssoDirectoryApiToken || ""}
+                          onChange={(e) => onSettingsChange({ ...settings, ssoDirectoryApiToken: e.target.value })}
+                        />
+                      </div>
+                      {settings.ssoDirectoryMode !== "authentik-api" && (
+                        <p style={{ fontSize: '0.78rem', color: '#fcd34d' }}>
+                          ⚠️ Deze bron is nog niet gebouwd (zie het plan) — de sync slaat tot die tijd over met een foutmelding in de logs, zonder de bestaande contactenlijst aan te raken.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </section>
           )}
 

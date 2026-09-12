@@ -16,5 +16,8 @@ export async function register() {
     // never started at all, so the sign silently never updated.
     const { ensureOBSManager } = await import('./lib/obsManager');
     ensureOBSManager();
+
+    const { initTeamDirectorySync } = await import('./lib/teamDirectorySync');
+    initTeamDirectorySync();
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -10,6 +10,16 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState("");
+  const [sso, setSso] = useState<{ enabled: boolean; providerName: string } | null>(null);
+
+  // Public, unauthenticated endpoint - this screen renders before anyone
+  // is logged in, so it can't use the regular (auth-gated) settings route.
+  useEffect(() => {
+    fetch("/api/auth/sso-status")
+      .then(res => res.json())
+      .then(data => setSso(data))
+      .catch(() => {});
+  }, []);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -40,9 +50,27 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         <img src="/logo.png" alt="Ark Church Logo" />
         <h1 className="gradient-text">Ark Church Operations Center</h1>
       </div>
-      <form onSubmit={handleLogin} className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', width: '450px' }}>
+      <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', width: '450px' }}>
         <h2 style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '10px' }}>Aanmelden</h2>
 
+        {sso?.enabled && (
+          <>
+            <a
+              href="/api/auth/signin/sso"
+              className="btn-primary"
+              style={{ width: '100%', textAlign: 'center', textDecoration: 'none', display: 'block', boxSizing: 'border-box' }}
+            >
+              {sso.providerName}
+            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', opacity: 0.5, fontSize: '0.8rem' }}>
+              <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
+              of
+              <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
+            </div>
+          </>
+        )}
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div className="input-group">
           <label className="input-label">Gebruikersnaam</label>
           <input
@@ -80,7 +108,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         >
           Aanmelden
         </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

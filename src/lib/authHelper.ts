@@ -52,17 +52,26 @@ export async function isAuthorized(
   requiredRole?: "admin" | "operator",
   requiredPermission?: string
 ): Promise<any | null> {
-  // 1. Check Google OAuth session (granted full admin status)
-  const session = await auth();
+  // 1. Check NextAuth session - Google (granted full admin status, used
+  // for YouTube API access) or the SSO provider (role/permissions computed
+  // from their identity-provider groups, see resolveSsoPermissions above).
+  const session = (await auth()) as any;
   if (session) {
-    const adminUser = {
-      username: session.user?.name || "Google User",
-      role: "admin" as const,
-      permissions: ["planner", "control", "monitor", "lights", "freeshow"]
-    };
-    if (!requiredRole || requiredRole === "admin" || requiredRole === "operator") {
-      if (!requiredPermission || adminUser.permissions.includes(requiredPermission)) {
-        return adminUser;
+    const isGoogle = session.provider === "google" || (!session.provider && session.youtubeToken);
+    const resolvedUser = isGoogle
+      ? {
+          username: session.user?.name || "Google User",
+          role: "admin" as const,
+          permissions: ["planner", "control", "monitor", "lights", "freeshow"]
+        }
+      : {
+          username: session.user?.name || session.user?.email || "SSO User",
+          role: (session as any).role || "operator",
+          permissions: (session as any).permissions || []
+        };
+    if (!requiredRole || requiredRole === resolvedUser.role || resolvedUser.role === "admin") {
+      if (!requiredPermission || resolvedUser.permissions.includes(requiredPermission)) {
+        return resolvedUser;
       }
     }
   }
