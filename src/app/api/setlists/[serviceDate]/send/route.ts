@@ -41,23 +41,32 @@ function formatDateLabel(iso: string): string {
 // Shared between the real send and the dry-run preview, so what the
 // worship leader sees in the preview is guaranteed to be exactly what goes
 // out - no separate client-side re-implementation to drift out of sync.
-function buildEmailContent(serviceDate: string, draft: DraftService, message?: string) {
+function buildEmailContent(serviceDate: string, draft: DraftService, message: string | undefined, includeText: boolean, includePdf: boolean) {
   const dateLabel = formatDateLabel(serviceDate);
   const bodyLines = [`Setlist voor ${dateLabel}:`, ''];
   draft.songs.forEach((s, i) => {
     bodyLines.push(`${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''}`);
   });
-  bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
+  if (includeText && includePdf) {
+    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als tekstbestand en pdf bijgevoegd.');
+  } else if (includeText) {
+    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als bijlage.');
+  } else if (includePdf) {
+    bodyLines.push('', 'De songteksten (en akkoorden, indien toegevoegd) staan als pdf bijgevoegd.');
+  }
   if (typeof message === 'string' && message.trim()) {
     bodyLines.push('', message.trim());
   }
   return { subject: `Setlist ${dateLabel}`, bodyText: bodyLines.join('\n') };
 }
 
-function attachmentFilenames(draft: DraftService, includePdf: boolean): string[] {
+function attachmentFilenames(draft: DraftService, includeText: boolean, includePdf: boolean): string[] {
   return draft.songs.flatMap(s => {
     const base = sanitizeFilename(s.title);
-    return includePdf ? [`${base}.txt`, `${base}.pdf`] : [`${base}.txt`];
+    const names: string[] = [];
+    if (includeText) names.push(`${base}.txt`);
+    if (includePdf) names.push(`${base}.pdf`);
+    return names;
   });
 }
 
@@ -73,7 +82,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
 
   const { serviceDate } = await params;
   try {
-    const { recipientIds, includePdf, message, dryRun, subject: subjectOverride, bodyText: bodyTextOverride } = await req.json();
+    const {
+      recipientIds,
+      replyToIds,
+      includePdf,
+      includeText: includeTextRaw,
+      message,
+      dryRun,
+      subject: subjectOverride,
+      bodyText: bodyTextOverride
+    } = await req.json();
+    // Defaults to on (matches the behavior before this became optional) when
+    // the field is simply absent, but respects an explicit false.
+    const includeText = includeTextRaw !== false;
     if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen ontvangers geselecteerd' }, { status: 400 });
     }
@@ -91,11 +112,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
     if (recipients.length === 0) {
       return NextResponse.json({ success: false, error: 'Geen van de geselecteerde contactpersonen heeft een e-mailadres' }, { status: 400 });
     }
+    // Reply-To is a separate, deliberate opt-in (see the setlist UI) - a
+    // worship leader/operator picks who should actually see and answer
+    // replies, since the "from"/"to" on the sent mail are the app's own
+    // address (see mailer.ts's BCC pattern).
+    const replyToContacts = Array.isArray(replyToIds)
+      ? contacts.filter(c => replyToIds.includes(c.id) && c.email)
+      : [];
 
     // subjectOverride/bodyTextOverride let the worship leader edit the
     // preview before confirming - the real send then uses exactly what they
     // reviewed instead of recomposing it fresh.
-    const composed = buildEmailContent(serviceDate, draft, message);
+    const composed = buildEmailContent(serviceDate, draft, message, includeText, !!includePdf);
     const subject = typeof subjectOverride === 'string' && subjectOverride.trim() ? subjectOverride : composed.subject;
     const bodyText = typeof bodyTextOverride === 'string' && bodyTextOverride.trim() ? bodyTextOverride : composed.bodyText;
 
@@ -106,24 +134,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
         success: true,
         preview: {
           to: recipients.map(r => ({ name: r.name, email: r.email! })),
+          replyTo: replyToContacts.map(r => ({ name: r.name, email: r.email! })),
           subject,
           bodyText,
-          attachments: attachmentFilenames(draft, !!includePdf)
+          attachments: attachmentFilenames(draft, includeText, !!includePdf)
         }
       });
     }
 
     const attachments = [];
-    for (const song of draft.songs) {
-      const songForExport = await withLyricsFilledIn(serviceDate, song);
-      attachments.push(buildSongTextFile(songForExport));
-      if (includePdf) {
-        attachments.push(await buildSongPdf(songForExport));
+    if (includeText || includePdf) {
+      for (const song of draft.songs) {
+        const songForExport = await withLyricsFilledIn(serviceDate, song);
+        if (includeText) attachments.push(buildSongTextFile(songForExport));
+        if (includePdf) attachments.push(await buildSongPdf(songForExport));
       }
     }
 
     const result = await sendSetlistEmail({
       to: recipients.map(r => r.email!),
+      replyTo: replyToContacts.map(r => r.email!),
       subject,
       bodyText,
       attachments

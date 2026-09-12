@@ -12,6 +12,7 @@ export interface SendMailOptions {
   subject: string;
   bodyText: string;
   attachments?: MailAttachment[];
+  replyTo?: string[];
 }
 
 export interface SendMailResult {
@@ -53,6 +54,7 @@ export async function sendSetlistEmail(opts: SendMailOptions): Promise<SendMailR
       from: `"${fromName}" <${fromEmail}>`,
       to: fromEmail,
       bcc: opts.to,
+      replyTo: opts.replyTo && opts.replyTo.length > 0 ? opts.replyTo : undefined,
       subject: opts.subject,
       text: opts.bodyText,
       attachments: opts.attachments?.map(a => ({ filename: a.filename, content: a.content })),
