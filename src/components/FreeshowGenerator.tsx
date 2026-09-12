@@ -151,6 +151,9 @@ export default function FreeshowGenerator() {
   const [showEditorTitle, setShowEditorTitle] = useState('');
   const [showEditorCategory, setShowEditorCategory] = useState('');
   const [showEditorChordsText, setShowEditorChordsText] = useState('');
+  const [showEditorChordsFileName, setShowEditorChordsFileName] = useState('');
+  const [showEditorChordsFilePath, setShowEditorChordsFilePath] = useState('');
+  const [showEditorChordsUploading, setShowEditorChordsUploading] = useState(false);
   const [showEditorYoutubeUrl, setShowEditorYoutubeUrl] = useState('');
   const [showEditorSlides, setShowEditorSlides] = useState<any[]>([]); // Array of { id, nextTimer, slideObj }
   const [showEditorRawJson, setShowEditorRawJson] = useState('');
@@ -763,6 +766,8 @@ export default function FreeshowGenerator() {
         // by the same "Title - Artist" split used everywhere else a song's
         // identity is looked up (SetlistBuilder.tsx, adHocAddSong here).
         setShowEditorChordsText('');
+        setShowEditorChordsFileName('');
+        setShowEditorChordsFilePath('');
         setShowEditorYoutubeUrl('');
         const nameSplit = (showObj.name || '').split('-');
         const metaTitle = nameSplit[0]?.trim();
@@ -773,6 +778,8 @@ export default function FreeshowGenerator() {
             .then(d => {
               if (d.success && d.meta) {
                 setShowEditorChordsText(d.meta.chordsText || '');
+                setShowEditorChordsFileName(d.meta.chordsFileName || '');
+                setShowEditorChordsFilePath(d.meta.chordsFilePath || '');
                 setShowEditorYoutubeUrl(d.meta.youtubeUrl || '');
               }
             })
@@ -821,6 +828,31 @@ export default function FreeshowGenerator() {
       }
     } catch (e: any) {
       alert(e.message || 'Verbindingsfout bij laden show-details');
+    }
+  };
+
+  // Same upload endpoint the setlist builder's chords field uses - lets a
+  // band's existing chord chart (.txt/.pdf) be attached to a song here too,
+  // instead of only being retypeable as free text.
+  const showEditorChordsFileSelected = async (file: File | null) => {
+    if (!file) return;
+    setShowEditorChordsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/chords-upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setShowEditorChordsFileName(data.fileName);
+        setShowEditorChordsFilePath(data.filePath);
+        setShowEditorChordsText('');
+      } else {
+        alert(data.error || 'Upload van akkoordbestand mislukt');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Verbindingsfout bij uploaden');
+    } finally {
+      setShowEditorChordsUploading(false);
     }
   };
 
@@ -922,7 +954,14 @@ export default function FreeshowGenerator() {
             fetch('/api/song-meta', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: metaTitle, artist: metaArtist, chordsText: showEditorChordsText, youtubeUrl: showEditorYoutubeUrl })
+              body: JSON.stringify({
+                title: metaTitle,
+                artist: metaArtist,
+                chordsText: showEditorChordsText,
+                chordsFileName: showEditorChordsFileName,
+                chordsFilePath: showEditorChordsFilePath,
+                youtubeUrl: showEditorYoutubeUrl
+              })
             }).catch(() => {});
           }
         }
@@ -2314,15 +2353,41 @@ export default function FreeshowGenerator() {
                 per-service equivalents). */}
             {showEditorMode === 'visual' && (
               <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
-                <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎸 Akkoorden (vrije tekst, optioneel)</label>
-                <textarea
-                  className="input"
-                  value={showEditorChordsText}
-                  onChange={e => setShowEditorChordsText(e.target.value)}
-                  rows={5}
-                  placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
-                  style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
-                />
+                <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎸 Akkoorden (optioneel)</label>
+                {showEditorChordsFilePath ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.5rem 0.7rem' }}>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {showEditorChordsFileName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setShowEditorChordsFilePath(''); setShowEditorChordsFileName(''); }}
+                      title="Bestand verwijderen"
+                      style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem' }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="input"
+                      value={showEditorChordsText}
+                      onChange={e => setShowEditorChordsText(e.target.value)}
+                      rows={5}
+                      placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
+                      style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.4rem' }}
+                    />
+                    <label style={{ display: 'inline-block', fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.8rem', cursor: 'pointer' }}>
+                      {showEditorChordsUploading ? '⏳ Bezig met uploaden...' : '📎 of upload een akkoordenbestand (.txt/.pdf)'}
+                      <input
+                        type="file"
+                        accept=".txt,.pdf"
+                        onChange={e => showEditorChordsFileSelected(e.target.files?.[0] || null)}
+                        disabled={showEditorChordsUploading}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </>
+                )}
                 <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎥 YouTube-link (referentie, optioneel)</label>
                 <input
                   type="text"
