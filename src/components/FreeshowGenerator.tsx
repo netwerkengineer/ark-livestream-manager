@@ -150,6 +150,8 @@ export default function FreeshowGenerator() {
   const [selectedShow, setSelectedShow] = useState<any>(null); // Full JSON array [id, showObj]
   const [showEditorTitle, setShowEditorTitle] = useState('');
   const [showEditorCategory, setShowEditorCategory] = useState('');
+  const [showEditorChordsText, setShowEditorChordsText] = useState('');
+  const [showEditorYoutubeUrl, setShowEditorYoutubeUrl] = useState('');
   const [showEditorSlides, setShowEditorSlides] = useState<any[]>([]); // Array of { id, nextTimer, slideObj }
   const [showEditorRawJson, setShowEditorRawJson] = useState('');
   const [showEditorMode, setShowEditorMode] = useState<'visual'|'raw'>('visual');
@@ -755,7 +757,28 @@ export default function FreeshowGenerator() {
         const showObj = fullShow[1];
         setShowEditorTitle(showObj.name || '');
         setShowEditorCategory(showObj.category || 'song');
-        
+
+        // Chords/YouTube-link live in this app's own store (data/songMeta.json),
+        // not in the .show file itself - see songMetaStore.ts for why. Keyed
+        // by the same "Title - Artist" split used everywhere else a song's
+        // identity is looked up (SetlistBuilder.tsx, adHocAddSong here).
+        setShowEditorChordsText('');
+        setShowEditorYoutubeUrl('');
+        const nameSplit = (showObj.name || '').split('-');
+        const metaTitle = nameSplit[0]?.trim();
+        const metaArtist = nameSplit[1]?.trim();
+        if (metaTitle) {
+          fetch(`/api/song-meta?title=${encodeURIComponent(metaTitle)}&artist=${encodeURIComponent(metaArtist || '')}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d.success && d.meta) {
+                setShowEditorChordsText(d.meta.chordsText || '');
+                setShowEditorYoutubeUrl(d.meta.youtubeUrl || '');
+              }
+            })
+            .catch(() => {});
+        }
+
         const slidesList: any[] = [];
         const activeLayoutId = showObj.settings?.activeLayout;
         if (activeLayoutId && showObj.layouts?.[activeLayoutId]?.slides) {
@@ -888,6 +911,21 @@ export default function FreeshowGenerator() {
       });
       const data = await res.json();
       if (data.success) {
+        // Chords/YouTube-link are only edited in the visual editor's own
+        // fields, and live in this app's own store rather than the .show
+        // file - see songMetaStore.ts.
+        if (showEditorMode === 'visual') {
+          const nameSplit = showEditorTitle.split('-');
+          const metaTitle = nameSplit[0]?.trim();
+          const metaArtist = nameSplit[1]?.trim();
+          if (metaTitle) {
+            fetch('/api/song-meta', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: metaTitle, artist: metaArtist, chordsText: showEditorChordsText, youtubeUrl: showEditorYoutubeUrl })
+            }).catch(() => {});
+          }
+        }
         setSelectedShow(null);
         fetchShows();
         refreshCatalog();
@@ -2264,6 +2302,33 @@ export default function FreeshowGenerator() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Chords + reference YouTube link - stored in the show's own
+                meta so they persist with the song permanently (see the
+                Setlist builder's per-song fields for the one-off,
+                per-service equivalents). */}
+            {showEditorMode === 'visual' && (
+              <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
+                <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎸 Akkoorden (vrije tekst, optioneel)</label>
+                <textarea
+                  className="input"
+                  value={showEditorChordsText}
+                  onChange={e => setShowEditorChordsText(e.target.value)}
+                  rows={5}
+                  placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
+                  style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
+                />
+                <label style={{ fontSize: '0.8rem', opacity: 0.7, display: 'block', marginBottom: '0.4rem' }}>🎥 YouTube-link (referentie, optioneel)</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={showEditorYoutubeUrl}
+                  onChange={e => setShowEditorYoutubeUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  style={{ margin: 0 }}
+                />
               </div>
             )}
 

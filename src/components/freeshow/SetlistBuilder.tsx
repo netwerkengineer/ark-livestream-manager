@@ -107,7 +107,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [songInput, setSongInput] = useState('');
   const [section, setSection] = useState('Worship');
   const [templateSections, setTemplateSections] = useState<string[]>([]);
-  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; section: string; loading: boolean } | null>(null);
+  const [staging, setStaging] = useState<{ title: string; artist?: string; text: string; chords: string; youtubeUrl?: string; section: string; loading: boolean } | null>(null);
   const [addMode, setAddMode] = useState<'song' | 'bible' | 'media'>('song');
   const [bibleTranslation, setBibleTranslation] = useState('');
   const [bibleBook, setBibleBook] = useState('Genesis');
@@ -130,11 +130,13 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [sendPanelOpen, setSendPanelOpen] = useState(false);
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [replyToIds, setReplyToIds] = useState<string[]>([]);
+  const [includeText, setIncludeText] = useState(true);
   const [includePdf, setIncludePdf] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [sendPreview, setSendPreview] = useState<{ to: Array<{ name: string; email: string }>; subject: string; bodyText: string; attachments: string[] } | null>(null);
+  const [sendPreview, setSendPreview] = useState<{ to: Array<{ name: string; email: string }>; replyTo: Array<{ name: string; email: string }>; subject: string; bodyText: string; attachments: string[] } | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkMessage, setCheckMessage] = useState('');
   const [unassigned, setUnassigned] = useState<Array<{ messageId?: string; subject?: string; receivedAt: string; excerpt: string }>>([]);
@@ -276,14 +278,23 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     setSongInput('');
     setStaging({ title: songTitle, artist, text: '', chords: '', section, loading: true });
     try {
-      const res = await fetch('/api/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: [{ type: 'song', title: songTitle, artist }] })
-      });
-      const data = await res.json();
-      const text = data.success && data.items?.[0] ? data.items[0].text || '' : '';
-      setStaging(prev => (prev ? { ...prev, text, loading: false } : prev));
+      const [previewRes, metaRes] = await Promise.all([
+        fetch('/api/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [{ type: 'song', title: songTitle, artist }] })
+        }),
+        // A song already added to a setlist before (or edited in the show
+        // editor) may already have chords/a reference link saved - pre-fill
+        // from there the same way the lyrics themselves are pre-filled,
+        // instead of always starting blank.
+        fetch(`/api/song-meta?title=${encodeURIComponent(songTitle)}&artist=${encodeURIComponent(artist)}`)
+      ]);
+      const previewData = await previewRes.json();
+      const text = previewData.success && previewData.items?.[0] ? previewData.items[0].text || '' : '';
+      const metaData = await metaRes.json().catch(() => null);
+      const meta = metaData?.success ? metaData.meta : null;
+      setStaging(prev => (prev ? { ...prev, text, chords: meta?.chordsText || prev.chords, youtubeUrl: meta?.youtubeUrl, loading: false } : prev));
     } catch {
       setStaging(prev => (prev ? { ...prev, loading: false } : prev));
     }
@@ -303,6 +314,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const data = await res.json();
       if (data.success) {
         setDraft(data.draft);
+        // Save chords back to this app's own song database too (not just
+        // this one service) so the next time this song comes up - in any
+        // setlist - the chords are already there. Best-effort: a failure
+        // here shouldn't block the song actually being added to the setlist.
+        if (staging.chords.trim()) {
+          fetch('/api/song-meta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: staging.title, artist: staging.artist, chordsText: staging.chords })
+          }).catch(() => {});
+        }
         setStaging(null);
       } else {
         setError(data.error || 'Kon lied niet toevoegen');
@@ -425,6 +447,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const data = await res.json();
       if (data.success) {
         setDraft(data.draft);
+        // Same as when a song is first added: keep this app's own song
+        // database (data/songMeta.json) in sync so an edit here also helps
+        // next time this song comes up.
+        const editedSong = draft?.songs.find(s => s.id === songId);
+        if (editedSong && editChords.trim()) {
+          fetch('/api/song-meta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: editedSong.title, artist: editedSong.artist, chordsText: editChords })
+          }).catch(() => {});
+        }
         setExpandedId(null);
       } else {
         setError(data.error || 'Kon lied niet opslaan');
@@ -525,6 +558,10 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     setSelectedRecipientIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
 
+  const toggleReplyTo = (id: string) => {
+    setReplyToIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
+  };
+
   // "Verstuur e-mail" no longer sends straight away - it first asks the
   // server (dryRun) for exactly what would be sent (recipients, subject,
   // body, attachment filenames) so the worship leader can review it, then
@@ -536,7 +573,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: selectedRecipientIds, includePdf, message: extraMessage, dryRun: true })
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, replyToIds, includeText, includePdf, message: extraMessage, dryRun: true })
       });
       const data = await res.json();
       if (data.success) {
@@ -566,6 +603,8 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientIds: selectedRecipientIds,
+          replyToIds,
+          includeText,
           includePdf,
           subject: sendPreview.subject,
           bodyText: sendPreview.bodyText
@@ -885,7 +924,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
                     />
                     <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.7rem', opacity: 0.6 }}>
-                      Akkoorden (vrije tekst, optioneel)
+                      Akkoorden (vrije tekst, optioneel) — wordt bewaard bij dit lied voor de volgende keer
                     </label>
                     <textarea
                       className="input"
@@ -895,6 +934,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       placeholder={'bv.\nG            D\nAmazing grace, how sweet the sound'}
                       style={{ width: '100%', fontFamily: 'monospace', resize: 'vertical', marginBottom: '0.8rem' }}
                     />
+                    {staging.youtubeUrl && (
+                      <div style={{ fontSize: '0.75rem', marginBottom: '0.8rem' }}>
+                        🎥 <a href={staging.youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>
+                          YouTube-referentie bekijken
+                        </a>
+                        <span style={{ opacity: 0.5 }}> (aanpassen via Beheer → Catalogus)</span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -958,17 +1005,28 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                     {(['band', 'operator', 'other'] as const).map(role => contactsByRole[role]?.length ? (
                       <div key={role} style={{ marginBottom: '0.6rem' }}>
                         <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.3rem', fontWeight: 600 }}>{ROLE_LABELS[role]}</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.9rem' }}>
                           {contactsByRole[role].map(c => (
-                            <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', opacity: c.email ? 1 : 0.4, cursor: c.email ? 'pointer' : 'default' }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedRecipientIds.includes(c.id)}
-                                onChange={() => toggleRecipient(c.id)}
-                                disabled={!c.email}
-                              />
-                              {c.name}{!c.email && ' (geen e-mail)'}
-                            </label>
+                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', opacity: c.email ? 1 : 0.4, cursor: c.email ? 'pointer' : 'default' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRecipientIds.includes(c.id)}
+                                  onChange={() => toggleRecipient(c.id)}
+                                  disabled={!c.email}
+                                />
+                                {c.name}{!c.email && ' (geen e-mail)'}
+                              </label>
+                              {c.email && (
+                                <label
+                                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', opacity: 0.7, cursor: 'pointer' }}
+                                  title="Antwoorden op deze e-mail gaan naar dit adres"
+                                >
+                                  <input type="checkbox" checked={replyToIds.includes(c.id)} onChange={() => toggleReplyTo(c.id)} />
+                                  ↩️ antwoord aan
+                                </label>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -987,8 +1045,12 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                     />
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
+                      <input type="checkbox" checked={includeText} onChange={e => setIncludeText(e.target.checked)} />
+                      Songtekst (.txt) bijvoegen
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', margin: '0.6rem 0' }}>
                       <input type="checkbox" checked={includePdf} onChange={e => setIncludePdf(e.target.checked)} />
-                      Ook als PDF bijvoegen (naast tekstbestand)
+                      Ook als PDF bijvoegen
                     </label>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -1178,6 +1240,15 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
             <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>
               {sendPreview.to.map(r => `${r.name} <${r.email}>`).join(', ')}
             </div>
+
+            {sendPreview.replyTo.length > 0 && (
+              <>
+                <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Antwoord aan</div>
+                <div style={{ fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+                  {sendPreview.replyTo.map(r => `${r.name} <${r.email}>`).join(', ')}
+                </div>
+              </>
+            )}
 
             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.2rem' }}>Onderwerp</div>
             <input
