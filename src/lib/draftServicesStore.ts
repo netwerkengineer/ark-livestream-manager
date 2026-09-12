@@ -212,7 +212,7 @@ export function addSongToDraft(
     store.services[serviceDate] = draft;
   }
 
-  if (!dedupeSongTitle(draft.songs, song.title)) {
+  if (!dedupeSongTitle(draft.songs, song.title, song.artist, song.section)) {
     draft.songs.push({
       id: newId(),
       title: song.title,
@@ -429,9 +429,22 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function dedupeSongTitle(existing: DraftSong[], title: string): boolean {
-  const normalized = title.trim().toLowerCase();
-  return existing.some(s => s.title.trim().toLowerCase() === normalized);
+// Title+artist+section, not title alone - a song legitimately repeated in
+// two sections (e.g. the same opener sung again as closer) must not be
+// silently dropped just because the title already appears earlier in the
+// service, and two different songs that happen to share a title (different
+// artist) shouldn't collide either. Still blocks a true accidental
+// duplicate - same song, same section, added twice (a re-run mail sync, or
+// someone clicking "+" twice).
+function dedupeSongTitle(existing: DraftSong[], title: string, artist: string | undefined, section: string): boolean {
+  const normalizedTitle = title.trim().toLowerCase();
+  const normalizedArtist = (artist || '').trim().toLowerCase();
+  const normalizedSection = section.trim().toLowerCase();
+  return existing.some(s =>
+    s.title.trim().toLowerCase() === normalizedTitle &&
+    (s.artist || '').trim().toLowerCase() === normalizedArtist &&
+    s.section.trim().toLowerCase() === normalizedSection
+  );
 }
 
 function isDuplicateScripture(existing: DraftScripture[], item: { book: string; chapter: number; verseStart: number; verseEnd?: number; translation: string }): boolean {
@@ -499,7 +512,7 @@ export function mergeParsedEmailIntoDraft(
 
   for (const item of parsed.items as ParsedItem[]) {
     if (item.type === 'song') {
-      if (!dedupeSongTitle(draft.songs, item.title)) {
+      if (!dedupeSongTitle(draft.songs, item.title, item.artist, item.section)) {
         draft.songs.push({
           id: newId(),
           title: item.title,
