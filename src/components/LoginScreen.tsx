@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
+import { signIn } from "next-auth/react";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -55,13 +56,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
         {sso?.enabled && (
           <>
-            <a
-              href="/api/auth/signin/sso"
+            <button
+              type="button"
+              onClick={() => signIn("sso")}
               className="btn-primary"
-              style={{ width: '100%', textAlign: 'center', textDecoration: 'none', display: 'block', boxSizing: 'border-box' }}
+              style={{ width: '100%' }}
             >
               {sso.providerName}
-            </a>
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', opacity: 0.5, fontSize: '0.8rem' }}>
               <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
               of
