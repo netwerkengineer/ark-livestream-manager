@@ -105,26 +105,25 @@ async function fetchSynologyApiMembers(groupName: string): Promise<DirectoryMemb
   if (!membersData.success) {
     throw new Error(`DSM kon groep "${groupName}" niet ophalen (foutcode ${membersData?.error?.code ?? "onbekend"})`);
   }
-  // TEMPORARY diagnostic - remove once the DSM member/user response shape
-  // is confirmed against a live NAS.
-  console.log(`[Team Directory Sync] DEBUG groep "${groupName}" ruwe respons:`, JSON.stringify(membersData));
-  const usernames: string[] = Array.isArray(membersData?.data?.members) ? membersData.data.members : [];
+  // The (undocumented) response nests members under data.users as full
+  // {name, description, uid} objects, not data.members as plain username
+  // strings - confirmed by inspecting a live response, since no official
+  // spec exists for this endpoint.
+  const userEntries: { name: string; description?: string }[] = Array.isArray(membersData?.data?.users) ? membersData.data.users : [];
 
   const members: DirectoryMember[] = [];
-  for (const username of usernames) {
-    const additional = encodeURIComponent(JSON.stringify(["email", "description"]));
+  for (const entry of userEntries) {
+    const additional = encodeURIComponent(JSON.stringify(["email"]));
     const userData = await dsmRequest(
-      `${baseUrl}/webapi/entry.cgi?api=SYNO.Core.User&version=1&method=get&name=${encodeURIComponent(username)}&additional=${additional}&_sid=${sid}`
+      `${baseUrl}/webapi/entry.cgi?api=SYNO.Core.User&version=1&method=get&name=${encodeURIComponent(entry.name)}&additional=${additional}&_sid=${sid}`
     );
-    // TEMPORARY diagnostic - remove once confirmed.
-    console.log(`[Team Directory Sync] DEBUG gebruiker "${username}" ruwe respons:`, JSON.stringify(userData));
     const user = userData?.data?.user;
     if (!user?.email) continue; // no email on file for this account - nothing to send a setlist to
     members.push({
-      name: user.description || user.name || username,
+      name: entry.description || entry.name,
       email: user.email,
       groups: [groupName],
-      externalId: username
+      externalId: entry.name
     });
   }
 
