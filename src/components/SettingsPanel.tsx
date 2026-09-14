@@ -1989,8 +1989,31 @@ export default function SettingsPanel({
                           />
                         </div>
                       </div>
+                      {settings.ssoDirectoryMode === "synology-api" && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                          <div className="input-group">
+                            <label className="input-label">DSM-adres</label>
+                            <input
+                              type="text"
+                              className="input-field"
+                              value={settings.ssoDirectoryApiUrl || ""}
+                              onChange={(e) => onSettingsChange({ ...settings, ssoDirectoryApiUrl: e.target.value })}
+                              placeholder="https://192.168.2.250:5001"
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="input-label">DSM-gebruikersnaam</label>
+                            <input
+                              type="text"
+                              className="input-field"
+                              value={settings.ssoDirectoryApiUser || ""}
+                              onChange={(e) => onSettingsChange({ ...settings, ssoDirectoryApiUser: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      )}
                       <div className="input-group">
-                        <label className="input-label">API-token / bind-wachtwoord</label>
+                        <label className="input-label">{settings.ssoDirectoryMode === "synology-api" ? "DSM-wachtwoord" : "API-token / bind-wachtwoord"}</label>
                         <input
                           type="password"
                           className="input-field"
@@ -1998,9 +2021,14 @@ export default function SettingsPanel({
                           onChange={(e) => onSettingsChange({ ...settings, ssoDirectoryApiToken: e.target.value })}
                         />
                       </div>
-                      {settings.ssoDirectoryMode !== "authentik-api" && (
+                      {settings.ssoDirectoryMode === "synology-ldap" && (
                         <p style={{ fontSize: '0.78rem', color: '#fcd34d' }}>
-                          ⚠️ Deze bron is nog niet gebouwd (zie het plan) — de sync slaat tot die tijd over met een foutmelding in de logs, zonder de bestaande contactenlijst aan te raken.
+                          ⚠️ LDAP is bewust niet gebouwd — Directory Server is een permanent draaiende dienst die de toch al krappe NAS extra RAM kost. Kies de DSM-API in plaats daarvan.
+                        </p>
+                      )}
+                      {settings.ssoDirectoryMode === "synology-api" && (
+                        <p style={{ fontSize: '0.78rem', color: '#fcd34d' }}>
+                          ⚠️ Nog niet getest tegen een echte NAS — controleer na inschakelen de serverlogs op de eerste sync-poging.
                         </p>
                       )}
                     </>

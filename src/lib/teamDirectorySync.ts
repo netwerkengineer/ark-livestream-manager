@@ -1,3 +1,5 @@
+import https from "https";
+import http from "http";
 import { getSettings, AppSettings } from "./settingsStore";
 import { upsertContactsFromDirectory } from "./contactsStore";
 
@@ -39,17 +41,89 @@ async function fetchAuthentikGroupMembers(groupName: string): Promise<DirectoryM
     }));
 }
 
-// Not yet built - deferred until the Proxmox/Authentik path has been fully
-// tested and it's actually time to tackle production (see the plan's
-// rollout order). Whichever of LDAP (via the Directory Server package) or
-// DSM's own web API turns out to be the practical choice on this
-// resource-constrained NAS gets implemented here.
+// Deferred: Directory Server (LDAP) would add a permanently-running domain
+// controller service to a NAS that's already tight on RAM (it crashes its
+// Docker daemon under memory pressure during app builds - see
+// project_nas_docker_oom_during_build). The DSM web API below avoids
+// installing anything extra, at the cost of using Synology's own
+// thinly-documented endpoints instead of a standard protocol.
 async function fetchSynologyLdapMembers(_groupName: string): Promise<DirectoryMember[]> {
-  throw new Error("synology-ldap is nog niet geïmplementeerd - zie het plan voor de afweging LDAP vs. DSM-webAPI");
+  throw new Error("synology-ldap is niet geïmplementeerd (bewust - zie de code-comment bij fetchSynologyLdapMembers)");
 }
 
-async function fetchSynologyApiMembers(_groupName: string): Promise<DirectoryMember[]> {
-  throw new Error("synology-api is nog niet geïmplementeerd - zie het plan voor de afweging LDAP vs. DSM-webAPI");
+// Minimal JSON-over-HTTP(S) helper for DSM's webapi/entry.cgi. Uses the
+// Node http/https modules directly (rather than fetch) so a self-signed
+// certificate on a LAN-only DSM address (e.g. https://192.168.2.250:5001)
+// can be trusted without needing a real cert just for this internal call -
+// this NEVER applies to any other outbound request in the app.
+function dsmRequest(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const isHttps = url.startsWith("https://");
+    const client = isHttps ? https : http;
+    const req = client.get(url, isHttps ? { rejectUnauthorized: false } : {}, (res) => {
+      let body = "";
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch {
+          reject(new Error(`DSM gaf geen geldige JSON terug (HTTP ${res.statusCode})`));
+        }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(10000, () => req.destroy(new Error("DSM API timeout")));
+  });
+}
+
+async function dsmLogin(baseUrl: string, account: string, password: string): Promise<string> {
+  const url = `${baseUrl}/webapi/entry.cgi?api=SYNO.API.Auth&version=6&method=login&account=${encodeURIComponent(account)}&passwd=${encodeURIComponent(password)}&session=LivestreamManager&format=sid`;
+  const data = await dsmRequest(url);
+  if (!data.success) {
+    throw new Error(`DSM login mislukt (foutcode ${data?.error?.code ?? "onbekend"}) - controleer ssoDirectoryApiUser/ssoDirectoryApiToken`);
+  }
+  return data.data.sid;
+}
+
+// Not yet verified against a live DSM instance - built from Synology's
+// undocumented-but-observed SYNO.Core.Group.Member / SYNO.Core.User APIs
+// (no first-party spec exists, see the plan's note on this). Needs a real
+// test run once the app is deployed on the NAS; exact error codes/shapes
+// may need adjusting then.
+async function fetchSynologyApiMembers(groupName: string): Promise<DirectoryMember[]> {
+  const settings = getSettings();
+  if (!settings.ssoDirectoryApiUrl) throw new Error("ssoDirectoryApiUrl (DSM-adres, bv. https://192.168.2.250:5001) is niet ingesteld");
+  if (!settings.ssoDirectoryApiUser) throw new Error("ssoDirectoryApiUser is niet ingesteld");
+  if (!settings.ssoDirectoryApiToken) throw new Error("ssoDirectoryApiToken (DSM-wachtwoord) is niet ingesteld");
+
+  const baseUrl = settings.ssoDirectoryApiUrl.replace(/\/$/, "");
+  const sid = await dsmLogin(baseUrl, settings.ssoDirectoryApiUser, settings.ssoDirectoryApiToken);
+
+  const membersData = await dsmRequest(
+    `${baseUrl}/webapi/entry.cgi?api=SYNO.Core.Group.Member&version=1&method=list&group=${encodeURIComponent(groupName)}&in_group=true&_sid=${sid}`
+  );
+  if (!membersData.success) {
+    throw new Error(`DSM kon groep "${groupName}" niet ophalen (foutcode ${membersData?.error?.code ?? "onbekend"})`);
+  }
+  const usernames: string[] = Array.isArray(membersData?.data?.members) ? membersData.data.members : [];
+
+  const members: DirectoryMember[] = [];
+  for (const username of usernames) {
+    const additional = encodeURIComponent(JSON.stringify(["email", "description"]));
+    const userData = await dsmRequest(
+      `${baseUrl}/webapi/entry.cgi?api=SYNO.Core.User&version=1&method=get&name=${encodeURIComponent(username)}&additional=${additional}&_sid=${sid}`
+    );
+    const user = userData?.data?.user;
+    if (!user?.email) continue; // no email on file for this account - nothing to send a setlist to
+    members.push({
+      name: user.description || user.name || username,
+      email: user.email,
+      groups: [groupName],
+      externalId: username
+    });
+  }
+
+  return members;
 }
 
 async function fetchGroupMembers(mode: AppSettings["ssoDirectoryMode"], groupName: string): Promise<DirectoryMember[]> {

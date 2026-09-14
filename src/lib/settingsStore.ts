@@ -141,7 +141,9 @@ export interface AppSettings {
   ssoContactSyncGroups?: string[];
   ssoContactSyncIntervalMinutes?: number;
   ssoDirectoryMode?: "authentik-api" | "synology-ldap" | "synology-api";
-  ssoDirectoryApiToken?: string; // Authentik API token, or the Synology LDAP bind password
+  ssoDirectoryApiUrl?: string; // Synology DSM base URL, e.g. https://192.168.2.250:5001 - not used for authentik-api (derived from ssoIssuerUrl)
+  ssoDirectoryApiUser?: string; // Synology DSM account for the API calls - not used for authentik-api
+  ssoDirectoryApiToken?: string; // Authentik API token, the DSM account's password, or the Synology LDAP bind password
 }
 
 export interface LocalUser {
@@ -324,6 +326,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ssoContactSyncGroups: [],
   ssoContactSyncIntervalMinutes: 360,
   ssoDirectoryMode: "authentik-api",
+  ssoDirectoryApiUrl: "",
+  ssoDirectoryApiUser: "",
   ssoDirectoryApiToken: ""
 };
 
