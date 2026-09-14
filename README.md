@@ -33,7 +33,7 @@ Deze applicatie centraliseert alle aspecten van livestream productie: van het ge
   - QLC+ lighting scenes
   - Bitfocus Companion setup
   - FreeShow shows, Bibles en projecten (optioneel incl. media)
-- **Multi-User Auth** - Next-Auth met YouTube OAuth en basic auth
+- **Multi-User Auth** - Next-Auth met YouTube OAuth, lokale accounts, en Team-login (SSO) via een generieke OIDC-provider (Authentik op test, Synology SSO Server op productie) inclusief automatische teamcontacten-synchronisatie vanuit de identity provider
 - **Settings Wizard** - Guided setup voor eerste configuratie
 
 ---

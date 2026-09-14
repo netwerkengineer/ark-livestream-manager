@@ -31,18 +31,25 @@ Een **Administrator** ziet altijd alle vijf. Een **Operator** ziet alleen de tab
 
 ## 1. Inloggen en rollen
 
-Er zijn twee soorten accounts:
+Er zijn twee manieren om in te loggen, en (los daarvan) twee rollen.
+
+### Inlogmethodes
+
+- **Team-login (SSO)** — de standaardmanier van inloggen als dit is ingeschakeld (zie 8.11): je logt in met je bestaande account bij de identity provider van je organisatie (op de testomgeving is dat Authentik, op productie de Synology NAS zelf via SSO Server). Er is geen apart wachtwoord voor deze app nodig, en er hoeft ook niemand in deze app zelf een gebruikerslijst bij te houden — dat gebeurt al bij de identity provider. Je rol en rechten worden automatisch bepaald op basis van de groep(en) waar je daar lid van bent (zie 8.11). Zit je in geen enkele herkende groep, dan kun je nog gewoon inloggen, maar zie je nergens toegang toe — er is bewust geen aparte "mag niet inloggen"-instelling nodig.
+- **Lokaal account (noodtoegang)** — een gebruikersnaam/wachtwoord die alleen in deze app zelf bestaat (zie 7. Gebruikersbeheer), volledig los van je Team-login-account. Is Team-login ingeschakeld, dan staat deze optie standaard verborgen achter de link **"Lokaal account gebruiken (noodtoegang)"** onder de Team-login-knop — bedoeld voor het geval de identity provider zelf een keer niet bereikbaar is tijdens een dienst. Is Team-login niet ingeschakeld, dan is dit gewoon de enige, altijd zichtbare inlogmethode.
+
+> ⚠️ **Belangrijk bij eerste installatie**: de app maakt bij de allereerste start automatisch twee standaard lokale accounts aan: `admin` / `arkadmin` en `operator` / `arkoperator`. Wijzig deze wachtwoorden **onmiddellijk** na installatie via Gebruikersbeheer (hoofdstuk 7) — dit zijn bekende, voorspelbare inloggegevens.
+
+### Rollen (gelden voor beide inlogmethodes)
 
 - **Administrator** — volledige toegang tot alle vijf tabbladen én Instellingen/Gebruikersbeheer.
-- **Operator** — alleen bediening; ziet alleen de tabbladen waarvoor een Administrator hem/haar rechten heeft gegeven (een combinatie van `planner`/`control`/`monitor`/`lights`/`freeshow`).
-
-> ⚠️ **Belangrijk bij eerste installatie**: de app maakt bij de allereerste start automatisch twee standaard-accounts aan: `admin` / `arkadmin` en `operator` / `arkoperator`. Wijzig deze wachtwoorden **onmiddellijk** na installatie via Gebruikersbeheer (hoofdstuk 7) — dit zijn bekende, voorspelbare inloggegevens.
+- **Operator** — alleen bediening; ziet alleen de tabbladen waarvoor rechten zijn toegekend (een combinatie van `planner`/`control`/`monitor`/`lights`/`freeshow`) — bij een lokaal account ingesteld via Gebruikersbeheer (hoofdstuk 7), bij Team-login via de groep→rechten-koppeling (8.11).
 
 Rechtsboven in de balk vind je:
 - **?** — helpvenster (korte uitleg + link naar deze handleiding)
 - **⚙️** (alleen Administrator) — Instellingen
 - Je rol en gebruikersnaam
-- **Afmelden**
+- **Afmelden** — logt je uit bij deze app. Bij Team-login blijft je sessie bij de identity provider zelf (Authentik/Synology) daarbij nog gewoon actief — logt iemand daarna opnieuw in via Team-login, dan gebeurt dat zonder opnieuw om een wachtwoord te vragen, zolang die onderliggende sessie nog geldig is. Wil je dat echt testen met een schone lei, gebruik dan een incognito/privévenster, of log ook expliciet uit bij de identity provider zelf.
 
 Er is ook een aparte "Inloggen met Google"-knop specifiek voor het koppelen van het YouTube-account (zie hoofdstuk 2) — dit is *geen* gewoon operator-account en geeft automatisch volledige (Administrator-)rechten op elke API-aanvraag. Zie de beveiligingsnotitie in hoofdstuk 10.
 
@@ -455,6 +462,8 @@ Liederen:
 
 Via Instellingen → Gebruikersbeheer.
 
+> ℹ️ Dit scherm beheert alleen **lokale accounts** (zie hoofdstuk 1). Wie via **Team-login (SSO)** inlogt, staat hier niet in en hoeft hier ook niet aangemaakt te worden — die mensen worden vanuit de identity provider zelf beheerd; hun rol/rechten in deze app stel je in via de groep→rechten-koppeling bij Instellingen → SSO (zie 8.11).
+
 **Rollen:**
 - **Administrator** — krijgt automatisch alle vijf rechten, ongeacht wat is aangevinkt.
 - **Operator** — moet minimaal één recht toegewezen krijgen uit: Stream Planner, Control Center, Live Monitor, Lichtregie, FreeShow Projecten.
@@ -580,6 +589,46 @@ Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "P
 
 Alleen zichtbaar voor beheerders. Overzicht van wat er is gebeurd: sync-runs (gestart/voltooid/fouten), stekkers aan/uit, LED-scherm-triggers, en instellingen-wijzigingen (met wie). Filterbaar op categorie, met een "Vernieuwen"-knop. Wordt automatisch beperkt tot de laatste ~5000 gebeurtenissen, zodat het geen onbeperkte schijfruimte inneemt.
 
+### 8.11 SSO (Team-login)
+
+Hiermee koppel je de app aan de identity provider van je organisatie, zodat teamleden inloggen met hun bestaande account in plaats van een apart wachtwoord voor deze app te krijgen (zie ook hoofdstuk 1). Op de testomgeving is dit Authentik; op de Synology-productieomgeving is dit de NAS zelf via het SSO Server-pakket. Beide werken via hetzelfde, standaard OpenID Connect-protocol — het verschil zit alleen in de ingevulde waarden hieronder.
+
+**Verbindingsinstellingen:**
+
+| Veld | Uitleg |
+|---|---|
+| SSO inschakelen | Zet de Team-login-knop op het inlogscherm aan/uit (zie hoofdstuk 1) |
+| Naam op de inlogknop | Bijvoorbeeld "Team-login" of "Inloggen met NAS-account" |
+| Issuer-URL | Het basisadres van de identity provider, bijvoorbeeld `https://authentik.voorbeeld.nl/application/o/livestream-manager/` of `https://sso.voorbeeld.synology.me/webman/sso`. Endpoints worden hier automatisch bij opgezocht (via `<issuer>/.well-known/openid-configuration`). |
+| Client ID / Client Secret | Krijg je van de identity provider zelf bij het aanmaken van de OAuth2/OIDC-applicatie/client daar |
+| OAuth scope | Meestal leeg laten (standaard: `openid profile email`). Alleen invullen als groepslidmaatschap anders niet in het inlogtoken terechtkomt — bijvoorbeeld `openid email groups` bij Synology's SSO Server. |
+| PKCE uitschakelen | Alleen aanzetten als inloggen faalt met een generieke serverfout bij het token-endpoint — geconstateerd bij Synology's SSO Server |
+| Groepen-claim in het ID-token | De naam van het veld waarin de identity provider de groepslidmaatschap meestuurt (standaard: `groups`) |
+
+> ⚠️ Plak je een Client ID/Secret of Issuer-URL vanuit de identity provider's eigen beheerscherm, controleer dan of er geen onzichtbaar spatie- of tab-teken is meegekomen — dit is bij zowel Authentik als Synology's SSO Server al eens voorgekomen en geeft dan een onduidelijke inlogfout. De app trimt dit sinds kort automatisch weg bij het opslaan, maar bij een oudere versie kan dit nog spelen.
+
+**Rechten per groep:**
+
+Een tabel groepsnaam → rol (Admin/Operator) → rechten (planner/control/monitor/lights/freeshow), met "+ Groep toevoegen"/verwijder-knoppen per rij. De groepsnaam moet **exact** overeenkomen met de groepsnaam bij de identity provider (hoofdlettergevoelig). Een groep die hier niet in staat, krijgt geen enkele permissie — iemand kan dan nog wel inloggen, maar ziet nergens toegang toe (zie ook hoofdstuk 1).
+
+**Teamcontacten automatisch synchroniseren:**
+
+Los van wie er mag *inloggen*, kun je hier ook automatisch de contactenlijst voor "📤 Verstuur naar team" (zie 5.1/5.3.3) laten vullen vanuit een of meer groepen bij de identity provider — inclusief mensen die zelf nooit op de app inloggen (bijvoorbeeld de meeste bandleden). Dit loopt volledig los van de rechten-tabel hierboven: een groep kan in geen van beide voorkomen, in allebei, of alleen hier.
+
+| Veld | Uitleg |
+|---|---|
+| Contactsync inschakelen | Zet de periodieke synchronisatie aan/uit |
+| Groepen om te synchroniseren | Eén of meer groepsnamen (net als hierboven: exact, hoofdlettergevoelig); "+ Groep toevoegen" voor een volgende |
+| Bron | Authentik (API), Synology (DSM-API), of Synology (LDAP) |
+| Interval (minuten) | Hoe vaak de sync draait (standaard 360 = elke 6 uur) |
+| API-token / DSM-gebruikersnaam + wachtwoord / DSM-adres | Afhankelijk van de gekozen bron — zie hieronder |
+
+- **Authentik (API)** — vraagt alleen een API-token (Directory → Tokens and App passwords, aangemaakt door een echte Authentik-superuser — lidmaatschap van de app-groep "Administrator" is hiervoor niet genoeg).
+- **Synology (DSM-API)** — vraagt het adres van de NAS (bijvoorbeeld `https://192.168.2.250:5001`), plus een gebruikersnaam/wachtwoord van een DSM-account. Maak hiervoor een apart, beperkt service-account aan: lid van de groep **administrators** (nodig, anders krijgt de app geen toegang tot de gebruikers-/groepeninformatie), maar via **Control Panel → Application Privileges** met alleen "DSM" toegestaan en al het overige (File Station, SMB, FTP, Synology Drive, etc.) expliciet geweigerd — zo kan dit account, mocht het wachtwoord ooit lekken, niets anders dan die gebruikers-/groepeninformatie uitlezen.
+- **Synology (LDAP)** — bewust (nog) niet gebouwd: dit zou het Directory Server-pakket vereisen, een permanent draaiende dienst die extra geheugen kost op een NAS die daar al krap in zit.
+
+Een mislukte sync (bijvoorbeeld een verkeerd wachtwoord, of een groep die niet bestaat) laat de bestaande contactenlijst gewoon ongemoeid — er wordt nooit stilzwijgend leeggemaakt. Handmatig toegevoegde contacten (Beheer → Team, zie 5.3.3) blijven bij elke sync altijd gewoon staan; alleen eerder gesynchroniseerde contacten die niet meer in een van de opgegeven groepen zitten, worden verwijderd.
+
 ---
 
 ## 9. Automatische achtergrondtaken
@@ -587,6 +636,7 @@ Alleen zichtbaar voor beheerders. Overzicht van wat er is gebeurd: sync-runs (ge
 Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 
 - **E-mailcontrole** — elke 10 minuten, mits IMAP-gegevens zijn ingesteld (zie 8.8); zie 5.1 voor hoe je dit ook handmatig ("Check nu") en opnieuw (mail als ongelezen markeren) kunt laten uitvoeren.
+- **Teamcontacten synchronisatie** — mits ingeschakeld (zie 8.11): op het ingestelde interval (standaard elke 6 uur) worden de leden van de opgegeven groep(en) bij de identity provider opgehaald en bijgewerkt in de contactenlijst voor "Verstuur naar team" (5.1/5.3.3) — ook voor mensen die zelf nooit inloggen. Draait ook eenmalig direct bij het opstarten van de server.
 - **Opschonen van verstuurde setlist-mail-kopieën** — draait mee met dezelfde e-mailcontrole hierboven. Elke setlist-mail die via "Verstuur naar team" (5.1) wordt verstuurd, laat automatisch een kopie achter in hetzelfde postvak (nodig om de ontvangers via BCC te kunnen versturen zonder ieders adres aan elkaar te tonen) — die kopieën ouder dan 7 dagen worden automatisch definitief verwijderd, zodat je nog even kunt terugkijken wat er verstuurd is zonder dat de inbox blijft volstromen.
 - **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert Shows, Media, Bibles en Templates (inclusief submappen) tweerichtingsverkeer tussen NAS en Beamer-PC, en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond. Extra FreeShow-doelen (zie 8.8) doen hier standaard niet aan mee — die syncen alleen als je ze zelf handmatig aanvinkt (zie 5.3.2). Een ingebouwde veiligheidsgrens voorkomt dat de sync in één keer een ongewoon groot aantal bestanden verwijdert (bijvoorbeeld door een tijdelijk onbereikbare map) — in dat geval wordt er die run niets verwijderd en verschijnt een waarschuwing in het synclog, zodat dit niet stilzwijgend tot dataverlies leidt.
 - **Sync na een nieuwe/gewijzigde thumbnail** — zodra er een nieuwe eerstvolgende livestream is (of de thumbnail daarvan verandert), wordt meteen een sync naar de Beamer-PC gestart (in plaats van te wachten tot 00:00 uur) — en de bijbehorende stekker gaat daarna, net als bij de nachtelijke sync, netjes uit.
@@ -602,6 +652,9 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 - **Wijzig de standaard-accounts** (`admin`/`arkadmin`, `operator`/`arkoperator`) direct na installatie.
 - **Instellingen zijn alleen voor Administrators** zichtbaar — Operators kunnen dit scherm niet openen, ook niet per ongeluk.
 - **Het Google-account waarmee YouTube gekoppeld wordt, geeft in de praktijk volledige Administrator-rechten** op elke aanvraag aan de app, los van het lokale rechtensysteem. Wees dus voorzichtig met wie toegang heeft tot dat Google-account.
+- **Bij Team-login (SSO) geldt hetzelfde "geen groep = geen toegang"-principe** als bij lokale accounts: een groep die niet voorkomt in de rechten-tabel (8.11) krijgt automatisch geen enkele permissie. Controleer na een wijziging in de groepsindeling bij de identity provider dus ook of de rechten-tabel in deze app nog klopt.
+- **Het lokale account blijft altijd bereikbaar als noodtoegang** zodra Team-login is ingeschakeld (zie hoofdstuk 1) — wijzig het wachtwoord hiervan dus net zo serieus als bij een normale installatie, ook al wordt het in de praktijk zelden gebruikt.
+- **API-tokens en wachtwoorden voor de identity provider/contactsync (8.11) staan, net als de overige verbindingswachtwoorden, in platte tekst** in `data/settings.json` op de server (zie het eerste punt hierboven).
 - **Elke instellingen-opslag herstart de server kort** (zie 8, intro).
 
 ---
@@ -614,6 +667,7 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 - Songtekst-herkenning uit e-mail volgt vaste regels (geen taalmodel); wijkt een aanlevering te veel af van het afgesproken formaat, dan wordt dat als "niet herkend" gemeld in plaats van geraden.
 - WhatsApp-verzending vanuit de Setlist-modus (5.1) is bewust niet geautomatiseerd — de "WhatsApp-samenvatting"-knop opent altijd `wa.me` met kant-en-klare tekst, waarna een mens zelf de ontvanger kiest in de eigen WhatsApp-app.
 - In de Setlist-modus (5.1) is de sectiekeuze beperkt tot de sjabloon-secties zelf (Start/Worship/Collecte/etc.); anders dan bij "Snel toevoegen" (5.2.2) kun je een item daar niet naast een specifiek los vast item (zoals "Welkom" of "Thema") plaatsen, alleen binnen een hele sectie.
+- **Synology (LDAP)** als bron voor teamcontacten-synchronisatie (zie 8.11) is bewust niet gebouwd — dit zou het Directory Server-pakket vereisen, een permanent draaiende dienst die extra geheugen kost op een NAS die daar al krap in zit. Gebruik in plaats daarvan "Synology (DSM-API)".
 
 ---
 
