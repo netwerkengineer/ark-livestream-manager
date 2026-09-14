@@ -1834,6 +1834,18 @@ export default function SettingsPanel({
                     </p>
                   </div>
 
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!settings.ssoDisablePkce}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoDisablePkce: e.target.checked })}
+                    />
+                    PKCE uitschakelen
+                  </label>
+                  <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px' }}>
+                    Alleen aanzetten als inloggen faalt met een generieke serverfout bij het token-endpoint — geconstateerd bij Synology's SSO Server.
+                  </p>
+
                   <div className="input-group">
                     <label className="input-label">Groepen-claim in het ID-token</label>
                     <input

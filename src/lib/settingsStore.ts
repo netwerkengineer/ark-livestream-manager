@@ -127,6 +127,7 @@ export interface AppSettings {
   ssoClientId?: string;
   ssoClientSecret?: string;
   ssoScope?: string; // override for the OAuth scope requested - only needed if the default doesn't include groups (e.g. Synology SSO Server)
+  ssoDisablePkce?: boolean; // skip PKCE (code_challenge) - only needed if the provider's token endpoint rejects it with a generic error (suspected on Synology SSO Server)
   ssoGroupClaim?: string; // ID-token claim holding the user's groups, default "groups"
   // Group name (as it appears in the claim) -> role/permissions this app
   // grants on login. A group not listed here grants nothing - a valid SSO
@@ -322,6 +323,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ssoClientId: "",
   ssoClientSecret: "",
   ssoScope: "",
+  ssoDisablePkce: false,
   ssoGroupClaim: "groups",
   ssoGroupPermissions: {},
   ssoContactSyncEnabled: false,

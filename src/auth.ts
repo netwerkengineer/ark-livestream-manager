@@ -51,6 +51,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
       // groups (observed on Synology SSO Server) sets this per-environment
       // in its own settings.json instead of here.
       ...(settings.ssoScope ? { authorization: { params: { scope: settings.ssoScope } } } : {}),
+      // Auth.js defaults to PKCE+state for an "oidc" provider. Only
+      // overridden when settings.ssoDisablePkce is set, so Authentik (which
+      // handles PKCE fine) is unaffected - this is specifically for
+      // providers whose token endpoint rejects the code exchange with a
+      // generic "server_error" when a code_challenge was sent (suspected
+      // on Synology SSO Server).
+      ...(settings.ssoDisablePkce ? { checks: ["state"] } : {}),
     });
   }
 
