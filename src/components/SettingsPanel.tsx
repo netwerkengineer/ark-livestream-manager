@@ -1821,6 +1821,20 @@ export default function SettingsPanel({
                   </div>
 
                   <div className="input-group">
+                    <label className="input-label">OAuth scope (optioneel)</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={settings.ssoScope || ""}
+                      onChange={(e) => onSettingsChange({ ...settings, ssoScope: e.target.value })}
+                      placeholder="Leeg = standaard (openid profile email)"
+                    />
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                      Alleen invullen als de groepen anders niet in het ID-token terechtkomen — bijvoorbeeld <code>openid profile email groups</code> bij Synology's SSO Server.
+                    </p>
+                  </div>
+
+                  <div className="input-group">
                     <label className="input-label">Groepen-claim in het ID-token</label>
                     <input
                       type="text"

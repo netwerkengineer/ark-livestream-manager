@@ -44,6 +44,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
       issuer: settings.ssoIssuerUrl,
       clientId: settings.ssoClientId,
       clientSecret: settings.ssoClientSecret,
+      // Only overridden when settings.ssoScope is actually set, so this
+      // never changes behavior for an already-working provider (e.g.
+      // Authentik on Proxmox, which gets groups back with Auth.js's default
+      // scope already) - a provider that needs an explicit scope to include
+      // groups (observed on Synology SSO Server) sets this per-environment
+      // in its own settings.json instead of here.
+      ...(settings.ssoScope ? { authorization: { params: { scope: settings.ssoScope } } } : {}),
     });
   }
 

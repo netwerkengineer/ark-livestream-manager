@@ -126,6 +126,7 @@ export interface AppSettings {
   ssoIssuerUrl?: string;
   ssoClientId?: string;
   ssoClientSecret?: string;
+  ssoScope?: string; // override for the OAuth scope requested - only needed if the default doesn't include groups (e.g. Synology SSO Server)
   ssoGroupClaim?: string; // ID-token claim holding the user's groups, default "groups"
   // Group name (as it appears in the claim) -> role/permissions this app
   // grants on login. A group not listed here grants nothing - a valid SSO
@@ -320,6 +321,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ssoIssuerUrl: "",
   ssoClientId: "",
   ssoClientSecret: "",
+  ssoScope: "",
   ssoGroupClaim: "groups",
   ssoGroupPermissions: {},
   ssoContactSyncEnabled: false,
