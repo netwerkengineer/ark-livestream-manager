@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, saveSettings } from "@/lib/settingsStore";
 import { isAuthorized } from "@/lib/authHelper";
 import { logActivity } from "@/lib/activityLog";
+import { getTokens } from "@/lib/tokenStore";
 
 export async function GET(req: NextRequest) {
   const settings = getSettings();
@@ -44,7 +45,14 @@ export async function GET(req: NextRequest) {
     ...sanitized,
     currentUser: authSession.username,
     userRole: authSession.role,
-    userPermissions: authSession.permissions
+    userPermissions: authSession.permissions,
+    // The YouTube link is one shared, server-side token (tokenStore.ts),
+    // not per-login-method - checking it here (rather than the client
+    // deriving it from next-auth's own session object) means it reads the
+    // same regardless of whether this request came from a Google, SSO, or
+    // local-password session. See the "isConnectedYoutube ignored the local
+    // login" bug this fixed.
+    isConnectedYoutube: !!getTokens().google
   });
 }
 

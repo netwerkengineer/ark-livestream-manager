@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import ThumbnailEditor from "@/components/ThumbnailEditor";
 import StreamMonitor from "@/components/StreamMonitor";
 import FreeshowGenerator from "@/components/FreeshowGenerator";
@@ -50,8 +50,11 @@ import SettingsPanel from "@/components/SettingsPanel";
 
 
 export default function Dashboard() {
-  const { data: session } = useSession();
-  const isConnectedYoutube = !!(session as any)?.youtubeToken;
+  // Server-derived, not read off next-auth's own session object directly -
+  // the YouTube link is one shared token (tokenStore.ts) used regardless of
+  // login method, but next-auth's client session only exists for Google/SSO
+  // logins, not the local-password one. See checkAuthAndLoad below.
+  const [isConnectedYoutube, setIsConnectedYoutube] = useState(false);
   const [title, setTitle] = useState("[Spreker] | [Onderwerp] | Ark Church | [Datum]");
   const [description, setDescription] = useState(`Livestream van de Zondagsdienst van Ark Church.
 
@@ -183,6 +186,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
         const perms = data.userPermissions || [];
         setUserPermissions(perms);
         setCurrentUser(data.currentUser || "Operator");
+        setIsConnectedYoutube(!!data.isConnectedYoutube);
         
         setTitle(data.defaultTitle || "");
         setDescription(data.defaultDescription || "");
