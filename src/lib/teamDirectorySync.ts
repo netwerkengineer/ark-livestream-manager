@@ -110,6 +110,8 @@ async function fetchSynologyApiMembers(groupName: string): Promise<DirectoryMemb
   // strings - confirmed by inspecting a live response, since no official
   // spec exists for this endpoint.
   const userEntries: { name: string; description?: string }[] = Array.isArray(membersData?.data?.users) ? membersData.data.users : [];
+  // TEMPORARY diagnostic - remove once the email lookup is confirmed working.
+  console.log(`[Team Directory Sync] DEBUG groep "${groupName}": ${userEntries.length} leden gevonden (${userEntries.map(e => e.name).join(", ")})`);
 
   const members: DirectoryMember[] = [];
   for (const entry of userEntries) {
@@ -117,6 +119,8 @@ async function fetchSynologyApiMembers(groupName: string): Promise<DirectoryMemb
     const userData = await dsmRequest(
       `${baseUrl}/webapi/entry.cgi?api=SYNO.Core.User&version=1&method=get&name=${encodeURIComponent(entry.name)}&additional=${additional}&_sid=${sid}`
     );
+    // TEMPORARY diagnostic - remove once confirmed.
+    console.log(`[Team Directory Sync] DEBUG gebruiker "${entry.name}" ruwe respons:`, JSON.stringify(userData));
     const user = userData?.data?.user;
     if (!user?.email) continue; // no email on file for this account - nothing to send a setlist to
     members.push({
