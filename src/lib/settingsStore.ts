@@ -413,10 +413,25 @@ export function getSettings(): AppSettings {
   return settings;
 }
 
+// Fields pasted from a provider's own admin UI (Authentik, Synology SSO
+// Server) have twice now come through with a stray leading tab character,
+// which silently breaks OIDC client authentication with no useful error
+// message - trimmed here so that class of mistake can't recur.
+const SSO_TRIM_FIELDS: (keyof AppSettings)[] = [
+  "ssoIssuerUrl", "ssoClientId", "ssoClientSecret", "ssoScope"
+];
+
 export function saveSettings(settings: Partial<AppSettings>) {
   const current = getSettings();
   const updated = { ...current, ...settings };
-  
+
+  for (const field of SSO_TRIM_FIELDS) {
+    const value = updated[field];
+    if (typeof value === "string") {
+      (updated as any)[field] = value.trim();
+    }
+  }
+
   // When keys are provided, we consider setup potentially complete
   if (updated.googleClientId && updated.googleClientSecret) {
     updated.isSetupComplete = true;
