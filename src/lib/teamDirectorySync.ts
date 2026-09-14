@@ -1,4 +1,4 @@
-import { getSettings } from "./settingsStore";
+import { getSettings, AppSettings } from "./settingsStore";
 import { upsertContactsFromDirectory } from "./contactsStore";
 
 interface DirectoryMember {
@@ -52,30 +52,48 @@ async function fetchSynologyApiMembers(_groupName: string): Promise<DirectoryMem
   throw new Error("synology-api is nog niet geïmplementeerd - zie het plan voor de afweging LDAP vs. DSM-webAPI");
 }
 
+async function fetchGroupMembers(mode: AppSettings["ssoDirectoryMode"], groupName: string): Promise<DirectoryMember[]> {
+  switch (mode) {
+    case "synology-ldap":
+      return fetchSynologyLdapMembers(groupName);
+    case "synology-api":
+      return fetchSynologyApiMembers(groupName);
+    case "authentik-api":
+    default:
+      return fetchAuthentikGroupMembers(groupName);
+  }
+}
+
 export async function syncTeamDirectory(): Promise<{ synced: number }> {
   const settings = getSettings();
-  if (!settings.ssoContactSyncEnabled || !settings.ssoContactSyncGroup) {
+  const groups = settings.ssoContactSyncGroups || [];
+  if (!settings.ssoContactSyncEnabled || groups.length === 0) {
     return { synced: 0 };
   }
 
-  let members: DirectoryMember[];
-  switch (settings.ssoDirectoryMode) {
-    case "synology-ldap":
-      members = await fetchSynologyLdapMembers(settings.ssoContactSyncGroup);
-      break;
-    case "synology-api":
-      members = await fetchSynologyApiMembers(settings.ssoContactSyncGroup);
-      break;
-    case "authentik-api":
-    default:
-      members = await fetchAuthentikGroupMembers(settings.ssoContactSyncGroup);
-      break;
+  // A failed fetch throws and never reaches upsertContactsFromDirectory, so
+  // a bad/empty response from the provider never wipes out the existing
+  // contact list - one broken group name shouldn't take down the sync for
+  // every other group, so each is fetched independently and errors are
+  // logged rather than aborting the whole run.
+  const membersByEmail = new Map<string, DirectoryMember>();
+  for (const groupName of groups) {
+    try {
+      const members = await fetchGroupMembers(settings.ssoDirectoryMode, groupName);
+      for (const member of members) {
+        const existing = membersByEmail.get(member.email);
+        if (existing) {
+          existing.groups = Array.from(new Set([...existing.groups, ...member.groups]));
+        } else {
+          membersByEmail.set(member.email, member);
+        }
+      }
+    } catch (err) {
+      console.error(`[Team Directory Sync] Groep "${groupName}" overslaan:`, err);
+    }
   }
 
-  // A failed fetch throws above and never reaches here, so a bad/empty
-  // response from the provider never wipes out the existing contact list -
-  // upsertContactsFromDirectory only ever adds/updates/prunes based on
-  // what this function actually returned.
+  const members = Array.from(membersByEmail.values());
   upsertContactsFromDirectory(members);
   return { synced: members.length };
 }

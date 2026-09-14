@@ -1928,17 +1928,45 @@ export default function SettingsPanel({
                   </label>
                   {settings.ssoContactSyncEnabled && (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
-                        <div className="input-group">
-                          <label className="input-label">Groep om te synchroniseren</label>
-                          <input
-                            type="text"
-                            className="input-field"
-                            value={settings.ssoContactSyncGroup || ""}
-                            onChange={(e) => onSettingsChange({ ...settings, ssoContactSyncGroup: e.target.value })}
-                            placeholder="Band"
-                          />
+                      <div className="input-group">
+                        <label className="input-label">Groepen om te synchroniseren</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {(settings.ssoContactSyncGroups || []).map((group: string, idx: number) => (
+                            <div key={idx} style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
+                                className="input-field"
+                                value={group}
+                                onChange={(e) => {
+                                  const groups = [...(settings.ssoContactSyncGroups || [])];
+                                  groups[idx] = e.target.value;
+                                  onSettingsChange({ ...settings, ssoContactSyncGroups: groups });
+                                }}
+                                placeholder="Worship Band"
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const groups = (settings.ssoContactSyncGroups || []).filter((_: string, i: number) => i !== idx);
+                                  onSettingsChange({ ...settings, ssoContactSyncGroups: groups });
+                                }}
+                                style={{ background: 'rgba(239,68,68,0.15)', border: 'none', borderRadius: '8px', padding: '0 12px', cursor: 'pointer', color: '#f87171' }}
+                              >
+                                Verwijder
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => onSettingsChange({ ...settings, ssoContactSyncGroups: [...(settings.ssoContactSyncGroups || []), ""] })}
+                            style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', alignSelf: 'flex-start' }}
+                          >
+                            + Groep toevoegen
+                          </button>
                         </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div className="input-group">
                           <label className="input-label">Bron</label>
                           <select

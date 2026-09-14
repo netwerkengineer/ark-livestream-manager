@@ -138,7 +138,7 @@ export interface AppSettings {
   // most band members never log in to this app at all, but still need to
   // receive the setlist mail.
   ssoContactSyncEnabled?: boolean;
-  ssoContactSyncGroup?: string;
+  ssoContactSyncGroups?: string[];
   ssoContactSyncIntervalMinutes?: number;
   ssoDirectoryMode?: "authentik-api" | "synology-ldap" | "synology-api";
   ssoDirectoryApiToken?: string; // Authentik API token, or the Synology LDAP bind password
@@ -321,7 +321,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ssoGroupClaim: "groups",
   ssoGroupPermissions: {},
   ssoContactSyncEnabled: false,
-  ssoContactSyncGroup: "",
+  ssoContactSyncGroups: [],
   ssoContactSyncIntervalMinutes: 360,
   ssoDirectoryMode: "authentik-api",
   ssoDirectoryApiToken: ""
