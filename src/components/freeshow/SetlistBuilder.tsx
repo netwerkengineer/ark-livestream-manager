@@ -136,7 +136,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [sendPanelOpen, setSendPanelOpen] = useState(false);
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
-  const [replyToIds, setReplyToIds] = useState<string[]>([]);
+  const [replyToId, setReplyToId] = useState<string>('');
   const [includeText, setIncludeText] = useState(true);
   const [includePdf, setIncludePdf] = useState(false);
   const [includeChords, setIncludeChords] = useState(false);
@@ -643,10 +643,6 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     setSelectedRecipientIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
   };
 
-  const toggleReplyTo = (id: string) => {
-    setReplyToIds(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
-  };
-
   // "Verstuur e-mail" no longer sends straight away - it first asks the
   // server (dryRun) for exactly what would be sent (recipients, subject,
   // body, attachment filenames) so the worship leader can review it, then
@@ -658,7 +654,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: selectedRecipientIds, replyToIds, includeText, includePdf, includeChords, includeYoutube, message: extraMessage, dryRun: true })
+        body: JSON.stringify({ recipientIds: selectedRecipientIds, replyToIds: replyToId ? [replyToId] : [], includeText, includePdf, includeChords, includeYoutube, message: extraMessage, dryRun: true })
       });
       const data = await res.json();
       if (data.success) {
@@ -688,7 +684,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientIds: selectedRecipientIds,
-          replyToIds,
+          replyToIds: replyToId ? [replyToId] : [],
           includeText,
           includePdf,
           includeChords,
@@ -1120,30 +1116,35 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                         <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.3rem', fontWeight: 600 }}>{ROLE_LABELS[role]}</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.9rem' }}>
                           {contactsByRole[role].map(c => (
-                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', opacity: c.email ? 1 : 0.4, cursor: c.email ? 'pointer' : 'default' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedRecipientIds.includes(c.id)}
-                                  onChange={() => toggleRecipient(c.id)}
-                                  disabled={!c.email}
-                                />
-                                {c.name}{!c.email && ' (geen e-mail)'}
-                              </label>
-                              {c.email && (
-                                <label
-                                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', opacity: 0.7, cursor: 'pointer' }}
-                                  title="Antwoorden op deze e-mail gaan naar dit adres"
-                                >
-                                  <input type="checkbox" checked={replyToIds.includes(c.id)} onChange={() => toggleReplyTo(c.id)} />
-                                  ↩️ antwoord aan
-                                </label>
-                              )}
-                            </div>
+                            <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', opacity: c.email ? 1 : 0.4, cursor: c.email ? 'pointer' : 'default' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedRecipientIds.includes(c.id)}
+                                onChange={() => toggleRecipient(c.id)}
+                                disabled={!c.email}
+                              />
+                              {c.name}{!c.email && ' (geen e-mail)'}
+                            </label>
                           ))}
                         </div>
                       </div>
                     ) : null)}
+
+                    <label style={{ display: 'block', marginTop: '0.6rem', marginBottom: '0.3rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                      ↩️ Antwoord aan (optioneel)
+                    </label>
+                    <select
+                      className="input"
+                      value={replyToId}
+                      onChange={e => setReplyToId(e.target.value)}
+                      style={{ width: '100%', marginBottom: '0.6rem' }}
+                      title="Antwoorden op deze e-mail gaan naar dit adres"
+                    >
+                      <option value="">Geen (standaard afzender)</option>
+                      {contacts.filter(c => c.email).map(c => (
+                        <option key={c.id} value={c.id}>{c.name} — {c.email}</option>
+                      ))}
+                    </select>
 
                     <label style={{ display: 'block', marginTop: '0.6rem', marginBottom: '0.3rem', fontSize: '0.75rem', opacity: 0.7 }}>
                       Extra bericht (optioneel) — bijv. dresscode, een opmerking, of een groet
