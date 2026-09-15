@@ -85,11 +85,8 @@ async function dsmLogin(baseUrl: string, account: string, password: string): Pro
   return data.data.sid;
 }
 
-// Not yet verified against a live DSM instance - built from Synology's
-// undocumented-but-observed SYNO.Core.Group.Member / SYNO.Core.User APIs
-// (no first-party spec exists, see the plan's note on this). Needs a real
-// test run once the app is deployed on the NAS; exact error codes/shapes
-// may need adjusting then.
+// Built from Synology's undocumented SYNO.Core.Group.Member / SYNO.Core.User
+// APIs (no first-party spec exists) - confirmed working against a live NAS.
 async function fetchSynologyApiMembers(groupName: string): Promise<DirectoryMember[]> {
   const settings = getSettings();
   if (!settings.ssoDirectoryApiUrl) throw new Error("ssoDirectoryApiUrl (DSM-adres, bv. https://192.168.2.250:5001) is niet ingesteld");

@@ -2052,11 +2052,6 @@ export default function SettingsPanel({
                           ⚠️ LDAP is bewust niet gebouwd — Directory Server is een permanent draaiende dienst die de toch al krappe NAS extra RAM kost. Kies de DSM-API in plaats daarvan.
                         </p>
                       )}
-                      {settings.ssoDirectoryMode === "synology-api" && (
-                        <p style={{ fontSize: '0.78rem', color: '#fcd34d' }}>
-                          ⚠️ Nog niet getest tegen een echte NAS — controleer na inschakelen de serverlogs op de eerste sync-poging.
-                        </p>
-                      )}
                     </>
                   )}
                 </>
