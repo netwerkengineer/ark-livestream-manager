@@ -29,6 +29,19 @@ export function getTokens() {
   return {};
 }
 
+// Called when Google says the refresh token itself is dead (invalid_grant),
+// not just the short-lived access token - clearing it here is what makes
+// isConnectedYoutube (which only checks whether a token string exists,
+// not whether it still works) correctly flip back to "not connected" and
+// show the "Inloggen met Google" button again, instead of silently staying
+// "connected" while every request keeps failing.
+function clearGoogleTokens() {
+  const tokens = getTokens();
+  delete tokens.google;
+  delete tokens.google_refresh;
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+}
+
 export async function refreshYoutubeToken(): Promise<string | null> {
   const tokens = getTokens();
   const refreshToken = tokens.google_refresh;
@@ -61,6 +74,12 @@ export async function refreshYoutubeToken(): Promise<string | null> {
     if (!res.ok) {
       const errText = await res.text();
       console.error(`[YouTube Token] Failed to refresh token: ${res.status} ${errText}`);
+      // invalid_grant means the refresh token itself is expired/revoked -
+      // no amount of retrying will fix this, so clear it now rather than
+      // leaving a dead token in place that makes isConnectedYoutube lie.
+      if (errText.includes("invalid_grant")) {
+        clearGoogleTokens();
+      }
       return null;
     }
 
