@@ -1111,6 +1111,15 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                   </p>
                 ) : (
                   <>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecipientIds([])}
+                        style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.6, fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        Alles deselecteren
+                      </button>
+                    </div>
                     {(['band', 'operator', 'other'] as const).map(role => contactsByRole[role]?.length ? (
                       <div key={role} style={{ marginBottom: '0.6rem' }}>
                         <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.3rem', fontWeight: 600 }}>{ROLE_LABELS[role]}</div>
