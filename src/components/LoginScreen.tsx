@@ -52,6 +52,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         <img src="/logo.png" alt="Ark Church Logo" />
         <h1 className="gradient-text">Ark Church Operations Center</h1>
       </div>
+      <p style={{ maxWidth: '450px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.9rem', margin: '-16px 0 0' }}>
+        Interne applicatie van Ark Church voor het plannen en uitzenden van diensten op YouTube, live bediening tijdens een uitzending,
+        het samenstellen van FreeShow-presentaties, lichtregie, en teambeheer.
+      </p>
       <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', width: '450px' }}>
         <h2 style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '10px' }}>Aanmelden</h2>
 
@@ -133,6 +137,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </>
         )}
       </div>
+      <a href="/privacy" style={{ color: 'var(--muted)', fontSize: '0.8rem', textDecoration: 'underline' }}>
+        Privacyverklaring
+      </a>
     </div>
   );
 }
