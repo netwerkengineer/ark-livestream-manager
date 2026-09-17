@@ -1129,6 +1129,15 @@ def main():
     # bereikbaarheid-gecheckt vlak voor hun eigen sync-stap, geen wek-poging)
     # Skipped entirely when --only-targets excluded the primary - no reason
     # to wake the Beamer PC for a run that was never going to touch it.
+    # we_started_beamer_plug / beamer_plug_turned_off track whether THIS run
+    # switched 'plug_beamer' on itself, and whether it has switched it back
+    # off again by the time the run ends - see the safety-net check after
+    # the per-target loop below, which closes the gap where the normal
+    # STAP 4 shutdown/plug-off never gets reached (PC didn't answer SSH in
+    # time, or the sync for the primary target raised an exception).
+    we_started_beamer_plug = False
+    beamer_plug_turned_off = False
+
     primary_in_targets = any(t["is_primary"] for t in targets)
     primary_reachable = True
     if not primary_in_targets:
@@ -1146,6 +1155,7 @@ def main():
                 print("[Power] Turning ON smart plug 'plug_beamer'...")
                 log_activity("plug", "Stekker 'plug_beamer' aangezet (sync)")
                 subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", "plug_beamer"])
+                we_started_beamer_plug = True
 
                 if wait_for_ssh(mac_user, mac_host):
                     print("[Power] Beamer PC successfully started!")
@@ -1340,6 +1350,7 @@ def main():
                     print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
                     log_activity("plug", "Stekker 'plug_beamer' uitgezet (na sync)")
                     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
+                    beamer_plug_turned_off = True
                     print("[Power] Stroom succesvol afgesloten.")
 
             _update_target_status(SCRIPT_DIR, target["key"], "done")
@@ -1347,6 +1358,20 @@ def main():
             print(f"[{label}] FOUT tijdens sync: {e} - doorgaan met volgende doel.")
             log_activity("error", f"Sync-fout voor {label}: {e}")
             _update_target_status(SCRIPT_DIR, target["key"], "error")
+
+    # Veiligheidsnet: als dit script zelf 'plug_beamer' heeft aangezet (de PC
+    # was offline) maar STAP 4 hierboven nooit is bereikt - omdat de PC niet
+    # op tijd reageerde op SSH, of de sync voor het hoofd-doel een fout gaf -
+    # dan blijft de stekker anders voor onbepaalde tijd aanstaan terwijl de
+    # PC niet eens gesynchroniseerd is. Niet van toepassing bij --keep-on
+    # (dan is "aan laten staan" precies de bedoeling).
+    if we_started_beamer_plug and not keep_on and not beamer_plug_turned_off:
+        print("\n--- VEILIGHEIDSNET: stekker 'plug_beamer' alsnog uitzetten ---")
+        print("Beamer PC kwam niet op tijd online of de sync gaf een fout na het zelf "
+              "aanzetten van de stekker - stekker wordt voor de zekerheid weer uitgezet.")
+        log_activity("plug", "Stekker 'plug_beamer' uitgezet (veiligheidsnet: PC niet bereikt na sync)")
+        subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
+        beamer_plug_turned_off = True
 
     # Save the updated sync state
     try:
