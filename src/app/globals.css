@@ -279,6 +279,11 @@ textarea.input-field {
 
 .input {
   width: 100%;
+  /* Without this, a <select>'s intrinsic content width (driven by its
+     longest <option> text) acts as a hard floor that flex/grid layout
+     respects even at width:100% - it won't shrink below that on a narrow
+     screen, forcing the whole row/column to overflow instead. */
+  min-width: 0;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
@@ -460,6 +465,20 @@ textarea.input-field {
   top: 1.5rem;
 }
 
+.setlist-columns {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 1.5rem;
+}
+
+/* Grid items default to min-width: auto, which lets them overflow their
+   track to fit their content's min-content size (e.g. a row of checkboxes
+   or buttons that won't wrap) - this is what actually caused the mobile
+   overflow, not the track width itself. */
+.setlist-columns > * {
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .content-grid {
     grid-template-columns: 1fr;
@@ -467,6 +486,10 @@ textarea.input-field {
 
   .sticky-col {
     position: static;
+  }
+
+  .setlist-columns {
+    grid-template-columns: 1fr;
   }
 }
 

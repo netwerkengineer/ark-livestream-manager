@@ -814,7 +814,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>Laden...</div>
       ) : (
-        <div className="setlist-columns" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: '1.5rem' }}>
+        <div className="setlist-columns">
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', opacity: 0.7 }}>
               Standaard-sectie voor het volgende lied
