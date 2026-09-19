@@ -114,18 +114,40 @@ def get_settings():
                 print(f"Error reading settings file {c}: {e}")
     return {}
 
+# Quick reachability/remote-command calls (ssh, never a data transfer) all
+# get this same short cap. ConnectTimeout alone only bounds the initial TCP
+# connect - a remote that accepts the connection but never completes the
+# SSH handshake (seen in production: a Beamer PC stuck mid-boot) hangs the
+# subprocess forever regardless of ConnectTimeout, which previously hung
+# the whole script - and with it, the smart plug - indefinitely. A quick
+# echo/uname/shutdown command has no legitimate reason to take longer than
+# this even on a slow connection.
+QUICK_SSH_TIMEOUT_S = 15
+
+
+def _run_with_timeout(cmd, timeout_s, **kwargs):
+    """subprocess.run wrapper that turns a hang into a normal (failed)
+    CompletedProcess instead of raising, so existing callers that just check
+    .returncode/.stdout/.stderr don't need to change."""
+    try:
+        return subprocess.run(cmd, timeout=timeout_s, **kwargs)
+    except subprocess.TimeoutExpired:
+        print(f"WAARSCHUWING: commando reageerde niet binnen {timeout_s}s, afgebroken: {cmd}")
+        return subprocess.CompletedProcess(cmd, returncode=124, stdout=b"", stderr=b"timeout")
+
+
 def detect_remote_os(user, host):
-    res = subprocess.run(
+    res = _run_with_timeout(
         ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "cmd.exe /c echo windows"],
-        capture_output=True
+        QUICK_SSH_TIMEOUT_S, capture_output=True
     )
     stdout = res.stdout.decode('utf-8', errors='replace')
     if "windows" in stdout.lower():
         return "windows"
 
-    res_uname = subprocess.run(
+    res_uname = _run_with_timeout(
         ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "uname -s"],
-        capture_output=True
+        QUICK_SSH_TIMEOUT_S, capture_output=True
     )
     if res_uname.stdout.decode('utf-8', errors='replace').strip().lower().startswith("linux"):
         return "linux"
@@ -166,9 +188,9 @@ def is_network_mount(user, host, remote_os, path):
     return any(normalized_path == mp or normalized_path.startswith(mp + "/") for mp in network_mount_points)
 
 def run_ssh_cmd(user, host, cmd_str):
-    res = subprocess.run(
+    res = _run_with_timeout(
         ["ssh", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", cmd_str],
-        capture_output=True
+        QUICK_SSH_TIMEOUT_S, capture_output=True
     )
     res.stdout = res.stdout.decode('utf-8', errors='replace')
     res.stderr = res.stderr.decode('utf-8', errors='replace')
@@ -176,13 +198,29 @@ def run_ssh_cmd(user, host, cmd_str):
 
 def run_ps_script(user, host, script):
     encoded = base64.b64encode(script.encode('utf-16-le')).decode('utf-8')
-    res = subprocess.run(
+    res = _run_with_timeout(
         ["ssh", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "powershell", "-EncodedCommand", encoded],
-        capture_output=True
+        QUICK_SSH_TIMEOUT_S, capture_output=True
     )
     res.stdout = res.stdout.decode('utf-8', errors='replace')
     res.stderr = res.stderr.decode('utf-8', errors='replace')
     return res
+
+# A single file transfer (unlike a reachability check) can legitimately
+# take a long time - a large video file over a slow link is still normal
+# operation, not a hang. This is generous on purpose (30 min for one file
+# comfortably covers even a multi-GB file on a slow connection) while still
+# guaranteeing that a stuck transfer - e.g. the same half-open-connection
+# failure mode as the reachability hang, just mid-transfer - can't block
+# the plug-off step forever the way an unbounded call could.
+SFTP_TRANSFER_TIMEOUT_S = 1800
+
+# Local Tuya plug commands never touch the Beamer PC over SSH, but they're
+# still a subprocess call that could in principle hang (device discovery
+# over LAN) - and this is exactly the call that turns the plug off, so it
+# gets the same treatment rather than being the one exception.
+PLUG_CMD_TIMEOUT_S = 30
+
 
 def sftp_transfer(user, host, local_path, remote_path, direction):
     """
@@ -199,8 +237,9 @@ def sftp_transfer(user, host, local_path, remote_path, direction):
         cmd = f"get \"{remote_path}\" \"{local_path}\"\n"
     else:
         cmd = f"put \"{local_path}\" \"{remote_path}\"\n"
-    res = subprocess.run(
+    res = _run_with_timeout(
         ["sftp", "-b", "-", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=no", f"{user}@{host}"],
+        SFTP_TRANSFER_TIMEOUT_S,
         input=cmd.encode('utf-8'),
         capture_output=True
     )
@@ -210,9 +249,9 @@ def sftp_transfer(user, host, local_path, remote_path, direction):
     return True
 
 def test_ssh(user, host):
-    res = subprocess.run(
+    res = _run_with_timeout(
         ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "-o", "PasswordAuthentication=no", f"{user}@{host}", "echo 'online'"],
-        capture_output=True
+        QUICK_SSH_TIMEOUT_S, capture_output=True
     )
     return res.returncode == 0
 
@@ -1154,7 +1193,7 @@ def main():
             if beamer_plug:
                 print("[Power] Turning ON smart plug 'plug_beamer'...")
                 log_activity("plug", "Stekker 'plug_beamer' aangezet (sync)")
-                subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", "plug_beamer"])
+                _run_with_timeout(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", "plug_beamer"], PLUG_CMD_TIMEOUT_S)
                 we_started_beamer_plug = True
 
                 if wait_for_ssh(mac_user, mac_host):
@@ -1349,7 +1388,7 @@ def main():
                     time.sleep(15)
                     print("[Power] Uitschakelen van smart plug 'plug_beamer'...")
                     log_activity("plug", "Stekker 'plug_beamer' uitgezet (na sync)")
-                    subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
+                    _run_with_timeout(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"], PLUG_CMD_TIMEOUT_S)
                     beamer_plug_turned_off = True
                     print("[Power] Stroom succesvol afgesloten.")
 
@@ -1370,7 +1409,7 @@ def main():
         print("Beamer PC kwam niet op tijd online of de sync gaf een fout na het zelf "
               "aanzetten van de stekker - stekker wordt voor de zekerheid weer uitgezet.")
         log_activity("plug", "Stekker 'plug_beamer' uitgezet (veiligheidsnet: PC niet bereikt na sync)")
-        subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"])
+        _run_with_timeout(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "off", "plug_beamer"], PLUG_CMD_TIMEOUT_S)
         beamer_plug_turned_off = True
 
     # Save the updated sync state
