@@ -114,6 +114,66 @@ def get_settings():
                 print(f"Error reading settings file {c}: {e}")
     return {}
 
+
+# Mirrors src/lib/mailer.ts's sendOpsAlertEmail on the TypeScript side - same
+# settings fields, same fixed-recipient/no-BCC shape, same per-key cooldown
+# so a problem that persists for days (e.g. the Beamer PC not booting) sends
+# one alert per cooldown window instead of one every single night's run.
+OPS_ALERT_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ops_alert_state.json")
+OPS_ALERT_COOLDOWN_S = 6 * 3600
+
+
+def send_ops_alert_email(subject, body, key=None):
+    settings = get_settings()
+    ops_email = settings.get("opsAlertEmail")
+    smtp_host = settings.get("smtpHost")
+    smtp_user = settings.get("smtpUser")
+    smtp_pass = settings.get("smtpPass")
+    if not ops_email or not smtp_host or not smtp_user or not smtp_pass:
+        return
+
+    alert_key = key or subject
+    state = {}
+    if os.path.exists(OPS_ALERT_STATE_FILE):
+        try:
+            with open(OPS_ALERT_STATE_FILE, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            state = {}
+    if time.time() - state.get(alert_key, 0) < OPS_ALERT_COOLDOWN_S:
+        return
+
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        smtp_port = int(settings.get("smtpPort") or 465)
+        smtp_secure = settings.get("smtpSecure", True)
+        from_name = settings.get("smtpFromName") or "Ark Church Livestream Manager"
+        from_email = settings.get("smtpFromEmail") or smtp_user
+
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg["Subject"] = f"[Ark Ops] {subject}"
+        msg["From"] = f"{from_name} <{from_email}>"
+        msg["To"] = ops_email
+
+        if smtp_secure:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+
+        os.makedirs(os.path.dirname(OPS_ALERT_STATE_FILE), exist_ok=True)
+        state[alert_key] = time.time()
+        with open(OPS_ALERT_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+    except Exception as e:
+        print(f"[OpsAlert] Kon foutmelding niet mailen: {e}")
+
 # Quick reachability/remote-command calls (ssh, never a data transfer) all
 # get this same short cap. ConnectTimeout alone only bounds the initial TCP
 # connect - a remote that accepts the connection but never completes the
@@ -1310,6 +1370,13 @@ def main():
         if target["is_primary"]:
             if not primary_reachable:
                 print(f"\n=== [{label}] Overgeslagen - hoofd-doel niet bereikbaar deze run ===")
+                log_activity("error", f"Sync overgeslagen: {label} was niet bereikbaar (o.a. thema.jpg wordt hierdoor niet bijgewerkt op de Beamer-PC).")
+                send_ops_alert_email(
+                    f"Sync overgeslagen: {label} niet bereikbaar",
+                    f"{label} was niet bereikbaar tijdens de sync, dus Shows/Media/Bijbels/Templates (inclusief thema.jpg) zijn niet bijgewerkt op deze PC.\n\n"
+                    "Mogelijke oorzaak: de PC start niet vanzelf op na het aanzetten van de stekker (bekend BIOS-probleem).",
+                    key="sync-primary-unreachable"
+                )
                 _update_target_status(SCRIPT_DIR, target["key"], "skipped")
                 continue
         else:

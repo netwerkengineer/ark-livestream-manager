@@ -1,6 +1,8 @@
 import { youtubeFetch } from "./tokenStore";
 import { getSettings } from "./settingsStore";
 import { triggerFreeShowSync } from "./syncTrigger";
+import { logActivity } from "./activityLog";
+import { sendOpsAlertEmail } from "./mailer";
 import fs from "fs";
 import path from "path";
 
@@ -41,6 +43,12 @@ async function syncThumbnailFromUrl(url: string) {
     const res = await fetch(url);
     if (!res.ok) {
       console.error(`[Thumbnail Sync] Failed to fetch image from URL: ${url}, status: ${res.status}`);
+      logActivity("error", `Thumbnail-sync mislukt: ophalen van de YouTube-thumbnail gaf status ${res.status}.`, { url });
+      sendOpsAlertEmail(
+        "Thumbnail-sync mislukt (ophalen bij YouTube)",
+        `Het ophalen van de thumbnail-afbeelding bij YouTube gaf status ${res.status}.\n\nURL: ${url}\n\nthema.jpg wordt hierdoor niet bijgewerkt.`,
+        { key: "thumbnail-fetch-failed" }
+      ).catch(() => {});
       return;
     }
     const arrayBuffer = await res.arrayBuffer();
@@ -66,8 +74,14 @@ async function syncThumbnailFromUrl(url: string) {
         const customFilePath = path.join(savePath, "thema.jpg");
         fs.writeFileSync(customFilePath, imageBuffer);
         console.log(`[Thumbnail Sync] Successfully synced new thumbnail to custom path: ${customFilePath}`);
-      } catch (pathErr) {
+      } catch (pathErr: any) {
         console.error(`[Thumbnail Sync] Failed to write to custom path ${savePath}:`, pathErr);
+        logActivity("error", `Thumbnail-sync: wegschrijven naar '${savePath}' mislukt (${pathErr?.message || pathErr}). De lokale kopie in de app is wel bijgewerkt.`);
+        sendOpsAlertEmail(
+          "Thumbnail-sync: NAS-pad niet schrijfbaar",
+          `thema.jpg kon niet weggeschreven worden naar '${savePath}':\n${pathErr?.message || pathErr}\n\nDe kopie binnen de app zelf is wel bijgewerkt, maar FreeShow op de Beamer-PC ziet deze niet totdat dit pad weer schrijfbaar is.`,
+          { key: "thumbnail-nas-write-failed" }
+        ).catch(() => {});
       }
     }
     
@@ -92,9 +106,23 @@ async function syncThumbnailFromUrl(url: string) {
     // targetKeys: ['primary'] - same reasoning as create/route.ts: this is
     // an automated trigger, and additional targets only ever sync when
     // someone explicitly picks them via the manual sync button.
-    triggerFreeShowSync({ targetKeys: ['primary'] }).catch(err => console.error("[Thumbnail Sync] Kon sync niet triggeren:", err));
-  } catch (err) {
+    triggerFreeShowSync({ targetKeys: ['primary'] }).catch(err => {
+      console.error("[Thumbnail Sync] Kon sync niet triggeren:", err);
+      logActivity("error", `Thumbnail-sync: het triggeren van de FreeShow-sync naar de Beamer-PC is mislukt (${err?.message || err}). thema.jpg staat wel klaar op de NAS.`);
+      sendOpsAlertEmail(
+        "Thumbnail-sync: kon Beamer-PC niet syncen",
+        `thema.jpg is bijgewerkt op de NAS, maar de sync naar de Beamer-PC kon niet gestart worden:\n${err?.message || err}\n\nMogelijk is de Beamer-PC niet bereikbaar (bekend probleem: PC start niet altijd vanzelf op via de stekker).`,
+        { key: "thumbnail-sync-trigger-failed" }
+      ).catch(() => {});
+    });
+  } catch (err: any) {
     console.error("[Thumbnail Sync] Error syncing thumbnail:", err);
+    logActivity("error", `Thumbnail-sync onverwacht mislukt: ${err?.message || err}`);
+    sendOpsAlertEmail(
+      "Thumbnail-sync onverwacht mislukt",
+      `De thumbnail-sync gaf een onverwachte fout:\n${err?.message || err}`,
+      { key: "thumbnail-sync-unexpected-error" }
+    ).catch(() => {});
   }
 }
 
@@ -108,12 +136,25 @@ export async function checkAndSyncUpcomingStreamThumbnail() {
     
     if (ytRes.status === 401) {
       console.warn("[Thumbnail Sync] YouTube credentials expired or invalid, skipping sync.");
+      logActivity("error", "Thumbnail-sync overgeslagen: YouTube-koppeling is verlopen of ongeldig. Log opnieuw in bij Planner → Inloggen met Google.");
+      sendOpsAlertEmail(
+        "YouTube-koppeling verlopen (thumbnail-sync gestopt)",
+        "De YouTube-koppeling is verlopen of ongeldig, waardoor thema.jpg niet meer automatisch wordt bijgewerkt.\n\n" +
+        "Los dit op door in de Planner opnieuw op 'Inloggen met Google' te klikken.\n\n" +
+        "Dit bericht wordt maximaal eens per 6 uur verstuurd zolang het probleem aanhoudt."
+      ).catch(() => {});
       return;
     }
 
     const ytData = await ytRes.json();
     if (ytData.error) {
       console.error("[Thumbnail Sync] YouTube API Error:", JSON.stringify(ytData.error));
+      logActivity("error", `Thumbnail-sync: YouTube API-fout (${ytData.error?.message || 'onbekend'}).`, { error: ytData.error });
+      sendOpsAlertEmail(
+        "Thumbnail-sync: YouTube API-fout",
+        `De YouTube API gaf een fout terug:\n${JSON.stringify(ytData.error, null, 2)}`,
+        { key: "thumbnail-youtube-api-error" }
+      ).catch(() => {});
       return;
     }
 
@@ -140,8 +181,14 @@ export async function checkAndSyncUpcomingStreamThumbnail() {
     } else {
       console.log("[Thumbnail Sync] No upcoming streams returned by YouTube API.");
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("[Thumbnail Sync] Error during background check:", err);
+    logActivity("error", `Thumbnail-sync onverwacht mislukt tijdens de achtergrondcheck: ${err?.message || err}`);
+    sendOpsAlertEmail(
+      "Thumbnail-sync: achtergrondcheck mislukt",
+      `De periodieke thumbnail-check gaf een onverwachte fout:\n${err?.message || err}`,
+      { key: "thumbnail-background-check-failed" }
+    ).catch(() => {});
   }
 }
 

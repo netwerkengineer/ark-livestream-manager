@@ -105,6 +105,11 @@ export interface AppSettings {
   smtpSecure?: boolean;
   smtpFromName?: string;
   smtpFromEmail?: string;
+  // Where operational failure alerts go (YouTube-token expired, thumbnail
+  // sync failed, Beamer PC unreachable during a sync, etc.) - separate from
+  // the team's setlist-mail recipients, since these are infra problems only
+  // the app's admin/maintainer needs to see.
+  opsAlertEmail?: string;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
   sshUser?: string;
@@ -305,6 +310,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   smtpSecure: true,
   smtpFromName: "Ark Church Livestream Manager",
   smtpFromEmail: "",
+  opsAlertEmail: "jeffrey.go@arkchurch.nl",
   ledPanelEnabled: false,
   ledPanelMac: "",
   sshUser: "jeffreygo",

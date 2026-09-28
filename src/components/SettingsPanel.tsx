@@ -1753,6 +1753,21 @@ export default function SettingsPanel({
                   />
                 </div>
               </div>
+
+              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>⚠️ Foutmeldingen</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
+                Adres waar de app zelf naar mailt als iets technisch misgaat (bv. de YouTube-koppeling verlopen, of thema.jpg niet bijgewerkt) — los van de setlist-mails aan het team hierboven. Gebruikt dezelfde SMTP-instellingen.
+              </p>
+              <div className="input-group">
+                <label className="input-label">E-mailadres voor foutmeldingen</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.opsAlertEmail || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, opsAlertEmail: e.target.value })}
+                  placeholder="jeffrey.go@arkchurch.nl"
+                />
+              </div>
             </section>
           )}
 

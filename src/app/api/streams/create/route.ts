@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
 import { youtubeFetch } from "@/lib/tokenStore";
 import { triggerFreeShowSync } from "@/lib/syncTrigger";
+import { logActivity } from "@/lib/activityLog";
+import { sendOpsAlertEmail } from "@/lib/mailer";
 import fs from "fs";
 import path from "path";
 
@@ -180,8 +182,14 @@ export async function POST(req: NextRequest) {
               const customFilePath = path.join(savePath, "thema.jpg");
               fs.writeFileSync(customFilePath, imageBuffer);
               console.log(`Thumbnail succesvol opgeslagen op custom pad: ${customFilePath}`);
-            } catch (pathErr) {
+            } catch (pathErr: any) {
               console.error(`Lokaal opslaan op custom pad ${savePath} mislukt:`, pathErr);
+              logActivity("error", `Thumbnail wegschrijven naar '${savePath}' mislukt bij het aanmaken van een stream (${pathErr?.message || pathErr}).`);
+              sendOpsAlertEmail(
+                "Thumbnail-sync: NAS-pad niet schrijfbaar",
+                `thema.jpg kon niet weggeschreven worden naar '${savePath}' bij het aanmaken van een nieuwe stream:\n${pathErr?.message || pathErr}`,
+                { key: "thumbnail-nas-write-failed" }
+              ).catch(() => {});
             }
           }
 
@@ -195,12 +203,26 @@ export async function POST(req: NextRequest) {
           // uit na afloop. targetKeys: ['primary'] - extra doelen (bv. een
           // zondagsschool-PC) staan bijna altijd uit en syncen alleen als
           // iemand dat handmatig aanvinkt, nooit via deze automatische trigger.
-          triggerFreeShowSync({ keepOn: false, targetKeys: ['primary'] }).catch(err => console.error("Kon sync niet triggeren na nieuwe thumbnail:", err));
+          triggerFreeShowSync({ keepOn: false, targetKeys: ['primary'] }).catch(err => {
+            console.error("Kon sync niet triggeren na nieuwe thumbnail:", err);
+            logActivity("error", `Kon de FreeShow-sync naar de Beamer-PC niet triggeren na een nieuwe thumbnail (${err?.message || err}).`);
+            sendOpsAlertEmail(
+              "Thumbnail-sync: kon Beamer-PC niet syncen",
+              `Er is een nieuwe thumbnail opgeslagen, maar de sync naar de Beamer-PC kon niet gestart worden:\n${err?.message || err}\n\nMogelijk is de Beamer-PC niet bereikbaar.`,
+              { key: "thumbnail-sync-trigger-failed" }
+            ).catch(() => {});
+          });
         } else {
           console.log(`Nieuwe uitzending "${broadcastId}" is niet de eerstvolgende geplande stream - thema.jpg blijft ongewijzigd.`);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Lokaal opslaan thumbnail mislukt:", err);
+        logActivity("error", `Thumbnail opslaan mislukt bij het aanmaken van een stream: ${err?.message || err}`);
+        sendOpsAlertEmail(
+          "Thumbnail-sync mislukt bij aanmaken stream",
+          `Het opslaan van thema.jpg gaf een onverwachte fout:\n${err?.message || err}`,
+          { key: "thumbnail-create-unexpected-error" }
+        ).catch(() => {});
       }
     }
 
