@@ -27,6 +27,12 @@ def get_single_plug_status(plug_info):
     device_id = plug_info.get("deviceId")
     local_key = plug_info.get("localKey")
     version = float(plug_info.get("version", 3.5))
+    # Multi-socket devices (e.g. a 4-way power strip) share one ip/deviceId/
+    # localKey across several TuyaPlug entries, each with a different
+    # switchIndex pointing at its own DPS key ("1".."4"). Existing
+    # single-socket plugs omit this field entirely and keep reading DPS "1",
+    # exactly as before.
+    switch_index = int(plug_info.get("switchIndex") or 1)
 
     result = {
         "id": plug_id,
@@ -60,9 +66,12 @@ def get_single_plug_status(plug_info):
         if status and "Error" not in status:
             result["is_online"] = True
             dps = status.get("dps", {})
-            result["state"] = "on" if dps.get("1") else "off"
-            
-            # Extract power parameters (LSC plug standard DPS keys)
+            result["state"] = "on" if dps.get(str(switch_index)) else "off"
+
+            # Extract power parameters (LSC plug standard DPS keys). On a
+            # multi-socket strip these are typically for the whole strip,
+            # not per-socket - shown as-is on every entry for that device
+            # rather than guessed-at per-socket numbers.
             current_ma = dps.get("18", 0)
             power_01w = dps.get("19", 0)
             voltage_01v = dps.get("20", 0)
@@ -81,24 +90,25 @@ def control_single_plug(plug_info, action):
     device_id = plug_info.get("deviceId")
     local_key = plug_info.get("localKey")
     version = float(plug_info.get("version", 3.5))
+    switch_index = int(plug_info.get("switchIndex") or 1)
 
     if not ip or not device_id or not local_key:
         print(f"[{name}] Error: Missing IP, Device ID or Local Key configuration.")
         return False
 
-    print(f"[{name}] Connecting to plug at {ip} (ID: {device_id}, Version: {version})...")
+    print(f"[{name}] Connecting to plug at {ip} (ID: {device_id}, Version: {version}, Switch: {switch_index})...")
     try:
         d = tinytuya.OutletDevice(device_id, ip, local_key)
         d.set_version(version)
-        
+
         if action == "on":
             print(f"[{name}] Turning ON...")
-            status = d.turn_on()
+            status = d.turn_on(switch=switch_index)
             print(f"[{name}] Response: {status}")
             return True
         elif action == "off":
             print(f"[{name}] Turning OFF...")
-            status = d.turn_off()
+            status = d.turn_off(switch=switch_index)
             print(f"[{name}] Response: {status}")
             return True
         elif action == "status":

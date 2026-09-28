@@ -169,6 +169,13 @@ export interface TuyaPlug {
   localKey: string;
   version: number;
   hostIp?: string;
+  // Which outlet/gang this entry controls, for multi-socket devices (e.g. a
+  // 4-way power strip) that share one ip/deviceId/localKey but expose each
+  // socket as its own DPS index. Omitted/1 keeps existing single-socket
+  // plugs (plug_beamer, plug_obs) working exactly as before - only a
+  // multi-socket device needs several TuyaPlug entries with the same
+  // connection details and a different switchIndex each.
+  switchIndex?: number;
 }
 
 export interface FreeShowSyncTarget {
