@@ -1772,20 +1772,6 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginTop: '12px' }}>⚠️ Foutmeldingen</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
-                Adres waar de app zelf naar mailt als iets technisch misgaat (bv. de YouTube-koppeling verlopen, of thema.jpg niet bijgewerkt) — los van de setlist-mails aan het team hierboven. Gebruikt dezelfde SMTP-instellingen.
-              </p>
-              <div className="input-group">
-                <label className="input-label">E-mailadres voor foutmeldingen</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={settings.opsAlertEmail || ""}
-                  onChange={(e) => onSettingsChange({ ...settings, opsAlertEmail: e.target.value })}
-                  placeholder="jeffrey.go@arkchurch.nl"
-                />
-              </div>
             </section>
           )}
 
@@ -2097,13 +2083,32 @@ export default function SettingsPanel({
           )}
 
           {settingsTab === "activityLog" && userRole === "admin" && (
-            <ActivityLogPanel />
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>⚠️ Foutmeldingen per e-mail</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-8px' }}>
+                Adres waar de app zelf naar mailt als er iets misgaat dat ook hier in het Activiteitenlog verschijnt (bv. de YouTube-koppeling verlopen, thema.jpg niet bijgewerkt, of de Beamer-PC onbereikbaar tijdens een sync) — geldt voor de hele app, niet alleen FreeShow. Gebruikt dezelfde SMTP-instellingen als de setlist-mails (tabblad FreeShow).
+              </p>
+              <div className="input-group">
+                <label className="input-label">E-mailadres voor foutmeldingen</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.opsAlertEmail || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, opsAlertEmail: e.target.value })}
+                  placeholder="jeffrey.go@arkchurch.nl"
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px', marginTop: '8px' }}>
+                <ActivityLogPanel />
+              </div>
+            </section>
           )}
 
         </div>
       </div>
 
-      {settingsTab !== "backup" && settingsTab !== "activityLog" && (
+      {settingsTab !== "backup" && (
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px', paddingBottom: '20px' }}>
           <button
             className="btn-primary"

@@ -122,7 +122,7 @@ export async function sendOpsAlertEmail(subject: string, bodyText: string, opts:
   const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, smtpFromName, smtpFromEmail, opsAlertEmail } = settings;
 
   if (!opsAlertEmail) {
-    return { success: false, error: 'Geen e-mailadres voor foutmeldingen ingesteld (Instellingen → FreeShow).' };
+    return { success: false, error: 'Geen e-mailadres voor foutmeldingen ingesteld (Instellingen → Activiteitenlog).' };
   }
   if (!smtpHost || !smtpUser || !smtpPass) {
     return { success: false, error: 'SMTP is niet geconfigureerd (Instellingen → FreeShow).' };
