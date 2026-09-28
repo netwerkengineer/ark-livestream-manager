@@ -8,10 +8,22 @@ import { upsertContactFromSso } from "./lib/contactsStore";
 export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
   const settings = getSettings();
 
-  // FORCE HTTPS in production/NAS mode to satisfy Google's security policy
-  if (settings.nextAuthUrl) {
-    process.env.NEXTAUTH_URL = settings.nextAuthUrl;
-    process.env.AUTH_URL = settings.nextAuthUrl; // for Auth.js v5
+  // FORCE HTTPS in production/NAS mode to satisfy Google's security policy.
+  // Derived per-request from the incoming Host header (not a fixed
+  // settings.nextAuthUrl) so this works no matter which domain the app is
+  // reached on - the app is now reverse-proxied under multiple hostnames
+  // at once (e.g. live.arkamersfoort.synology.me and ops.arkchurch.nl), and
+  // a fixed URL here always sent every login back to just one of them,
+  // regardless of which one the user actually started from. trustHost:
+  // true below is what makes relying on the Host header safe: DSM's
+  // reverse proxy only forwards hostnames we've explicitly configured to
+  // reach this app, so it can't be pointed at an arbitrary attacker-chosen
+  // host.
+  const requestHost = req?.headers?.get?.("host");
+  const nextAuthUrl = requestHost ? `https://${requestHost}` : settings.nextAuthUrl;
+  if (nextAuthUrl) {
+    process.env.NEXTAUTH_URL = nextAuthUrl;
+    process.env.AUTH_URL = nextAuthUrl; // for Auth.js v5
   }
 
   const providers: any[] = [
