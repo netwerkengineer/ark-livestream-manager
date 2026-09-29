@@ -10,6 +10,7 @@ import OBSWebSocket from 'obs-websocket-js';
 import { getSettings } from './settingsStore';
 import { youtubeFetch } from './tokenStore';
 import { logActivity } from './activityLog';
+import { sendOpsAlertEmail } from './mailer';
 import { spawn } from 'child_process';
 import path from 'path';
 
@@ -163,6 +164,20 @@ export async function updateLedState(isOBSActive: boolean) {
 // calls/day).
 const YOUTUBE_LIVE_POLL_INTERVAL_MS = 60000;
 
+// checkYouTubeLiveState() returns null on any fetch error or non-ok API
+// response (e.g. quotaExceeded) - the poll below silently does nothing in
+// that case, which is exactly what stranded the LED panel showing a stale
+// state through an entire service on 2026-09-14/21ish (confirmed: manually
+// testing the panel from the Monitor page worked, since that bypasses this
+// YouTube check entirely, but it never flipped on its own when the stream
+// actually went live or ended). A handful of consecutive nulls could still
+// be a one-off blip, so this only alerts once the check has been unable to
+// determine live status for several polls in a row - not on the very first
+// failure, but well before someone sitting through a whole broken service
+// would otherwise be the first to notice.
+let consecutiveNullChecks = 0;
+const NULL_CHECK_ALERT_THRESHOLD = 3;
+
 function initYouTubeLivePolling() {
   if (youtubePollTimer) return;
   youtubePollTimer = setInterval(async () => {
@@ -171,7 +186,21 @@ function initYouTubeLivePolling() {
     const triggerSource = settings.ledTriggerSource || "youtube";
     if (triggerSource === "youtube") {
       const isYtLive = await checkYouTubeLiveState();
-      if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
+      if (isYtLive === null) {
+        consecutiveNullChecks++;
+        if (consecutiveNullChecks === NULL_CHECK_ALERT_THRESHOLD) {
+          const message = `LED-paneel: YouTube-livestatus kon ${NULL_CHECK_ALERT_THRESHOLD} keer op rij niet opgehaald worden - het paneel kan hierdoor vastlopen op de laatst bekende stand (bv. bij een verlopen YouTube-koppeling of een quota-fout).`;
+          logActivity('error', message);
+          sendOpsAlertEmail(
+            'LED-paneel: YouTube-status niet op te halen',
+            message,
+            { key: 'led-youtube-check-failing', cooldownMs: 30 * 60 * 1000 }
+          ).catch(() => {});
+        }
+        return;
+      }
+      consecutiveNullChecks = 0;
+      if (lastStreamActiveState !== isYtLive) {
         console.log(`[LED Control] Periodic YouTube check: status changed to ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}`);
         const ok = await handleStreamStateChange(isYtLive);
         if (ok) lastStreamActiveState = isYtLive;
