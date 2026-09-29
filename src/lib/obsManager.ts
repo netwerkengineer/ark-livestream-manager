@@ -11,6 +11,7 @@ import { getSettings } from './settingsStore';
 import { youtubeFetch } from './tokenStore';
 import { logActivity } from './activityLog';
 import { sendOpsAlertEmail } from './mailer';
+import { isWithinSundayServiceWindow } from './serviceWindow';
 import { spawn } from 'child_process';
 import path from 'path';
 
@@ -190,29 +191,9 @@ const NULL_CHECK_ALERT_THRESHOLD = 3;
 // always works, bypassing this check entirely) or switch ledTriggerSource
 // to "obs" for that day, rather than maintaining a holiday calendar for a
 // handful of days a year.
-function parseHHMM(value: string | undefined, fallback: string): number {
-  const [h, m] = (value || fallback).split(':').map(n => parseInt(n, 10));
-  const hours = Number.isFinite(h) ? h : 0;
-  const minutes = Number.isFinite(m) ? m : 0;
-  return hours * 60 + minutes;
-}
-
-function isWithinSundayServiceWindow(settings: ReturnType<typeof getSettings>): boolean {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Amsterdam',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date());
-  const weekday = parts.find(p => p.type === 'weekday')?.value;
-  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const minutesSinceMidnight = hour * 60 + minute;
-  const windowStart = parseHHMM(settings.ledYoutubePollStartTime, '10:00');
-  const windowEnd = parseHHMM(settings.ledYoutubePollEndTime, '12:30');
-  return weekday === 'Sun' && minutesSinceMidnight >= windowStart && minutesSinceMidnight <= windowEnd;
-}
+// (isWithinSundayServiceWindow lives in serviceWindow.ts - also used by the
+// public live-status API, which has the same quota incentive to skip
+// polling YouTube outside service hours.)
 
 function initYouTubeLivePolling() {
   if (youtubePollTimer) return;

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { youtubeFetch } from "@/lib/tokenStore";
+import { getSettings } from "@/lib/settingsStore";
+import { isWithinSundayServiceWindow } from "@/lib/serviceWindow";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ type LiveStatus = {
   title: string | null;
 };
 
+const NOT_LIVE: LiveStatus = { live: false, url: null, title: null };
+
 export async function GET() {
   if (cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
@@ -26,6 +30,15 @@ export async function GET() {
     cache = { data, timestamp: Date.now() };
     return NextResponse.json(data);
   };
+
+  // The website's own PHP-side cache already limits this to at most one
+  // call every 30s, but that's still ~2,880 YouTube calls/day if left
+  // running around the clock - on the vast majority of days there's never
+  // a stream to find. Skip the YouTube call entirely outside the same
+  // Sunday service window the LED panel uses (Instellingen -> Verbindingen).
+  if (!isWithinSundayServiceWindow(getSettings())) {
+    return respond(NOT_LIVE);
+  }
 
   try {
     const activeRes = await youtubeFetch(

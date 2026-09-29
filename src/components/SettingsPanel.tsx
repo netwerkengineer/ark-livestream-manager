@@ -548,7 +548,7 @@ export default function SettingsPanel({
                         />
                       </div>
                       <p className="text-[10px] text-muted" style={{ marginTop: '6px' }}>
-                        Alleen op zondag binnen dit tijdvak checkt de app automatisch de YouTube-livestatus voor het LED-paneel (bespaart API-quota). Op een andere dag (bv. Kerstavond) werkt de test-knop op de Monitor-pagina nog gewoon.
+                        Alleen op zondag binnen dit tijdvak checkt de app automatisch de YouTube-livestatus — voor het LED-paneel én voor de "we zijn nu live"-banner op de website (bespaart API-quota). Op een andere dag (bv. Kerstavond) werkt de test-knop op de Monitor-pagina nog gewoon, en toont de website geen automatische banner.
                       </p>
                     </div>
                   </div>
