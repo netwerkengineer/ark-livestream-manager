@@ -180,16 +180,24 @@ const NULL_CHECK_ALERT_THRESHOLD = 3;
 
 // The service is (almost) always Sunday ~10:30-12:00 - checking YouTube
 // live status 24/7 the rest of the week is quota spent on days there's
-// essentially never a stream to detect. Gated to Sunday 10:00-12:30
-// (Europe/Amsterdam, with buffer on both sides for setup running early/
-// service running long) - cuts this poll's usage to a couple hundred
-// calls once a week instead of ~1,440/day, every day.
+// essentially never a stream to detect. Gated to a configurable Sunday
+// window (Instellingen -> Presentatie, default 10:00-12:30 Europe/
+// Amsterdam - buffer either side of the usual service) - cuts this poll's
+// usage to a couple hundred calls once a week instead of ~1,440/day,
+// every day.
 // A holiday service on another day (Kerstavond, Goede Vrijdag, ...) won't
 // auto-detect here - use the manual test button on the Monitor page (which
 // always works, bypassing this check entirely) or switch ledTriggerSource
 // to "obs" for that day, rather than maintaining a holiday calendar for a
 // handful of days a year.
-function isWithinSundayServiceWindow(): boolean {
+function parseHHMM(value: string | undefined, fallback: string): number {
+  const [h, m] = (value || fallback).split(':').map(n => parseInt(n, 10));
+  const hours = Number.isFinite(h) ? h : 0;
+  const minutes = Number.isFinite(m) ? m : 0;
+  return hours * 60 + minutes;
+}
+
+function isWithinSundayServiceWindow(settings: ReturnType<typeof getSettings>): boolean {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Amsterdam',
     weekday: 'short',
@@ -201,7 +209,9 @@ function isWithinSundayServiceWindow(): boolean {
   const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
   const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
   const minutesSinceMidnight = hour * 60 + minute;
-  return weekday === 'Sun' && minutesSinceMidnight >= 10 * 60 && minutesSinceMidnight <= 12 * 60 + 30;
+  const windowStart = parseHHMM(settings.ledYoutubePollStartTime, '10:00');
+  const windowEnd = parseHHMM(settings.ledYoutubePollEndTime, '12:30');
+  return weekday === 'Sun' && minutesSinceMidnight >= windowStart && minutesSinceMidnight <= windowEnd;
 }
 
 function initYouTubeLivePolling() {
@@ -211,7 +221,7 @@ function initYouTubeLivePolling() {
     if (!settings.ledPanelEnabled) return;
     const triggerSource = settings.ledTriggerSource || "youtube";
     if (triggerSource === "youtube") {
-      if (!isWithinSundayServiceWindow()) return;
+      if (!isWithinSundayServiceWindow(settings)) return;
       const isYtLive = await checkYouTubeLiveState();
       if (isYtLive === null) {
         consecutiveNullChecks++;

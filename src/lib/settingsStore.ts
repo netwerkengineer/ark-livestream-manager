@@ -119,6 +119,15 @@ export interface AppSettings {
   ledInactiveText?: string;
   ledInactiveColor?: string;
   ledTriggerSource?: "youtube" | "obs";
+  // The Sunday ("HH:MM", Europe/Amsterdam) window the "youtube" trigger
+  // source auto-polls YouTube's live status in - outside it (including
+  // every other day of the week) the LED panel only updates via the
+  // Monitor page's manual test button or by switching ledTriggerSource to
+  // "obs" for that day, e.g. for a Kerstavond/Goede Vrijdag service.
+  // Defaults (10:00-12:30) cover the usual ~10:30-12:00 service with
+  // buffer for setup running early or the service running long.
+  ledYoutubePollStartTime?: string;
+  ledYoutubePollEndTime?: string;
   atemHost?: string;
 
   // Team-SSO: login + rights via an external identity provider (Authentik
@@ -327,6 +336,8 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   ledInactiveText: "LIVESTREAM OFFLINE",
   ledInactiveColor: "#00ff00",
   ledTriggerSource: "youtube",
+  ledYoutubePollStartTime: "10:00",
+  ledYoutubePollEndTime: "12:30",
   atemHost: "",
 
   // SSO Defaults - disabled until an issuer/client is actually configured

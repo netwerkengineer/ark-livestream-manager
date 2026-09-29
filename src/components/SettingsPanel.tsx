@@ -530,6 +530,27 @@ export default function SettingsPanel({
                         </div>
                       </div>
                     </div>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+                      <label className="text-[11px] text-muted" style={{ display: 'block', marginBottom: '6px' }}>YouTube-controle venster (alleen zondag):</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input
+                          className="input-field"
+                          type="time"
+                          value={settings.ledYoutubePollStartTime || "10:00"}
+                          onChange={(e) => onSettingsChange({ ...settings, ledYoutubePollStartTime: e.target.value })}
+                        />
+                        <input
+                          className="input-field"
+                          type="time"
+                          value={settings.ledYoutubePollEndTime || "12:30"}
+                          onChange={(e) => onSettingsChange({ ...settings, ledYoutubePollEndTime: e.target.value })}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted" style={{ marginTop: '6px' }}>
+                        Alleen op zondag binnen dit tijdvak checkt de app automatisch de YouTube-livestatus voor het LED-paneel (bespaart API-quota). Op een andere dag (bv. Kerstavond) werkt de test-knop op de Monitor-pagina nog gewoon.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
