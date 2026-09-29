@@ -153,6 +153,16 @@ export async function updateLedState(isOBSActive: boolean) {
   }
 }
 
+// Every 10s (24/7, regardless of whether a service is even happening) was
+// 8,640 YouTube API calls/day on its own - ~86% of the whole default
+// 10,000-unit daily quota, confirmed as the dominant cause of a real
+// quotaExceeded incident (2026-09-29, production at 9,427/10,000 units for
+// the day with this as by far the largest contributor). A physical LED
+// sign board doesn't need sub-minute precision - 60s still updates it
+// promptly relative to a human noticing, at 1/6th the API cost (1,440
+// calls/day).
+const YOUTUBE_LIVE_POLL_INTERVAL_MS = 60000;
+
 function initYouTubeLivePolling() {
   if (youtubePollTimer) return;
   youtubePollTimer = setInterval(async () => {
@@ -167,7 +177,7 @@ function initYouTubeLivePolling() {
         if (ok) lastStreamActiveState = isYtLive;
       }
     }
-  }, 10000);
+  }, YOUTUBE_LIVE_POLL_INTERVAL_MS);
 }
 
 export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null): Promise<boolean> {

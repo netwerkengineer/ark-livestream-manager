@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { logActivity } from './activityLog';
+import { sendOpsAlertEmail } from './mailer';
 
 const QUOTA_FILE = path.join(process.cwd(), 'data', 'youtube_quota.json');
 
@@ -13,7 +15,16 @@ const ASSUMED_DAILY_LIMIT = 10000;
 interface QuotaState {
   date: string; // Pacific-time quota day (YYYY-MM-DD), matching Google's actual daily reset boundary
   unitsUsed: number;
+  warnedThisDay?: boolean;
 }
+
+// Fire once per quota-day the first time estimated usage crosses this -
+// the point of tracking usage at all is to catch a runaway consumer (e.g.
+// the LED panel's YouTube poll, which alone used ~86% of a day's quota
+// before its interval was fixed) before it actually blocks functionality,
+// not just to explain it afterwards via the reactive quotaExceeded alert
+// already sent elsewhere (thumbnailSync.ts).
+const WARN_THRESHOLD_PERCENT = 80;
 
 function pacificDateKey(): string {
   // en-CA formats as YYYY-MM-DD
@@ -54,6 +65,19 @@ function estimateCost(url: string, method: string): number {
 export function recordYoutubeQuotaUsage(url: string, method: string) {
   const state = readState();
   state.unitsUsed += estimateCost(url, method);
+
+  const percentUsed = (state.unitsUsed / ASSUMED_DAILY_LIMIT) * 100;
+  if (percentUsed >= WARN_THRESHOLD_PERCENT && !state.warnedThisDay) {
+    state.warnedThisDay = true;
+    const message = `YouTube API-quota (geschat) staat op ${Math.round(percentUsed)}% van het dagelijkse limiet (${state.unitsUsed}/${ASSUMED_DAILY_LIMIT} units, ${state.date}).`;
+    logActivity('error', message);
+    sendOpsAlertEmail(
+      'YouTube API-quota bijna op',
+      `${message}\n\nBij 100% gaan YouTube-acties (thumbnail-sync, planner, live-status) tijdelijk mislukken tot het quotum rond 9:00 's ochtends (Nederlandse tijd, middernacht Pacific) automatisch reset.`,
+      { key: 'youtube-quota-warning' }
+    ).catch(() => {});
+  }
+
   writeState(state);
 }
 
