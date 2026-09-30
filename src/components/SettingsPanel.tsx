@@ -39,6 +39,9 @@ interface SettingsPanelProps {
   userManagementError: string;
   userManagementSuccess: string;
   currentUser: string | null;
+  isConnectedYoutube: boolean;
+  onConnectYoutube: () => void;
+  onDisconnectYoutube: () => void;
   onClose: () => void;
   onSettingsChange: (settings: any) => void;
   onTabChange: (tab: "general" | "connections" | "plugs" | "scheduler" | "midi" | "buttons" | "users" | "freeshow" | "sso" | "backup" | "activityLog") => void;
@@ -67,6 +70,9 @@ export default function SettingsPanel({
   userManagementError,
   userManagementSuccess,
   currentUser,
+  isConnectedYoutube,
+  onConnectYoutube,
+  onDisconnectYoutube,
   onClose,
   onSettingsChange,
   onTabChange,
@@ -372,6 +378,31 @@ export default function SettingsPanel({
           {settingsTab === "general" && (
             <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <h3 style={{ fontSize: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>📝 Algemene Instellingen</h3>
+
+              <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MonitorPlay size={18} color="var(--primary)" />
+                    <strong>YouTube/Google-koppeling</strong>
+                    <span style={{ fontSize: '0.8rem', color: isConnectedYoutube ? '#4ade80' : 'var(--muted)' }}>
+                      {isConnectedYoutube ? '● Verbonden' : '○ Niet verbonden'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="btn-outline" onClick={onConnectYoutube}>
+                      {isConnectedYoutube ? 'Opnieuw inloggen' : 'Inloggen met Google'}
+                    </button>
+                    {isConnectedYoutube && (
+                      <button type="button" className="btn-danger" onClick={onDisconnectYoutube}>
+                        Loskoppelen
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '12px' }}>
+                  Dit is de Google/YouTube-koppeling waarmee de app livestreams beheert (Planner) en thumbnails synct. &quot;Verbonden&quot; betekent alleen dat er een token is opgeslagen — als YouTube-acties toch blijven mislukken (bv. &quot;Insufficient Permission&quot;/scope-fouten in het Activiteitenlog), klik dan op &quot;Loskoppelen&quot; en daarna opnieuw op &quot;Inloggen met Google&quot;, en zorg dat je bij Google's toestemmingsscherm alle gevraagde rechten toestaat (met name YouTube-beheer).
+                </p>
+              </div>
 
               <div className="input-group">
                 <label className="input-label">Thumbnail Opslag Pad (NAS)</label>

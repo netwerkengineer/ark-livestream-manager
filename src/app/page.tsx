@@ -283,6 +283,19 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
     signOut({ callbackUrl: "/" });
   };
 
+  // Clears the stored YouTube token so isConnectedYoutube flips back to
+  // false and the "Inloggen met Google" button reappears - needed because
+  // that button is otherwise hidden whenever any token is present, even
+  // one that was granted the wrong scopes and fails on every YouTube call.
+  const handleDisconnectYoutube = async () => {
+    try {
+      await fetch("/api/auth/youtube-disconnect", { method: "POST" });
+    } catch (err) {
+      console.error("Error disconnecting YouTube:", err);
+    }
+    setIsConnectedYoutube(false);
+  };
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserManagementError("");
@@ -920,6 +933,9 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
               userManagementError={userManagementError}
               userManagementSuccess={userManagementSuccess}
               currentUser={currentUser}
+              isConnectedYoutube={isConnectedYoutube}
+              onConnectYoutube={() => signIn("google")}
+              onDisconnectYoutube={handleDisconnectYoutube}
               onClose={() => setShowSettings(false)}
               onSettingsChange={setSettings}
               onTabChange={setSettingsTab}

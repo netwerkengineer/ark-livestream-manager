@@ -35,7 +35,11 @@ export function getTokens() {
 // not whether it still works) correctly flip back to "not connected" and
 // show the "Inloggen met Google" button again, instead of silently staying
 // "connected" while every request keeps failing.
-function clearGoogleTokens() {
+// Also exported for the manual "Loskoppelen" button in Settings - useful
+// when the token technically still works but was granted the wrong scopes
+// (e.g. YouTube permissions unchecked during Google's consent screen),
+// which invalid_grant doesn't catch since the token itself isn't dead.
+export function clearGoogleTokens() {
   const tokens = getTokens();
   delete tokens.google;
   delete tokens.google_refresh;
