@@ -51,12 +51,51 @@ def _resolve_all_channels(plug_info, all_plugs):
     return sorted(set(channels)) or [1]
 
 
-def get_single_plug_status(plug_info, all_plugs=None):
+def _device_key(plug_info):
+    return (plug_info.get("ip"), plug_info.get("deviceId"), plug_info.get("localKey"))
+
+
+def _fetch_device_status(ip, device_id, local_key, version):
+    """One physical connection + status query - the actual network I/O,
+    factored out so every TuyaPlug entry sharing the same ip/deviceId/
+    localKey (a multi-socket strip's separate channel entries) can reuse a
+    single result instead of each opening its own simultaneous connection.
+    Many cheap Tuya modules only tolerate one local connection at a time;
+    several entries polling the same physical plug concurrently (as the
+    status_json "all" batch does every poll) was causing some of them to
+    randomly fail and read as "offline" for a cycle, then recover the next
+    - a monitoring artifact, not the plug actually dropping off the network."""
+    device_status = {"is_online": False, "dps": {}}
+    if not ip or not device_id or not local_key:
+        return device_status
+
+    # Quick TCP port check to avoid tinytuya blocking on offline plugs
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1.0)
+        s.connect((ip, 6668))
+        s.close()
+    except Exception:
+        return device_status
+
+    try:
+        d = tinytuya.OutletDevice(device_id, ip, local_key)
+        d.set_version(version)
+        d.set_socketTimeout(1.2)  # Fast timeout for responsive UI but robust enough for network latency
+        status = d.status()
+        if status and "Error" not in status:
+            device_status["is_online"] = True
+            device_status["dps"] = status.get("dps", {})
+    except Exception:
+        pass
+    return device_status
+
+
+def get_single_plug_status(plug_info, all_plugs=None, device_status=None):
     name = plug_info.get("name", plug_info.get("id"))
     plug_id = plug_info.get("id")
     ip = plug_info.get("ip")
-    device_id = plug_info.get("deviceId")
-    local_key = plug_info.get("localKey")
     version = float(plug_info.get("version", 3.5))
     # Multi-socket devices (e.g. a 4-way power strip) share one ip/deviceId/
     # localKey across several TuyaPlug entries, each with a different
@@ -79,46 +118,36 @@ def get_single_plug_status(plug_info, all_plugs=None):
         "current_a": 0.0
     }
 
-    if not ip or not device_id or not local_key:
+    # A precomputed device_status (shared across sibling entries) skips the
+    # network call entirely; only fetch fresh if none was passed in, so a
+    # direct/standalone call to this function still works on its own.
+    if device_status is None:
+        device_status = _fetch_device_status(
+            ip, plug_info.get("deviceId"), plug_info.get("localKey"), version
+        )
+
+    if not device_status["is_online"]:
         return result
 
-    # Quick TCP port check to avoid tinytuya blocking on offline plugs
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1.0)
-        s.connect((ip, 6668))
-        s.close()
-    except Exception:
-        return result
+    result["is_online"] = True
+    dps = device_status["dps"]
+    if is_all_channels:
+        channels = _resolve_all_channels(plug_info, all_plugs)
+        result["state"] = "on" if any(dps.get(str(ch)) for ch in channels) else "off"
+    else:
+        result["state"] = "on" if dps.get(str(switch_index)) else "off"
 
-    try:
-        d = tinytuya.OutletDevice(device_id, ip, local_key)
-        d.set_version(version)
-        d.set_socketTimeout(1.2)  # Fast timeout for responsive UI but robust enough for network latency
-        status = d.status()
-        if status and "Error" not in status:
-            result["is_online"] = True
-            dps = status.get("dps", {})
-            if is_all_channels:
-                channels = _resolve_all_channels(plug_info, all_plugs)
-                result["state"] = "on" if any(dps.get(str(ch)) for ch in channels) else "off"
-            else:
-                result["state"] = "on" if dps.get(str(switch_index)) else "off"
+    # Extract power parameters (LSC plug standard DPS keys). On a
+    # multi-socket strip these are typically for the whole strip,
+    # not per-socket - shown as-is on every entry for that device
+    # rather than guessed-at per-socket numbers.
+    current_ma = dps.get("18", 0)
+    power_01w = dps.get("19", 0)
+    voltage_01v = dps.get("20", 0)
 
-            # Extract power parameters (LSC plug standard DPS keys). On a
-            # multi-socket strip these are typically for the whole strip,
-            # not per-socket - shown as-is on every entry for that device
-            # rather than guessed-at per-socket numbers.
-            current_ma = dps.get("18", 0)
-            power_01w = dps.get("19", 0)
-            voltage_01v = dps.get("20", 0)
-
-            result["current_a"] = round(current_ma / 1000.0, 3)
-            result["power_w"] = round(power_01w / 10.0, 1)
-            result["voltage_v"] = round(voltage_01v / 10.0, 1)
-    except Exception:
-        pass
+    result["current_a"] = round(current_ma / 1000.0, 3)
+    result["power_w"] = round(power_01w / 10.0, 1)
+    result["voltage_v"] = round(voltage_01v / 10.0, 1)
     return result
 
 
@@ -220,8 +249,27 @@ def main():
                         "version": version
                     }]
         
+        # Query each unique physical device (ip/deviceId/localKey) only
+        # once, not once per plug entry pointing at it - see
+        # _fetch_device_status for why several concurrent connections to
+        # the same multi-socket strip caused it to flicker "offline".
+        unique_devices = {}
+        for p in target_plugs:
+            unique_devices.setdefault(_device_key(p), p)
+
+        def _fetch_for_key(item):
+            key, sample_plug = item
+            ip, device_id, local_key = key
+            version = float(sample_plug.get("version", 3.5))
+            return key, _fetch_device_status(ip, device_id, local_key, version)
+
         with ThreadPoolExecutor(max_workers=10) as executor:
-            results = list(executor.map(lambda p: get_single_plug_status(p, plugs), target_plugs))
+            device_statuses = dict(executor.map(_fetch_for_key, unique_devices.items()))
+
+        results = [
+            get_single_plug_status(p, plugs, device_statuses[_device_key(p)])
+            for p in target_plugs
+        ]
         print(json.dumps(results))
         sys.exit(0)
 
