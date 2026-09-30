@@ -30,12 +30,14 @@ def _resolve_all_channels(plug_info, all_plugs):
     channels that DO have their own entry, which silently misses the rest."""
     explicit = plug_info.get("allChannels")
     if explicit:
-        try:
-            channels = sorted(set(int(c) for c in explicit))
-            if channels:
-                return channels
-        except (TypeError, ValueError):
-            pass
+        parts = explicit if isinstance(explicit, list) else str(explicit).split(",")
+        channels = []
+        for part in parts:
+            part = str(part).strip()
+            if part.isdigit():
+                channels.append(int(part))
+        if channels:
+            return sorted(set(channels))
 
     ip = plug_info.get("ip")
     device_id = plug_info.get("deviceId")

@@ -192,7 +192,9 @@ export interface TuyaPlug {
   // has its own configured entry, so explicit allChannels is preferred
   // whenever the strip has channels you don't otherwise expose individually.
   switchIndex?: number | "all";
-  allChannels?: number[];
+  // Comma-separated (e.g. "1,2,3,4"), not a number[] - kept as the raw
+  // string the user typed in Settings; control_plug.py parses it.
+  allChannels?: string;
 }
 
 export interface FreeShowSyncTarget {

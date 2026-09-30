@@ -802,14 +802,17 @@ export default function SettingsPanel({
                             className="input-field"
                             style={{ marginTop: '8px' }}
                             placeholder="Kanalen, bv. 1,2,3,4"
-                            value={(plug.allChannels || []).join(',')}
+                            // Kept as the raw typed string, not parsed into
+                            // numbers on every keystroke - re-deriving the
+                            // displayed value from a parsed-then-rejoined
+                            // array stripped trailing/in-progress commas
+                            // (e.g. typing "1," immediately snapped back to
+                            // "1"), making it impossible to type a list at
+                            // all. control_plug.py parses this string.
+                            value={plug.allChannels || ""}
                             onChange={(e) => {
                               const updatedPlugs = [...settings.tuyaPlugs];
-                              const parsed = e.target.value
-                                .split(',')
-                                .map((v: string) => parseInt(v.trim(), 10))
-                                .filter((n: number) => Number.isFinite(n));
-                              updatedPlugs[idx] = { ...plug, allChannels: parsed };
+                              updatedPlugs[idx] = { ...plug, allChannels: e.target.value };
                               onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
                             }}
                           />
