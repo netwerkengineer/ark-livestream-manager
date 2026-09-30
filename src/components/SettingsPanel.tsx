@@ -696,6 +696,31 @@ export default function SettingsPanel({
                       >
                         Verwijderen
                       </button>
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '8px' }}
+                        title="Kopieert IP/Device ID/Local Key/Protocol - vul daarna zelf een nieuwe naam, ID en kanaal in"
+                        onClick={() => {
+                          // Keeps the connection details (same physical
+                          // device, e.g. a multi-socket strip) but clears
+                          // everything that must be unique per channel -
+                          // exactly the 3 fields you'd otherwise retype by
+                          // hand for every extra socket.
+                          const duplicated = {
+                            ...plug,
+                            id: "",
+                            name: "",
+                            switchIndex: 1,
+                            allChannels: undefined,
+                          };
+                          const updatedPlugs = [...settings.tuyaPlugs];
+                          updatedPlugs.splice(idx + 1, 0, duplicated);
+                          onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
+                        }}
+                      >
+                        Dupliceer
+                      </button>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
@@ -770,7 +795,26 @@ export default function SettingsPanel({
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Kanaal (bij stekkerdoos met meerdere stopcontacten)</label>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                          Kanaal (meerdere stopcontacten)
+                          <span
+                            title={'Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan (gebruik de "Dupliceer"-knop hierboven om dat snel te doen). Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten — dat vult de kanalenlijst standaard met "1,2,3,4,5"; pas die aan naar bv. "1,3,5" om alleen die specifieke kanalen te triggeren.'}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '50%',
+                              border: '1px solid rgba(255,255,255,0.3)',
+                              fontSize: '0.65rem',
+                              cursor: 'help',
+                              flexShrink: 0
+                            }}
+                          >
+                            ?
+                          </span>
+                        </label>
                         <input
                           className="input-field"
                           type="number"
@@ -832,9 +876,6 @@ export default function SettingsPanel({
                         )}
                       </div>
                     </div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '6px', marginBottom: 0 }}>
-                      Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan. Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten — dat vult de kanalenlijst standaard met "1,2,3,4,5"; pas die aan naar bv. "1,3,5" om alleen die specifieke kanalen te triggeren.
-                    </p>
                   </div>
                 ))}
               </div>
