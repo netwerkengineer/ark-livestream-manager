@@ -184,10 +184,15 @@ export interface TuyaPlug {
   // plugs (plug_beamer, plug_obs) working exactly as before - only a
   // multi-socket device needs several TuyaPlug entries with the same
   // connection details and a different switchIndex each.
-  // "all" marks an aggregate entry instead: control_plug.py resolves every
-  // sibling entry sharing the same ip/deviceId/localKey and switches them
-  // all together in one command, same as the strip's own "all" button.
+  // "all" marks an aggregate entry instead: control_plug.py switches every
+  // channel in allChannels together in one command, same as the strip's
+  // own "all" button. If allChannels is left empty, it falls back to
+  // auto-detecting every sibling entry's switchIndex sharing the same ip/
+  // deviceId/localKey - only reliable when every physical channel actually
+  // has its own configured entry, so explicit allChannels is preferred
+  // whenever the strip has channels you don't otherwise expose individually.
   switchIndex?: number | "all";
+  allChannels?: number[];
 }
 
 export interface FreeShowSyncTarget {

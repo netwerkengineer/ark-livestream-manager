@@ -797,10 +797,27 @@ export default function SettingsPanel({
                           />
                           Bedient alle kanalen tegelijk
                         </label>
+                        {plug.switchIndex === "all" && (
+                          <input
+                            className="input-field"
+                            style={{ marginTop: '8px' }}
+                            placeholder="Kanalen, bv. 1,2,3,4"
+                            value={(plug.allChannels || []).join(',')}
+                            onChange={(e) => {
+                              const updatedPlugs = [...settings.tuyaPlugs];
+                              const parsed = e.target.value
+                                .split(',')
+                                .map((v: string) => parseInt(v.trim(), 10))
+                                .filter((n: number) => Number.isFinite(n));
+                              updatedPlugs[idx] = { ...plug, allChannels: parsed };
+                              onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                     <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '6px', marginBottom: 0 }}>
-                      Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan. Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten.
+                      Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan. Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten — vul daarbij zelf de volledige kanalenlijst in (bv. "1,2,3,4"), ook voor kanalen die je niet apart als losse stekker hebt aangemaakt.
                     </p>
                   </div>
                 ))}

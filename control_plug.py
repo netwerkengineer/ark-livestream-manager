@@ -22,10 +22,21 @@ def get_settings():
 
 def _resolve_all_channels(plug_info, all_plugs):
     """For a TuyaPlug entry with switchIndex == "all" (an aggregate control
-    for a whole multi-socket strip), find every sibling entry sharing the
-    same ip/deviceId/localKey and collect their individual switch numbers -
-    exactly what the strip's own "all" button in the Tuya app does under
-    the hood (one command setting every channel's DPS at once)."""
+    for a whole multi-socket strip), figure out which DPS numbers to switch
+    together. Prefers the entry's own explicit allChannels list (set by the
+    user in Settings) since a strip can have channels nobody bothered to
+    expose as an individual plug entry - falling back to auto-detecting
+    every sibling entry sharing the same ip/deviceId/localKey only covers
+    channels that DO have their own entry, which silently misses the rest."""
+    explicit = plug_info.get("allChannels")
+    if explicit:
+        try:
+            channels = sorted(set(int(c) for c in explicit))
+            if channels:
+                return channels
+        except (TypeError, ValueError):
+            pass
+
     ip = plug_info.get("ip")
     device_id = plug_info.get("deviceId")
     local_key = plug_info.get("localKey")
