@@ -791,6 +791,11 @@ export default function SettingsPanel({
                             checked={plug.switchIndex === "all"}
                             onChange={(e) => {
                               const checked = e.target.checked;
+                              // A leftover allChannels: [] from an earlier
+                              // build (before this became a plain string)
+                              // is truthy in JS, so "|| default" alone
+                              // wouldn't replace it - only a real string counts.
+                              const existing = typeof plug.allChannels === "string" ? plug.allChannels : "";
                               const updatedPlugs = [...settings.tuyaPlugs];
                               updatedPlugs[idx] = {
                                 ...plug,
@@ -798,7 +803,7 @@ export default function SettingsPanel({
                                 // Sensible starting default (a common 4-outlet
                                 // + USB strip) rather than leaving it blank -
                                 // edit down to e.g. "1,3,5" for a subset.
-                                allChannels: checked ? (plug.allChannels || "1,2,3,4,5") : plug.allChannels,
+                                allChannels: checked ? (existing || "1,2,3,4,5") : existing,
                               };
                               onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
                             }}
@@ -817,7 +822,7 @@ export default function SettingsPanel({
                             // (e.g. typing "1," immediately snapped back to
                             // "1"), making it impossible to type a list at
                             // all. control_plug.py parses this string.
-                            value={plug.allChannels || ""}
+                            value={typeof plug.allChannels === "string" ? plug.allChannels : ""}
                             onChange={(e) => {
                               const updatedPlugs = [...settings.tuyaPlugs];
                               updatedPlugs[idx] = { ...plug, allChannels: e.target.value };
