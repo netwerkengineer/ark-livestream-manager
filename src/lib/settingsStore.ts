@@ -184,7 +184,10 @@ export interface TuyaPlug {
   // plugs (plug_beamer, plug_obs) working exactly as before - only a
   // multi-socket device needs several TuyaPlug entries with the same
   // connection details and a different switchIndex each.
-  switchIndex?: number;
+  // "all" marks an aggregate entry instead: control_plug.py resolves every
+  // sibling entry sharing the same ip/deviceId/localKey and switches them
+  // all together in one command, same as the strip's own "all" button.
+  switchIndex?: number | "all";
 }
 
 export interface FreeShowSyncTarget {

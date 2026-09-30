@@ -638,7 +638,10 @@ export default function SettingsPanel({
 
                 {(settings.tuyaPlugs || []).map((plug: any, idx: number) => (
                   <div
-                    key={plug.id || idx}
+                    // Not plug.id: that field is itself editable below, and
+                    // using it as the key remounted this whole row (killing
+                    // focus) on every keystroke while typing a new ID.
+                    key={idx}
                     className="glass-card"
                     style={{
                       padding: '16px',
@@ -773,17 +776,31 @@ export default function SettingsPanel({
                           type="number"
                           min={1}
                           placeholder="1"
-                          value={plug.switchIndex || 1}
+                          disabled={plug.switchIndex === "all"}
+                          style={plug.switchIndex === "all" ? { opacity: 0.4 } : undefined}
+                          value={plug.switchIndex === "all" ? "" : (plug.switchIndex || 1)}
                           onChange={(e) => {
                             const updatedPlugs = [...settings.tuyaPlugs];
                             updatedPlugs[idx] = { ...plug, switchIndex: parseInt(e.target.value, 10) || 1 };
                             onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
                           }}
                         />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.75rem', color: 'var(--muted)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={plug.switchIndex === "all"}
+                            onChange={(e) => {
+                              const updatedPlugs = [...settings.tuyaPlugs];
+                              updatedPlugs[idx] = { ...plug, switchIndex: e.target.checked ? "all" : 1 };
+                              onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
+                            }}
+                          />
+                          Bedient alle kanalen tegelijk
+                        </label>
                       </div>
                     </div>
                     <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '6px', marginBottom: 0 }}>
-                      Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan.
+                      Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan. Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten.
                     </p>
                   </div>
                 ))}
