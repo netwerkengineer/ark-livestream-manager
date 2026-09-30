@@ -85,6 +85,10 @@ export default function SettingsPanel({
   setNewPermissions,
   setEditingUsername
 }: SettingsPanelProps) {
+  // Which plug row's channel-help popover is open (a native `title`
+  // attribute only shows on hover, not on click/tap, so a real popover is
+  // needed for it to work with a click and on touch devices).
+  const [openPlugHelpIdx, setOpenPlugHelpIdx] = useState<number | null>(null);
   const [detectingOutputs, setDetectingOutputs] = useState(false);
   const [detectedOutputs, setDetectedOutputs] = useState<{ id: string; name: string }[] | null>(null);
   const [detectError, setDetectError] = useState('');
@@ -794,11 +798,12 @@ export default function SettingsPanel({
                           <option value="3.5">3.5</option>
                         </select>
                       </div>
-                      <div>
+                      <div style={{ position: 'relative' }}>
                         <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                           Kanaal (meerdere stopcontacten)
-                          <span
-                            title={'Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan (gebruik de "Dupliceer"-knop hierboven om dat snel te doen). Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar "Bedient alle kanalen tegelijk" aan om alle stopcontacten in één keer aan/uit te zetten — dat vult de kanalenlijst standaard met "1,2,3,4,5"; pas die aan naar bv. "1,3,5" om alleen die specifieke kanalen te triggeren.'}
+                          <button
+                            type="button"
+                            onClick={() => setOpenPlugHelpIdx(openPlugHelpIdx === idx ? null : idx)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -807,14 +812,40 @@ export default function SettingsPanel({
                               height: '14px',
                               borderRadius: '50%',
                               border: '1px solid rgba(255,255,255,0.3)',
+                              background: 'transparent',
+                              color: 'inherit',
                               fontSize: '0.65rem',
-                              cursor: 'help',
+                              lineHeight: 1,
+                              padding: 0,
+                              cursor: 'pointer',
                               flexShrink: 0
                             }}
                           >
                             ?
-                          </span>
+                          </button>
                         </label>
+                        {openPlugHelpIdx === idx && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              zIndex: 10,
+                              top: '100%',
+                              left: 0,
+                              marginTop: '4px',
+                              width: '280px',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              background: '#1e293b',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                              fontSize: '0.75rem',
+                              color: 'var(--muted)',
+                              lineHeight: 1.5
+                            }}
+                          >
+                            Alleen relevant bij een stekkerdoos met meerdere los schakelbare stopcontacten: maak voor elk stopcontact een aparte stekker aan met dezelfde IP/Device ID/Local Key, en geef elke een ander kanaalnummer (1, 2, 3, ...). Een gewone losse stekker laat je gewoon op 1 staan (gebruik de &quot;Dupliceer&quot;-knop hierboven om dat snel te doen). Voeg optioneel nog één extra stekker-entry toe met dezelfde IP/Device ID/Local Key en vink daar &quot;Bedient alle kanalen tegelijk&quot; aan om alle stopcontacten in één keer aan/uit te zetten — dat vult de kanalenlijst standaard met &quot;1,2,3,4,5&quot;; pas die aan naar bv. &quot;1,3,5&quot; om alleen die specifieke kanalen te triggeren.
+                          </div>
+                        )}
                         <input
                           className="input-field"
                           type="number"
