@@ -16,6 +16,9 @@ interface QuotaState {
   date: string; // Pacific-time quota day (YYYY-MM-DD), matching Google's actual daily reset boundary
   unitsUsed: number;
   warnedThisDay?: boolean;
+  // Per caller + endpoint, so "who used 8000 units?" has an answer: the
+  // total alone can't tell a runaway poll from normal use.
+  breakdown?: Record<string, { calls: number; units: number }>;
 }
 
 // Fire once per quota-day the first time estimated usage crosses this -
@@ -62,18 +65,45 @@ function estimateCost(url: string, method: string): number {
   return 50;
 }
 
-export function recordYoutubeQuotaUsage(url: string, method: string) {
+function breakdownKey(url: string, method: string, source?: string): string {
+  let resource = "onbekend";
+  try {
+    const u = new URL(url);
+    resource = u.pathname.replace(/^\/youtube\/v3\//, "");
+    const status = u.searchParams.get("broadcastStatus");
+    if (status) resource += `[${status}]`;
+  } catch {}
+  return `${source || "overig"} | ${(method || "GET").toUpperCase()} ${resource}`;
+}
+
+function topConsumers(state: QuotaState, limit = 5): string {
+  const rows = Object.entries(state.breakdown || {})
+    .sort((a, b) => b[1].units - a[1].units)
+    .slice(0, limit);
+  if (rows.length === 0) return "(geen uitsplitsing beschikbaar)";
+  return rows.map(([key, v]) => `- ${key}: ${v.calls}x, ${v.units} units`).join("\n");
+}
+
+export function recordYoutubeQuotaUsage(url: string, method: string, source?: string) {
   const state = readState();
-  state.unitsUsed += estimateCost(url, method);
+  const cost = estimateCost(url, method);
+  state.unitsUsed += cost;
+
+  const key = breakdownKey(url, method, source);
+  state.breakdown = state.breakdown || {};
+  const entry = state.breakdown[key] || { calls: 0, units: 0 };
+  entry.calls += 1;
+  entry.units += cost;
+  state.breakdown[key] = entry;
 
   const percentUsed = (state.unitsUsed / ASSUMED_DAILY_LIMIT) * 100;
   if (percentUsed >= WARN_THRESHOLD_PERCENT && !state.warnedThisDay) {
     state.warnedThisDay = true;
     const message = `YouTube API-quota (geschat) staat op ${Math.round(percentUsed)}% van het dagelijkse limiet (${state.unitsUsed}/${ASSUMED_DAILY_LIMIT} units, ${state.date}).`;
-    logActivity('error', message);
+    logActivity('error', `${message}\nGrootste verbruikers:\n${topConsumers(state, 3)}`);
     sendOpsAlertEmail(
       'YouTube API-quota bijna op',
-      `${message}\n\nBij 100% gaan YouTube-acties (thumbnail-sync, planner, live-status) tijdelijk mislukken tot het quotum rond 9:00 's ochtends (Nederlandse tijd, middernacht Pacific) automatisch reset.`,
+      `${message}\n\nGrootste verbruikers vandaag:\n${topConsumers(state)}\n\nBij 100% gaan YouTube-acties (thumbnail-sync, planner, live-status) tijdelijk mislukken tot het quotum rond 9:00 's ochtends (Nederlandse tijd, middernacht Pacific) automatisch reset.`,
       { key: 'youtube-quota-warning' }
     ).catch(() => {});
   }

@@ -102,13 +102,36 @@ function execScpCommand(
 let lastStreamActiveState: boolean | null = null;
 let youtubePollTimer: NodeJS.Timeout | null = null;
 
+// Why the most recent check returned null, so the "kon niet opgehaald worden"
+// alert can say what actually went wrong instead of guessing (it used to
+// only suggest "expired link or quota" - the real cause turned out to be
+// neither, see the URL note below).
+let lastLiveCheckError: string | null = null;
+
 export async function checkYouTubeLiveState(): Promise<boolean | null> {
   try {
+    // broadcastStatus and mine are mutually exclusive filters on
+    // liveBroadcasts.list - sending both (as this did from the day the
+    // YouTube trigger was added) makes YouTube answer 400
+    // "incompatibleParameters" every single time, so this check could never
+    // succeed and the LED panel never reacted to going live. broadcastStatus
+    // alone already only returns the authorized channel's own broadcasts.
     const res = await youtubeFetch(
-      "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=status&broadcastStatus=active&mine=true",
-      { cache: "no-store" }
+      "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=status&broadcastStatus=active&broadcastType=all",
+      { cache: "no-store" },
+      "led-paneel"
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        const reason = body?.error?.errors?.[0]?.reason;
+        detail = `${body?.error?.message || ""}${reason ? ` [${reason}]` : ""}`.trim();
+      } catch {}
+      lastLiveCheckError = `HTTP ${res.status}${detail ? `: ${detail}` : ""}`;
+      return null;
+    }
+    lastLiveCheckError = null;
     const data = await res.json();
     if (data.items && Array.isArray(data.items)) {
       const isLive = data.items.some(
@@ -119,6 +142,7 @@ export async function checkYouTubeLiveState(): Promise<boolean | null> {
     return false;
   } catch (err: any) {
     console.error("[YouTube Live Check] Error fetching live status:", err?.message || err);
+    lastLiveCheckError = `netwerkfout: ${err?.message || err}`;
     return null;
   }
 }
@@ -207,7 +231,7 @@ function initYouTubeLivePolling() {
       if (isYtLive === null) {
         consecutiveNullChecks++;
         if (consecutiveNullChecks === NULL_CHECK_ALERT_THRESHOLD) {
-          const message = `LED-paneel: YouTube-livestatus kon ${NULL_CHECK_ALERT_THRESHOLD} keer op rij niet opgehaald worden - het paneel kan hierdoor vastlopen op de laatst bekende stand (bv. bij een verlopen YouTube-koppeling of een quota-fout).`;
+          const message = `LED-paneel: YouTube-livestatus kon ${NULL_CHECK_ALERT_THRESHOLD} keer op rij niet opgehaald worden - het paneel kan hierdoor vastlopen op de laatst bekende stand. Laatste fout: ${lastLiveCheckError || 'onbekend'}.`;
           logActivity('error', message);
           sendOpsAlertEmail(
             'LED-paneel: YouTube-status niet op te halen',

@@ -100,7 +100,9 @@ export async function refreshYoutubeToken(): Promise<string | null> {
   return null;
 }
 
-export async function youtubeFetch(url: string, init: RequestInit = {}): Promise<Response> {
+// `source` only labels who made the call in the daily quota breakdown
+// (youtubeQuota.ts), so a runaway consumer can be named instead of guessed at.
+export async function youtubeFetch(url: string, init: RequestInit = {}, source?: string): Promise<Response> {
   const tokens = getTokens();
   const token = tokens.google;
 
@@ -114,7 +116,7 @@ export async function youtubeFetch(url: string, init: RequestInit = {}): Promise
 
   // Perform initial fetch
   let res = await fetch(url, { ...init, headers });
-  recordYoutubeQuotaUsage(url, init.method || "GET");
+  recordYoutubeQuotaUsage(url, init.method || "GET", source);
 
   // If unauthorized (expired token), attempt refresh
   if (res.status === 401) {
@@ -124,7 +126,7 @@ export async function youtubeFetch(url: string, init: RequestInit = {}): Promise
       // Retry request with new token
       headers["Authorization"] = `Bearer ${newToken}`;
       res = await fetch(url, { ...init, headers });
-      recordYoutubeQuotaUsage(url, init.method || "GET");
+      recordYoutubeQuotaUsage(url, init.method || "GET", source);
     }
   }
 

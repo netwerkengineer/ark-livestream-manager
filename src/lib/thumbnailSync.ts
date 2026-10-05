@@ -131,7 +131,8 @@ export async function checkAndSyncUpcomingStreamThumbnail() {
     console.log("[Thumbnail Sync] Checking for upcoming streams...");
     const ytRes = await youtubeFetch(
       "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&mine=true&maxResults=50",
-      { cache: "no-store" }
+      { cache: "no-store" },
+      "thumbnail-sync"
     );
     
     if (ytRes.status === 401) {

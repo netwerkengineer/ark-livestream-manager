@@ -43,7 +43,8 @@ export async function GET() {
   try {
     const activeRes = await youtubeFetch(
       "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&broadcastStatus=active&broadcastType=all",
-      { cache: "no-store" }
+      { cache: "no-store" },
+      "website-banner"
     );
 
     if (!activeRes.ok) {

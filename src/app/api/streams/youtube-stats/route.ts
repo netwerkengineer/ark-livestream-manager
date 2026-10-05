@@ -4,6 +4,8 @@ import { youtubeFetch } from "@/lib/tokenStore";
 
 export const dynamic = "force-dynamic";
 
+const monitorFetch = (url: string, init?: RequestInit) => youtubeFetch(url, init, "monitor-pagina");
+
 // The no-videoId path can chain up to 4 YouTube API calls (active/upcoming/
 // any broadcast lookups + video details) - a short cache keeps multiple
 // clients polling this endpoint concurrently from each retriggering that
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     if (!broadcastId) {
       // 1. Fetch active live broadcasts on YouTube
-      const activeRes = await youtubeFetch(
+      const activeRes = await monitorFetch(
         "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&broadcastStatus=active&broadcastType=all",
         { cache: "no-store" }
       );
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
         lifeCycleStatus = item.status.lifeCycleStatus; // usually 'live'
       } else {
         // Fallback: Fetch upcoming scheduled broadcasts
-        const upcomingRes = await youtubeFetch(
+        const upcomingRes = await monitorFetch(
           "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&broadcastStatus=upcoming&broadcastType=all",
           { cache: "no-store" }
         );
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
           lifeCycleStatus = item.status.lifeCycleStatus; // usually 'ready'
         } else {
           // Fallback 2: Fetch any recent broadcast
-          const anyRes = await youtubeFetch(
+          const anyRes = await monitorFetch(
             "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&mine=true&maxResults=1",
             { cache: "no-store" }
           );
@@ -100,7 +102,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Query videos API to get liveStreamingDetails & statistics (viewers, likes, views)
-    const videoRes = await youtubeFetch(
+    const videoRes = await monitorFetch(
       `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails,statistics,status&id=${broadcastId}`,
       { cache: "no-store" }
     );
