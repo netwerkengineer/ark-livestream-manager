@@ -21,7 +21,7 @@ export function resolveSsoPermissions(groups: string[]): { role: "admin" | "oper
     (entry.permissions || []).forEach(p => permissions.add(p));
   }
   if (role === "admin") {
-    return { role, permissions: ["planner", "control", "monitor", "lights", "freeshow"] };
+    return { role, permissions: ["planner", "control", "monitor", "lights", "tracks", "freeshow"] };
   }
   return { role, permissions: Array.from(permissions) };
 }

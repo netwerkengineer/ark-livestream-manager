@@ -1,0 +1,107 @@
+{
+  "busses": [
+    {
+      "name": "CLICK",
+      "out": 1,
+      "match": [
+        "click*",
+        "metronome*"
+      ]
+    },
+    {
+      "name": "GUIDE",
+      "out": 2,
+      "match": [
+        "guide*",
+        "cues*"
+      ]
+    },
+    {
+      "name": "DRUMS / PERC",
+      "out": 3,
+      "match": [
+        "drum*",
+        "perc*",
+        "loop*"
+      ]
+    },
+    {
+      "name": "BASS",
+      "out": 4,
+      "match": [
+        "bass*",
+        "synth bass*",
+        "sub*"
+      ]
+    },
+    {
+      "name": "KEYS",
+      "out": 5,
+      "match": [
+        "keys*",
+        "piano*",
+        "organ*",
+        "synth*",
+        "rhodes*"
+      ]
+    },
+    {
+      "name": "GITAREN",
+      "out": 6,
+      "match": [
+        "eg*",
+        "ag*",
+        "gtr*",
+        "guitar*"
+      ]
+    },
+    {
+      "name": "BGV / KOOR",
+      "out": 7,
+      "match": [
+        "choir*",
+        "bgv*",
+        "vox*",
+        "vocal*",
+        "voc*",
+        "soprano*",
+        "alto*",
+        "tenor*",
+        "bari*",
+        "gang*"
+      ]
+    },
+    {
+      "name": "PADS / STRINGS / FX",
+      "out": 8,
+      "match": [
+        "pad*",
+        "string*",
+        "fx*",
+        "synth fx*",
+        "brass*"
+      ]
+    }
+  ],
+  "live": [
+    "drums*",
+    "bass",
+    "keys",
+    "piano 1*",
+    "eg 1*"
+  ],
+  "fallback_bus": "PADS / STRINGS / FX",
+  "freeshow": {
+    "enabled": true,
+    "channel": 5,
+    "note": 0,
+    "midi_hw_out_index": -1,
+    "skip": [
+      "count off",
+      "count-in",
+      "count in",
+      ""
+    ],
+    "velocity_offset": 1
+  }
+}

@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import fs from 'fs/promises';
 import path from 'path';
+import { chunkForScreen } from './slideSplit';
 
 function generateId() {
   return Math.random().toString(36).padEnd(15, '0').substring(2, 13);
@@ -205,22 +206,38 @@ export function createShowObject(show: any) {
         text: [{ value: line.trim(), style: "font-size: 100px;" }]
       }));
 
-      const itemId = generateId();
+      const textItems = (chunk: any[]) => [{
+        id: generateId(),
+        type: "text",
+        lines: chunk,
+        style: "top:88px;left:50px;height:904px;width:1820px;",
+        align: "",
+        auto: false
+      }];
+
+      // At most two rows on screen per slide (a long line wraps and counts
+      // as two): more doesn't fit the livestream lower third. The group
+      // slide gets the first lines, the rest become child slides of that
+      // group - the same structure
+      // FreeShow itself uses when it splits a group, so the layout still
+      // references only the group slide and FreeShow shows the children
+      // right after it. Presentations keep all their lines on one slide.
+      const chunks: any[][] = show.data.category === 'presentation' ? [lines] : chunkForScreen(lines);
+
+      const childIds = chunks.slice(1).map(chunk => {
+        const childId = generateId();
+        slides[childId] = { group: null, color: null, settings: {}, notes: "", items: textItems(chunk) };
+        return childId;
+      });
 
       slides[slideId] = {
         group: activeGroupName,
         color: activeGroupColor,
         settings: {},
         notes: "",
-        items: [{
-          id: itemId,
-          type: "text",
-          lines: lines,
-          style: "top:88px;left:50px;height:904px;width:1820px;",
-          align: "",
-          auto: false
-        }],
-        globalGroup: activeGroupKey || (activeGroupName ? activeGroupName.toLowerCase().replace(/\s+/g, '_') : null)
+        items: textItems(chunks[0]),
+        globalGroup: activeGroupKey || (activeGroupName ? activeGroupName.toLowerCase().replace(/\s+/g, '_') : null),
+        ...(childIds.length ? { children: childIds } : {})
       };
     }
 

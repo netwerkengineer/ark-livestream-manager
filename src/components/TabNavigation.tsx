@@ -6,10 +6,11 @@ import {
   Activity,
   Sun,
   Layers,
+  SlidersHorizontal,
   type LucideIcon
 } from "lucide-react";
 
-type TabType = "planner" | "monitor" | "control" | "lights" | "freeshow";
+type TabType = "planner" | "monitor" | "control" | "lights" | "tracks" | "freeshow";
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -23,6 +24,7 @@ const TABS: { id: TabType; label: string; icon: LucideIcon }[] = [
   { id: "control", label: "Regie", icon: ShieldAlert },
   { id: "monitor", label: "Monitor", icon: Activity },
   { id: "lights", label: "Licht", icon: Sun },
+  { id: "tracks", label: "Tracks", icon: SlidersHorizontal },
   { id: "freeshow", label: "FreeShow", icon: Layers },
 ];
 

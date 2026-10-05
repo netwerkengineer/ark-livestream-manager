@@ -7,7 +7,7 @@ async function countFiles(dir: string): Promise<number> {
   try {
     const items = await fs.readdir(dir, { withFileTypes: true });
     for (const item of items) {
-      if (item.name === 'backups' && dir.endsWith('data')) continue;
+      if ((item.name === 'backups' || item.name === 'tracks') && dir.endsWith('data')) continue;
       
       const itemPath = path.join(dir, item.name);
       
@@ -49,7 +49,8 @@ export async function generateBackup(
       
       const items = await fs.readdir(dataDir);
       for (const item of items) {
-        if (item === 'backups' || item === 'backup_progress.json' || item.startsWith('temp_zip_')) {
+        // data/tracks holds the MultiTracks library (gigabytes) and is its own backup
+        if (item === 'backups' || item === 'tracks' || item === 'backup_progress.json' || item.startsWith('temp_zip_')) {
           continue;
         }
         await fs.symlink(path.join(dataDir, item), path.join(zipDataDir, item));
@@ -256,7 +257,8 @@ export function generateStreamBackup(
         
         const items = await fs.readdir(dataDir);
         for (const item of items) {
-          if (item === 'backups' || item === 'backup_progress.json' || item.startsWith('temp_zip_')) {
+          // data/tracks holds the MultiTracks library (gigabytes) and is its own backup
+          if (item === 'backups' || item === 'tracks' || item === 'backup_progress.json' || item.startsWith('temp_zip_')) {
             continue;
           }
           await fs.symlink(path.join(dataDir, item), path.join(zipDataDir, item));

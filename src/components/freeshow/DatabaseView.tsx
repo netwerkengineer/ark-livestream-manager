@@ -130,6 +130,33 @@ export default function DatabaseView(props: DatabaseViewProps) {
   }, [showsList]);
 
   const [isImportingProject, setIsImportingProject] = useState(false);
+  const [isSplittingLines, setIsSplittingLines] = useState(false);
+
+  // Songs with more than 2 lines on a slide don't fit the livestream lower
+  // third: preview which ones, then split them (originals backed up first).
+  const splitSongLines = async () => {
+    setIsSplittingLines(true);
+    try {
+      const res = await fetch('/api/maintenance/split-lines');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      if (data.changes.length === 0) {
+        alert(`Alle liederen hebben al max. ${data.maxLines} regels per dia op het scherm.`);
+        return;
+      }
+      const list = data.changes.map((c: any) => `• ${c.name} (nu tot ${c.maxLines} regels op het scherm)`).join('\n');
+      if (!confirm(`Deze ${data.changes.length} lied(eren) worden opgesplitst naar max. ${data.maxLines} regels per dia op het scherm; een regel langer dan ${data.maxChars} tekens loopt door en telt als 2 (de tekst blijft gelijk, er wordt eerst een backup gemaakt):\n\n${list}\n\nDoorgaan? Sluit FreeShow eerst af op de computers en draai daarna een sync.`)) return;
+      const run = await fetch('/api/maintenance/split-lines', { method: 'POST' });
+      const result = await run.json();
+      if (!result.success) throw new Error(result.error);
+      alert(`${result.changes.length} lied(eren) aangepast. Backup: ${result.backupDir}${result.tracksNotes?.length ? '\n\n' + result.tracksNotes.join('\n') : ''}`);
+      fetchCatalog();
+    } catch (e: any) {
+      alert('Opsplitsen mislukt: ' + (e?.message || e));
+    } finally {
+      setIsSplittingLines(false);
+    }
+  };
   const [importProjectStatus, setImportProjectStatus] = useState('');
 
   interface SyncTargetStatus { key: string; label?: string; status: 'pending' | 'running' | 'done' | 'skipped' | 'error' }
@@ -429,6 +456,9 @@ export default function DatabaseView(props: DatabaseViewProps) {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={optimizeMediaPaths} disabled={isOptimizing}>
                        {isOptimizing ? t('loading') : t('optimize_media')}
+                    </button>
+                    <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={splitSongLines} disabled={isSplittingLines} title="Liederen met meer dan 2 regels per dia opsplitsen (lower third livestream)">
+                       {isSplittingLines ? t('loading') : 'Max. 2 regels'}
                     </button>
                     <button className="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }} onClick={downloadBackup}>
                        {t('backup')}

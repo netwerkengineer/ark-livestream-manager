@@ -62,7 +62,7 @@ export async function isAuthorized(
       ? {
           username: session.user?.name || "Google User",
           role: "admin" as const,
-          permissions: ["planner", "control", "monitor", "lights", "freeshow"]
+          permissions: ["planner", "control", "monitor", "lights", "tracks", "freeshow"]
         }
       : {
           username: session.user?.name || session.user?.email || "SSO User",
@@ -85,7 +85,7 @@ export async function isAuthorized(
       const user = settings.users?.find(u => u.username.toLowerCase() === payload.username.toLowerCase());
       
       const userPermissions = user?.role === "admin"
-        ? ["planner", "control", "monitor", "lights", "freeshow"]
+        ? ["planner", "control", "monitor", "lights", "tracks", "freeshow"]
         : (user?.permissions || []);
 
       const resolvedUser = {

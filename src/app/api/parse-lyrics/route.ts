@@ -21,10 +21,13 @@ export async function POST(req: NextRequest) {
     const activeLayoutId = showObj.settings.activeLayout;
     const layoutSlides = showObj.layouts[activeLayoutId].slides;
 
+    // Lines past the per-slide maximum live in child slides of the group
+    // (see createShowObject); the editor keeps them together with it.
     const slides = layoutSlides.map((layoutSlide: any) => ({
       id: layoutSlide.id,
       nextTimer: layoutSlide.nextTimer || 10,
-      slideObj: showObj.slides[layoutSlide.id]
+      slideObj: showObj.slides[layoutSlide.id],
+      children: (showObj.slides[layoutSlide.id].children || []).map((id: string) => ({ id, slideObj: showObj.slides[id] }))
     }));
 
     return NextResponse.json({ success: true, slides });

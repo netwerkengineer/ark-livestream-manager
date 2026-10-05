@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import BroadcastControlCenter from "@/components/BroadcastControlCenter";
 import LightsControl from "@/components/LightsControl";
+import TracksControl from "@/components/TracksControl";
 import BackupRestoreSettings from "@/components/BackupRestoreSettings";
 import SetupWizard from "@/components/SetupWizard";
 import LoginScreen from "@/components/LoginScreen";
@@ -87,7 +88,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   const [tags, setTags] = useState("");
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights" | "freeshow">("control");
+  const [activeTab, setActiveTab] = useState<"planner" | "monitor" | "control" | "lights" | "tracks" | "freeshow">("control");
 
   // New UI states
   const [showSettings, setShowSettings] = useState(false);
@@ -197,6 +198,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           else if (perms.includes("planner")) setActiveTab("planner");
           else if (perms.includes("monitor")) setActiveTab("monitor");
           else if (perms.includes("lights")) setActiveTab("lights");
+          else if (perms.includes("tracks")) setActiveTab("tracks");
           else if (perms.includes("freeshow")) setActiveTab("freeshow");
         }
       } catch (err) {
@@ -321,7 +323,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           username: newUsername,
           password: newPassword || undefined,
           role: newRole,
-          permissions: newRole === "operator" ? newPermissions : ["planner", "control", "monitor", "lights", "freeshow"]
+          permissions: newRole === "operator" ? newPermissions : ["planner", "control", "monitor", "lights", "tracks", "freeshow"]
         })
       });
       const data = await res.json();
@@ -897,6 +899,15 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
           exit={{ opacity: 0, scale: 0.95 }}
         >
           <LightsControl settings={settings} />
+        </motion.div>
+      ) : activeTab === "tracks" ? (
+        <motion.div
+          key="tracks"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+        >
+          <TracksControl settings={settings} />
         </motion.div>
       ) : (
         <motion.div

@@ -53,6 +53,22 @@ export interface AppSettings {
   // QLC+ Configuration
   qlcEnabled: boolean;
 
+  // Tracks (REAPER web interface on the track computer)
+  reaperEnabled?: boolean;
+  reaperHost?: string;
+  reaperPort?: number;
+  // Outputs of the track computer: auto | multi (8 channels, X32) | 2ch
+  // (Click+Guide | Tracks) | stereo (test via speakers)
+  reaperOutputMode?: 'auto' | 'multi' | '2ch' | 'stereo';
+  // FreeShow slides this many beats before the line is sung (0-4)
+  reaperCueLeadBeats?: number;
+  // Track computer keeps the audio of songs played in this many past weeks
+  // (plus everything on upcoming setlists and pinned songs)
+  trackKeepWeeks?: number;
+  // Shared secret for the track-computer agent (ark_tracks_agent.py) that
+  // downloads uploaded MultiTracks zips - separate from user logins.
+  trackAgentToken?: string;
+
   // Tuya Smart Plug Configuration
   tuyaDeviceId?: string;
   tuyaDeviceIp?: string;
@@ -284,6 +300,11 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
 
   // QLC+ Defaults
   qlcEnabled: false,
+
+  // Tracks (REAPER) Defaults
+  reaperEnabled: false,
+  reaperHost: "127.0.0.1",
+  reaperPort: 8080,
 
   // Tuya Smart Plug Defaults - intentionally empty. Configure your own
   // plugs at Instellingen -> Slimme Stekkers; nothing here should ever be

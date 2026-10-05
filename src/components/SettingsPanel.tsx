@@ -512,6 +512,67 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Sliders size={18} color="var(--primary)" /> <strong>Tracks (REAPER)</strong></div>
+                    <label className="switch" style={{ scale: '0.8' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!settings.reaperEnabled}
+                        onChange={(e) => onSettingsChange({...settings, reaperEnabled: e.target.checked})}
+                      />
+                      <span className="slider round"></span>
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: settings.reaperEnabled ? 1 : 0.5, pointerEvents: settings.reaperEnabled ? 'auto' : 'none' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                      <input className="input-field" placeholder="Track-computer IP" value={settings.reaperHost || ""} onChange={(e) => onSettingsChange({...settings, reaperHost: e.target.value})} />
+                      <input className="input-field" type="number" placeholder="Poort" value={settings.reaperPort || 8080} onChange={(e) => onSettingsChange({...settings, reaperPort: parseInt(e.target.value) || 8080})} />
+                    </div>
+                    <p className="text-[10px] text-muted">Webinterface van REAPER (Settings → Control/OSC/web → Web browser interface), standaard poort 8080.</p>
+                    <div className="input-group">
+                      <label className="input-label" style={{ fontSize: '0.7rem' }}>Uitgangen van de track-computer</label>
+                      <select className="input-field" value={settings.reaperOutputMode || "auto"} onChange={(e) => onSettingsChange({...settings, reaperOutputMode: e.target.value as "auto" | "multi" | "2ch" | "stereo"})}>
+                        <option value="auto">Automatisch (8 uitgangen als het apparaat ze heeft, anders stereo)</option>
+                        <option value="multi">8 kanalen – elke groep een eigen uitgang (X32)</option>
+                        <option value="2ch">2 kanalen – uitgang 1: Click + Guide, uitgang 2: Tracks</option>
+                        <option value="stereo">Stereo – alles samen (testen via speakers)</option>
+                      </select>
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label" style={{ fontSize: '0.7rem' }}>Audio op de track-computer bewaren van songs gespeeld in de laatste</label>
+                      <select className="input-field" value={String(settings.trackKeepWeeks ?? 8)} onChange={(e) => onSettingsChange({...settings, trackKeepWeeks: parseInt(e.target.value)})}>
+                        {[2, 4, 8, 12, 26, 52].map(n => <option key={n} value={String(n)}>{n} weken</option>)}
+                      </select>
+                      <p className="text-[10px] text-muted" style={{ marginTop: '4px' }}>Plus alles op komende setlists en songs met &quot;altijd houden&quot;. Van andere songs verwijdert de track-computer alleen de audio; die komt vanzelf terug als de song weer op een setlist staat.</p>
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label" style={{ fontSize: '0.7rem' }}>FreeShow-dia&apos;s eerder tonen</label>
+                      <select className="input-field" value={String(settings.reaperCueLeadBeats ?? 2)} onChange={(e) => onSettingsChange({...settings, reaperCueLeadBeats: parseFloat(e.target.value)})}>
+                        {[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map(n => (
+                          <option key={n} value={String(n)}>{n === 0 ? "Precies op de maat" : `${String(n).replace(".", ",")} tel${n === 1 ? "" : "len"} eerder`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+                      <input className="input-field" readOnly placeholder="Agent-token (nog niet ingesteld)" value={settings.trackAgentToken || ""} onFocus={(e) => e.target.select()} style={{ fontFamily: 'monospace', fontSize: '0.75rem' }} />
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                        onClick={() => {
+                          if (settings.trackAgentToken && !confirm("Nieuwe token maken? De agent op de track-computer moet daarna de nieuwe token krijgen (~/Tracks/_tools/agent.json).")) return;
+                          const bytes = crypto.getRandomValues(new Uint8Array(24));
+                          onSettingsChange({...settings, trackAgentToken: Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')});
+                        }}
+                      >
+                        Nieuwe token
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted">Token voor de agent op de track-computer die geüploade MultiTracks ophaalt en omzet. Zet hem in ~/Tracks/_tools/agent.json op die Mac.</p>
+                  </div>
+                </div>
+
+                <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Monitor size={18} color="#3b82f6" /> <strong>Presentatie (FreeShow)</strong></div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
@@ -1265,6 +1326,7 @@ export default function SettingsPanel({
                         <option value="control">Control Center</option>
                         <option value="monitor">Live Monitor</option>
                         <option value="lights">Lichtregie</option>
+                        <option value="tracks">Tracks (REAPER)</option>
                         <option value="freeshow">FreeShow Projecten</option>
                       </select>
                     </div>
@@ -1399,6 +1461,7 @@ export default function SettingsPanel({
                         { id: "control", name: "Control Center" },
                         { id: "monitor", name: "Live Monitor" },
                         { id: "lights", name: "Lichtregie" },
+                        { id: "tracks", name: "Tracks (REAPER)" },
                         { id: "freeshow", name: "FreeShow Projecten" }
                       ].map(perm => (
                         <label key={perm.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -2098,7 +2161,7 @@ export default function SettingsPanel({
                       </div>
                       {entry.role !== "admin" && (
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
-                          {["freeshow", "control", "planner", "lights", "monitor"].map(perm => (
+                          {["freeshow", "control", "planner", "lights", "tracks", "monitor"].map(perm => (
                             <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <input
                                 type="checkbox"

@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     delete sanitized.ftpPass;
     delete sanitized.webdavPass;
     delete sanitized.imapPass;
+    delete sanitized.trackAgentToken;
     if (sanitized.tuyaPlugs) {
       sanitized.tuyaPlugs = sanitized.tuyaPlugs.map((p: any) => {
         const { localKey, ...rest } = p;

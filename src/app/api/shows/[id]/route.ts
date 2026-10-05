@@ -4,6 +4,7 @@ import path from 'path';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
 import { getItemType } from '@/lib/freeshowUtils';
+import { rebuildArrangementsForShow, renameShowInArrangements } from '@/lib/trackArrangement';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -82,9 +83,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         try {
           await fs.unlink(oldFilePath);
         } catch (e) {}
+        await renameShowInArrangements(oldFilename, newFilename);
       }
 
-      return NextResponse.json({ success: true, filename: newFilename, show: parsedArray });
+      // A song with tracks: its slide numbers may have shifted, so rebuild
+      // the Tracks layout and cue table (best effort - needs REAPER)
+      const tracks = await rebuildArrangementsForShow(newFilename).catch(() => ({ rebuilt: 0, failed: [] as string[] }));
+      if (tracks.failed.length) console.warn('[Tracks] Layout na opslaan niet bijgewerkt:', tracks.failed);
+
+      return NextResponse.json({ success: true, filename: newFilename, show: parsedArray, tracks });
     }
 
     // Support 2: Visual edits (meta & slide text modifications)

@@ -11,6 +11,7 @@ import YoutubeInput from './freeshow/YoutubeInput';
 import MediaInput from './freeshow/MediaInput';
 import DatabaseView from './freeshow/DatabaseView';
 import SetlistBuilder from './freeshow/SetlistBuilder';
+import { slideLines, lineText, resplitGroup, maxLinesInGroup, editableLayoutId } from '@/lib/slideSplit';
 import {
   BIBLE_BOOKS,
   resolveMediaPath,
@@ -802,9 +803,10 @@ export default function FreeshowGenerator() {
         }
 
         const slidesList: any[] = [];
-        const activeLayoutId = showObj.settings?.activeLayout;
-        if (activeLayoutId && showObj.layouts?.[activeLayoutId]?.slides) {
-          const layoutSlides = showObj.layouts[activeLayoutId].slides;
+        // The normal layout, also when the Tracks layout is the active one
+        const editLayoutId = editableLayoutId(showObj);
+        if (editLayoutId && showObj.layouts?.[editLayoutId]?.slides) {
+          const layoutSlides = showObj.layouts[editLayoutId].slides;
           for (const layoutSlide of layoutSlides) {
             const slideId = layoutSlide.id;
             const slide = showObj.slides?.[slideId];
@@ -813,12 +815,19 @@ export default function FreeshowGenerator() {
                 id: slideId,
                 nextTimer: layoutSlide.nextTimer || 10,
                 background: layoutSlide.background || undefined,
-                slideObj: JSON.parse(JSON.stringify(slide))
+                layoutChildren: layoutSlide.children,
+                slideObj: JSON.parse(JSON.stringify(slide)),
+                // Child slides (the group's next lines) travel with their group
+                // slide, otherwise saving would drop them from the show.
+                children: (slide.children || [])
+                  .filter((id: string) => showObj.slides?.[id])
+                  .map((id: string) => ({ id, slideObj: JSON.parse(JSON.stringify(showObj.slides[id])) }))
               });
             }
           }
         } else if (showObj.slides) {
-          Object.entries(showObj.slides).forEach(([slideId, slide]: any) => {
+          const childIds = new Set(Object.values(showObj.slides).flatMap((s: any) => s.children || []));
+          Object.entries(showObj.slides).filter(([slideId]) => !childIds.has(slideId)).forEach(([slideId, slide]: any) => {
             slidesList.push({
               id: slideId,
               nextTimer: 10,
@@ -907,9 +916,11 @@ export default function FreeshowGenerator() {
         showObj.timestamps.modified = Date.now();
 
         const newSlides: Record<string, any> = {};
-        const activeLayoutId = showObj.settings?.activeLayout || 'default-layout';
+        // Edits go into the normal layout; other layouts (e.g. Tracks) and
+        // the active-layout choice stay as they are.
+        const editLayoutId = editableLayoutId(showObj) || 'default-layout';
         showObj.settings = showObj.settings || {};
-        showObj.settings.activeLayout = activeLayoutId;
+        showObj.settings.activeLayout = showObj.settings.activeLayout || editLayoutId;
 
         showObj.media = showObj.media || {};
         if (showEditorBackground) {
@@ -925,8 +936,17 @@ export default function FreeshowGenerator() {
         const layoutSlidesList: any[] = [];
 
         showEditorSlides.forEach((s, idx) => {
+          // Drop empty lines (e.g. a trailing Enter) and split the group one last time
+          if (getItemType(s.slideObj?.items?.[0] || {}) === 'text') {
+            const lines = [s.slideObj, ...(s.children || []).map((c: any) => c.slideObj)]
+              .flatMap((o: any) => slideLines(o))
+              .filter((l: any) => lineText(l).trim() !== '');
+            if (lines.length) s = { ...s, ...(({ parent, children }) => ({ slideObj: parent, children }))(resplitGroup(s.slideObj, s.children || [], lines, splitSize(s, lines.length))) };
+          }
           newSlides[s.id] = s.slideObj;
+          for (const child of s.children || []) newSlides[child.id] = child.slideObj;
           const layoutEntry: any = { id: s.id, nextTimer: s.nextTimer || 10 };
+          if (s.layoutChildren && s.children?.length) layoutEntry.children = s.layoutChildren;
           // The background picker only manages the show's overall
           // background (slide 0, same convention createShowObject uses) -
           // any other slide's own background (rare, but possible if set
@@ -939,13 +959,24 @@ export default function FreeshowGenerator() {
           layoutSlidesList.push(layoutEntry);
         });
 
-        showObj.slides = newSlides;
+        // Replace only this layout's slides; slides that only other layouts
+        // use (e.g. the blank Tracks slides) stay.
+        const merged: Record<string, any> = { ...(showObj.slides || {}) };
+        for (const entry of showObj.layouts?.[editLayoutId]?.slides || []) {
+          for (const childId of merged[entry.id]?.children || []) delete merged[childId];
+          delete merged[entry.id];
+        }
+        Object.assign(merged, newSlides);
+        showObj.slides = merged;
         showObj.layouts = showObj.layouts || {};
-        showObj.layouts[activeLayoutId] = {
-          name: showObj.layouts[activeLayoutId]?.name || "Default",
-          notes: showObj.layouts[activeLayoutId]?.notes || "",
+        showObj.layouts[editLayoutId] = {
+          name: showObj.layouts[editLayoutId]?.name || "Default",
+          notes: showObj.layouts[editLayoutId]?.notes || "",
           slides: layoutSlidesList
         };
+        for (const [id, layout] of Object.entries<any>(showObj.layouts)) {
+          if (id !== editLayoutId) layout.slides = (layout.slides || []).filter((e: any) => merged[e.id]);
+        }
 
         const updatedShow = [showId, showObj];
         body = { rawJson: JSON.stringify(updatedShow, null, 2) };
@@ -1087,17 +1118,30 @@ export default function FreeshowGenerator() {
     }
   };
 
+  const splitSize = (s: any, lineCount: number): number | 'screen' => {
+    if (showEditorCategory === 'song') return 'screen';
+    const children = s.children || [];
+    return children.length ? Math.max(1, maxLinesInGroup(s.slideObj, children)) : Math.max(1, lineCount);
+  };
+
+  // The textarea holds the whole group (group slide + child slides); on
+  // every change it's split over slides again. Songs get at most two rows on
+  // screen per slide (livestream lower third, see slideSplit.ts); other
+  // shows keep the number of lines per slide they already had.
   const updateSlideText = (idx: number, newText: string) => {
     const updated = [...showEditorSlides];
     const s = updated[idx];
     if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
       const item = s.slideObj.items[0];
       if (getItemType(item) === 'text') {
-        const existingStyle = item.lines?.[0]?.text?.[0]?.style || "font-size: 100px; color: white;";
-        item.lines = newText.split('\n').map((lineStr: string) => ({
-          align: item.lines?.[0]?.align || "",
+        const firstLine = slideLines(s.slideObj)[0];
+        const existingStyle = firstLine?.text?.[0]?.style || "font-size: 100px; color: white;";
+        const lines = newText.split('\n').map((lineStr: string) => ({
+          align: firstLine?.align || "",
           text: [{ value: lineStr, style: existingStyle }]
         }));
+        const split = resplitGroup(s.slideObj, s.children || [], lines, splitSize(s, lines.length));
+        updated[idx] = { ...s, slideObj: split.parent, children: split.children };
       }
     }
     setShowEditorSlides(updated);
@@ -1121,6 +1165,8 @@ export default function FreeshowGenerator() {
     if (s && s.slideObj && s.slideObj.items && s.slideObj.items[0]) {
       const item = s.slideObj.items[0];
       if (getItemType(item) === 'text') {
+        s.children = [];
+        delete s.slideObj.children;
         s.slideObj.items = [
           {
             type: "media",
@@ -2499,8 +2545,11 @@ export default function FreeshowGenerator() {
                       const groupColor = slideObj?.color || 'var(--primary)';
                       
                       let textVal = '';
+                      const slideCount = 1 + (slideItem.children?.length || 0);
                       if (isText) {
-                        textVal = item.lines?.map((line: any) => line.text?.map((t: any) => t.value).join('') || '').join('\n') || '';
+                        textVal = [slideObj, ...(slideItem.children || []).map((c: any) => c.slideObj)]
+                          .flatMap((o: any) => slideLines(o).map(lineText))
+                          .join('\n');
                       }
                       
                       let mediaSrc = '';
@@ -2515,6 +2564,11 @@ export default function FreeshowGenerator() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '0.9rem', color: groupColor }}>
                               <span>Slide {idx + 1}</span>
+                              {slideCount > 1 && (
+                                <span style={{ fontSize: '0.7rem', opacity: 0.7, fontWeight: 'normal' }} title="Max. 2 regels per dia voor de livestream">
+                                  {slideCount} dia&apos;s
+                                </span>
+                              )}
                               <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 'normal' }}>
                                 {isText ? 'Tekst' : isMedia ? 'Media' : 'Onbekend'}
                               </span>
