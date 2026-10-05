@@ -839,6 +839,7 @@ function handlers.setlist(...)
     if path ~= "" then findOrOpen(path) end
   end
   st.setlist = paths
+  reaper.SetExtState(SECTION, "setlist", table.concat(paths, "\n"), true)
   -- Terug naar de song die al actief was als die in de setlist staat, anders de eerste
   local keep = false
   for _, path in ipairs(paths) do
@@ -945,6 +946,51 @@ handleCommand = function(raw)
   st.error = (not ok) and tostring(err):gsub("^.-:%d+: ", "") or nil
 end
 
+---------------------------------------------------------------- einde nummer
+-- Is het laatste stuk van een nummer uit, dan stopt REAPER en staat het volgende nummer
+-- uit de setlist klaar (begin, FreeShow op de lege startdia). Starten doet de
+-- worshipleader zelf: er zit vaak gebed of een overgang tussen.
+local songEnded = false
+
+local function nextInSetlist()
+  local _, path = reaper.EnumProjects(-1)
+  for i, p in ipairs(st.setlist or {}) do
+    if p == path then
+      for j = i + 1, #st.setlist do
+        if st.setlist[j] ~= "" then return st.setlist[j] end
+      end
+      return nil
+    end
+  end
+end
+
+local function songEnd()
+  local last = 0
+  local i = 0
+  while true do
+    local ret, isrgn, _, rgnend = reaper.EnumProjectMarkers3(0, i)
+    if ret == 0 then break end
+    if isrgn and rgnend > last then last = rgnend end
+    i = i + 1
+  end
+  return last
+end
+
+local function checkSongEnd()
+  if not isPlaying() then songEnded = false return end
+  if songEnded or st.loop then return end
+  local finish = songEnd()
+  if finish > 0 and reaper.GetPlayPosition() >= finish - 0.05 then
+    songEnded = true
+    local nextPath = nextInSetlist()
+    reaper.OnStopButtonEx(0)
+    if nextPath then
+      local ok, err = pcall(handlers.song, nextPath)
+      if not ok then st.error = tostring(err) end
+    end
+  end
+end
+
 ---------------------------------------------------------------- state
 local function writeState()
   local tabs = {}
@@ -978,6 +1024,7 @@ local function writeState()
     smoothSeek = smoothSeekCmd ~= nil,
     lastCmd = st.lastCmd,
     error = st.error,
+    nextSong = nextInSetlist(),
   }
   reaper.SetExtState(SECTION, "state", json(out), false)
 end
@@ -1002,6 +1049,7 @@ end
 
 local function loop()
   detectSeek()
+  checkSongEnd()
   applyRouting()
   updateCues()
   local raw = reaper.GetExtState(SECTION, "cmd")
@@ -1024,6 +1072,11 @@ local function loop()
 end
 
 smoothSeekCmd = findSmoothSeekCmd()
+-- setlist van de vorige keer (blijft bewaard na een herstart van REAPER)
+do
+  local saved = reaper.GetExtState(SECTION, "setlist")
+  if saved ~= "" then st.setlist = split(saved, "\n") end
+end
 scanSongs()
 reaper.SetExtState(SECTION, "running", "1", false)
 loop()

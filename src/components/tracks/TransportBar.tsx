@@ -21,6 +21,9 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
   const current = regions.find(r => position >= r.start && position < r.end);
   const activeTab = state?.bridge?.tabs.find(t => t.active);
   const song = activeTab ? parseSongName(activeTab.name) : null;
+  // Set up automatically when this song ends
+  const nextPath = state?.bridge?.nextSong;
+  const next = nextPath ? parseSongName((nextPath.split("/").pop() || "").replace(/\.rpp$/i, "")) : null;
 
   const run = async (action: string) => {
     try {
@@ -43,6 +46,7 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         <span className="trk-label">Song</span>
         <strong>{song?.title || "—"}</strong>
         {song?.key && <span className="trk-meta">{song.key} · {song.bpm} BPM</span>}
+        {next && <span className="trk-meta" title="Staat klaar zodra dit nummer uit is">Hierna: {next.title}</span>}
       </div>
       <div className="trk-transport-buttons">
         <button className="trk-t-btn" onClick={() => run("start")} title="Naar begin"><SkipBack size={stage ? 26 : 20} /></button>
