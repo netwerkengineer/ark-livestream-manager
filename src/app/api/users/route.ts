@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       // Update existing user
       const user = users[existingIdx];
       user.role = role;
-      user.permissions = role === "admin" ? ["planner", "control", "monitor", "lights", "tracks", "freeshow"] : permissions;
+      user.permissions = role === "admin" ? ["planner", "control", "monitor", "lights", "tracks", "oefenen", "freeshow"] : permissions;
       if (password) {
         const salt = generateSalt();
         user.salt = salt;
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         role,
         salt,
         passwordHash: hashPassword(password, salt),
-        permissions: role === "admin" ? ["planner", "control", "monitor", "lights", "tracks", "freeshow"] : permissions
+        permissions: role === "admin" ? ["planner", "control", "monitor", "lights", "tracks", "oefenen", "freeshow"] : permissions
       });
     }
 

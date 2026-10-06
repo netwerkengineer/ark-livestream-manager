@@ -22,6 +22,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -406,8 +407,12 @@ def sample_original_click(orig_path, tm, end_q):
         return None
     tmp = os.path.join(tempfile.gettempdir(), f"ark-click-{os.getpid()}.wav")
     try:
-        subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{CLICK_SR}", "-c", "1", orig_path, tmp],
-                       check=True, capture_output=True)
+        if shutil.which("afconvert"):
+            subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{CLICK_SR}", "-c", "1", orig_path, tmp],
+                           check=True, capture_output=True)
+        else:  # server (Linux): ffmpeg
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", orig_path, "-ac", "1", "-ar", str(CLICK_SR),
+                            "-c:a", "pcm_s16le", tmp], check=True, capture_output=True)
         with wave.open(tmp) as w:
             data = array.array("h", w.readframes(w.getnframes()))
     except (OSError, subprocess.CalledProcessError, wave.Error):

@@ -475,3 +475,93 @@ export async function saveArrangement(
   await writeStore(store);
   return { cues: built.cues, slides: built.slides, warnings: built.warnings };
 }
+
+// ------------------------------------------------------------- practice player
+
+export interface PracticeSlide {
+  t: number;         // seconds into the track
+  slide: number;     // slide number in the Tracks layout
+  lines: string[];
+}
+
+// Tempo map as in the practice manifest: [beat, second, bpm] per change
+// (stepwise, like mt2reaper's TempoMap).
+type TempoMap = number[][];
+
+function qnToSec(tempo: TempoMap, qn: number): number {
+  let cur = tempo[0];
+  for (const t of tempo) if (t[0] <= qn) cur = t;
+  return cur[1] + (qn - cur[0]) * 60 / cur[2];
+}
+
+function secToQn(tempo: TempoMap, sec: number): number {
+  let cur = tempo[0];
+  for (const t of tempo) if (t[1] <= sec) cur = t;
+  return cur[0] + (sec - cur[1]) * cur[2] / 60;
+}
+
+// The lyrics timeline of a track for the practice player: the same moments
+// the bridge in REAPER starts from (first slide of a section LEAD beats
+// early, the rest at the recorded beat or spread by text length), with the
+// full text of each slide from the show's Tracks layout. Blocks moved by
+// hand in REAPER are not known here.
+export async function practiceLyrics(
+  rppPath: string,
+  sections: { id: number; start: number; end: number }[],
+  tempo: TempoMap,
+): Promise<PracticeSlide[] | null> {
+  const stored = await getStoredArrangement(rppPath);
+  if (!stored?.cues || !stored.showFile || !tempo.length) return null;
+  const { show } = await readShow(stored.showFile);
+  const layout = Object.values<any>(show.layouts || {}).find(l => l.name === TRACKS_LAYOUT_NAME);
+  if (!layout) return null;
+
+  // slide number (1-based, child slides counted) -> lines
+  const flat: string[][] = [];
+  for (const entry of layout.slides || []) {
+    const slide = show.slides?.[entry.id];
+    if (!slide) continue;
+    const ids = [entry.id, ...(slide.children || []).filter((c: string) => show.slides[c])];
+    for (const id of ids) flat.push(slideLines(show.slides[id]).map(lineText).filter((l: string) => l.trim()));
+  }
+
+  const lead = getSettings().reaperCueLeadBeats ?? 2;
+  const byRegion = new Map<number, { n: number; w: number; q?: number }[]>();
+  for (const part of stored.cues.split(';')) {
+    const m = part.match(/^(\d+):(.*)$/);
+    if (!m) continue; // "show:..." line
+    byRegion.set(Number(m[1]), m[2].split(',').map(entry => {
+      const e = entry.match(/^(\d+)@(\d+(?:\.\d+)?)(?:@(-?\d+(?:\.\d+)?))?/);
+      return e ? { n: Number(e[1]), w: Number(e[2]), q: e[3] !== undefined ? Number(e[3]) : undefined } : null;
+    }).filter((x): x is { n: number; w: number; q: number | undefined } => !!x));
+  }
+
+  const out: PracticeSlide[] = [];
+  for (const section of sections) {
+    const list = byRegion.get(section.id);
+    if (!list?.length) continue;
+    const qs = secToQn(tempo, section.start);
+    const len = secToQn(tempo, section.end) - qs;
+    const total = list.reduce((sum, s) => sum + s.w, 0) || 1;
+    let useRecorded = true;
+    let last = 0;
+    for (const s of list.slice(1)) {
+      if (s.q === undefined) continue;
+      if (s.q <= last || s.q >= len - 0.25) useRecorded = false;
+      last = s.q;
+    }
+    let acc = 0;
+    let prev: number | null = null;
+    list.forEach((s, k) => {
+      let qn: number;
+      if (k === 0) qn = qs - lead;
+      else if (s.q !== undefined && useRecorded) qn = qs + s.q;
+      else qn = qs + Math.round(acc / total * len) - lead;
+      if (prev !== null && qn < prev + 0.25) qn = Math.min(prev + 0.5, qs + len - 0.25);
+      prev = qn;
+      acc += s.w;
+      out.push({ t: qnToSec(tempo, Math.max(0, qn)), slide: s.n, lines: flat[s.n - 1] || [] });
+    });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}

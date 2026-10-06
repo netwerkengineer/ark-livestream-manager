@@ -61,6 +61,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Copy all Python scripts for direct execution fallback and services
 COPY --from=builder --chown=nextjs:nodejs /app/*.py ./
 
+# tracks_practice.py (practice versions of the tracks) reuses mt2reaper's
+# .als reader, sections and click, with the same bus layout
+COPY --from=builder --chown=nextjs:nodejs /app/track-computer/mt2reaper.py /app/track-computer/busses.example.json ./track-computer/
+
 # Static content read at request time (e.g. the handleiding markdown for
 # /manual/[lang]) isn't picked up by Next's standalone output tracing since
 # it's read via fs at runtime, not imported - needs an explicit copy.

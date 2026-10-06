@@ -1152,3 +1152,45 @@ textarea.input-field {
 .trk-pad-volume input { flex: 1; accent-color: #a855f7; }
 .trk-pads.stage .trk-pad-key { padding: 20px 0; font-size: 1.2rem; }
 .trk-badge.pending { background: #f97316; color: #fff; animation: trk-pulse 0.9s ease-in-out infinite; }
+
+/* ---------- Oefenen (practice player) ---------- */
+.prc { display: flex; flex-direction: column; gap: 20px; }
+.prc-top { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.prc-list { display: flex; flex-direction: column; gap: 14px; }
+.prc-group { display: flex; flex-direction: column; gap: 6px; }
+.prc-group .trk-label { display: flex; align-items: center; gap: 6px; }
+.prc-scroll { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding-right: 2px; }
+.prc-song {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 12px; border-radius: 10px; text-align: left;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  color: var(--foreground); font-size: 0.88rem; cursor: pointer;
+}
+.prc-song:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+.prc-song.on { border-color: var(--primary); background: rgba(56,189,248,0.14); }
+.prc-song:disabled, .prc-song.missing { opacity: 0.55; cursor: default; }
+.prc-song-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.prc-song small { color: var(--muted); font-size: 0.72rem; white-space: nowrap; }
+.prc-search {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+  background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); color: var(--muted);
+}
+.prc-search input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--foreground); font-size: 0.88rem; }
+.prc-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.prc-transport { margin: 0; }
+.prc-bar {
+  position: relative; height: 22px; border-radius: 8px; overflow: hidden; cursor: pointer;
+  background: rgba(255,255,255,0.05);
+}
+.prc-bar span { position: absolute; top: 0; bottom: 0; opacity: 0.55; border-right: 1px solid rgba(0,0,0,0.45); }
+.prc-bar i { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.8); }
+.prc-lyrics { min-height: 170px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 14px; }
+.prc-lyrics-now p { font-size: clamp(1.15rem, 2.6vw, 1.9rem); font-weight: 700; line-height: 1.35; margin: 0; }
+.prc-lyrics-next { color: var(--muted); font-size: 0.9rem; }
+.prc-lyrics-empty { color: var(--muted); display: flex; align-items: center; gap: 10px; margin: 0; }
+.prc-spin { animation: prc-spin 1s linear infinite; vertical-align: -2px; }
+@keyframes prc-spin { to { transform: rotate(360deg); } }
+@media (max-width: 900px) {
+  .prc-top { grid-template-columns: minmax(0, 1fr); }
+  .prc-scroll { max-height: 220px; }
+}

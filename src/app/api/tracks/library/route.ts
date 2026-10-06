@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
 import { listTracks, getTrack, setTrackStatus, deleteTrack, getAgentInfo, receivedBytes } from "@/lib/trackLibrary";
 import { neededTrackIds } from "@/lib/trackCache";
+import { ensurePracticeVersions, practiceState } from "@/lib/trackPractice";
 import { logActivity } from "@/lib/activityLog";
 
 export async function GET(req: NextRequest) {
@@ -12,8 +13,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
   const needed = neededTrackIds();
-  const items = listTracks()
-    .map(i => ({ ...i, needed: needed.has(i.id), ...(i.status === "uploading" ? { received: receivedBytes(i.id) } : {}) }))
+  const all = listTracks();
+  ensurePracticeVersions(all);
+  const items = all
+    .map(i => ({
+      ...i,
+      needed: needed.has(i.id),
+      practice: practiceState(i.id),
+      ...(i.status === "uploading" ? { received: receivedBytes(i.id) } : {}),
+    }))
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   return NextResponse.json({ items, agent: getAgentInfo() });
 }

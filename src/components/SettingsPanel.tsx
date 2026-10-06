@@ -1327,6 +1327,7 @@ export default function SettingsPanel({
                         <option value="monitor">Live Monitor</option>
                         <option value="lights">Lichtregie</option>
                         <option value="tracks">Tracks (REAPER)</option>
+                        <option value="oefenen">Oefenen (band)</option>
                         <option value="freeshow">FreeShow Projecten</option>
                       </select>
                     </div>
@@ -1462,6 +1463,7 @@ export default function SettingsPanel({
                         { id: "monitor", name: "Live Monitor" },
                         { id: "lights", name: "Lichtregie" },
                         { id: "tracks", name: "Tracks (REAPER)" },
+                        { id: "oefenen", name: "Oefenen (band)" },
                         { id: "freeshow", name: "FreeShow Projecten" }
                       ].map(perm => (
                         <label key={perm.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -2161,7 +2163,7 @@ export default function SettingsPanel({
                       </div>
                       {entry.role !== "admin" && (
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
-                          {["freeshow", "control", "planner", "lights", "tracks", "monitor"].map(perm => (
+                          {["freeshow", "control", "planner", "lights", "tracks", "oefenen", "monitor"].map(perm => (
                             <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <input
                                 type="checkbox"

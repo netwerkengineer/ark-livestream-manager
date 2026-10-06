@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
+import { enqueuePractice } from "@/lib/trackPractice";
 import { getTrack, receivedBytes, appendChunk, completeUpload, CHUNK_SIZE } from "@/lib/trackLibrary";
 import { logActivity } from "@/lib/activityLog";
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (req.nextUrl.searchParams.get("complete") === "1") {
     try {
       const done = await completeUpload(item.id);
+      enqueuePractice(item.id);
       logActivity("system", `Track "${item.fileName}" geüpload door ${authSession.username}.`);
       return NextResponse.json({ success: true, item: done });
     } catch (err) {

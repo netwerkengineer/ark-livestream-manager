@@ -7,10 +7,11 @@ import {
   Sun,
   Layers,
   SlidersHorizontal,
+  Headphones,
   type LucideIcon
 } from "lucide-react";
 
-type TabType = "planner" | "monitor" | "control" | "lights" | "tracks" | "freeshow";
+type TabType = "planner" | "monitor" | "control" | "lights" | "tracks" | "oefenen" | "freeshow";
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -25,6 +26,7 @@ const TABS: { id: TabType; label: string; icon: LucideIcon }[] = [
   { id: "monitor", label: "Monitor", icon: Activity },
   { id: "lights", label: "Licht", icon: Sun },
   { id: "tracks", label: "Tracks", icon: SlidersHorizontal },
+  { id: "oefenen", label: "Oefenen", icon: Headphones },
   { id: "freeshow", label: "FreeShow", icon: Layers },
 ];
 
