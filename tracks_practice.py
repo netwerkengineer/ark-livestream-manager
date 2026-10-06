@@ -7,7 +7,7 @@ Zet elke stem om naar AAC in stukken van CHUNK seconden (48 kHz), met een kleine
 overlap ervoor en erna zodat de browser de stukken naadloos aan elkaar kan zetten.
 Per tijdstuk komen de stukken van alle stems in één bestand (seg/<n>.bin), zodat de
 speler één verzoek per CHUNK seconden doet in plaats van één per stem. Stille stukken
-worden overgeslagen. Leest tempomap, maatsoort en secties uit het .als-bestand met
+worden overgeslagen. Leest tempomap, maatsoort en secties uit het .als-bestand (of song.json) met
 dezelfde code als mt2reaper (secties dus met dezelfde nummers als de regions in
 REAPER) en maakt dezelfde eigen click (1/4, 1/8, 1/16).
 
@@ -56,7 +56,7 @@ def extract(zip_path, dest):
             base = os.path.basename(name)
             if "__MACOSX" in name or base.startswith("._") or name.endswith("/"):
                 continue
-            if base.lower().endswith(".als") or base.lower().endswith(AUDIO_EXT):
+            if base.lower().endswith(".als") or base.lower() == "song.json" or base.lower().endswith(AUDIO_EXT):
                 z.extract(name, dest)
 
 
@@ -148,8 +148,8 @@ def main():
         extract(zip_path, src_dir)
         root, als_path = m.find_song_root(src_dir)
         if not als_path:
-            raise SystemExit("Geen .als-bestand in de zip")
-        als = m.read_als(als_path)
+            raise SystemExit("Geen .als-bestand of song.json in de zip")
+        als = m.read_song(als_path)
         tm = m.TempoMap(als["tempo"])
         cfg = json.loads(json.dumps(m.DEFAULT_CONFIG))
         with open(os.path.join(HERE, "track-computer", "busses.example.json")) as f:
@@ -190,7 +190,7 @@ def main():
         os.makedirs(os.path.join(chunks_dir, "seg"))
         per_stem = []
         # niet alle kernen: op een NAS blijven de andere diensten dan bruikbaar
-    with ThreadPoolExecutor(max_workers=max(2, min(3, os.cpu_count() or 2))) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(3, os.cpu_count() or 2))) as pool:
             for i, s in enumerate(stems):
                 progress("encode", stem=s["name"], done=i, total=len(stems))
                 outs, s["channels"] = stem_to_chunks(s["path"], s["position"], s["channels"], duration, work, i, pool)
@@ -233,7 +233,7 @@ def main():
 
         manifest = {
             "version": VERSION,
-            "title": os.path.basename(os.path.normpath(root)),
+            "title": als.get("title") or os.path.basename(os.path.normpath(root)),
             "duration": round(duration, 6),
             "sampleRate": SR,
             "chunk": CHUNK,

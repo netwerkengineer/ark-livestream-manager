@@ -1,0 +1,18 @@
+{
+  "title": "Naam van het nummer",
+  "album": "Eigen opname",
+  "key": "C",
+  "bpm": 112,
+  "timesig": "4/4",
+  "sections": [
+    ["Count Off", 1],
+    ["Intro", 3],
+    ["Verse 1", 11],
+    ["Chorus", 19],
+    ["Verse 2", 27],
+    ["Chorus", 35],
+    ["Bridge", 43],
+    ["Chorus", 51],
+    ["Ending", 59]
+  ]
+}

@@ -13,6 +13,10 @@ Alleen Python 3 standaardbibliotheek. Gebruik:
     python3 mt2reaper.py "/pad/naar/uitgepakte map"
     python3 mt2reaper.py "/pad/naar/map met veel zips" --all
 Opties: --config busses.json   --samplerate 48000   --out /andere/map
+
+Eigen opname i.p.v. een MultiTracks-download: een map of zip met de stems en een
+song.json (titel, key, bpm, timesig, secties in maten; zie song.example.json).
+Controleren voor het uploaden:  python3 mt2reaper.py "/pad/naar/map" --check
 """
 import argparse
 import array
@@ -132,6 +136,152 @@ def read_als(path):
                 "warped": clip.find("IsWarped").get("Value") == "true",
             })
     return {"tempo": tempo_ev, "timesig": ts_ev, "markers": markers, "tracks": tracks}
+
+
+# ------------------------------- Eigen opname (song.json) -------------------
+# Alternatief voor een MultiTracks/Ableton-download: een map of zip met de stems en een
+# song.json met titel, toonsoort, tempo, maatsoort en secties in maten (zie
+# song.example.json). Levert dezelfde gegevens als read_als.
+AUDIO_EXT = (".wav", ".m4a", ".aif", ".aiff", ".mp3", ".flac", ".caf")
+
+
+def _num(v, what):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        raise SystemExit(f"song.json: {what} moet een getal zijn (gevonden: {v!r})")
+
+
+def _timesig(v, what):
+    m = re.match(r"^\s*(\d+)\s*/\s*(\d+)\s*$", str(v))
+    if not m or int(m.group(2)) not in (1, 2, 4, 8, 16, 32):
+        raise SystemExit(f"song.json: {what} moet een maatsoort zijn als \"4/4\" of \"6/8\" (gevonden: {v!r})")
+    return int(m.group(1)), int(m.group(2))
+
+
+def _bar_to_qn(bar, beat, sigs):
+    """Maat (1 = eerste maat) + tel (1 = eerste tel) -> kwartnoten vanaf het begin.
+    sigs: [(maat, (teller, noemer))] oplopend, begint bij maat 1."""
+    whole = int(bar)
+    qn, b, cur = 0.0, 1, sigs[0][1]
+    idx = 0
+    while b < whole:
+        while idx + 1 < len(sigs) and sigs[idx + 1][0] <= b:
+            idx += 1
+        cur = sigs[idx][1]
+        qn += cur[0] * 4.0 / cur[1]
+        b += 1
+    while idx + 1 < len(sigs) and sigs[idx + 1][0] <= whole:
+        idx += 1
+    cur = sigs[idx][1]
+    qn += (bar - whole) * cur[0] * 4.0 / cur[1]      # gebroken maat
+    qn += (beat - 1) * 4.0 / cur[1]                   # tel binnen de maat
+    return qn
+
+
+def read_song_json(path):
+    root = os.path.dirname(path)
+    try:
+        with open(path, encoding="utf-8") as f:
+            j = json.load(f)
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"song.json is niet te lezen: {e}")
+    if not isinstance(j, dict):
+        raise SystemExit("song.json: verwacht een object met title, bpm en sections")
+    title = str(j.get("title") or "").strip()
+    if not title:
+        raise SystemExit("song.json: \"title\" ontbreekt")
+
+    # maatsoort (in maten) -> kwartnoten
+    raw = j.get("timesig", "4/4")
+    sig_in = [[1, raw]] if isinstance(raw, str) else raw
+    sigs = sorted([(int(_num(b, "maat in timesig")), _timesig(v, "timesig")) for b, v in sig_in])
+    if not sigs or sigs[0][0] != 1:
+        raise SystemExit("song.json: timesig moet bij maat 1 beginnen")
+    timesig = [(_bar_to_qn(b, 1, sigs), ts) for b, ts in sigs]
+
+    # tempo
+    if "tempo" in j:
+        tempo_in = [(int(_num(b, "maat in tempo")), _num(v, "tempo")) for b, v in j["tempo"]]
+    elif "bpm" in j:
+        tempo_in = [(1, _num(j["bpm"], "bpm"))]
+    else:
+        raise SystemExit("song.json: \"bpm\" (of \"tempo\": [[maat, bpm], ...]) ontbreekt")
+    tempo_in.sort()
+    if tempo_in[0][0] != 1:
+        raise SystemExit("song.json: tempo moet bij maat 1 beginnen")
+    if any(v < 20 or v > 400 for _, v in tempo_in):
+        raise SystemExit("song.json: tempo buiten 20-400 bpm")
+    tempo = [(_bar_to_qn(b, 1, sigs), v) for b, v in tempo_in]
+    tm = TempoMap(tempo)
+
+    # secties
+    sections = []
+    for entry in j.get("sections", []):
+        if isinstance(entry, dict):
+            name, bar, beat, sec = entry.get("name"), entry.get("bar"), entry.get("beat", 1), entry.get("sec")
+        else:
+            name = entry[0]
+            bar = entry[1] if len(entry) > 1 else None
+            beat, sec = (entry[2] if len(entry) > 2 else 1), None
+        name = str(name or "").strip()
+        if not name:
+            raise SystemExit(f"song.json: sectie zonder naam: {entry!r}")
+        if sec is not None:
+            qn = tm_len_beats(tm, _num(sec, f"sec van {name}"))
+        elif bar is not None:
+            if _num(bar, f"maat van {name}") < 1:
+                raise SystemExit(f"song.json: maat van \"{name}\" moet vanaf 1 tellen")
+            qn = _bar_to_qn(_num(bar, f"maat van {name}"), _num(beat, f"tel van {name}"), sigs)
+        else:
+            raise SystemExit(f"song.json: sectie \"{name}\" heeft een \"bar\" (maat) of \"sec\" (seconden) nodig")
+        sections.append((qn, name))
+    sections.sort()
+    if not sections:
+        raise SystemExit("song.json: \"sections\" ontbreekt; zonder secties kan er niet gesprongen worden")
+
+    # stems: opgegeven, anders alle audiobestanden in de map
+    stems = []
+    listed = j.get("stems")
+    if listed:
+        for s in listed:
+            s = {"file": s} if isinstance(s, str) else dict(s)
+            if not s.get("file"):
+                raise SystemExit(f"song.json: stem zonder \"file\": {s!r}")
+            stems.append({"name": s.get("name") or os.path.splitext(os.path.basename(s["file"]))[0],
+                          "file": os.path.basename(s["file"]),
+                          "start_beats": tm_len_beats(tm, _num(s.get("start", 0), "start")) if s.get("start") else 0.0,
+                          "warped": False})
+    else:
+        found = {}
+        for dp, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in ("__MACOSX", "peaks")]
+            for f in sorted(files):
+                if f.startswith("._") or f.startswith("Ark Click") or not f.lower().endswith(AUDIO_EXT):
+                    continue
+                base = os.path.splitext(f)[0]
+                # .m4a met een omgezette .wav ernaast: de .wav
+                if base not in found or f.lower().endswith(".wav"):
+                    found[base] = f
+        for base in sorted(found, key=str.lower):
+            stems.append({"name": base, "file": found[base], "start_beats": 0.0, "warped": False})
+    if not stems:
+        raise SystemExit("song.json: geen audiobestanden (stems) gevonden naast song.json")
+
+    # naam in MultiTracks-stijl ("Titel-Album-Toonsoort-120.00bpm"): daar halen de app
+    # en de padspeler titel, toonsoort en tempo uit
+    clean = lambda s: re.sub(r"\s+", " ", re.sub(r"[-\\/:*?\"<>|]+", " ", str(s))).strip()
+    key = str(j.get("key") or "").strip()
+    name = f"{clean(title)}-{clean(j.get('album') or 'Eigen opname')}"
+    if re.match(r"^[A-G][#b]?m?$", key):
+        name += f"-{key}-{tempo_in[0][1]:.2f}bpm"
+    elif key:
+        raise SystemExit(f"song.json: key \"{key}\" is geen toonsoort (bijv. C, Bb, F#m)")
+    return {"tempo": tempo, "timesig": timesig, "markers": sections, "tracks": stems, "title": name}
+
+
+def read_song(path):
+    return read_song_json(path) if path.lower().endswith(".json") else read_als(path)
 
 
 class TempoMap:
@@ -581,7 +731,13 @@ def add_click_to_rpp(rpp_path, clicks, stems_dir_rel):
 
 # ------------------------------- Main -------------------------------------
 def find_song_root(folder):
+    """Map met de songbeschrijving: een song.json (eigen opname, gaat voor) of een
+    Ableton-set (.als) van MultiTracks."""
     for dirpath, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if d != "__MACOSX"]
+        for f in files:
+            if f.lower() == "song.json":
+                return dirpath, os.path.join(dirpath, f)
         for f in files:
             if f.lower().endswith(".als") and not f.startswith("._"):
                 return dirpath, os.path.join(dirpath, f)
@@ -599,11 +755,11 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         folder = src
     root, als_path = find_song_root(folder)
     if not als_path:
-        raise SystemExit(f"Geen .als-bestand gevonden in {folder}")
+        raise SystemExit(f"Geen .als-bestand of song.json gevonden in {folder}")
 
-    als = read_als(als_path)
+    als = read_song(als_path)
     tm = TempoMap(als["tempo"])
-    title = os.path.basename(os.path.normpath(root))
+    title = als.get("title") or os.path.basename(os.path.normpath(root))
 
     stem_files, missing = [], []
     for t in als["tracks"]:
@@ -700,6 +856,45 @@ def safe(s):
     return re.sub(r'[\\/:*?"<>|]+', "_", s).strip() or "song"
 
 
+def check_song(source, cfg):
+    """Controle vóór het uploaden: wat leest mt2reaper uit de map of song.json."""
+    path = source
+    if os.path.isdir(source):
+        _, path = find_song_root(source)
+    if not path or not os.path.exists(path):
+        raise SystemExit(f"Geen song.json of .als gevonden in {source}")
+    als = read_song(path)
+    root = os.path.dirname(path)
+    tm = TempoMap(als["tempo"])
+    fmt = lambda s: f"{int(s // 60)}:{s % 60:04.1f}"
+    print(f"Naam:      {als.get('title') or os.path.basename(root)}")
+    print("Tempo:     " + ", ".join(f"{bpm:g} bpm" + (f" (vanaf {tm.beats_to_sec(b):.1f}s)" if b else "") for b, bpm in als["tempo"]))
+    print("Maatsoort: " + ", ".join(f"{n}/{d}" for _, (n, d) in als["timesig"]))
+    longest, problems = 0.0, []
+    print("\nStems:")
+    for st in als["tracks"]:
+        found = next((os.path.join(dp, f) for dp, _, fs in os.walk(root) for f in fs
+                      if f == st["file"] or f == os.path.splitext(st["file"])[0] + ".wav"), None)
+        info = wav_info(found) if found and found.lower().endswith(".wav") else None
+        if info:
+            longest = max(longest, info[2] + tm.beats_to_sec(st["start_beats"]))
+        bus = pick_bus(st["name"], cfg)
+        live = " [LIVE: gemute]" if is_live(st["name"], cfg) else ""
+        print(f"  {st['name']:<22} -> {bus}{live}" + ("" if found else "   <-- BESTAND ONTBREEKT"))
+        if not found:
+            problems.append(f"bestand ontbreekt: {st['file']}")
+    print("\nSecties:")
+    for qn, name in als["markers"]:
+        sec = tm.beats_to_sec(qn)
+        flag = "   <-- na het einde van de audio" if longest and sec >= longest else ""
+        print(f"  {fmt(sec):>7}  {name}{flag}")
+        if flag:
+            problems.append(f"sectie \"{name}\" begint na het einde van de audio")
+    if longest:
+        print(f"\nLengte audio: {fmt(longest)}")
+    print("\n" + ("Let op:\n  " + "\n  ".join(problems) if problems else "Ziet er goed uit."))
+
+
 def main():
     ap = argparse.ArgumentParser(description="MultiTracks.com download -> REAPER project")
     ap.add_argument("source", help="zip-bestand, uitgepakte songmap, of (met --all) een map met zips/songmappen")
@@ -709,6 +904,7 @@ def main():
     ap.add_argument("--out", help="uitpakmap voor een zip (standaard naast de zip)")
     ap.add_argument("--force", action="store_true", help="bestaande .RPP-projecten overschrijven")
     ap.add_argument("--add-click", action="store_true", help="alleen de eigen click (1/4, 1/8, 1/16) toevoegen aan een bestaand project")
+    ap.add_argument("--check", action="store_true", help="alleen controleren (song.json of map): tempo, secties en stems tonen")
     ap.add_argument("--report-json", help="schrijf een JSON-rapport van de verwerkte nummers naar dit bestand")
     a = ap.parse_args()
 
@@ -717,6 +913,9 @@ def main():
         with open(a.config, encoding="utf-8") as f:
             cfg.update(json.load(f))
 
+    if a.check:
+        check_song(a.source, cfg)
+        return
     reports = []
     if a.all:
         items = sorted(os.listdir(a.source))
