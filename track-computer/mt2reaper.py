@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import uuid
 import wave
 import zipfile
@@ -398,7 +399,47 @@ def _blip(freq, amp, ms=30):
             for i in range(n)]
 
 
-def generate_clicks(stems_dir, als, tm, song_len):
+def sample_original_click(orig_path, tm, end_q):
+    """Knipt één tik op de tel en één tik op de tussenliggende achtste uit de originele
+    MultiTracks-click, zodat de eigen click hetzelfde klinkt. None als dat niet lukt."""
+    if not orig_path or not os.path.exists(orig_path):
+        return None
+    tmp = os.path.join(tempfile.gettempdir(), f"ark-click-{os.getpid()}.wav")
+    try:
+        subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{CLICK_SR}", "-c", "1", orig_path, tmp],
+                       check=True, capture_output=True)
+        with wave.open(tmp) as w:
+            data = array.array("h", w.readframes(w.getnframes()))
+    except (OSError, subprocess.CalledProcessError, wave.Error):
+        return None
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    n = int(CLICK_SR * 0.07)  # 70 ms: de tikken duren ~50 ms
+    fade = int(CLICK_SR * 0.005)
+
+    def hit(offset):
+        # eerste tel (of achtste) waar de originele click echt tikt
+        q = offset
+        while q < min(end_q, 256):
+            start = int(round(tm.beats_to_sec(q) * CLICK_SR))
+            seg = data[start:start + n]
+            if len(seg) == n and max(abs(v) for v in seg) > 2000:
+                seg = list(seg)
+                for i in range(fade):
+                    seg[n - fade + i] = int(seg[n - fade + i] * (fade - i) / fade)
+                return seg
+            q += 1
+        return None
+
+    quarter, eighth = hit(0.0), hit(0.5)
+    if not quarter or not eighth:
+        return None
+    return {"accent": quarter, "quarter": quarter, "eighth": eighth,
+            "sixteenth": [int(v * 0.6) for v in eighth]}
+
+
+def generate_clicks(stems_dir, als, tm, song_len, orig_click=None):
     """Schrijft de drie click-stems (WAV, 48 kHz mono) en geeft ze terug als stems."""
     end_q = tm_len_beats(tm, song_len)
     # maatbegin uit de maatsoortwisselingen
@@ -409,7 +450,8 @@ def generate_clicks(stems_dir, als, tm, song_len):
         cur = [s for b, s in ts if b <= q + 1e-6]
         num, den = cur[-1] if cur else (ts[0][1] if ts else (4, 4))
         q += num * 4.0 / den
-    sounds = {"accent": _blip(1600, 0.9), "quarter": _blip(1100, 0.75), "eighth": _blip(900, 0.5), "sixteenth": _blip(800, 0.35)}
+    sounds = sample_original_click(orig_click, tm, end_q) or \
+        {"accent": _blip(1600, 0.9), "quarter": _blip(1100, 0.75), "eighth": _blip(900, 0.5), "sixteenth": _blip(800, 0.35)}
     n_samples = int((song_len + 1) * CLICK_SR)
     layers = {name: array.array("h", bytes(2 * n_samples)) for name, _, _ in CLICK_STEMS}
     k = 0
@@ -469,6 +511,22 @@ def add_click_to_rpp(rpp_path, clicks, stems_dir_rel):
         return None
     names = [name_of(b) for b in blocks]
     if any(n in ("Click 1/4", "Click 1/8", "Click 1/16") for n in names):
+        # staan er al: alleen de itemlengte bijwerken (de WAV's zijn opnieuw gemaakt)
+        length = max(st["length"] for st in clicks)
+        changed, item_len = False, None
+        for k, l in enumerate(lines):
+            s = l.strip()
+            if s.startswith("<ITEM"):
+                item_len = None
+            elif s.startswith("LENGTH ") and item_len is None:
+                item_len = k
+            elif s.startswith("FILE ") and "Ark Click " in s and item_len is not None:
+                new = lines[item_len][:len(lines[item_len]) - len(lines[item_len].lstrip())] + f"LENGTH {length:.10f}"
+                if lines[item_len] != new:
+                    lines[item_len], changed = new, True
+        if changed:
+            open(rpp_path + ".tmp", "w", encoding="utf-8").write("\n".join(lines))
+            os.replace(rpp_path + ".tmp", rpp_path)
         return False
     bus = next((k for k, n in enumerate(names) if re.match(r"(?i)^click\b.*->\s*out\s*\d+", n)), None)
     if bus is None:
@@ -548,9 +606,11 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
             continue
         # zoek het bestand (meestal in MultiTracks/)
         found = None
+        # na omzetting is een .m4a weg en staat de .wav er nog
+        wav_name = os.path.splitext(t["file"])[0] + ".wav"
         for dp, _, fs in os.walk(root):
-            if t["file"] in fs:
-                found = os.path.join(dp, t["file"])
+            if t["file"] in fs or wav_name in fs:
+                found = os.path.join(dp, t["file"] if t["file"] in fs else wav_name)
                 break
         if not found:
             missing.append(t["file"])
@@ -569,10 +629,15 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         })
     rel_dir = stem_files[0]["rel_dir"] if stem_files else "MultiTracks"
     song_len = max([s["length"] for s in stem_files] + [0])
+    # de originele click: daaruit komt de klank van de eigen click
+    orig_click = next((os.path.join(root, s["rel_dir"], s["file"]) for s in stem_files
+                       if s["name"].lower().startswith("click") and pick_bus(s["name"], cfg) == pick_bus("click", cfg)), None)
 
     rpp_path = os.path.join(root, f"{safe(title)}.RPP")
     if add_click:
-        clicks = generate_clicks(os.path.join(root, rel_dir), als, tm, song_len)
+        if song_len <= 0:
+            raise SystemExit(f"Geen stems gevonden in {root}; click niet gemaakt")
+        clicks = generate_clicks(os.path.join(root, rel_dir), als, tm, song_len, orig_click)
         added = add_click_to_rpp(rpp_path, clicks, rel_dir)
         print(f"\n== {title}\n   Eigen click {'toegevoegd' if added else 'bijgewerkt (stond er al)'}\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True, "click": True}
@@ -583,7 +648,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         click_dir = os.path.join(root, rel_dir)
         if "Ark Click" in open(rpp_path, encoding="utf-8", errors="ignore").read() and song_len > 0 and \
                 any(not os.path.exists(os.path.join(click_dir, f)) for _, f, _ in CLICK_STEMS):
-            generate_clicks(click_dir, als, tm, song_len)
+            generate_clicks(click_dir, als, tm, song_len, orig_click)
         print(f"\n== {title}\n   Bestaat al, overgeslagen (gebruik --force om opnieuw te maken)\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True}
 
@@ -592,7 +657,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         for st in stem_files:
             if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
                 st["muted"] = True
-        for st in generate_clicks(os.path.join(root, rel_dir), als, tm, song_len):
+        for st in generate_clicks(os.path.join(root, rel_dir), als, tm, song_len, orig_click):
             st["rel_dir"] = rel_dir
             stem_files.append(st)
     rpp, per_bus, markers = build_rpp(title, als, rel_dir, stem_files, cfg, samplerate, root)
