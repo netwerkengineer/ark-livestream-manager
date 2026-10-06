@@ -248,6 +248,8 @@ def read_song_json(path):
             s = {"file": s} if isinstance(s, str) else dict(s)
             if not s.get("file"):
                 raise SystemExit(f"song.json: stem zonder \"file\": {s!r}")
+            if os.path.basename(s["file"]).startswith("._"):
+                continue        # verborgen macOS-bijbestandje, geen audio
             stems.append({"name": s.get("name") or os.path.splitext(os.path.basename(s["file"]))[0],
                           "file": os.path.basename(s["file"]),
                           "start_beats": tm_len_beats(tm, _num(s.get("start", 0), "start")) if s.get("start") else 0.0,
