@@ -11,6 +11,10 @@
 // Only a few chunks around the play position are decoded at a time (a whole
 // song with 25 stems decoded would not fit on a phone); the browser keeps the
 // downloaded segments in its HTTP cache.
+//
+// Tempo: the sources play at `rate` (slower = lower), the pitch shifter
+// worklet behind the master puts the mix back at its own pitch. Song times
+// (sections, bars, lyrics) stay as they are; only the audio clock stretches.
 
 export interface PracticeStem {
   name: string;
@@ -58,7 +62,8 @@ export interface GroupMix { volume: number; mute: boolean }
 interface Piece {
   ctx: number;      // audio clock start
   song: number;     // song time at that moment
-  dur: number;      // length without the fade-out tail
+  dur: number;      // length on the audio clock, without the fade-out tail
+  rate: number;     // song seconds per audio-clock second
   sources: AudioBufferSourceNode[];
   gains: GainNode[];
 }
@@ -66,6 +71,8 @@ interface Piece {
 const AHEAD = 2.5;       // seconds scheduled ahead
 const TICK_MS = 100;
 const START_DELAY = 0.08;
+export const MIN_RATE = 0.5;
+export const MAX_RATE = 1.1;
 
 export class UnauthorizedError extends Error {}
 
@@ -73,6 +80,9 @@ export class PracticeEngine {
   readonly m: PracticeManifest;
   private ctx: AudioContext;
   private master: GainNode;
+  private shifter: AudioWorkletNode | null = null;
+  private shifterLatency = 0;
+  rate = 1;
   private groupGain = new Map<string, GainNode>();
   private stemGain: GainNode[] = [];
   private analysers: AnalyserNode[] = [];
@@ -128,7 +138,34 @@ export class PracticeEngine {
 
   // ------------------------------------------------------------- loading
 
+  // Tempo needs the pitch shifter (AudioWorklet; https only)
+  get canTempo(): boolean {
+    return !!this.shifter;
+  }
+
+  private async setupShifter() {
+    try {
+      if (!this.ctx.audioWorklet) return;
+      await this.ctx.audioWorklet.addModule("/practice-pitch-worklet.js");
+      const node = new AudioWorkletNode(this.ctx, "ark-pitch", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+      node.port.onmessage = ev => {
+        if (typeof ev.data?.latency === "number") this.shifterLatency = ev.data.latency / this.ctx.sampleRate;
+      };
+      this.master.disconnect();
+      this.master.connect(node).connect(this.ctx.destination);
+      this.shifter = node;
+    } catch {
+      // no worklet: plays at the normal tempo only
+      this.shifter = null;
+    }
+  }
+
   async init() {
+    await this.setupShifter();
     // iOS: play through the silent switch like a music app
     try {
       const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
@@ -208,8 +245,9 @@ export class PracticeEngine {
   private schedulePiece(k: number, bufs: (AudioBuffer | null)[], song: number, end: number, at: number) {
     const seg = this.m.segments[k];
     const xf = this.m.crossfade;
-    const dur = end - song;
-    const piece: Piece = { ctx: at, song, dur, sources: [], gains: [] };
+    const rate = this.rate;
+    const dur = (end - song) / rate;
+    const piece: Piece = { ctx: at, song, dur, rate, sources: [], gains: [] };
     bufs.forEach((buf, i) => {
       if (!buf) return;
       const src = this.ctx.createBufferSource();
@@ -219,9 +257,11 @@ export class PracticeEngine {
       g.gain.linearRampToValueAtTime(1, at + xf);
       g.gain.setValueAtTime(1, at + dur);
       g.gain.linearRampToValueAtTime(0, at + dur + xf);
+      src.playbackRate.value = rate;
       src.connect(g).connect(this.stemGain[i]);
       const offset = Math.max(0, song - seg.start + this.shift);
-      src.start(at, offset, Math.max(0.001, Math.min(dur + xf, buf.duration - offset)));
+      src.start(at, offset);
+      src.stop(at + Math.max(0.001, Math.min(dur + xf, (buf.duration - offset) / rate)));
       piece.sources.push(src);
       piece.gains.push(g);
     });
@@ -276,7 +316,7 @@ export class PracticeEngine {
       }
       if (end - song > 0.002) {
         this.schedulePiece(k, bufs, song, end, this.cursor.ctx);
-        this.cursor = { ctx: this.cursor.ctx + (end - song), song: next };
+        this.cursor = { ctx: this.cursor.ctx + (end - song) / this.rate, song: next };
       } else {
         this.cursor = { ctx: this.cursor.ctx, song: next };
       }
@@ -316,7 +356,7 @@ export class PracticeEngine {
 
   private songAt(t: number): number | null {
     for (const p of this.pieces) {
-      if (t >= p.ctx && t < p.ctx + p.dur) return p.song + (t - p.ctx);
+      if (t >= p.ctx && t < p.ctx + p.dur) return p.song + (t - p.ctx) * p.rate;
     }
     if (this.cursor && t >= this.cursor.ctx - 1e-6) return this.cursor.song;
     // in the not-yet-filled gap after a piece: the cursor's song time
@@ -342,9 +382,9 @@ export class PracticeEngine {
 
   get position(): number {
     if (!this.playing) return this.pausedAt;
-    const t = this.ctx.currentTime - (this.ctx.outputLatency || 0);
+    const t = this.ctx.currentTime - (this.ctx.outputLatency || 0) - this.shifterLatency;
     for (const p of this.pieces) {
-      if (t >= p.ctx && t < p.ctx + p.dur) return p.song + (t - p.ctx);
+      if (t >= p.ctx && t < p.ctx + p.dur) return p.song + (t - p.ctx) * p.rate;
     }
     if (this.pieces.length && t < this.pieces[0].ctx) return this.pieces[0].song;
     return this.cursor ? this.cursor.song : this.pausedAt;
@@ -426,6 +466,19 @@ export class PracticeEngine {
     if (this.loop && this.loop.id !== section.id) this.loop = null;
     this.pending = { at, to: section.start, section };
     this.prefetch(section.start);
+    this.reschedule();
+    this.onChange();
+  }
+
+  // Tempo as a fraction of the original (0.5 .. 1.1), pitch stays the same
+  setRate(rate: number) {
+    const r = Math.max(MIN_RATE, Math.min(MAX_RATE, Math.round(rate * 100) / 100));
+    if (!this.shifter || r === this.rate) return;
+    this.rate = r;
+    const ratio = this.shifter.parameters.get("ratio");
+    const at = this.ctx.currentTime + (this.playing ? 0.12 : 0);
+    // the shifter hears the new speed after its own delay
+    ratio?.setValueAtTime(1 / r, at + this.shifterLatency * 0.75);
     this.reschedule();
     this.onChange();
   }

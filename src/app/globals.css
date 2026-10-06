@@ -1194,3 +1194,45 @@ textarea.input-field {
   .prc-top { grid-template-columns: minmax(0, 1fr); }
   .prc-scroll { max-height: 220px; }
 }
+.prc-tempo { display: flex; flex-direction: column; gap: 4px; }
+.prc-tempo .trk-label { display: flex; align-items: center; gap: 4px; }
+.prc-tempo-row { display: flex; align-items: center; gap: 4px; }
+.prc-tempo-btn, .prc-tempo-val {
+  height: 34px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05); color: var(--foreground); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.prc-tempo-btn { width: 34px; }
+.prc-tempo-val { min-width: 58px; font-family: monospace; font-weight: 700; font-size: 0.95rem; }
+.prc-tempo-val.on { border-color: #f59e0b; color: #fbbf24; background: rgba(245,158,11,0.12); }
+.prc-tempo-btn:disabled, .prc-tempo-val:disabled { opacity: 0.4; cursor: default; }
+
+/* Low screens (phone in landscape): a whole channel strip fits on screen,
+   the fader takes the height that is left */
+@media (max-height: 520px) {
+  .glass-card:has(> .mx-rack) { padding: 10px 12px; }
+  .glass-card:has(> .mx-rack) .mx-head { margin-bottom: 6px; gap: 6px; }
+  .glass-card:has(> .mx-rack) .trk-title { font-size: 0.95rem; }
+  .glass-card:has(> .mx-rack) .trk-arr-hint { display: none; }
+  .mx-rack { gap: 6px; padding-bottom: 6px; }
+  .mx-strip, .mx-strip.bus { min-width: 70px; padding: 6px 4px; gap: 4px; border-radius: 10px; }
+  .mx-fader { height: max(130px, calc(100svh - 190px)); padding: 4px 0; gap: 4px; }
+  .mx-scale { width: 18px; }
+  .mx-scale span { font-size: 0.55rem; }
+  .mx-groove-area { width: 30px; }
+  .mx-value { font-size: 0.7rem; padding: 1px 4px; min-width: 44px; }
+  .mx-btn { width: 28px; height: 26px; font-size: 0.75rem; }
+  .mx-ms { gap: 4px; }
+  .mx-name { font-size: 0.68rem; max-width: 66px; }
+  .mx-tags { min-height: 0; }
+  .mx-tags:empty { display: none; }
+  .mx-stems { padding: 2px 6px; font-size: 0.65rem; }
+}
+@media (max-width: 640px) {
+  .glass-card:has(> .mx-rack) { padding: 14px 10px; }
+  .mx-rack { gap: 6px; }
+  .mx-strip, .mx-strip.bus { min-width: 72px; padding: 10px 4px 8px; }
+  .mx-btn { width: 30px; height: 30px; }
+  .mx-name { max-width: 68px; }
+  .mx-value { min-width: 46px; }
+}

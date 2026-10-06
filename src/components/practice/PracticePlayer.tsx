@@ -3,14 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Play, Pause, Square, Repeat, Headphones, ListMusic, SlidersHorizontal, Search,
-  ChevronDown, ChevronUp, Loader2, AlertTriangle, RotateCcw, Music, CalendarDays,
+  ChevronDown, ChevronUp, Loader2, AlertTriangle, RotateCcw, Music, CalendarDays, Minus, Plus, Gauge,
 } from "lucide-react";
 import Fader from "../tracks/Fader";
 import { faderToVolume, volumeToFader, formatDb, meterPercent, UNITY } from "../tracks/faderLaw";
 import { parseSongName, sectionColor } from "../tracks/songName";
 import { formatTime } from "../tracks/useReaper";
 import {
-  PracticeEngine, UnauthorizedError,
+  PracticeEngine, UnauthorizedError, MIN_RATE, MAX_RATE,
   type JumpMode, type PracticeManifest, type PracticeSection, type StemMix, type GroupMix,
 } from "./practiceEngine";
 
@@ -25,6 +25,7 @@ const MODES: { id: JumpMode; label: string; hint: string }[] = [
 ];
 
 const MIX_KEY = (id: string) => `practice-mix:${id}`;
+const TEMPO_KEY = (id: string) => `practice-tempo:${id}`;
 
 function readStorage(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -143,6 +144,9 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
       setLyrics(data.lyrics || null);
       setMixState({ ...engine.mix });
       await engine.init();
+      // Tempo of this song from last time
+      const savedRate = Number(readStorage(TEMPO_KEY(id)));
+      if (savedRate && engine.canTempo) engine.setRate(savedRate);
     } catch (err) {
       setSongError(err instanceof UnauthorizedError ? "Je bent niet (meer) ingelogd." : err instanceof Error ? err.message : String(err));
     } finally {
@@ -233,6 +237,13 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
     );
     writeStorage(MIX_KEY(songId), null);
     setMixState({ ...en.mix });
+  };
+
+  const changeRate = (rate: number) => {
+    const en = engineRef.current;
+    if (!en || !songId) return;
+    en.setRate(rate);
+    writeStorage(TEMPO_KEY(songId), en.rate === 1 ? null : String(en.rate));
   };
 
   // ------------------------------------------------------------- derived
@@ -345,7 +356,11 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
             <div className="trk-song">
               <span className="trk-label">Oefenen</span>
               <strong>{song?.title || (loading ? "Laden…" : "Kies een nummer")}</strong>
-              {song?.key && <span className="trk-meta">{song.key} · {song.bpm} BPM</span>}
+              {song?.key && (
+                <span className="trk-meta">
+                  {song.key} · {engine && engine.rate !== 1 && song.bpm ? `${Math.round(Number(song.bpm) * engine.rate)} BPM (origineel ${song.bpm})` : `${song.bpm} BPM`}
+                </span>
+              )}
             </div>
             <div className="trk-transport-buttons">
               <button
@@ -363,6 +378,16 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
             <div className="trk-clock">
               <span className="trk-time">{formatTime(position)}</span>
               <span className="trk-meta">{manifest ? formatTime(manifest.duration) : "-"}</span>
+            </div>
+            <div className="prc-tempo" title={engine && !engine.canTempo ? "Tempo aanpassen kan niet in deze browser" : "Tempo (toonhoogte blijft gelijk)"}>
+              <span className="trk-label"><Gauge size={12} /> Tempo</span>
+              <div className="prc-tempo-row">
+                <button className="prc-tempo-btn" onClick={() => changeRate((engine?.rate || 1) - 0.05)} disabled={!engine?.canTempo || (engine?.rate || 1) <= MIN_RATE} aria-label="Langzamer"><Minus size={14} /></button>
+                <button className={`prc-tempo-val${engine && engine.rate !== 1 ? " on" : ""}`} onClick={() => changeRate(1)} disabled={!engine?.canTempo} title="Terug naar 100%">
+                  {Math.round((engine?.rate || 1) * 100)}%
+                </button>
+                <button className="prc-tempo-btn" onClick={() => changeRate((engine?.rate || 1) + 0.05)} disabled={!engine?.canTempo || (engine?.rate || 1) >= MAX_RATE} aria-label="Sneller"><Plus size={14} /></button>
+              </div>
             </div>
             <div className="trk-current">
               <span className="trk-label">Sectie</span>
