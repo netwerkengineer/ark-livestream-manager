@@ -282,7 +282,8 @@ func tick() {
         let dev = reaperOutputDeviceName(), out = bridgeOutput()
         if dev != pads.device || out != pads.output || !pads.configured {
             pads.device = dev; pads.output = out
-            if pads.current != nil || !pads.configured { pads.configure() }
+            // Ook als er niets speelt: anders komt de volgende pad nog op de oude uitgang
+            pads.configure()
         }
     }
     if Date().timeIntervalSince(lastStateWrite) > 0.5 { writeState(); lastStateWrite = Date() }
