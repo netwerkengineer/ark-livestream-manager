@@ -38,6 +38,7 @@ const isLiveStem = (name: string) => /\[LIVE\]/i.test(name);
 const OUTPUT_LABEL: Record<string, string> = {
   multi: "Uitgangen: 8 kanalen (X32)",
   "2ch": "Uitgangen: 1 = Click + Guide · 2 = Tracks",
+  "3ch": "Uitgangen: 1 = Click + Guide · 2 + 3 = Tracks (stereo)",
   stereo: "Uitgangen: stereo (test)",
 };
 const stemLabel = (name: string) => name.replace(/\s*\[LIVE\]\s*/i, "").trim();

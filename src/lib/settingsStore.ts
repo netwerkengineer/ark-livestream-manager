@@ -57,9 +57,9 @@ export interface AppSettings {
   reaperEnabled?: boolean;
   reaperHost?: string;
   reaperPort?: number;
-  // Outputs of the track computer: auto | multi (8 channels, X32) | 2ch
+  // Outputs of the track computer: auto | multi (8 channels, X32) | 2ch | 3ch (tracks in stereo)
   // (Click+Guide | Tracks) | stereo (test via speakers)
-  reaperOutputMode?: 'auto' | 'multi' | '2ch' | 'stereo';
+  reaperOutputMode?: 'auto' | 'multi' | '2ch' | '3ch' | 'stereo';
   // FreeShow slides this many beats before the line is sung (0-4)
   reaperCueLeadBeats?: number;
   // Track computer keeps the audio of songs played in this many past weeks

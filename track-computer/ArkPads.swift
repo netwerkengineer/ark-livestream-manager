@@ -4,7 +4,7 @@
 // stoppen, starten en songwissels. Wisselen van toonsoort gaat met een crossfade.
 // Gebruikt hetzelfde audioapparaat als REAPER (reaper.ini) en dezelfde uitgang als de
 // gekozen uitgangsmodus van de tracks (bridge-state): X32 -> uitgang 8 (PADS-bus),
-// 2 kanalen -> uitgang 2 (tracks), stereo -> 1+2.
+// 2 kanalen -> uitgang 2 (tracks), 3 kanalen -> uitgang 2+3 (tracks stereo), stereo -> 1+2.
 //
 // Bediening via REAPER's webinterface (zelfde route als de rest van de app):
 //   app -> SET/EXTSTATE/ArkPads/cmd/<id \t opdracht \t arg...>
@@ -106,7 +106,7 @@ final class PadEngine {
     var volume: Float = 0.8
     var setName = "", layer = "", key = ""
     var device: String?
-    var output = ""   // multi | 2ch | stereo
+    var output = ""   // multi | 2ch | 3ch | stereo
     var error: String?
     var configured = false
 
@@ -116,6 +116,8 @@ final class PadEngine {
         switch output {
         case "multi" where hwChannels >= 8:
             map[7] = 0; return (1, map)                 // uitgang 8: PADS-bus van de X32
+        case "3ch" where hwChannels >= 3:
+            map[1] = 0; map[2] = 1; return (2, map)     // uitgang 2 + 3: tracks in stereo
         case "2ch" where hwChannels >= 2:
             map[1] = 0; return (1, map)                 // uitgang 2: tracks
         default:
@@ -236,7 +238,7 @@ func bridgeOutput() -> String {
     guard let data = s.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "stereo" }
     // Toegepaste stand; als REAPER's audio nog niet draait de gekozen stand
     if let out = json["output"] as? String { return out }
-    if let mode = json["outputMode"] as? String, mode == "multi" || mode == "2ch" { return mode }
+    if let mode = json["outputMode"] as? String, mode == "multi" || mode == "2ch" || mode == "3ch" { return mode }
     return "stereo"
 }
 

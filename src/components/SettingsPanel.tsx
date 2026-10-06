@@ -531,10 +531,11 @@ export default function SettingsPanel({
                     <p className="text-[10px] text-muted">Webinterface van REAPER (Settings → Control/OSC/web → Web browser interface), standaard poort 8080.</p>
                     <div className="input-group">
                       <label className="input-label" style={{ fontSize: '0.7rem' }}>Uitgangen van de track-computer</label>
-                      <select className="input-field" value={settings.reaperOutputMode || "auto"} onChange={(e) => onSettingsChange({...settings, reaperOutputMode: e.target.value as "auto" | "multi" | "2ch" | "stereo"})}>
+                      <select className="input-field" value={settings.reaperOutputMode || "auto"} onChange={(e) => onSettingsChange({...settings, reaperOutputMode: e.target.value as "auto" | "multi" | "2ch" | "3ch" | "stereo"})}>
                         <option value="auto">Automatisch (8 uitgangen als het apparaat ze heeft, anders stereo)</option>
                         <option value="multi">8 kanalen – elke groep een eigen uitgang (X32)</option>
-                        <option value="2ch">2 kanalen – uitgang 1: Click + Guide, uitgang 2: Tracks</option>
+                        <option value="2ch">2 kanalen – uitgang 1: Click + Guide, uitgang 2: Tracks (mono)</option>
+                        <option value="3ch">3 kanalen – uitgang 1: Click + Guide, uitgang 2 + 3: Tracks (stereo)</option>
                         <option value="stereo">Stereo – alles samen (testen via speakers)</option>
                       </select>
                     </div>

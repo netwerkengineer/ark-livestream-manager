@@ -16,7 +16,7 @@
 --   reload                     nieuwe versie van dit script laden
 --   sections \t pad            secties (regions) van een song -> ExtState ArkTracks/sections
 --   cues \t pad \t tabel       FreeShow-cuetabel van een song opslaan (zie FreeShow-cues)
---   output \t modus            uitgangen: auto | multi | 2ch | stereo (zie uitgangen)
+--   output \t modus            uitgangen: auto | multi | 2ch | 3ch | stereo (zie uitgangen)
 --   lead \t tellen             FreeShow-dia's zoveel tellen eerder tonen (0-4)
 --   freeshow \t host \t poort  FreeShow REST-API voor de cues (leeg = MIDI)
 -- Lange opdrachten mogen in delen komen, zie handlePart.
@@ -303,11 +303,13 @@ onLoopStopped = restoreGuide
 -- uitgangsmodus (instelling in de app, hier onthouden) bepaalt wat er echt gebeurt:
 --   multi  : elke bus naar zijn eigen uitgang (X32, 8 kanalen)
 --   2ch    : Click + Guide mono naar uitgang 1, alle andere bussen mono naar uitgang 2
+--   3ch    : Click + Guide mono naar uitgang 1, de tracks in stereo naar uitgang 2 + 3
+--   (2ch en 3ch: Click + Guide 3 dB zachter, anders pieken ze samen bijna op 0 dBFS)
 --   stereo : alles naar de stereo-master (testen via speakers)
 --   auto   : multi als het audioapparaat genoeg uitgangen heeft, anders stereo
 -- Dit wordt bij elke song- en apparaatwissel opnieuw gezet, dus het klopt ook als een
 -- project in een andere stand is opgeslagen.
-local OUTPUT_MODES = { auto = true, multi = true, ["2ch"] = true, stereo = true }
+local OUTPUT_MODES = { auto = true, multi = true, ["2ch"] = true, ["3ch"] = true, stereo = true }
 local outputMode = reaper.GetExtState(SECTION, "outputMode")
 if not OUTPUT_MODES[outputMode] then outputMode = "auto" end
 local routing = { proj = nil, applied = nil, outs = nil, checked = 0, force = false }
@@ -338,15 +340,21 @@ local function applyRouting()
   if #busses == 0 then routing.proj, routing.outs, routing.applied = proj, outs, nil return end
   local how = outputMode
   if how == "auto" then how = outs < maxOut and "stereo" or "multi" end
+  if how == "3ch" and outs < 3 then how = outs >= 2 and "2ch" or "stereo" end
   if how == "2ch" and outs < 2 then how = "stereo" end
   if not routing.force and proj == routing.proj and outs == routing.outs and how == routing.applied then return end
   for _, b in ipairs(busses) do
     reaper.SetMediaTrackInfo_Value(b.track, "B_MAINSEND", how == "stereo" and 1 or 0)
-    local dst = b.out - 1
+    local dst, flag = b.out - 1, 1024 -- 1024 = mono, zonder = stereopaar
     if how == "2ch" then dst = b.monitor and 0 or 1 end
+    if how == "3ch" then
+      if b.monitor then dst = 0 else dst, flag = 1, 0 end
+    end
+    local vol = (b.monitor and (how == "2ch" or how == "3ch")) and 0.7079 or 1 -- -3 dB
     for s = 0, reaper.GetTrackNumSends(b.track, 1) - 1 do
       reaper.SetTrackSendInfo_Value(b.track, 1, s, "B_MUTE", how == "stereo" and 1 or 0)
-      reaper.SetTrackSendInfo_Value(b.track, 1, s, "I_DSTCHAN", 1024 + dst) -- 1024 = mono
+      reaper.SetTrackSendInfo_Value(b.track, 1, s, "I_DSTCHAN", flag + dst)
+      reaper.SetTrackSendInfo_Value(b.track, 1, s, "D_VOL", vol)
     end
   end
   reaper.SetMediaTrackInfo_Value(reaper.GetMasterTrack(0), "B_MUTE", how == "stereo" and 0 or 1)
@@ -698,7 +706,7 @@ end
 ---------------------------------------------------------------- commands
 local handlers = {}
 
--- Uitgangsmodus (auto | multi | 2ch | stereo), blijft bewaard na een herstart
+-- Uitgangsmodus (auto | multi | 2ch | 3ch | stereo), blijft bewaard na een herstart
 function handlers.output(mode)
   if not OUTPUT_MODES[mode] then error("Onbekende uitgangsmodus") end
   outputMode = mode
