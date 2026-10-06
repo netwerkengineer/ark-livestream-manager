@@ -58,6 +58,7 @@ export interface BridgeState {
   leadBeats?: number;  // FreeShow slides this many beats early
   freeshow?: string;   // host:port of FreeShow's REST API the cues go to (none = MIDI)
   nextSong?: string;   // project path of the next song in the setlist (set up when this one ends)
+  pendingSong?: string; // song a transition is waiting for (switches at the chosen moment)
   hasCues?: boolean;   // active song has a FreeShow cue table
   recording?: boolean; // "Timing opnemen" is running
   recSlide?: number;   // while recording: slide (within the section) on screen now
@@ -140,6 +141,7 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       leadBeats: typeof s.leadBeats === 'number' ? s.leadBeats : undefined,
       freeshow: s.freeshow ?? undefined,
       nextSong: s.nextSong ?? undefined,
+      pendingSong: s.pendingSong ?? undefined,
       hasCues: !!s.hasCues,
       recording: !!s.recording,
       recSlide: s.recSlide ?? undefined,

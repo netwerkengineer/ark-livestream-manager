@@ -15,14 +15,17 @@ Alleen Python 3 standaardbibliotheek. Gebruik:
 Opties: --config busses.json   --samplerate 48000   --out /andere/map
 """
 import argparse
+import array
 import fnmatch
 import gzip
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 import uuid
+import wave
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -341,8 +344,9 @@ def build_rpp(song_title, als, stems_dir_rel, stem_files, cfg, samplerate, stems
         w("  >")
         for i, st in enumerate(stems):
             last = i == len(stems) - 1
-            muted = is_live(st["name"], cfg)
-            track_open(st["name"] + (" [LIVE]" if muted else ""), [
+            live = is_live(st["name"], cfg)
+            muted = st.get("muted", live)
+            track_open(st["name"] + (" [LIVE]" if live else ""), [
                 "MAINSEND 1 0",
                 f"MUTESOLO {1 if muted else 0} 0 0",
                 "ISBUS 2 -1" if last else "ISBUS 0 0",
@@ -374,6 +378,144 @@ def tm_len_beats(tm, seconds):
     return lo
 
 
+# ------------------------------- Eigen click -------------------------------
+# De click van MultiTracks is één afgemixt bestand (vaak achtsten met accenten). Daarom
+# maken we zelf drie click-stems uit de tempomap: kwarten (accent op de 1), de tussenliggende
+# achtsten en de tussenliggende zestienden. In de app krijgt elk een eigen fader en mute;
+# samen klinken ze als een gewone click in de gekozen onderverdeling.
+CLICK_SR = 48000
+CLICK_STEMS = [
+    # naam, bestand, standaard gemute
+    ("Click 1/4", "Ark Click 1-4.wav", False),
+    ("Click 1/8", "Ark Click 1-8.wav", True),
+    ("Click 1/16", "Ark Click 1-16.wav", True),
+]
+
+
+def _blip(freq, amp, ms=30):
+    n = int(CLICK_SR * ms / 1000)
+    return [int(32767 * amp * math.sin(2 * math.pi * freq * i / CLICK_SR) * math.exp(-i / (CLICK_SR * 0.006)))
+            for i in range(n)]
+
+
+def generate_clicks(stems_dir, als, tm, song_len):
+    """Schrijft de drie click-stems (WAV, 48 kHz mono) en geeft ze terug als stems."""
+    end_q = tm_len_beats(tm, song_len)
+    # maatbegin uit de maatsoortwisselingen
+    ts = sorted(als["timesig"])
+    bar_starts, q = set(), 0.0
+    while q <= end_q + 0.001:
+        bar_starts.add(round(q * 4))
+        cur = [s for b, s in ts if b <= q + 1e-6]
+        num, den = cur[-1] if cur else (ts[0][1] if ts else (4, 4))
+        q += num * 4.0 / den
+    sounds = {"accent": _blip(1600, 0.9), "quarter": _blip(1100, 0.75), "eighth": _blip(900, 0.5), "sixteenth": _blip(800, 0.35)}
+    n_samples = int((song_len + 1) * CLICK_SR)
+    layers = {name: array.array("h", bytes(2 * n_samples)) for name, _, _ in CLICK_STEMS}
+    k = 0
+    while k / 4.0 <= end_q:
+        qn = k / 4.0
+        if k % 4 == 0:
+            layer, sound = "Click 1/4", ("accent" if k in bar_starts else "quarter")
+        elif k % 2 == 0:
+            layer, sound = "Click 1/8", "eighth"
+        else:
+            layer, sound = "Click 1/16", "sixteenth"
+        start = int(round(tm.beats_to_sec(qn) * CLICK_SR))
+        buf, blip = layers[layer], sounds[sound]
+        for i, v in enumerate(blip):
+            if start + i >= n_samples:
+                break
+            buf[start + i] = max(-32768, min(32767, buf[start + i] + v))
+        k += 1
+    stems = []
+    for name, filename, muted in CLICK_STEMS:
+        path = os.path.join(stems_dir, filename)
+        with wave.open(path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(CLICK_SR)
+            w.writeframes(layers[name].tobytes())
+        stems.append({"name": name, "file": filename, "position": 0.0, "length": song_len,
+                      "sr": CLICK_SR, "muted": muted, "generated": True})
+    return stems
+
+
+def add_click_to_rpp(rpp_path, clicks, stems_dir_rel):
+    """Click-stems toevoegen aan een bestaand project (ook door REAPER opgeslagen), in de
+    CLICK-map; de originele click wordt gemute. Mix en de rest van het project blijven."""
+    text = open(rpp_path, encoding="utf-8").read()
+    lines = text.split("\n")
+    # trackblokken: van "  <TRACK" tot de bijbehorende "  >"
+    blocks, i = [], 0
+    while i < len(lines):
+        if lines[i].startswith("  <TRACK"):
+            j = i + 1
+            while not lines[j].startswith("  >"):
+                j += 1
+            blocks.append([i, j])
+            i = j + 1
+        else:
+            i += 1
+    def name_of(b):
+        for l in lines[b[0]:b[1]]:
+            if l.strip().startswith("NAME "):
+                return l.strip()[5:].strip("\"'")
+        return ""
+    def isbus(b):
+        for k in range(b[0], b[1]):
+            if lines[k].strip().startswith("ISBUS "):
+                return k
+        return None
+    names = [name_of(b) for b in blocks]
+    if any(n in ("Click 1/4", "Click 1/8", "Click 1/16") for n in names):
+        return False
+    bus = next((k for k, n in enumerate(names) if re.match(r"(?i)^click\b.*->\s*out\s*\d+", n)), None)
+    if bus is None:
+        raise SystemExit("Geen CLICK-groep gevonden in het project")
+    last = bus
+    for k in range(bus + 1, len(blocks)):
+        last = k
+        line = lines[isbus(blocks[k])] if isbus(blocks[k]) is not None else ""
+        if re.match(r"\s*ISBUS 2 ", line):
+            break
+        # originele click(s) muten
+    for k in range(bus + 1, last + 1):
+        for m in range(blocks[k][0], blocks[k][1]):
+            if lines[m].strip().startswith("MUTESOLO "):
+                parts = lines[m].split()
+                lines[m] = lines[m][:len(lines[m]) - len(lines[m].lstrip())] + "MUTESOLO 1 " + " ".join(parts[2:])
+    # de laatste child sluit de map niet meer af; de nieuwe laatste wel
+    k = isbus(blocks[last])
+    if k is not None:
+        lines[k] = re.sub(r"ISBUS 2 -?\d+", "ISBUS 0 0", lines[k])
+    new = []
+    for n, st in enumerate(clicks):
+        new += [
+            f"  <TRACK {g()}",
+            f"    NAME {q(st['name'])}",
+            "    MAINSEND 1 0",
+            f"    MUTESOLO {1 if st['muted'] else 0} 0 0",
+            "    ISBUS 2 -1" if n == len(clicks) - 1 else "    ISBUS 0 0",
+            "    <ITEM",
+            "      POSITION 0",
+            f"      LENGTH {st['length']:.10f}",
+            "      LOOP 0",
+            f"      NAME {q(st['file'])}",
+            f"      IGUID {g()}",
+            "      <SOURCE WAVE",
+            f"        FILE {q(os.path.join(stems_dir_rel, st['file']))}",
+            "      >",
+            "    >",
+            "  >",
+        ]
+    end = blocks[last][1]
+    lines = lines[:end + 1] + new + lines[end + 1:]
+    open(rpp_path + ".tmp", "w", encoding="utf-8").write("\n".join(lines))
+    os.replace(rpp_path + ".tmp", rpp_path)
+    return True
+
+
 # ------------------------------- Main -------------------------------------
 def find_song_root(folder):
     for dirpath, dirs, files in os.walk(folder):
@@ -383,7 +525,7 @@ def find_song_root(folder):
     return None, None
 
 
-def convert(src, cfg, samplerate, out_dir=None, force=False):
+def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
     if os.path.isfile(src) and src.lower().endswith(".zip"):
         dest = out_dir or os.path.splitext(src)[0]
         if not os.path.isdir(dest):
@@ -426,14 +568,33 @@ def convert(src, cfg, samplerate, out_dir=None, force=False):
             "sr": info[0] if info else None,
         })
     rel_dir = stem_files[0]["rel_dir"] if stem_files else "MultiTracks"
+    song_len = max([s["length"] for s in stem_files] + [0])
 
     rpp_path = os.path.join(root, f"{safe(title)}.RPP")
+    if add_click:
+        clicks = generate_clicks(os.path.join(root, rel_dir), als, tm, song_len)
+        added = add_click_to_rpp(rpp_path, clicks, rel_dir)
+        print(f"\n== {title}\n   Eigen click {'toegevoegd' if added else 'bijgewerkt (stond er al)'}\n   -> {rpp_path}")
+        return {"title": title, "rpp": rpp_path, "skipped": True, "click": True}
     # Een bestaand project kan in REAPER aangepast en opgeslagen zijn (mix, mutes):
     # alleen met --force opnieuw maken.
     if os.path.exists(rpp_path) and not force:
+        # audio kan door de cache-opruiming weg zijn geweest: eigen click opnieuw maken
+        click_dir = os.path.join(root, rel_dir)
+        if "Ark Click" in open(rpp_path, encoding="utf-8", errors="ignore").read() and song_len > 0 and \
+                any(not os.path.exists(os.path.join(click_dir, f)) for _, f, _ in CLICK_STEMS):
+            generate_clicks(click_dir, als, tm, song_len)
         print(f"\n== {title}\n   Bestaat al, overgeslagen (gebruik --force om opnieuw te maken)\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True}
 
+    if cfg.get("click", {}).get("enabled", True) and song_len > 0:
+        # eigen click: de originele click-stem(s) standaard gemute
+        for st in stem_files:
+            if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
+                st["muted"] = True
+        for st in generate_clicks(os.path.join(root, rel_dir), als, tm, song_len):
+            st["rel_dir"] = rel_dir
+            stem_files.append(st)
     rpp, per_bus, markers = build_rpp(title, als, rel_dir, stem_files, cfg, samplerate, root)
     with open(rpp_path, "w", encoding="utf-8") as f:
         f.write(rpp)
@@ -477,6 +638,7 @@ def main():
     ap.add_argument("--samplerate", type=int, default=48000, help="projectsamplerate (X32 = 48000)")
     ap.add_argument("--out", help="uitpakmap voor een zip (standaard naast de zip)")
     ap.add_argument("--force", action="store_true", help="bestaande .RPP-projecten overschrijven")
+    ap.add_argument("--add-click", action="store_true", help="alleen de eigen click (1/4, 1/8, 1/16) toevoegen aan een bestaand project")
     ap.add_argument("--report-json", help="schrijf een JSON-rapport van de verwerkte nummers naar dit bestand")
     a = ap.parse_args()
 
@@ -496,7 +658,7 @@ def main():
                 reports.append(convert(p, cfg, a.samplerate, force=a.force))
         print(f"\n{len(reports)} nummer(s) verwerkt.")
     else:
-        reports.append(convert(a.source, cfg, a.samplerate, a.out, force=a.force))
+        reports.append(convert(a.source, cfg, a.samplerate, a.out, force=a.force, add_click=a.add_click))
     if a.report_json:
         with open(a.report_json, "w", encoding="utf-8") as f:
             json.dump(reports, f, ensure_ascii=False, indent=2)

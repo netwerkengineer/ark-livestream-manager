@@ -817,6 +817,16 @@ function handlers.cues(path, data)
   if path == cues.path then cues.path = false end -- opnieuw inlezen
 end
 
+function handlers.songcancel()
+  local p = st.pendingSong
+  st.pendingSong = nil
+  if p and p.saved then
+    for _, s in ipairs(p.saved) do
+      if reaper.ValidatePtr2(0, s.track, "MediaTrack*") then reaper.SetMediaTrackInfo_Value(s.track, "D_VOL", s.vol) end
+    end
+  end
+end
+
 function handlers.scan() scanSongs() end
 
 -- Nieuwe versie van dit script laden zonder REAPER te herstarten
@@ -860,7 +870,33 @@ function handlers.reopen(path)
   cues.path = false
 end
 
-function handlers.song(path)
+-- Ander nummer kiezen. Speelt er iets en is er een modus (end | bar | now), dan wordt
+-- er op dat muzikale moment overgegaan: het huidige nummer fadet kort uit (REAPER kan
+-- niet sample-nauwkeurig tussen projecten wisselen) en het nieuwe start vanaf zijn
+-- Count Off. Zonder modus of als er niets speelt: stoppen en klaarzetten.
+function handlers.song(path, mode)
+  local _, current = reaper.EnumProjects(-1)
+  if isPlaying() and mode and mode ~= "" and path ~= current then
+    if not findOpen(path) then error("Dit nummer staat nog niet klaar in REAPER (setlist klaarzetten)") end
+    local pos = reaper.GetPlayPosition()
+    local at
+    if mode == "end" then
+      local cur = currentRegion()
+      at = cur and cur.finish or pos + 0.3
+      stopLoop() -- anders komt het einde van de sectie nooit
+    elseif mode == "bar" then
+      local _, measure = reaper.TimeMap2_timeToBeats(0, pos)
+      at = reaper.TimeMap2_beatsToTime(0, 0, measure + 1)
+    else
+      at = pos + 0.35
+    end
+    -- uitfaden over (maximaal) één tel voor het overgangsmoment
+    local beat = reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, at)) - reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, at) - 1)
+    local fade = math.min(beat, mode == "now" and 0.3 or 0.6)
+    st.pendingSong = { path = path, at = at, fadeFrom = math.max(pos, at - fade) }
+    return
+  end
+  st.pendingSong = nil
   reaper.OnStopButtonEx(0)
   stopLoop()
   restoreGuide()
@@ -976,9 +1012,41 @@ local function songEnd()
   return last
 end
 
+-- Overgang naar een ander nummer (zie handlers.song): uitfaden, wisselen, starten
+local function checkSongTransition()
+  local p = st.pendingSong
+  if not p then return end
+  if not isPlaying() then handlers.songcancel() return end
+  local pos = reaper.GetPlayPosition()
+  if pos >= p.fadeFrom and not p.saved then
+    p.saved = {}
+    for _, b in ipairs((busTracks())) do
+      p.saved[#p.saved + 1] = { track = b.track, vol = reaper.GetMediaTrackInfo_Value(b.track, "D_VOL") }
+    end
+  end
+  if p.saved and pos < p.at - 0.02 then
+    local g = math.max(0, math.min(1, (p.at - pos) / math.max(0.05, p.at - p.fadeFrom)))
+    for _, s in ipairs(p.saved) do reaper.SetMediaTrackInfo_Value(s.track, "D_VOL", s.vol * g) end
+    return
+  end
+  if pos < p.at - 0.02 then return end
+  -- wisselen
+  local old = reaper.EnumProjects(-1)
+  reaper.OnStopButtonEx(old)
+  for _, s in ipairs(p.saved or {}) do reaper.SetMediaTrackInfo_Value(s.track, "D_VOL", s.vol) end -- mix terug
+  stopLoop()
+  restoreGuide()
+  st.pendingSong, st.pending = nil, nil
+  local proj = findOpen(p.path)
+  if not proj then return end
+  reaper.SelectProjectInstance(proj)
+  reaper.SetEditCurPos2(proj, 0, true, false)
+  reaper.OnPlayButtonEx(proj)
+end
+
 local function checkSongEnd()
   if not isPlaying() then songEnded = false return end
-  if songEnded or st.loop then return end
+  if songEnded or st.loop or st.pendingSong then return end
   local finish = songEnd()
   if finish > 0 and reaper.GetPlayPosition() >= finish - 0.05 then
     songEnded = true
@@ -1025,6 +1093,7 @@ local function writeState()
     lastCmd = st.lastCmd,
     error = st.error,
     nextSong = nextInSetlist(),
+    pendingSong = st.pendingSong and st.pendingSong.path or nil,
   }
   reaper.SetExtState(SECTION, "state", json(out), false)
 end
@@ -1049,6 +1118,7 @@ end
 
 local function loop()
   detectSeek()
+  checkSongTransition()
   checkSongEnd()
   applyRouting()
   updateCues()

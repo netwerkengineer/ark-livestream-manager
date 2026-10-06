@@ -65,12 +65,16 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
   const openPaths = new Set(state?.bridge?.tabs.map(t => t.path) || []);
   const playing = state?.playState === 1;
 
+  const pendingSong = state?.bridge?.pendingSong;
+
+  // While playing: transition at the chosen jump moment (tap again to cancel);
+  // stopped: set the song up right away
   const selectSong = async (song: SetlistSong) => {
     if (!song.path || song.path === activePath) return;
-    if (playing && !confirm(`"${song.title}" kiezen? De huidige song stopt.`)) return;
     setBusy(true);
     try {
-      await reaperAction({ action: "song", path: song.path });
+      if (playing && song.path === pendingSong) await reaperAction({ action: "songCancel" });
+      else await reaperAction({ action: "song", path: song.path, ...(playing ? { mode: state?.bridge?.mode || "end" } : {}) });
     } catch (err) {
       onError(err instanceof Error ? err.message : "Song kiezen mislukt");
     } finally {
@@ -147,7 +151,9 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
                     {s.path && s.local === "slim" && <> · <span style={{ color: "#fbbf24" }}>audio wordt opgehaald…</span></>}
                   </small>
                 </span>
-                {isActive ? <span className="trk-badge on">Actief</span> : isOpen ? <span className="trk-badge"><Check size={11} /> Klaar</span> : null}
+                {isActive ? <span className="trk-badge on">Actief</span>
+                  : s.path && s.path === pendingSong ? <span className="trk-badge pending" title="Tik nogmaals om te annuleren">volgt…</span>
+                  : isOpen ? <span className="trk-badge"><Check size={11} /> Klaar</span> : null}
               </button>
               {!stage && (
                 <div className="trk-row-tools">

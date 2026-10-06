@@ -1151,3 +1151,4 @@ textarea.input-field {
 .trk-pad-volume { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 200px; }
 .trk-pad-volume input { flex: 1; accent-color: #a855f7; }
 .trk-pads.stage .trk-pad-key { padding: 20px 0; font-size: 1.2rem; }
+.trk-badge.pending { background: #f97316; color: #fff; animation: trk-pulse 0.9s ease-in-out infinite; }

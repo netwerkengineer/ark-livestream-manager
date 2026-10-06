@@ -5,7 +5,7 @@ bedient hem via REAPER's webinterface (Tracks-tab en de podiumweergave `/tracks`
 
 | Bestand | Waar op de track-computer | Wat |
 |---|---|---|
-| `mt2reaper.py` | `~/Tracks/_tools/` | Zet een MultiTracks-download (zip of map) om naar een REAPER-project: stems in 8 bussen, tempomap, secties als regions. `.m4a`-stems worden met `afconvert` naar WAV omgezet. |
+| `mt2reaper.py` | `~/Tracks/_tools/` | Zet een MultiTracks-download (zip of map) om naar een REAPER-project: stems in 8 bussen, tempomap, secties als regions. `.m4a`-stems worden met `afconvert` naar WAV omgezet. Maakt ook een eigen click (stems *Click 1/4*, *1/8*, *1/16*, uit de tempomap); de originele click staat standaard gemute, net als 1/8 en 1/16. Bestaand project: `--add-click <songmap>`. |
 | `busses.example.json` | `~/Tracks/_tools/busses.json` | Busindeling (welke stem naar welke uitgang), `freeshow.midi_hw_out_index` = MIDI-uitgang voor FreeShow in REAPER. |
 | `convert-all.command` | `~/Tracks/_tools/` | Dubbelklikbaar: alles in `~/Tracks/Songs` omzetten. |
 | `ark_tracks_agent.py` | `~/Tracks/_tools/` | Haalt geüploade tracks van de server op, zet ze om, en houdt alleen de audio van songs die nodig zijn (setlists, recent, "altijd houden"). |
