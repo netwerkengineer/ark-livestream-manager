@@ -70,7 +70,7 @@ function runNext() {
   patchState(id, { status: 'processing', message: 'Uitpakken' });
 
   const script = path.join(process.cwd(), 'tracks_practice.py');
-  const child = spawn('python3', [script, trackFilePath(id), practiceDir(id)], {
+  const child = spawn('nice', ['-n', '10', 'python3', script, trackFilePath(id), practiceDir(id)], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stderr = '';

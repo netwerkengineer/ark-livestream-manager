@@ -130,14 +130,21 @@ export default function TracksControl({ settings }: TracksControlProps) {
     send({ action, track: track.index, value: on });
   };
 
+  // Without the track computer (REAPER off) the library stays usable: uploads
+  // also feed the practice player ("Oefenen"), which doesn't need REAPER
   if (!isEnabled) {
     return (
-      <div className="glass-card" style={{ padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
-        <SlidersHorizontal size={48} style={{ color: "var(--primary)", opacity: 0.5 }} />
-        <h3 style={{ fontSize: "1.25rem", fontWeight: "bold" }}>Tracks Uitgeschakeld</h3>
-        <p style={{ color: "var(--muted)", maxWidth: "500px", fontSize: "0.9rem", lineHeight: "1.6" }}>
-          De koppeling met REAPER op de track-computer is uitgeschakeld. Schakel &quot;Tracks (REAPER)&quot; in bij &quot;Instellingen&quot; om de faders te gebruiken.
-        </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="glass-card" style={{ padding: "28px", textAlign: "center", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
+          <SlidersHorizontal size={40} style={{ color: "var(--primary)", opacity: 0.5 }} />
+          <h3 style={{ fontSize: "1.15rem", fontWeight: "bold" }}>Koppeling met REAPER staat uit</h3>
+          <p style={{ color: "var(--muted)", maxWidth: "520px", fontSize: "0.88rem", lineHeight: "1.6" }}>
+            Faders, setlist en arrangement werken pas als &quot;Tracks (REAPER)&quot; aanstaat bij &quot;Instellingen&quot; en de track-computer bereikbaar is.
+            Tracks uploaden voor de oefenspeler kan hieronder wel.
+          </p>
+        </div>
+        <TrackLibraryPanel onError={showError} onStatus={showSuccess} />
+        {statusMessage && <div className={`trk-toast ${statusMessage.type}`}>{statusMessage.text}</div>}
       </div>
     );
   }

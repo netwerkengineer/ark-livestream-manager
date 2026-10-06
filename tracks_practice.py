@@ -189,7 +189,8 @@ def main():
         chunks_dir = os.path.join(work, "out")
         os.makedirs(os.path.join(chunks_dir, "seg"))
         per_stem = []
-        with ThreadPoolExecutor(max_workers=max(2, (os.cpu_count() or 2))) as pool:
+        # niet alle kernen: op een NAS blijven de andere diensten dan bruikbaar
+    with ThreadPoolExecutor(max_workers=max(2, min(3, os.cpu_count() or 2))) as pool:
             for i, s in enumerate(stems):
                 progress("encode", stem=s["name"], done=i, total=len(stems))
                 outs, s["channels"] = stem_to_chunks(s["path"], s["position"], s["channels"], duration, work, i, pool)
