@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useDropzone } from "react-dropzone";
-import { Library, UploadCloud, RotateCcw, Trash2, CheckCircle2, AlertTriangle, Loader2, Server, ChevronDown, ChevronUp, Pin, HardDrive, Cloud } from "lucide-react";
+import { Library, UploadCloud, RotateCcw, Trash2, CheckCircle2, AlertTriangle, Loader2, Server, ChevronDown, ChevronUp, Pin, HardDrive, Cloud, Music2 } from "lucide-react";
 import type { TrackItem, AgentInfo } from "@/lib/trackLibrary";
 import { reaperAction } from "./useReaper";
 import { parseSongName } from "./songName";
+import OwnRecordingWizard from "./OwnRecordingWizard";
 
 interface TrackLibraryPanelProps {
   onError: (message: string) => void;
@@ -43,6 +44,7 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
   const [agent, setAgent] = useState<AgentInfo | null>(null);
   const [upload, setUpload] = useState<{ name: string; sent: number; size: number } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [wizard, setWizard] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const onErrorRef = useRef(onError);
   useEffect(() => { onErrorRef.current = onError; });
@@ -178,6 +180,18 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
         )}
       </div>
 
+      {wizard ? (
+        <OwnRecordingWizard
+          onClose={() => setWizard(false)}
+          onError={onError}
+          onDone={title => { onStatus(`"${title}" staat op de server; de oefenversie wordt gemaakt en de track-computer haalt hem op.`); load(); }}
+        />
+      ) : (
+        <button className="own-open" onClick={() => setWizard(true)} disabled={!!upload}>
+          <Music2 size={15} /> Eigen opname toevoegen <small>(zelf opgenomen stems, zonder MultiTracks-zip)</small>
+        </button>
+      )}
+
       <p className="trk-arr-hint">
         Op de Mac mini staat alleen de audio van songs op komende setlists, songs van de laatste weken en songs met <Pin size={11} /> (altijd houden).
         Van de rest blijft het REAPER-project staan (mix, dia-blokken); de audio komt vanzelf terug zodra de song weer op een setlist staat.
@@ -204,7 +218,7 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
                   </small>
                   <small className="trk-lib-msg">
                     {STATUS_LABEL[item.status]}{item.message ? ` – ${item.message}` : ""}
-                    {item.status === "uploading" && item.received !== undefined && ` (${mb(item.received)} ontvangen; kies hetzelfde bestand opnieuw om verder te gaan)`}
+                    {item.status === "uploading" && item.received !== undefined && (item.own ? ` (${mb(item.received)} ontvangen; maak dezelfde opname opnieuw om verder te gaan)` : ` (${mb(item.received)} ontvangen; kies hetzelfde bestand opnieuw om verder te gaan)`)}
                   </small>
                 </span>
                 {item.status === "ready" && (

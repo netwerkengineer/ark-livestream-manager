@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
 import { listTracks, getTrack, setTrackStatus, deleteTrack, getAgentInfo, receivedBytes } from "@/lib/trackLibrary";
+import { ownReceivedTotal } from "@/lib/trackOwn";
 import { neededTrackIds } from "@/lib/trackCache";
 import { ensurePracticeVersions, practiceState } from "@/lib/trackPractice";
 import { logActivity } from "@/lib/activityLog";
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
       ...i,
       needed: needed.has(i.id),
       practice: practiceState(i.id),
-      ...(i.status === "uploading" ? { received: receivedBytes(i.id) } : {}),
+      ...(i.status === "uploading" ? { received: i.own ? ownReceivedTotal(i.id) : receivedBytes(i.id) } : {}),
     }))
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   return NextResponse.json({ items, agent: getAgentInfo() });

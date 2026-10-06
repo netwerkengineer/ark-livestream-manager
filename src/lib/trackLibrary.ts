@@ -16,6 +16,8 @@ const FILES_DIR = path.join(TRACKS_DIR, 'files');
 const INDEX_FILE = path.join(TRACKS_DIR, 'library.json');
 const AGENT_FILE = path.join(TRACKS_DIR, 'agent.json');
 
+export const OWN_DIR = path.join(TRACKS_DIR, 'own');
+
 export const CHUNK_SIZE = 8 * 1024 * 1024;
 export const MAX_TRACK_SIZE = 4 * 1024 * 1024 * 1024;
 
@@ -44,6 +46,9 @@ export interface TrackItem {
   updatedAt: string;
   // Keep the audio on the track computer even when no setlist needs it
   pinned?: boolean;
+  // Own recording made with the form (stems arrive one by one, the server
+  // zips them): files in data/tracks/own/<id> until it is complete
+  own?: boolean;
   // Reported by the agent: "full" = audio on the track computer, "slim" =
   // only the REAPER project there (audio removed to save space)
   local?: 'full' | 'slim';
@@ -118,6 +123,22 @@ export function sanitizeFileName(name: string): string {
   return base || 'track.zip';
 }
 
+export async function createOwnItem(fileName: string, size: number, uploadedBy: string): Promise<TrackItem> {
+  const now = new Date().toISOString();
+  const item: TrackItem = {
+    id: crypto.randomBytes(12).toString('hex'),
+    fileName: sanitizeFileName(fileName),
+    size,
+    status: 'uploading',
+    own: true,
+    uploadedBy,
+    uploadedAt: now,
+    updatedAt: now,
+  };
+  await updateIndex(items => { items.push(item); });
+  return item;
+}
+
 export async function createUpload(fileName: string, size: number, uploadedBy: string): Promise<TrackItem> {
   const now = new Date().toISOString();
   const item: TrackItem = {
@@ -164,7 +185,7 @@ export async function completeUpload(id: string): Promise<TrackItem> {
   return setTrackStatus(id, { status: 'stored', message: 'Wacht op de track-computer' });
 }
 
-export async function setTrackStatus(id: string, patch: Partial<Pick<TrackItem, 'status' | 'message' | 'report' | 'pinned' | 'local'>>): Promise<TrackItem> {
+export async function setTrackStatus(id: string, patch: Partial<Pick<TrackItem, 'status' | 'message' | 'report' | 'pinned' | 'local' | 'size'>>): Promise<TrackItem> {
   return updateIndex(items => {
     const item = items.find(i => i.id === id);
     if (!item) throw new Error('Track niet gevonden');
@@ -173,6 +194,7 @@ export async function setTrackStatus(id: string, patch: Partial<Pick<TrackItem, 
     if (patch.report) item.report = patch.report;
     if (patch.pinned !== undefined) item.pinned = patch.pinned;
     if (patch.local) item.local = patch.local;
+    if (patch.size !== undefined) item.size = patch.size;
     item.updatedAt = new Date().toISOString();
     return { ...item };
   });
@@ -182,6 +204,7 @@ export async function setTrackStatus(id: string, patch: Partial<Pick<TrackItem, 
 // ~/Tracks/_trash on the track computer.
 export async function deleteTrack(id: string): Promise<void> {
   await setTrackStatus(id, { status: 'deleted', message: 'Verwijderd' });
+  fs.rmSync(path.join(OWN_DIR, id), { recursive: true, force: true });
   try {
     fs.unlinkSync(trackFilePath(id));
   } catch {
