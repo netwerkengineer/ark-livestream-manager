@@ -1068,6 +1068,20 @@ local function checkSongEnd()
 end
 
 ---------------------------------------------------------------- state
+-- MIDI-uitgangen die REAPER nu ziet (voor controle van de FreeShow-MIDI-route: apparaatnummer
+-- van de FreeShow MIDI-track = index in deze lijst). Ververst alleen bij het opstarten van REAPER.
+local midiOutCache
+local function midiOutputs()
+  if midiOutCache then return midiOutCache end
+  local list = {}
+  for i = 0, reaper.GetNumMIDIOutputs() - 1 do
+    local ok, name = reaper.GetMIDIOutputName(i, "")
+    if ok then list[#list + 1] = { i = i, name = name } end
+  end
+  midiOutCache = list
+  return list
+end
+
 local function writeState()
   local tabs = {}
   local active = reaper.EnumProjects(-1)
@@ -1095,6 +1109,7 @@ local function writeState()
     recSlides = rec and rec.region and cues.regions and cues.regions[rec.region] and #cues.regions[rec.region] or nil,
     output = routing.applied,
     outputs = routing.outs,
+    midiOut = midiOutputs(),
     pending = st.pending,
     region = region and region.id or nil,
     smoothSeek = smoothSeekCmd ~= nil,
