@@ -1,19 +1,19 @@
 # Handleiding — Ark Church Livestream Manager
 
-*Versie van dit document: bij app-versie 2.34.0*
+*Versie van dit document: bij app-versie 2.40.0*
 
 ## Inleiding
 
-Deze handleiding beschrijft alle onderdelen van de Ark Church Livestream Manager: het plannen en uitzenden van diensten op YouTube, de live-bediening tijdens een uitzending, het samenstellen van FreeShow-presentaties (inclusief de automatische e-mail-aanlevering), lichtregie, en het beheer van gebruikers en instellingen.
+Deze handleiding beschrijft alle onderdelen van de Ark Church Livestream Manager: het plannen en uitzenden van diensten op YouTube, de live-bediening tijdens een uitzending, het samenstellen van FreeShow-presentaties (inclusief de automatische e-mail-aanlevering), lichtregie, het afspelen van de band-tracks (REAPER) met een oefenspeler voor bandleden, en het beheer van gebruikers en instellingen.
 
 Het document bestaat uit twee delen:
 
 - **Deel 1 — Voor operators & vrijwilligers**: alles wat je nodig hebt om de app te bedienen tijdens en rond een dienst.
 - **Deel 2 — Technische bijlage**: voor de beheerder(s) — alle instellingen, serverconfiguratie, beveiliging en bekende beperkingen.
 
-### De vijf hoofdonderdelen
+### De zeven hoofdonderdelen
 
-Bovenin de app vind je (afhankelijk van je rechten) tot vijf tabbladen — de knoppen zelf zijn kort gelabeld, de volledige naam staat hieronder tussen haakjes:
+Bovenin de app vind je (afhankelijk van je rechten) tot zeven tabbladen — de knoppen zelf zijn kort gelabeld, de volledige naam staat hieronder tussen haakjes:
 
 | Tabblad | Rechtennaam | Waarvoor |
 |---|---|---|
@@ -21,9 +21,13 @@ Bovenin de app vind je (afhankelijk van je rechten) tot vijf tabbladen — de kn
 | 🎛️ Regie (Control Center) | `control` | Live bediening: OBS, stroom, noodknoppen |
 | 📺 Monitor (Live Monitor) | `monitor` | Live status, statistieken, OBS-detailbediening |
 | 💡 Licht (Lichtregie) | `lights` | QLC+ lichtbediening |
+| 🎚️ Tracks (REAPER) | `tracks` | De band-tracks afspelen en per sectie bedienen (zie 6a) |
+| 🎧 Oefenen (band) | `oefenen` | Oefenspeler voor bandleden thuis, in de browser (zie 6b) |
 | ⛪ FreeShow (FreeShow Projecten) | `freeshow` | Liederen, Bijbelteksten en media tot een dienst samenstellen |
 
-Een **Administrator** ziet altijd alle vijf. Een **Operator** ziet alleen de tabbladen waarvoor hij/zij expliciet rechten heeft gekregen (zie hoofdstuk 1). Alleen een Administrator ziet het tandwiel-icoon rechtsboven naar Instellingen.
+Een **Administrator** ziet altijd alle zeven. Een **Operator** ziet alleen de tabbladen waarvoor hij/zij expliciet rechten heeft gekregen (zie hoofdstuk 1). Alleen een Administrator ziet het tandwiel-icoon rechtsboven naar Instellingen.
+
+> ℹ️ De app past zich aan telefoon- en tabletschermen aan: op een smal scherm komen kolommen onder elkaar te staan en is het instellingenmenu één rij waar je zijwaarts doorheen swipet.
 
 ---
 
@@ -42,8 +46,8 @@ Er zijn twee manieren om in te loggen, en (los daarvan) twee rollen.
 
 ### Rollen (gelden voor beide inlogmethodes)
 
-- **Administrator** — volledige toegang tot alle vijf tabbladen én Instellingen/Gebruikersbeheer.
-- **Operator** — alleen bediening; ziet alleen de tabbladen waarvoor rechten zijn toegekend (een combinatie van `planner`/`control`/`monitor`/`lights`/`freeshow`) — bij een lokaal account ingesteld via Gebruikersbeheer (hoofdstuk 7), bij Team-login via de groep→rechten-koppeling (8.11).
+- **Administrator** — volledige toegang tot alle zeven tabbladen én Instellingen/Gebruikersbeheer.
+- **Operator** — alleen bediening; ziet alleen de tabbladen waarvoor rechten zijn toegekend (een combinatie van `planner`/`control`/`monitor`/`lights`/`tracks`/`oefenen`/`freeshow`) — bij een lokaal account ingesteld via Gebruikersbeheer (hoofdstuk 7), bij Team-login via de groep→rechten-koppeling (8.11). Heeft iemand *alleen* het recht `oefenen`, dan opent de app na het inloggen meteen de oefenspeler (zie 6b).
 
 Rechtsboven in de balk vind je:
 - **?** — helpvenster (korte uitleg + link naar deze handleiding)
@@ -51,13 +55,15 @@ Rechtsboven in de balk vind je:
 - Je rol en gebruikersnaam
 - **Afmelden** — logt je uit bij deze app. Bij Team-login blijft je sessie bij de identity provider zelf (Authentik/Synology) daarbij nog gewoon actief — logt iemand daarna opnieuw in via Team-login, dan gebeurt dat zonder opnieuw om een wachtwoord te vragen, zolang die onderliggende sessie nog geldig is. Wil je dat echt testen met een schone lei, gebruik dan een incognito/privévenster, of log ook expliciet uit bij de identity provider zelf.
 
-Er is ook een aparte "Inloggen met Google"-knop specifiek voor het koppelen van het YouTube-account (zie hoofdstuk 2) — dit is *geen* gewoon operator-account en geeft automatisch volledige (Administrator-)rechten op elke API-aanvraag. Zie de beveiligingsnotitie in hoofdstuk 10.
+Er is ook een aparte "Inloggen met Google"-knop specifiek voor het koppelen van het YouTube-account (zie hoofdstuk 2; de status van de koppeling en de knoppen **Opnieuw inloggen** en **Loskoppelen** staan ook bij Instellingen → Algemeen, zie 8.1) — dit is *geen* gewoon operator-account en geeft automatisch volledige (Administrator-)rechten op elke API-aanvraag. Zie de beveiligingsnotitie in hoofdstuk 10.
 
 ---
 
 ## 2. Stream Planner — uitzendingen inplannen
 
 Voordat je hier iets kunt inplannen moet het YouTube-kanaal gekoppeld zijn. Is dat nog niet gebeurd (of is de koppeling verlopen), dan zie je een knop **"Inloggen met Google"** — dit start de standaard Google-inlogflow. Na een succesvolle koppeling verschijnt het planningsformulier.
+
+Komt de geschatte YouTube-API-quota van vandaag boven de 70%, dan verschijnt bij "YouTube Kanaal" de waarschuwing "⚠️ API-quota: x% gebruikt vandaag (schatting)". Bij 100% werken YouTube-acties (inplannen, thumbnail, live-status) tijdelijk niet totdat het quotum 's ochtends rond 9:00 uur (Nederlandse tijd) vanzelf wordt vernieuwd. De beheerder krijgt bij 80% ook een melding per e-mail (zie 8.10).
 
 ### Stream inplannen
 
@@ -80,6 +86,8 @@ Klik op **"Plan Alles In"** om de uitzending aan te maken. Bij succes verschijnt
 
 Klik op de thumbnail-voorvertoning of "Open Editor" om een thumbnail-afbeelding te maken/bewerken. Deze wordt zowel naar YouTube geüpload als lokaal opgeslagen (o.a. als `thema.jpg` op de NAS) zodat OBS/FreeShow deze automatisch als beeld kunnen tonen vóór de uitzending begint.
 
+Daarnaast controleert de app elke 10 minuten zelf of er een nieuwe eerstvolgende livestream is en zet de thumbnail dan automatisch als `thema.jpg` klaar (zie hoofdstuk 9). Op een omgeving die de YouTube-koppeling niet gebruikt, bijvoorbeeld een testomgeving, kan een beheerder dit uitzetten (zie 8.1).
+
 ### Geplande streams
 
 Rechts zie je de lijst met geplande uitzendingen, gegroepeerd op titel/tijd. Per uitzending:
@@ -99,7 +107,7 @@ Bovenaan zie je de status van alle gekoppelde diensten (Companion, OBS, X32, QLC
 
 ### Slimme stekkers
 
-Als er stekkers zijn ingesteld (Instellingen → Slimme Stekkers), zie je hier per stekker: naam, online/offline-status, aan/uit-status, en (indien online) spanning/stroom/vermogen. De status wordt elke 10 seconden automatisch ververst.
+Als er stekkers zijn ingesteld (Instellingen → Slimme Stekkers), zie je hier per stekker: naam, online/offline-status, aan/uit-status, en (indien online) spanning/stroom/vermogen. De status wordt elke 10 seconden automatisch ververst. Een stekkerdoos met meerdere stopcontacten (bijvoorbeeld een 4-voudige met USB-poort) toont één kaart per ingesteld stopcontact, en eventueel een extra kaart die alle stopcontacten tegelijk schakelt (zie 8.3).
 
 > ℹ️ Voor de Beamer-PC en de OBS-PC geldt: zodra Windows daadwerkelijk wordt afgesloten — via de app, via een schema, óf gewoon handmatig door iemand die op de PC zelf op "Afsluiten" klikt — gaat de bijbehorende slimme stekker automatisch ná een korte vertraging uit (genoeg tijd om Windows echt te laten afsluiten voordat de stroom wordt verbroken). Dit geldt niet voor extra FreeShow-doelen (zie 8.8).
 
@@ -156,6 +164,8 @@ Toont: LIVE/STANDBY-status, titel, aantal kijkers, likes, weergaven, en een link
 
 (Alleen zichtbaar als dit is ingeschakeld bij Instellingen.) Handmatige testknoppen om het LED-scherm te sturen: **"ON AIR (Rood)"** / **"OFFLINE (Groen)"**.
 
+De automatische omschakeling (het scherm gaat vanzelf op ON AIR zodra YouTube meldt dat je live bent, en terug naar OFFLINE erna) werkt alleen op zondag binnen het tijdvak dat bij Instellingen → Verbindingen is ingesteld (standaard 10:00–12:30, zie 8.2). Op een andere dag, bijvoorbeeld bij een kerstavonddienst, gebruik je deze testknoppen.
+
 ---
 
 ## 5. FreeShow Projecten
@@ -187,7 +197,7 @@ Twee waarschuwingsblokken kunnen verschijnen:
 **Project aanmaken / bijwerken** genereert of actualiseert het FreeShow-project voor deze dienst — zelfde mechanisme als hieronder bij "Verstuur naar team" (die knop werkt het project ook automatisch bij, zie verderop), en dezelfde waarschuwing bij een conflict met een handmatige wijziging in FreeShow zelf (zie 5.2.6).
 
 **📤 Verstuur naar team**: klapt een paneel open met:
-- Contactpersonen (uit Beheer → Team, zie 5.3.3), gegroepeerd op rol (Band / Beamer-operator / Overig) — vink aan wie de mail moet krijgen. Ernaast staat per contactpersoon met een e-mailadres een kleine **"↩️ antwoord aan"**-vinkje: vink dit aan bij wie een eventuele reactie op de mail moet ontvangen. Dit staat los van "wie krijgt de mail" en moet apart aangevinkt worden — zonder dit vinkje komt een antwoord van iemand die op "Beantwoorden" klikt namelijk bij het eigen afzenderadres van de app terecht (zie de uitleg bij BCC in hoofdstuk 9), niet bij een mens.
+- Contactpersonen (uit Beheer → Team, zie 5.3.3), gegroepeerd op rol (Band / Beamer-operator / Overig) — vink aan wie de mail moet krijgen. Met **"Alles deselecteren"** (rechtsboven in het paneel) haal je in één keer alle vinkjes weg. Ernaast staat per contactpersoon met een e-mailadres een kleine **"↩️ antwoord aan"**-vinkje: vink dit aan bij wie een eventuele reactie op de mail moet ontvangen. Dit staat los van "wie krijgt de mail" en moet apart aangevinkt worden — zonder dit vinkje komt een antwoord van iemand die op "Beantwoorden" klikt namelijk bij het eigen afzenderadres van de app terecht (zie de uitleg bij BCC in hoofdstuk 9), niet bij een mens.
 - **Extra bericht** (optioneel, vrij tekstveld) — voor bijvoorbeeld een dresscode, een opmerking, of een persoonlijke groet (bijvoorbeeld "God bless, Jeffrey"); wordt onderaan de e-mail geplaatst en per browser onthouden zodat je 'm niet elke week hoeft te herschrijven.
 - **"Songtekst (.txt) bijvoegen"**, **"PDF bijvoegen"**, **"Akkoorden bijvoegen"** en **"YouTube bijvoegen"** — vier losse vinkjes. Songtekst en PDF bevatten alleen de liedtekst; akkoorden komen (indien aanwezig) als eigen bijlage per lied mee — het geüploade bestand zelf, of anders een gegenereerd tekstbestand uit de vrije akkoordentekst. "YouTube bijvoegen" voegt geen bijlage toe, maar zet de opgeslagen YouTube-referenties (zie 5.3.1) als linkjes onderaan de berichttekst. Zet alles uit om de mail zonder bijlagen te versturen (alleen de liedjeslijst in de berichttekst).
 - **"✉️ Verstuur e-mail"** opent eerst een **controlescherm**: ontvangers, eventuele "Antwoord aan"-adressen, onderwerp en berichttekst (beide hier nog aan te passen) en de lijst bijlagen — pas na **"✅ Akkoord, versturen"** gaat de mail daadwerkelijk uit. Ontbrak er nog songtekst bij een lied (bijvoorbeeld een via e-mail aangeleverd lied waar niemand tekst bij heeft gezet), dan wordt die op het moment van versturen automatisch alsnog opgezocht (als "Songtekst bijvoegen" of "PDF bijvoegen" aanstaat). Het versturen werkt in dezelfde stap ook het FreeShow-project bij, dus je hoeft daarna niet nog los op "Project bijwerken" te klikken.
@@ -290,7 +300,9 @@ In de Visuele editor staat ook **"🎸 Akkoorden & 🎥 YouTube-link"**: voor ak
 
 **Duplicaten** — "Start Scan" zoekt shows met (vrijwel) dezelfde naam/inhoud. Per gevonden paar: "Vergelijk" opent een scherm waarin je de twee versies naast elkaar ziet (inclusief gekoppelde achtergrondmedia) en met één klik kiest welke bewaard blijft; het andere wordt verwijderd.
 
-**Bibliotheek** — "Optimaliseer Media" corrigeert/herstelt mediaverwijzingen in shows; "Back-up" downloadt een kopie van de hele showbibliotheek; hier kun je ook los een show uit de bibliotheek verwijderen.
+**Bibliotheek** — "Optimaliseer Media" corrigeert/herstelt mediaverwijzingen in shows; "Back-up" downloadt een kopie van de hele showbibliotheek; hier kun je ook los een show uit de bibliotheek verwijderen. **"Max. 2 regels"** splitst bestaande liederen met meer dan 2 regels per dia op (zie hieronder).
+
+**Max. 2 regels per dia** — voor liederen geldt een maximum van 2 regels per dia, omdat meer er in de onderste beeldbalk van de livestream slecht uitziet. Een regel langer dan 32 tekens loopt door op het scherm en telt dus voor 2. Nieuwe liederen worden automatisch zo opgesplitst en de show-editor houdt zich hieraan. Met de knop **"Max. 2 regels"** pas je de liederen aan die er al staan: je krijgt eerst een lijst te zien van de liederen die veranderen en moet bevestigen; er wordt vooraf een back-up gemaakt (de map staat in de melding achteraf). Liederen die al aan de regel voldoen blijven ongewijzigd.
 
 **Prullenbak** — verwijderde shows staan hier tijdelijk; "Herstellen" haalt ze terug, "Prullenbak Leegmaken" verwijdert ze definitief (kan niet ongedaan gemaakt worden).
 
@@ -456,6 +468,92 @@ Liederen:
 - **Stroboscoop** — kleur + snelheid, met een aparte "STROBE UIT"-knop
 - **Fresnel Dimmers** — vier losse dimmers plus een hoofdregelaar
 
+### Overgangstijd (fade)
+
+Bovenin het blok **Kleurgroepen** staat **Overgangstijd (Fade)** met zes knoppen: *Direct (0s)*, *0.5s*, *1s*, *2s*, *3s* en *5s*.
+
+- Het is **één instelling voor alle lichtgroepen samen**; per lamptype apart instellen kan niet. De tijd geldt voor alles wat je daarna schakelt via de **Hoofdscènes** en de **Kleurgroepen**: LED-bars, SlimPARs, Color Bar Spots, KLS-200-spots, en de Fresnels voor zover die in een hoofdscène meedoen.
+- Hij geldt **niet** voor de **Lichtshows** (Color Chase en Rainbow Wave hebben een eigen tempo), voor de **Stroboscoop** en voor de losse **Fresnel Dimmers**-schuifjes (die zetten direct een niveau).
+- De gekozen tijd werkt vanaf de eerstvolgende scène of kleur die je kiest.
+- Na een herstart van QLC+ staat de overgangstijd weer op *Direct*, ook als de app nog een andere knop als gekozen toont. Kies dan opnieuw een tijd.
+
+### Stroboscoop
+
+Kies een kleur en stel met de schuif **Snelheid** het tempo in: van *Langzaam* (ongeveer één flits per 2 seconden) tot *Extreem* (enkele tientallen milliseconden tussen de flitsen). **STROBE UIT** zet de flitser uit.
+
+> ⚠️ Snelle stroboscoop-effecten kunnen bij mensen met lichtgevoelige epilepsie klachten veroorzaken. Gebruik ze spaarzaam en waarschuw aanwezigen.
+
+---
+
+## 6a. Tracks — de band-tracks afspelen (REAPER)
+
+Dit tabblad bedient de **track-computer** (een Mac met REAPER) waarop de backing tracks van de band worden afgespeeld: een click, een guide (die de secties aankondigt) en de stems per groep, zoals drums, bas en keys. Je ziet het tabblad met het recht `tracks`, en alleen als het is ingeschakeld bij Instellingen → Verbindingen → **Tracks (REAPER)** (zie 8.2). Staat de koppeling uit, dan zie je "Koppeling met REAPER staat uit"; is de track-computer niet bereikbaar, dan zie je "REAPER niet bereikbaar".
+
+> ℹ️ REAPER zelf, de bridge en de agent op de track-computer worden buiten deze app geïnstalleerd en vallen buiten deze handleiding. Hier staat alleen wat je in de app doet.
+
+Bovenaan kies je tussen **Live**, **Bibliotheek** en de link **Podiumweergave (telefoon/tablet)**.
+
+### 6a.1 Live
+
+**Transportbalk** — toont de **Song** en de huidige **Sectie**, met knoppen voor naar het begin, afspelen, pauze en stop. Met **Opslaan** bewaar je de huidige mix (faders en mutes) in het REAPER-project van dat nummer, zodat die de volgende keer weer zo klaarstaat.
+
+**Setlist** — de liederen van de dienst, uit de setlist die je bij FreeShow hebt gebouwd (zie 5.1). Elk lied wordt op naam gekoppeld aan een track in de bibliotheek. Per lied zie je de status:
+
+- **Actief** — dit nummer is geladen en staat klaar of speelt
+- **Klaar** — het project van dit nummer staat al open in REAPER; het volgende nummer van de setlist wordt automatisch klaargezet zodra het huidige afgelopen is
+- **volgt…** — je hebt tijdens het afspelen een ander nummer gekozen. Het nieuwe nummer start op het eerstvolgende muzikale moment (zie Sprongmoment hieronder). Tik nogmaals om dit te annuleren.
+- **geen track gevonden** — er staat geen bijpassende track in de bibliotheek; upload hem bij Bibliotheek (6a.2)
+- **audio wordt opgehaald…** — het nummer is bekend, maar de audio staat nog niet op de track-computer. Die wordt vanzelf opgehaald.
+
+Met het vernieuw-icoon laad je de lijst opnieuw. Een tweede knop opent alle gevonden songs als projecttabs in REAPER.
+
+**Arrangement** — een knop per sectie van het nummer (Intro, Couplet, Refrein, enzovoort; elke soort heeft een eigen kleur). Tik op een sectie om ernaartoe te springen. Met **Sprongmoment** kies je *wanneer* de sprong gebeurt:
+
+- **Einde sectie** — de sectie waar je nu in zit eerst afmaken en dan naadloos doorgaan
+- **Volgende maat** — springt op de eerstvolgende maatstreep
+- **Direct** — springt meteen
+
+**Loop sectie** herhaalt de huidige sectie totdat je de loop weer uitzet, bijvoorbeeld als de voorganger nog even doorgaat. De guide past zich bij een sprong aan, zodat de aankondiging past bij de sectie waar je naartoe springt.
+
+**Groepen** — per groep (bijvoorbeeld drums) een fader en een **MUTE**-knop. Klap een groep open om de afzonderlijke stems te zien. Dubbeltik op een fader om hem op 0 dB te zetten. Stems die de band normaal zelf live speelt zijn gemarkeerd met **LIVE** en staan standaard gemute; mist er iemand, zet dan de mute van die stem uit. **Alles unmuten** zet alle stems in één keer weer aan.
+
+**Pads** — twaalf toetsen (een per toonsoort) waarmee je een pad-klank onder de dienst kunt laten liggen. Je stelt **Klank**, **Volume** en **Uitfaden** in; de toonsoort van het huidige nummer wordt gemarkeerd. Dit werkt alleen als de padspeler (ArkPads) op de track-computer draait. Anders zie je "De padspeler draait niet op de track-computer (ArkPads)."
+
+**Songteksten in FreeShow automatisch mee laten lopen** — bij elk lied in de setlist staat een knop **Tekst**. Hiermee koppel je de FreeShow-show van het lied aan de secties van de track. De app maakt in die show een aparte indeling "Tracks" met een startdia, een lege dia voor instrumentale stukken en de tekstdia's in de volgorde van het arrangement. Tijdens het afspelen schakelt FreeShow daarna vanzelf naar de juiste dia, ook na een sprong of loop. Je kunt de show laten zoeken of zelf een andere kiezen, een **Voorstel** laten maken en dat per sectie aanpassen of weghalen.
+
+Klopt de automatische timing van de dia's niet, gebruik dan **Timing opnemen**: speel het nummer af en tik op het moment dat de **Volgende dia** moet komen. Met **Opslaan** wordt dat per sectie onthouden en gebruikt de app voortaan jouw timing. Hoeveel tellen de dia's eerder dan de muziek worden getoond (standaard 2) stel je in bij 8.2.
+
+### 6a.2 Bibliotheek
+
+**Track-bibliotheek** — alle nummers waarvoor tracks beschikbaar zijn. Nieuwe tracks voeg je toe door een **MultiTracks-zip** naar het vak te slepen of erop te klikken. De zip wordt in stukken geüpload (en hervat vanzelf na een haperende verbinding). Daarna haalt de track-computer hem automatisch op, zet hem om naar een REAPER-project en maakt de server er een oefenversie van voor de oefenspeler (6b). Per nummer zie je de status en de secties. Het label **op Mac mini** betekent dat de audio op de track-computer staat. Bij een fout kun je het **Opnieuw proberen**, en met **Verwijderen** haal je een nummer weg.
+
+**Eigen opname toevoegen** — voor stems die je zelf hebt opgenomen, zonder MultiTracks-zip. Een wizard met drie stappen en daarna **Uploaden**:
+
+- **Nummer** — naam en tempo (bpm)
+- **Secties** — kies per sectie de soort (couplet, refrein, enzovoort) en vanaf welke maat die begint
+- **Stems** — sleep de audiobestanden erheen of kies ze. Markeer een stem als **LIVE** als de band dit normaal zelf speelt; die staat dan standaard gemute.
+
+**Schijfruimte op de track-computer** — de audio van nummers die in de laatste weken niet zijn gespeeld en niet op een komende setlist staan, wordt automatisch van de track-computer verwijderd (alleen de audio; project en mix blijven bestaan). Komt een nummer weer op een setlist, dan wordt de audio vanzelf teruggehaald. De setlist is meestal al op woensdag bekend. Nummers die je op "altijd houden" zet, blijven altijd staan. Het aantal weken stel je in bij 8.2.
+
+### 6a.3 Podiumweergave
+
+De link **Podiumweergave (telefoon/tablet)** opent een aparte pagina "Podium" zonder faders, bedoeld voor een tablet of telefoon op het podium: de setlist en de sectieknoppen staan groot in beeld en het scherm blijft aan. Met **Naar het dashboard** ga je terug.
+
+---
+
+## 6b. Oefenen — de oefenspeler voor bandleden
+
+Met het tabblad **Oefenen** (recht `oefenen`; wie `tracks` heeft mag het ook gebruiken) oefenen bandleden thuis in de browser, zonder REAPER en zonder dat de track-computer hoeft te draaien. De pagina is ook rechtstreeks te openen als `/oefenen`; **Naar het dashboard** gaat terug.
+
+- **Nummers** — links staan bovenaan de liederen van de eerstvolgende dienst en daaronder **Alle nummers**, met een zoekveld. Kies een nummer; het wordt gedownload ("laden…"). Reken op ongeveer 75 MB per nummer, gebruik dus bij voorkeur wifi. Een net geüpload nummer is pas na ongeveer twee minuten klaar.
+- **Afspelen** — afspelen, pauze en stop (terug naar het begin), en zoeken in het nummer. Je ziet de toonsoort en het tempo.
+- **Tempo** — met **Langzamer**, **Sneller** en **Terug naar 100%** pas je het tempo aan; de toonhoogte blijft gelijk. Zo kun je een lastig stuk rustig oefenen.
+- **Sectie** — tik op een sectie om ernaartoe te springen, met dezelfde **Sprongmoment**-keuze en **Loop sectie** als bij Tracks (6a.1).
+- **Mix** — per groep **Mute** en **Solo** en een fader; open een groep om de afzonderlijke stems te zien. Jouw mix wordt **per nummer op dit apparaat onthouden**; **Standaardmix** zet hem terug. Stems met **LIVE** zijn de delen die de band normaal zelf speelt.
+- **Tekst** — is er een tekst aan het nummer gekoppeld (zie de knop **Tekst** bij 6a.1), dan loopt die mee met het arrangement. Anders staat er "Geen tekst gekoppeld aan dit nummer."
+
+Op een telefoon is de mixer compact weergegeven.
+
 ---
 
 ## 7. Gebruikersbeheer (alleen Administrator)
@@ -465,8 +563,8 @@ Via Instellingen → Gebruikersbeheer.
 > ℹ️ Dit scherm beheert alleen **lokale accounts** (zie hoofdstuk 1). Wie via **Team-login (SSO)** inlogt, staat hier niet in en hoeft hier ook niet aangemaakt te worden — die mensen worden vanuit de identity provider zelf beheerd; hun rol/rechten in deze app stel je in via de groep→rechten-koppeling bij Instellingen → SSO (zie 8.11).
 
 **Rollen:**
-- **Administrator** — krijgt automatisch alle vijf rechten, ongeacht wat is aangevinkt.
-- **Operator** — moet minimaal één recht toegewezen krijgen uit: Stream Planner, Control Center, Live Monitor, Lichtregie, FreeShow Projecten.
+- **Administrator** — krijgt automatisch alle zeven rechten, ongeacht wat is aangevinkt.
+- **Operator** — moet minimaal één recht toegewezen krijgen uit: Stream Planner, Control Center, Live Monitor, Lichtregie, Tracks (REAPER), Oefenen (band), FreeShow Projecten.
 
 **Een gebruiker aanmaken/bewerken:** gebruikersnaam (niet meer te wijzigen na aanmaken), wachtwoord (leeg laten bij bewerken = ongewijzigd), rol, en (bij Operator) de rechten-checkboxen.
 
@@ -486,6 +584,8 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
 
 ### 8.1 Algemeen
 
+**YouTube/Google-koppeling** (bovenaan het tabblad) — toont of er een koppeling is (**● Verbonden** of **○ Niet verbonden**) met de knoppen **Inloggen met Google** / **Opnieuw inloggen** en **Loskoppelen**. "Verbonden" betekent alleen dat er een token is opgeslagen, niet dat het nog werkt. Blijven YouTube-acties mislukken (bijvoorbeeld met "Insufficient Permission" of een scope-fout in het Activiteitenlog), of heb je bij het inloggen in Google's toestemmingsscherm niet alles toegestaan, klik dan op **Loskoppelen**, daarna op **Inloggen met Google**, en sta alle gevraagde rechten toe (vooral het beheren van je YouTube-account). Deze knoppen staan hier ook voor het geval de Planner de inlogknop niet toont omdat er nog een onbruikbaar token is opgeslagen. Loskoppelen is alleen voor Administrators en wordt in het Activiteitenlog vastgelegd. Elke omgeving (bijvoorbeeld test en productie) heeft zijn eigen koppeling. Gebruiken ze dezelfde Google-projectgegevens (Client ID), dan delen ze ook dezelfde dagelijkse quota.
+
 | Veld | Uitleg |
 |---|---|
 | Thumbnail Opslag Pad (NAS) | Map waar OBS/FreeShow de livestream-thumbnail kunnen ophalen |
@@ -493,6 +593,7 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
 | Standaard YouTube Tags | Standaard trefwoorden bij een nieuwe uitzending |
 | Standaard Beschrijving | Standaardtekst voor de videobeschrijving |
 | WhatsApp Uitnodiging Template | Berichtsjabloon met plekhouders `{link}`, `{titel}`, `{datum}`, `{tijd}` |
+| Thumbnail automatisch synchroniseren (elke 10 minuten) | Vinkje, standaard aan. Zet dit uit op een omgeving die de YouTube-koppeling niet gebruikt, bijvoorbeeld een testomgeving met een verlopen token. De achtergrondcontrole slaat dan over voordat er iets bij YouTube wordt opgevraagd: geen quota-verbruik en geen meldingen "YouTube-koppeling is verlopen" in het Activiteitenlog of per e-mail. De instelling werkt direct, zonder herstart. |
 
 ### 8.2 Verbindingen
 
@@ -501,14 +602,39 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
 - **Behringer X32 (OSC)** — IP, poort
 - **Atem Mini Pro** — IP-adres. Wordt gebruikt om bij het opstarten van de OBS-PC te wachten tot de Atem online is vóórdat OBS zelf start (anders herkent OBS de Atem-video-invoer niet), en om de status op de Regie-tab te tonen.
 - **Lichtregie (QLC+)** — aan/uit-schakelaar, IP, poort (standaard 7700)
+  > ℹ️ QLC+ leest zijn werkbestand (scènes, fades, strobe-snelheid) alleen bij het opstarten van de `qlcplus`-container in. Een wijziging daarin, ook na een nieuwe uitrol van de app, werkt pas nadat die container is herstart.
 - **Presentatie (FreeShow)** — FreeShow IP, poort (standaard 5505). Het media-pad stel je in bij het tabblad **FreeShow** (`freeshowMediaPath`, zie 8.8).
-- **LED Paneel (BK-Light)** — aan/uit, doel-host (leeg = zelfde als FreeShow-host), SSH-gebruiker, Bluetooth MAC (optioneel, anders auto-detectie), tekst/kleur voor "actief" en "inactief"
+- **LED Paneel (BK-Light)** — aan/uit, doel-host (leeg = zelfde als FreeShow-host), SSH-gebruiker, Bluetooth MAC (optioneel, anders auto-detectie), tekst/kleur voor "actief" en "inactief", en het **YouTube-controle venster (alleen zondag)**: een begin- en eindtijd (standaard 10:00–12:30, Nederlandse tijd). Alleen op zondag binnen dit tijdvak vraagt de app elke minuut aan YouTube of je live bent; daarmee schakelt het LED-paneel vanzelf tussen ON AIR en OFFLINE, en kan de website een "we zijn nu live"-banner tonen (zie 9). Op andere dagen of tijden wordt YouTube hiervoor niet bevraagd, wat quota spaart.
+- **Tracks (REAPER)** — aan/uit-schakelaar en het IP en de poort van de track-computer (standaard 8080; dit is de webinterface van REAPER, onder Settings → Control/OSC/web → Web browser interface). Verder staan er bij deze kaart nog vier instellingen:
+- **Tracks: uitgangen van de track-computer** — *Automatisch* (8 uitgangen als het audio-apparaat die heeft, anders stereo), *8 kanalen* (elke groep een eigen uitgang, voor de X32), *2 kanalen* (uitgang 1: click + guide, uitgang 2: tracks in mono), *3 kanalen* (uitgang 1: click + guide, uitgang 2 + 3: tracks in stereo) of *Stereo* (alles samen, om via speakers te testen)
+- **Tracks: audio op de track-computer bewaren van songs gespeeld in de laatste** 2 tot 52 weken (standaard 8), plus alles op komende setlists en songs die je op "altijd houden" zet (zie 6a.2)
+- **Tracks: FreeShow-dia's eerder tonen** — van *Precies op de maat* tot *4 tellen eerder* (standaard 2)
+- **Tracks: agent-token** met de knop **Nieuwe token** — de agent op de track-computer die geüploade MultiTracks ophaalt en omzet, heeft deze token nodig in zijn eigen configuratie. Maak je een nieuwe token, dan moet de agent die daarna ook krijgen.
   > ℹ️ Of het LED-paneel reageert op de YouTube-status of de OBS-status (`ledTriggerSource`) is nog niet in de interface in te stellen — dit staat standaard op "youtube" en kan alleen via het instellingenbestand op de server worden gewijzigd.
 
 ### 8.3 Slimme Stekkers (Tuya)
 
 - **Tuya API Host IP** — waar de lokale Tuya-brug draait (leeg = lokaal/Docker)
-- Per stekker: naam, unieke ID, IP-adres, Tuya Device ID, Local Key, gekoppelde host-IP, protocolversie (3.1/3.3/3.4/3.5)
+- Per stekker: naam, unieke ID, IP-adres, Tuya Device ID, Local Key, gekoppelde host-IP, protocolversie (3.1/3.3/3.4/3.5), en bij een stekkerdoos met meerdere stopcontacten het **Kanaal** (zie hieronder). Het **?**-icoontje bij Kanaal toont een korte uitleg.
+- **Dupliceer** — kopieert een stekker en laat alleen naam, unieke ID en kanaal leeg; IP, Device ID, Local Key en protocolversie blijven staan. De kopie komt direct onder het origineel. Handig bij 4 of 5 stopcontacten van dezelfde stekkerdoos.
+
+**Een stekkerdoos met meerdere stopcontacten** (bijvoorbeeld een 4-voudige met USB-poort) is voor Tuya één apparaat — één IP, Device ID en Local Key — met een eigen schakelaar per stopcontact: kanaal 1 t/m 4, en de USB-poort is meestal kanaal 5. Maak per stopcontact een eigen stekker aan met dezelfde IP, Device ID en Local Key maar een ander **Kanaal**; gebruik **Dupliceer** om dat snel te doen. Een gewone losse stekker laat je op kanaal 1 staan.
+
+Wil je alles in één keer kunnen schakelen, zoals met de "alles"-knop in de Tuya-app, maak dan nog één extra stekker en vink **Bedient alle kanalen tegelijk** aan. Het veld daaronder vult zich met `1,2,3,4,5`; pas dat aan (kommagescheiden) als je maar een deel wilt schakelen, bijvoorbeeld `1,3,5`. Laat je de lijst leeg, dan schakelt deze knop alleen de kanalen waarvoor je zelf al een eigen stekker hebt aangemaakt. Op de kaart van de "alles"-stekker betekent *aan*: minstens één kanaal staat aan.
+
+Alle kaarten van dezelfde stekkerdoos tonen dezelfde spanning, stroom en vermogen, want die worden voor de hele doos gemeten. De status van een doos wordt per ronde maar één keer opgevraagd, hoeveel kaarten er ook bij horen.
+
+**Een nieuwe stekker koppelen aan Tuya** — stap voor stap:
+
+- **Stap 1 — koppelen in de app.** Voeg de stekker toe in de **Smart Life-app** (Tuya) onder het account dat je voor deze app gebruikt.
+- **Stap 2 — Cloud-project (eenmalig).** Maak op iot.tuya.com een Cloud-project aan (Cloud → Create Cloud Project, Development Method *Smart Home*, Data Center *Central Europe*) met de dienst **IoT Core**. Dat is een gratis proefabonnement dat na ongeveer een halfjaar verlengd moet worden (**Extend Trial Period**).
+- **Stap 3 — account koppelen.** Open in het project **Devices → Link Tuya App Account → Add App Account** en scan de QR-code met de Smart Life-app (Me → scan-icoon rechtsboven). Daarna staan de apparaten van dat account in het project.
+- **Stap 4 — Device ID en Local Key.** Op het tabblad Overview van het project staan **Access ID** en **Access Secret**. Daarmee lees je de gegevens van de stekker uit: via het hulpscript `get_tuya_devices.py` (met `TUYA_API_KEY` en `TUYA_API_SECRET` als omgevingsvariabelen) of via Cloud → **API Explorer** met "Query Device Detail". Je krijgt de **Device ID** en de **Local Key** (`local_key`). Het IP-adres dat Tuya daarbij toont is het publieke adres van je internetverbinding en is niet bruikbaar.
+- **Stap 5 — lokaal IP-adres.** Zoek het lokale IP-adres van de stekker in de DHCP-lijst van je router. Geef de stekker bij voorkeur een vast adres. Een stekker op een apart IoT-wifi/subnet is niet te vinden met een scan vanaf een ander subnet; scan dan vanaf een apparaat op dat IoT-netwerk. Als protocolversie werkt 3.4 vaak; probeer 3.3 of 3.5 als de stekker niet reageert.
+- **Stap 6 — invullen.** Vul de gegevens in bij Instellingen → Slimme Stekkers en klik op **Wijzigingen Opslaan**.
+
+> ℹ️ Een nieuw Cloud-project kan in het begin de foutmelding "No permission. The data center is suspended" geven, ook als alles in het dashboard op "In service" staat. Die verdwijnt vanzelf na enige tijd (in onze ervaring binnen een uur).
+> ⚠️ Koppel je een stekker opnieuw in de Tuya-app, dan krijgt hij een nieuwe Local Key en werkt de oude niet meer. Zet de Access Secret nooit in een bestand dat in git terechtkomt.
 
 ### 8.4 Schema's
 
@@ -585,9 +711,21 @@ Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "P
 
 **Herstellen**: upload een eerder gemaakte back-up-zip, kies welke onderdelen teruggezet moeten worden, en klik **"Herstel Geselecteerde Onderdelen"**. Er wordt automatisch eerst een veiligheidskopie van de huidige staat gemaakt voordat er iets wordt overschreven.
 
+De track-bibliotheek (`data/tracks`, de geüploade MultiTracks) zit niet in de app-back-up.
+
 ### 8.10 Activiteitenlog
 
 Alleen zichtbaar voor beheerders. Overzicht van wat er is gebeurd: sync-runs (gestart/voltooid/fouten), stekkers aan/uit, LED-scherm-triggers, en instellingen-wijzigingen (met wie). Filterbaar op categorie, met een "Vernieuwen"-knop. Wordt automatisch beperkt tot de laatste ~5000 gebeurtenissen, zodat het geen onbeperkte schijfruimte inneemt.
+
+**Foutmeldingen per e-mail** — bovenaan dit tabblad stel je het **E-mailadres voor foutmeldingen** in. Naar dat adres mailt de app zelf als er iets misgaat dat ook in het log verschijnt; dit geldt voor de hele app, niet alleen voor FreeShow. De mail gaat via de SMTP-gegevens van 8.8; zonder adres of zonder SMTP wordt er niets gemaild (het log blijft wel gevuld). Meldingen die per e-mail komen:
+
+- **YouTube-koppeling verlopen** — de thumbnail-sync is gestopt en `thema.jpg` wordt niet bijgewerkt; log opnieuw in (zie 8.1)
+- **Thumbnail-sync mislukt** — thumbnail ophalen bij YouTube, een YouTube API-fout, het NAS-pad niet schrijfbaar, of de sync naar de Beamer-PC kon niet starten
+- **Sync overgeslagen** — de Beamer-PC was niet bereikbaar tijdens de sync
+- **LED-paneel: YouTube-status niet op te halen** — na 3 mislukte controles op rij, met de echte foutreden in de melding
+- **YouTube API-quota bijna op** — bij 80% van de geschatte daglimiet, met een lijst van welke onderdelen (LED-paneel, website-banner, Monitor, thumbnail-sync, enzovoort) het meeste hebben verbruikt
+
+Dezelfde soort melding wordt per e-mail hoogstens eens per 6 uur verstuurd (de LED-melding eens per half uur), zodat een aanhoudend probleem je inbox niet volstuurt. In het Activiteitenlog komt elke gebeurtenis wel gewoon voor.
 
 ### 8.11 SSO (Team-login)
 
@@ -609,7 +747,7 @@ Hiermee koppel je de app aan de identity provider van je organisatie, zodat team
 
 **Rechten per groep:**
 
-Een tabel groepsnaam → rol (Admin/Operator) → rechten (planner/control/monitor/lights/freeshow), met "+ Groep toevoegen"/verwijder-knoppen per rij. De groepsnaam moet **exact** overeenkomen met de groepsnaam bij de identity provider (hoofdlettergevoelig). Een groep die hier niet in staat, krijgt geen enkele permissie — iemand kan dan nog wel inloggen, maar ziet nergens toegang toe (zie ook hoofdstuk 1).
+Een tabel groepsnaam → rol (Admin/Operator) → rechten (planner/control/monitor/lights/tracks/oefenen/freeshow), met "+ Groep toevoegen"/verwijder-knoppen per rij. De groepsnaam moet **exact** overeenkomen met de groepsnaam bij de identity provider (hoofdlettergevoelig). Een groep die hier niet in staat, krijgt geen enkele permissie — iemand kan dan nog wel inloggen, maar ziet nergens toegang toe (zie ook hoofdstuk 1).
 
 **Teamcontacten automatisch synchroniseren:**
 
@@ -640,7 +778,10 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 - **Opschonen van verstuurde setlist-mail-kopieën** — draait mee met dezelfde e-mailcontrole hierboven. Elke setlist-mail die via "Verstuur naar team" (5.1) wordt verstuurd, laat automatisch een kopie achter in hetzelfde postvak (nodig om de ontvangers via BCC te kunnen versturen zonder ieders adres aan elkaar te tonen) — die kopieën ouder dan 7 dagen worden automatisch definitief verwijderd, zodat je nog even kunt terugkijken wat er verstuurd is zonder dat de inbox blijft volstromen.
 - **NAS/Beamer-PC synchronisatie & opschoning** — draait via een geplande taak op de Synology NAS (`sync_and_cleanup_freeshow.py`, standaard om 00:00 uur): schoont Bijbelteksten ouder dan 7 dagen op, synchroniseert Shows, Media, Bibles en Templates (inclusief submappen) tweerichtingsverkeer tussen NAS en Beamer-PC, en zet aan het eind de Beamer-PC + bijbehorende slimme stekker netjes uit als de PC voor deze taak is opgestart of al aanstond. Extra FreeShow-doelen (zie 8.8) doen hier standaard niet aan mee — die syncen alleen als je ze zelf handmatig aanvinkt (zie 5.3.2). Een ingebouwde veiligheidsgrens voorkomt dat de sync in één keer een ongewoon groot aantal bestanden verwijdert (bijvoorbeeld door een tijdelijk onbereikbare map) — in dat geval wordt er die run niets verwijderd en verschijnt een waarschuwing in het synclog, zodat dit niet stilzwijgend tot dataverlies leidt.
 - **Sync na een nieuwe/gewijzigde thumbnail** — zodra er een nieuwe eerstvolgende livestream is (of de thumbnail daarvan verandert), wordt meteen een sync naar de Beamer-PC gestart (in plaats van te wachten tot 00:00 uur) — en de bijbehorende stekker gaat daarna, net als bij de nachtelijke sync, netjes uit.
-- **Thumbnail-synchronisatie** — elke 10 minuten wordt gecontroleerd of er een nieuwe eerstvolgende livestream is, en zo ja, de thumbnail lokaal bijgewerkt (zie hierboven).
+- **Thumbnail-synchronisatie** — elke 10 minuten wordt gecontroleerd of er een nieuwe eerstvolgende livestream is, en zo ja, de thumbnail lokaal bijgewerkt (zie hierboven). Uit te zetten per omgeving, zie 8.1.
+- **YouTube-livestatus voor het LED-paneel en de website** — alleen op zondag binnen het ingestelde tijdvak (8.2) vraagt de app elke minuut aan YouTube of er een uitzending live is. Het LED-paneel (zie 4) schakelt daarmee automatisch tussen ON AIR en OFFLINE. De website kan via een klein openbaar statusadres (`/api/public/live-status`, zonder inlog) een "we zijn nu live"-banner tonen; dat adres geeft alleen terug of er live is, de kijk-link en de titel, en onthoudt het antwoord 20 seconden. Buiten het tijdvak wordt YouTube hiervoor niet bevraagd.
+- **YouTube-quota bijhouden** — de app telt (als schatting) hoeveel YouTube-API-units ze per dag gebruikt, per onderdeel uitgesplitst, in `data/youtube_quota.json`. Bij 80% van de standaard daglimiet (10.000 units, vernieuwd 's ochtends rond 9:00 uur Nederlandse tijd) volgt een melding in het Activiteitenlog en per e-mail (zie 8.10).
+- **Track-bibliotheek en oefenversies** — na het uploaden van een MultiTracks-zip (6a.2) haalt de agent op de track-computer die automatisch op en zet hem om naar een REAPER-project, en bouwt de server een oefenversie voor de oefenspeler (6b), ongeveer 2 minuten per nummer. Audio van nummers die lang niet gespeeld zijn wordt van de track-computer opgeschoond (8.2).
 - **Wachten op de Atem vóór OBS start** — als er een Atem-IP is ingesteld (zie 8.2), wacht het opstartproces van de OBS-PC tot de Atem online is (reageert op ping) vóórdat OBS zelf wordt gestart. Start OBS namelijk vóór de Atem, dan herkent OBS de video-invoer van de Atem niet.
 - **Automatisch wegklikken van OBS' "niet netjes afgesloten"-melding** — als de OBS-PC ooit onverwacht is afgesloten (bijvoorbeeld een stroomonderbreking), toont OBS bij de volgende start een melding die vraagt om te kiezen tussen veilige en normale modus. Deze melding wordt automatisch weggeklikt (altijd "Starten in normale modus" — veilige modus zou de WebSocket-koppeling met deze app uitschakelen), zodat OBS niet blijft hangen wanneer niemand er fysiek bij zit.
 
@@ -655,6 +796,8 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 - **Bij Team-login (SSO) geldt hetzelfde "geen groep = geen toegang"-principe** als bij lokale accounts: een groep die niet voorkomt in de rechten-tabel (8.11) krijgt automatisch geen enkele permissie. Controleer na een wijziging in de groepsindeling bij de identity provider dus ook of de rechten-tabel in deze app nog klopt.
 - **Het lokale account blijft altijd bereikbaar als noodtoegang** zodra Team-login is ingeschakeld (zie hoofdstuk 1) — wijzig het wachtwoord hiervan dus net zo serieus als bij een normale installatie, ook al wordt het in de praktijk zelden gebruikt.
 - **API-tokens en wachtwoorden voor de identity provider/contactsync (8.11) staan, net als de overige verbindingswachtwoorden, in platte tekst** in `data/settings.json` op de server (zie het eerste punt hierboven).
+- **Het openbare livestatus-adres (`/api/public/live-status`) vraagt bewust geen inlog**, omdat de website het moet kunnen opvragen. Het geeft alleen terug of er live is, de publieke kijk-link en de titel.
+- **De agent-token (8.2) geeft de track-computer toegang tot de track-bibliotheek** en staat, net als de overige sleutels, in platte tekst in `data/settings.json`. Maak met **Nieuwe token** een nieuwe aan als je denkt dat hij gelekt is, en zet hem daarna ook bij de agent.
 - **Elke instellingen-opslag herstart de server kort** (zie 8, intro).
 
 ---
@@ -662,6 +805,9 @@ Een aantal dingen gebeurt zonder dat iemand hoeft te klikken:
 ## 11. Bekende beperkingen (stand van zaken)
 
 - `ledTriggerSource` (YouTube- vs. OBS-gestuurd LED-signaal), een `adminPin`-functie voor herstel-/back-up-routes, en `smtpSecure` (of de SMTP-verbinding versleuteld is, zie 8.8) bestaan in de instellingen-data, maar hebben nog geen scherm — alleen via handmatige bewerking van het instellingenbestand op de server.
+- **Tracks (REAPER)** en **Oefenen** vragen een track-computer met REAPER, de bridge en de agent; de installatie daarvan valt buiten deze app en deze handleiding.
+- De oefenspeler (6b) is nog niet uitgebreid getest op Safari (iPhone/iPad); gebruik bij problemen Chrome.
+- De automatische YouTube-controle voor het LED-paneel en de website-banner werkt alleen op zondag binnen het ingestelde tijdvak (8.2). Op feestdagen, zoals kerstavond of Goede Vrijdag, gebruik je de testknoppen bij de Monitor (hoofdstuk 4).
 - Facebook-livestreams worden niet automatisch ingepland; dit blijft een handmatige stap via Facebook's eigen Live Producer.
 - Bij het inladen van een `.project`-bestand dat niet door deze app zelf is opgeslagen (native FreeShow, of via de e-mail-koppeling), wordt de playlist best-effort gereconstrueerd — controleer het resultaat voordat je verdergaat.
 - Songtekst-herkenning uit e-mail volgt vaste regels (geen taalmodel); wijkt een aanlevering te veel af van het afgesproken formaat, dan wordt dat als "niet herkend" gemeld in plaats van geraden.
