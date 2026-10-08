@@ -126,6 +126,13 @@ export interface AppSettings {
   // the team's setlist-mail recipients, since these are infra problems only
   // the app's admin/maintainer needs to see.
   opsAlertEmail?: string;
+  // Switches off the background thumbnail check (every 10 min: looks for the
+  // upcoming stream and copies its thumbnail to thema.jpg). Mainly for a
+  // test environment that shares the YouTube link with production but
+  // whose own token has expired - without this it logs/emails "koppeling
+  // verlopen" every cycle. Only an explicit false disables it, so every
+  // existing settings.json (no key) keeps syncing.
+  thumbnailSyncEnabled?: boolean;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
   sshUser?: string;
@@ -358,6 +365,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   smtpFromName: "Ark Church Livestream Manager",
   smtpFromEmail: "",
   opsAlertEmail: "jeffrey.go@arkchurch.nl",
+  thumbnailSyncEnabled: true,
   ledPanelEnabled: false,
   ledPanelMac: "",
   sshUser: "jeffreygo",

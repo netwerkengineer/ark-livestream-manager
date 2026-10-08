@@ -127,6 +127,12 @@ async function syncThumbnailFromUrl(url: string) {
 }
 
 export async function checkAndSyncUpcomingStreamThumbnail() {
+  // Read per run (not once at startup) so ticking the box in Settings takes
+  // effect on the next cycle without restarting the app. Returns before any
+  // YouTube call, so a disabled environment also stops spending quota and
+  // stops producing "koppeling verlopen" log lines/e-mails.
+  if (getSettings().thumbnailSyncEnabled === false) return;
+
   try {
     console.log("[Thumbnail Sync] Checking for upcoming streams...");
     const ytRes = await youtubeFetch(

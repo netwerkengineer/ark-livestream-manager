@@ -412,6 +412,20 @@ export default function SettingsPanel({
                 <label className="input-label">Thumbnail Opslag Pad (NAS)</label>
                 <input className="input-field" value={settings.thumbnailSavePath} onChange={(e) => onSettingsChange({...settings, thumbnailSavePath: e.target.value})} placeholder="/volume1/Beamer/FreeShow/Media" />
                 <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>Dit is de map op de NAS waar OBS de thumbnails ophaalt.</p>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: '3px' }}
+                    checked={settings.thumbnailSyncEnabled !== false}
+                    onChange={(e) => onSettingsChange({ ...settings, thumbnailSyncEnabled: e.target.checked })}
+                  />
+                  <span style={{ fontSize: '0.85rem' }}>
+                    Thumbnail automatisch synchroniseren (elke 10 minuten)
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--muted)', marginTop: '2px' }}>
+                      Zoekt op YouTube de eerstvolgende uitzending en zet de thumbnail als thema.jpg. Zet dit uit op een omgeving die de YouTube-koppeling niet gebruikt (bv. de testomgeving): dan stopt ook de melding &quot;YouTube-koppeling is verlopen&quot; in het Activiteitenlog en de e-mail.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
