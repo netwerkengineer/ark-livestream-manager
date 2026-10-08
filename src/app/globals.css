@@ -479,6 +479,37 @@ textarea.input-field {
   min-width: 0;
 }
 
+/* Planner and Monitor tabs: two columns on desktop, one on tablet/phone.
+   They used to be inline grid-template-columns (1.5fr 1fr / 1fr 1fr) with
+   no breakpoint, so a 375px phone got two columns of ~390px + ~250px and
+   the whole page became ~690px wide (Safari then zooms out / pans).
+   min-width: 0 stops a grid item's content from forcing its column wider
+   than its track, same trick as .setlist-columns below. */
+.planner-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 32px;
+}
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.planner-grid > *,
+.monitor-grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .planner-grid,
+  .monitor-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+
 @media (max-width: 900px) {
   .content-grid {
     grid-template-columns: 1fr;

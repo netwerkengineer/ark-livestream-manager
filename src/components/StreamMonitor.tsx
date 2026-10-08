@@ -267,14 +267,19 @@ export default function StreamMonitor({ settings, scheduledStreams }: StreamMoni
 
         {!obsConnected && (
           <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#fbbf24' }}>
-            <WifiOff size={14} />
-            De server verbindt via <strong>ws://</strong> op de achtergrond. OBS hoeft geen TLS te hebben.
-            Controleer of OBS draait op <strong>{settings.obsHost}:{settings.obsPort}</strong>.
+            <WifiOff size={14} style={{ flexShrink: 0 }} />
+            {/* One flex item, not loose text nodes + <strong>s: in a flex row
+                each of those became its own column and could not wrap, which
+                pushed the page wider than a phone screen. */}
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+              De server verbindt via <strong>ws://</strong> op de achtergrond. OBS hoeft geen TLS te hebben.
+              Controleer of OBS draait op <strong>{settings.obsHost}:{settings.obsPort}</strong>.
+            </span>
           </div>
         )}
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      <div className="monitor-grid">
         {/* Live Stats Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <section className="glass-card">

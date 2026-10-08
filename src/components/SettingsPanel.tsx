@@ -2440,15 +2440,29 @@ export default function SettingsPanel({
             padding-top: 16px;
           }
 
+          /* One swipeable row instead of a wrapped list: with 11 sections
+             the wrapped version stacked one button per row and filled the
+             whole phone screen, pushing the actual settings out of view. */
           .settings-sidebar {
             width: 100%;
             flex-direction: row;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
             border-right: none;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-right: 0;
-            padding-bottom: 16px;
+            padding-bottom: 12px;
+            gap: 6px;
             max-height: none;
+            flex-shrink: 0;
+          }
+
+          .settings-sidebar button {
+            flex-shrink: 0;
+            white-space: nowrap;
+            padding: 10px 14px !important;
           }
 
           .settings-content {

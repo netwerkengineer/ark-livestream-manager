@@ -112,6 +112,21 @@ const MANUAL_CSS = `
   padding: 0.9rem 1.1rem; margin: 1rem 0; font-size: 0.88rem;
 }
 #manual-page .page-break { break-before: page; }
+/* Phone/tablet: the 240px sticky table of contents next to the text left
+   the text ~100px wide and pushed the page to ~860px. Stack them instead,
+   keep the contents list short and scrollable, and let wide tables/code
+   scroll sideways inside their own box instead of stretching the page. */
+@media (max-width: 900px) {
+  #manual-page .print-bar { padding: 0.6rem 1rem; gap: 0.75rem; }
+  #manual-page .manual-layout { display: block; padding: 1rem 0.75rem; }
+  #manual-page .manual-toc {
+    position: static; max-height: 220px; margin-bottom: 1rem;
+  }
+  #manual-page .manual-content { padding: 1.25rem 1rem; overflow-wrap: anywhere; }
+  #manual-page .doc-title { font-size: 1.5rem; }
+  #manual-page h2 { font-size: 1.2rem; margin-top: 1.75rem; }
+  #manual-page .manual-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 @media print {
   #manual-page .no-print { display: none !important; }
   #manual-page { background: white; }

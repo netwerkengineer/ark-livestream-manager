@@ -587,7 +587,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}
+              className="planner-grid"
             >
             {/* Left Column */}
             <motion.section 
