@@ -13,7 +13,7 @@ interface ArkEngine { available: boolean; call: (path: string, params?: Record<s
 declare global {
   interface Window {
     arkEngine?: ArkEngine;
-    arkDesktop?: { version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; getConnection: () => Promise<{ server: string; hasKey: boolean }>; setConnection: (server: string, key?: string) => Promise<unknown> };
+    arkDesktop?: { version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }> };
   }
 }
 

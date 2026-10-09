@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, SlidersHorizontal, Headphones, Settings } from "lucide-react";
+import { AlertTriangle, SlidersHorizontal, Headphones } from "lucide-react";
 import TracksControl from "@/components/TracksControl";
 import PracticePlayer from "@/components/practice/PracticePlayer";
-import DesktopSettings from "@/components/tracks/DesktopSettings";
 import { hasDesktopEngine, installDesktopAdapter, engineCall } from "@/lib/desktopEngine";
 
 // In the desktop app the Tracks screens talk to the engine in the app instead of to REAPER;
@@ -22,7 +21,7 @@ async function syncEngine(data: { freeShowHost?: string; freeShowPort?: number; 
   } catch { /* the screens show the engine error themselves */ }
 }
 
-type Tab = "tracks" | "oefenen" | "instellingen";
+type Tab = "tracks" | "oefenen";
 
 // Shell for the desktop app (a window that only shows this page): the full Tracks control and
 // the practice player of the web app, without the rest of the dashboard.
@@ -33,9 +32,6 @@ export default function DesktopPage() {
   const [settings, setSettings] = useState<any>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const [allowed, setAllowed] = useState<Tab[]>([]);
-  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const showStatus = (text: string) => { setToast({ type: "success", text }); setTimeout(() => setToast(null), 3000); };
-  const showError = (text: string) => { setToast({ type: "error", text }); setTimeout(() => setToast(null), 4000); };
 
   useEffect(() => {
     fetch("/api/settings", { cache: "no-store" })
@@ -47,7 +43,6 @@ export default function DesktopPage() {
         const tabs: Tab[] = [];
         if ((admin || perms.includes("tracks")) && data.reaperEnabled) tabs.push("tracks");
         if (admin || perms.includes("oefenen") || perms.includes("tracks")) tabs.push("oefenen");
-        if (hasDesktopEngine()) tabs.push("instellingen");
         setSettings(data);
         setAllowed(tabs);
         if (hasDesktopEngine()) syncEngine(data);
@@ -56,13 +51,6 @@ export default function DesktopPage() {
         setStatus("ok");
       })
       .catch(() => setStatus("login"));
-  }, []);
-
-  // the app's menu (Instellingen… / ⌘,) opens the settings tab
-  useEffect(() => {
-    const open = () => { setTab("instellingen"); try { localStorage.setItem("ark-desktop-tab", "instellingen"); } catch { /* no memory */ } };
-    window.addEventListener("ark-open-settings", open);
-    return () => window.removeEventListener("ark-open-settings", open);
   }, []);
 
   const choose = (t: Tab) => {
@@ -93,14 +81,8 @@ export default function DesktopPage() {
         {allowed.includes("oefenen") && (
           <button className={`trk-icon-btn${tab === "oefenen" ? " pinned" : ""}`} onClick={() => choose("oefenen")}><Headphones size={14} /> Oefenen</button>
         )}
-        {allowed.includes("instellingen") && (
-          <button className={`trk-icon-btn${tab === "instellingen" ? " pinned" : ""}`} onClick={() => choose("instellingen")}><Settings size={14} /> Instellingen</button>
-        )}
       </nav>
-      {tab === "tracks" ? <TracksControl settings={settings} />
-        : tab === "oefenen" ? <PracticePlayer />
-        : <DesktopSettings onStatus={showStatus} onError={showError} />}
-      {toast && <div className={`trk-toast ${toast.type}`}>{toast.text}</div>}
+      {tab === "tracks" ? <TracksControl settings={settings} /> : <PracticePlayer />}
     </div>
   );
 }
