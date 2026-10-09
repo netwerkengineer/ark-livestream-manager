@@ -78,6 +78,18 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
   const openPaths = new Set(state?.bridge?.tabs.map(t => t.path) || []);
   const playing = state?.playState === 1;
 
+  // Desktop app: the songs of the list are put in memory by themselves (no button): a transition during
+  // playing needs the next song to be ready. Only when the list changes and nothing is playing.
+  const autoLoaded = useRef("");
+  useEffect(() => {
+    if (!desktop || !data || playing) return;
+    const paths = data.setlist.map(s => s.path).filter((p): p is string => !!p);
+    const key = paths.join("|");
+    if (!paths.length || key === autoLoaded.current) return;
+    autoLoaded.current = key;
+    reaperAction({ action: "load", date: data.date || "own" }, "/api/reaper/setlist").catch(() => { autoLoaded.current = ""; });
+  }, [desktop, data, playing]);
+
   const pendingSong = state?.bridge?.pendingSong;
 
   // While playing: transition at the chosen jump moment (tap again to cancel);
@@ -142,9 +154,11 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
           </select>
         )}
         <button className="trk-icon-btn" onClick={() => load(date)} title="Vernieuwen"><RefreshCw size={14} /></button>
-        <button className="trk-load" onClick={loadIntoReaper} disabled={busy || !matched || playing} title="Alle gevonden songs openen als projecttabs in REAPER">
-          <Download size={14} /> {busy ? "Bezig…" : "Klaarzetten in REAPER"}
-        </button>
+        {!desktop && (
+          <button className="trk-load" onClick={loadIntoReaper} disabled={busy || !matched || playing} title="Alle gevonden songs openen als projecttabs in REAPER">
+            <Download size={14} /> {busy ? "Bezig…" : "Klaarzetten in REAPER"}
+          </button>
+        )}
       </div>
 
       {data?.own && (
