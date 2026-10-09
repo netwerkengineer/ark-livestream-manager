@@ -1018,7 +1018,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         for st in stem_files:
             if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
                 st["muted"] = True
-        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in clicks], cfg)
+        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in clicks], cfg, rpp_path)
         print(f"\n== {title}\n   Eigen click {'toegevoegd' if added else 'bijgewerkt (stond er al)'}\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True, "click": True}
     # Een bestaand project kan in REAPER aangepast en opgeslagen zijn (mix, mutes):
@@ -1032,7 +1032,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         for st in stem_files:
             if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
                 st["muted"] = True
-        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in click_entries(click_dir, orig_click)], cfg)
+        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in click_entries(click_dir, orig_click)], cfg, rpp_path)
         print(f"\n== {title}\n   Bestaat al, overgeslagen (gebruik --force om opnieuw te maken)\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True}
 
@@ -1047,7 +1047,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
     rpp, per_bus, markers = build_rpp(title, als, rel_dir, stem_files, cfg, samplerate, root)
     with open(rpp_path, "w", encoding="utf-8") as f:
         f.write(rpp)
-    write_player_file(root, title, als, rel_dir, stem_files, cfg)
+    write_player_file(root, title, als, rel_dir, stem_files, cfg, rpp_path)
 
     # Rapport
     print(f"\n== {title}")
@@ -1086,7 +1086,7 @@ def click_entries(click_dir, orig_click):
     return out
 
 
-def write_player_file(root, title, als, rel_dir, stem_files, cfg):
+def write_player_file(root, title, als, rel_dir, stem_files, cfg, rpp_path=None):
     """Schrijft ark-player.json naast het project: alles wat de eigen speler (ark-player) nodig heeft - stems met
     startpositie en standaard-mute, secties in seconden, tempo en maatsoort in kwartnoten. Het RPP blijft gewoon bestaan."""
     tm = TempoMap(als["tempo"])
@@ -1100,10 +1100,13 @@ def write_player_file(root, title, als, rel_dir, stem_files, cfg):
             "offset": round(float(st.get("position", 0.0)), 6),
             "mute": bool(muted),
         })
-    sections = [{"name": name, "sec": round(tm.beats_to_sec(b), 6)} for b, name in als["markers"] if name]
+    # id = het regionnummer in het RPP (1, 2, ... in volgorde van de benoemde markers): de cuetabel gebruikt die nummers
+    sections = [{"id": i, "name": name, "sec": round(tm.beats_to_sec(b), 6)}
+                for i, (b, name) in enumerate([m for m in als["markers"] if m[1]], 1)]
     data = {
-        "format": 1,
+        "format": 2,
         "title": title,
+        "rpp": os.path.basename(rpp_path) if rpp_path else None,
         "stems": stems,
         "sections": sections,
         "tempo_qn": [[round(b, 6), round(bpm, 6)] for b, bpm in als["tempo"]],

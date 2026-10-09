@@ -1,7 +1,7 @@
 # ark-player (prototype)
 
 Eigen multitrack-speler voor de tracks-computer, als mogelijke vervanger van REAPER (alleen macOS voor nu).
-Stand: **stap 2 van 5**. Draait naast REAPER; raakt REAPER, de bridge en de agent niet aan.
+Stand: **stap 3 van 5**. Draait naast REAPER; raakt REAPER, de bridge en de agent niet aan.
 
 ## Wat het nu kan (stap 2, 2 kanalen eerst)
 - Een song-map laden (`song.json` + stems) en alle stems in het geheugen zetten (ca. 1 GB per nummer). Eigen Click-stems
@@ -14,6 +14,16 @@ Stand: **stap 2 van 5**. Draait naast REAPER; raakt REAPER, de bridge en de agen
 - **Guide-aankondiging bij een sprong of loop:** de guide-stem in de laatste twee maten voor het sprongmoment wordt vervangen door de originele
   aankondiging van de doelsectie (zoals `prepareGuide` in de bridge); te laat voor de hele cue -> alleen dempen.
 - Lokale HTTP-API op 127.0.0.1 (poort 8099): `/state /load?path= /play /pause /stop /seek?t= /jump /loop /cancel /mode /output?mode= /mute /gain /master`.
+
+## Stap 3: setlist, overgangen en FreeShow-cues
+- **Bibliotheek en setlist:** `scan` leest `~/Tracks/Songs` (nummers met `ark-player.json`), `setlist?p=<pad>&p=<pad>` zet nummers in het geheugen (budget 6 GB), `load?path=` of `song?path=&mode=` kiest een nummer. Het pad is het RPP-pad (zoals de app het gebruikt) of de songmap.
+- **Overgang naar een ander nummer** (`song?path=&mode=end|bar|now`): het huidige nummer fadet kort uit op het gekozen muzikale moment en het nieuwe begint bij zijn Count Off (zoals de bridge). Aan het einde van een nummer wordt het volgende uit de setlist klaargezet (gestopt, bij het begin).
+- **FreeShow-cues:** de speler leest `<project>.RPP.cues` (dezelfde cuetabel als de bridge) en stuurt de dia's via REST (`index_select_slide`, bij een nummerwissel `id_select_show`) met voorlooptijd (`lead?beats=0-4`, standaard 2). De eerste dia van een sectie komt de voorlooptijd eerder, bij een geplande sprong of loop komt de eerste dia van de doelsectie op tijd, bij starten wordt de dia opnieuw gestuurd. `cues?path=&data=` schrijft een nieuwe cuetabel (zelfde formaat als de bridge-opdracht `cues`). `freeshow?host=&port=` stelt FreeShow in.
+- **Timing opnemen:** `record?action=start|save|cancel`, `tap[?pos=]`, `taps` (resultaat per sectie voor de app) en `notes` (de tijdlijn).
+- **Instellingen blijven bewaard** (`~/Library/Application Support/ArkPlayer/config.json`): uitgangsmodus, sprongmodus, voorlooptijd, FreeShow-adres.
+- **Audioapparaat:** wordt bij het starten op 48 kHz gezet (de stems zijn 48 kHz) en de engine start opnieuw als het apparaat of de samplerate verandert.
+- Tests (offline, virtuele klok): `ark-player cuetest <songmap met RPP>` en `ark-player transtest <songmapA> <songmapB>`.
+- **Niet gebouwd:** MIDI als terugval voor FreeShow (alleen REST), en handmatig verschoven blokken uit een bestaand REAPER-project worden niet overgenomen (timing komt uit de cuetabel en de opgenomen taps).
 
 ## Speelbestand `ark-player.json`
 `mt2reaper.py` schrijft sinds 9 okt 2026 naast het RPP een `ark-player.json` (voor MultiTracks-zips en eigen opnames, ook voor bestaande nummers als je de map opnieuw door mt2reaper haalt):
@@ -32,8 +42,8 @@ Zet het mastervolume bij een eerste luistertest laag (`--master-db -24`). Met `A
 
 ## Bekende verschillen en open punten
 - Mono-downmix: een stereo-stem naar een mono-uitgang wordt gemiddeld ((L+R)/2). REAPER's eigen mono-send kan anders klinken (niveau); vergelijk dit met een echte song voordat je overstapt.
-- Samplerate-omrekening (alles moet 48 kHz zijn), maatsoortwissels binnen een nummer en het verouderde `audioUnit`-onderdeel van macOS 27.
-- Setlist/overgangen en FreeShow-cues (stap 3), adapter in de app (stap 4), stevig maken (stap 5).
+- Samplerate-omrekening (het apparaat wordt op 48 kHz gezet; stems met een andere rate worden niet omgerekend) en het verouderde `audioUnit`-onderdeel van macOS 27.
+- Adapter in de app (stap 4, met beveiliging voor toegang vanaf het netwerk), stevig maken met launchd en herstel na een crash (stap 5).
 
 ## Gemeten (7 okt/9 okt 2026)
 - MacBook Pro (M-chip): 16 stems, 274 s, 999 MB; laden 0,2 s; mixen gemiddeld 40 us per blok van 512 samples (10,7 ms beschikbaar).

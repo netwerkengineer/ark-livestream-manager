@@ -60,3 +60,7 @@ next-env.d.ts
 /config/qlcplus/config/
 /temp_build/
 /temp_companion/
+
+# ark-player / desktop app build output
+/track-computer/ark-desktop/build/
+/track-computer/ark-player/ark-player

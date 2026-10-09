@@ -18,6 +18,7 @@
 --   cues \t pad \t tabel       FreeShow-cuetabel van een song opslaan (zie FreeShow-cues)
 --   output \t modus            uitgangen: auto | multi | 2ch | 3ch | stereo (zie uitgangen)
 --   lead \t tellen             FreeShow-dia's zoveel tellen eerder tonen (0-4)
+--   master \t volume \t mute  master volume (lineair 0-2) en master mute (0/1)
 --   freeshow \t host \t poort  FreeShow REST-API voor de cues (leeg = MIDI)
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
@@ -313,6 +314,11 @@ local OUTPUT_MODES = { auto = true, multi = true, ["2ch"] = true, ["3ch"] = true
 local outputMode = reaper.GetExtState(SECTION, "outputMode")
 if not OUTPUT_MODES[outputMode] then outputMode = "auto" end
 local routing = { proj = nil, applied = nil, outs = nil, checked = 0, force = false }
+-- Master volume (voor alle bussen samen) en master mute; blijft bewaard na een herstart. Bij hardware-uitgangen
+-- gaat het in de sends van de bussen, bij "stereo" op de masterstrook.
+local masterGain = tonumber(reaper.GetExtState(SECTION, "masterGain")) or 1
+local masterMuted = reaper.GetExtState(SECTION, "masterMuted") == "1"
+local function masterFactor() return masterMuted and 0 or masterGain end
 
 local function busTracks()
   local list, maxOut = {}, 0
@@ -350,7 +356,7 @@ local function applyRouting()
     if how == "3ch" then
       if b.monitor then dst = 0 else dst, flag = 1, 0 end
     end
-    local vol = (b.monitor and (how == "2ch" or how == "3ch")) and 0.7079 or 1 -- -3 dB
+    local vol = ((b.monitor and (how == "2ch" or how == "3ch")) and 0.7079 or 1) * (how == "stereo" and 1 or masterFactor()) -- -3 dB voor click+guide
     for s = 0, reaper.GetTrackNumSends(b.track, 1) - 1 do
       reaper.SetTrackSendInfo_Value(b.track, 1, s, "B_MUTE", how == "stereo" and 1 or 0)
       reaper.SetTrackSendInfo_Value(b.track, 1, s, "I_DSTCHAN", flag + dst)
@@ -358,6 +364,7 @@ local function applyRouting()
     end
   end
   reaper.SetMediaTrackInfo_Value(reaper.GetMasterTrack(0), "B_MUTE", how == "stereo" and 0 or 1)
+  reaper.SetMediaTrackInfo_Value(reaper.GetMasterTrack(0), "D_VOL", how == "stereo" and masterFactor() or 1)
   routing.proj, routing.outs, routing.applied, routing.force = proj, outs, how, false
 end
 
@@ -681,11 +688,14 @@ local function updateCues()
   if not playing and slide then st.cueWhenStopped = false end
 end
 
--- Regions uit een projectbestand lezen zonder het te openen
+-- Regions uit een projectbestand lezen zonder het te openen. Met de tempo-envelop van het
+-- project erbij (stapsgewijs, zoals mt2reaper hem schrijft) komt elke sectie ook in
+-- kwartnoten (startQn/finishQn): de app kan dan de timing van dia's in tellen tonen.
 local function readSections(path)
   local f = io.open(path, "r")
   if not f then error("Project niet gevonden: " .. path) end
   local byId, list = {}, {}
+  local firstBpm, pts, inTempo = nil, {}, false
   for line in f:lines() do
     local id, pos, q, name, flags = line:match("^%s*MARKER%s+(%d+)%s+([%-%d%.]+)%s+([\"'])(.-)%3%s+(%d+)")
     if id and (tonumber(flags) & 1) == 1 then
@@ -697,14 +707,45 @@ local function readSections(path)
         byId[id].finish = tonumber(pos)
       end
     end
+    -- tempo: "  TEMPO bpm n d" en de punten in <TEMPOENVEX ... > ("PT seconden bpm vorm ...")
+    local bpm0 = line:match("^%s*TEMPO%s+([%d%.]+)")
+    if bpm0 and not firstBpm then firstBpm = tonumber(bpm0) end
+    if line:match("^%s*<TEMPOENVEX") then inTempo = true
+    elseif inTempo and line:match("^  >%s*$") then inTempo = false
+    elseif inTempo then
+      local t, b = line:match("^%s*PT%s+([%-%d%.eE%+]+)%s+([%d%.eE%+]+)")
+      if t and tonumber(t) and tonumber(b) then pts[#pts + 1] = { t = tonumber(t), bpm = tonumber(b) } end
+    end
   end
   f:close()
   table.sort(list, function(a, b) return a.start < b.start end)
+  table.sort(pts, function(a, b) return a.t < b.t end)
+  local function qnAt(sec)
+    local qn, prevT, bpm = 0, 0, firstBpm or (pts[1] and pts[1].bpm) or 120
+    for _, p in ipairs(pts) do
+      if p.t >= sec then break end
+      if p.t > prevT then qn = qn + (p.t - prevT) * bpm / 60; prevT = p.t end
+      bpm = p.bpm
+    end
+    return qn + (sec - prevT) * bpm / 60
+  end
+  for _, s in ipairs(list) do
+    s.startQn = qnAt(s.start)
+    if s.finish then s.finishQn = qnAt(s.finish) end
+  end
   return list
 end
 
 ---------------------------------------------------------------- commands
 local handlers = {}
+
+-- Master volume (lineair, 0-2) en master mute (0/1)
+function handlers.master(vol, mute)
+  local v = tonumber(vol)
+  if v and v >= 0 and v <= 2 then masterGain = v; reaper.SetExtState(SECTION, "masterGain", tostring(v), true) end
+  if mute ~= nil and mute ~= "" then masterMuted = (mute == "1"); reaper.SetExtState(SECTION, "masterMuted", masterMuted and "1" or "0", true) end
+  routing.force = true
+end
 
 -- Uitgangsmodus (auto | multi | 2ch | 3ch | stereo), blijft bewaard na een herstart
 function handlers.output(mode)
@@ -1102,6 +1143,8 @@ local function writeState()
     guideCue = guide ~= nil,
     outputMode = outputMode,
     leadBeats = LEAD_QN,
+    master = masterGain,
+    masterMute = masterMuted,
     freeshow = (freeshow.host ~= "" and freeshow.port) and (freeshow.host .. ":" .. freeshow.port) or nil,
     hasCues = cues.regions ~= nil,
     recording = rec ~= nil,
