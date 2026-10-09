@@ -1,6 +1,6 @@
 # Ark Church Livestream Manager
 
-**v2.41.0** - Een all-in-one livestream management applicatie voor kerkdiensten, gebouwd met Next.js 16.
+**v2.42.0** - Een all-in-one livestream management applicatie voor kerkdiensten, gebouwd met Next.js 16.
 
 Deze applicatie centraliseert alle aspecten van livestream productie: van het genereren van presentaties en thumbnails tot het aansturen van lichtshows, LED-borden en OBS stream control. Speciaal ontwikkeld voor Ark Church om de gehele technische workflow van een livestream te stroomlijnen.
 
