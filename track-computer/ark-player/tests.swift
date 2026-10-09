@@ -232,3 +232,51 @@ func transtest(a: String, b: String) throws {
     sim.run(4)
     print("Einde van het nummer: gestopt \(!p.mixer.playing) | actief nu: \((p.activePath as NSString).lastPathComponent) | positie \(String(format: "%.2f", p.mixer.posSec)) s")
 }
+
+// ------------------------------------------------------------- padtest (offline): pad laden, afspelen per uitgangsmodus, crossfade en stop
+func padtest(wav: String) throws {
+    let dir = NSTemporaryDirectory() + "ark-padtest"
+    try? FileManager.default.removeItem(atPath: dir)
+    try FileManager.default.createDirectory(atPath: dir + "/Set/Laag", withIntermediateDirectories: true)
+    for k in ["C", "D"] { try FileManager.default.copyItem(atPath: wav, toPath: "\(dir)/Set/Laag/\(k).wav") }
+    let m = Mixer()
+    m.pads.root = dir; m.pads.scan()
+    print("sets: \(m.pads.sets)")
+    var fails = 0
+    func check(_ ok: Bool, _ what: String) { print(ok ? "ok   " : "FOUT ", what); if !ok { fails += 1 } }
+    let frames = 4800
+    func run(blocks: Int, nOut: Int) -> [Float] {   // piekniveau per uitgang
+        var peak = [Float](repeating: 0, count: nOut)
+        let bufs = (0..<nOut).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: frames) }
+        for _ in 0..<blocks {
+            m.render(frames: frames, out: bufs)
+            for c in 0..<nOut { for i in 0..<frames { peak[c] = max(peak[c], abs(bufs[c][i])) } }
+        }
+        bufs.forEach { $0.deallocate() }
+        return peak
+    }
+    for (mode, outCh, expect) in [("stereo", 2, [0, 1]), ("2ch", 2, [1]), ("3ch", 3, [1, 2]), ("multi", 8, [7])] {
+        m.outCh = outCh; m.requested = mode; m.applyRouting()
+        m.pads.play(set: "Set", layer: "Laag", key: "C", fade: 0.2, sr: 48000)
+        while m.pads.loading { Thread.sleep(forTimeInterval: 0.05) }
+        check(m.pads.error.isEmpty, "\(mode): laden zonder fout (\(m.pads.error))")
+        let peak = run(blocks: 12, nOut: outCh)
+        for c in 0..<outCh { check(expect.contains(c) ? peak[c] > 0.05 : peak[c] < 0.0001, "\(mode): uitgang \(c + 1) \(expect.contains(c) ? "speelt" : "stil") (piek \(peak[c]))") }
+        m.pads.stop(fade: 0.1, sr: 48000)
+        _ = run(blocks: 6, nOut: outCh)
+        check(run(blocks: 2, nOut: outCh).allSatisfy { $0 < 0.0001 }, "\(mode): na stop stil")
+    }
+    // crossfade: tijdens het wisselen horen we nooit twee volle pads (som blijft in de buurt van 1)
+    m.outCh = 2; m.requested = "stereo"; m.applyRouting()
+    m.pads.play(set: "Set", layer: "Laag", key: "C", fade: 0.1, sr: 48000)
+    while m.pads.loading { Thread.sleep(forTimeInterval: 0.05) }
+    _ = run(blocks: 6, nOut: 2)
+    m.pads.play(set: "Set", layer: "Laag", key: "D", fade: 0.5, sr: 48000)
+    while m.pads.loading { Thread.sleep(forTimeInterval: 0.05) }
+    _ = run(blocks: 8, nOut: 2)
+    check(m.pads.voices.count == 1 && m.pads.key == "D", "crossfade klaar: één pad over (\(m.pads.voices.count) stemmen, toon \(m.pads.key))")
+    m.pads.play(set: "Set", layer: "Laag", key: "X", fade: 1, sr: 48000)
+    check(!m.pads.error.isEmpty, "onbekende toon geeft een melding")
+    print(fails == 0 ? "PADTEST GESLAAGD" : "PADTEST: \(fails) fouten")
+    exit(fails == 0 ? 0 : 1)
+}

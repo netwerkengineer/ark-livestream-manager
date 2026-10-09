@@ -234,7 +234,7 @@ export default function TracksControl({ settings }: TracksControlProps) {
 
       <PadsPanel state={state} onError={showError} />
 
-      <TimingRecorder state={state} onError={showError} onStatus={showSuccess} />
+      {!offline && <TimingRecorder state={state} onError={showError} onStatus={showSuccess} />}
 
       {/* Busses */}
       <section className="glass-card">

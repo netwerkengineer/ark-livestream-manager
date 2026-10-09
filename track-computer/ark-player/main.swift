@@ -13,6 +13,9 @@ func flag(_ name: String) -> Bool { if let i = args.firstIndex(of: name) { args.
 switch cmd {
 case "devices":
     for d in allDevices() where d.outCh > 0 { print("\(d.name)  (\(d.outCh) uitgangen)") }
+case "padtest":
+    guard let wav = args.first else { print("gebruik: ark-player padtest <wav>"); exit(2) }
+    do { try padtest(wav: wav) } catch { print("FOUT: \(error)"); exit(1) }
 case "selftest":
     let mode = opt("--mode") ?? (flag("--multi") ? "multi" : "stereo")
     guard let folder = args.first else { print("gebruik: ark-player selftest <songmap> [start] [duur] [--mode stereo|2ch|3ch|multi]"); exit(2) }

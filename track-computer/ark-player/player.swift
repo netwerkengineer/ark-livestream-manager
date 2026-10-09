@@ -13,6 +13,7 @@ final class Config {
     var lastHost = "", lastPort = 5506     // het adres dat de server het laatst opgaf: zonder server blijft dat bruikbaar
     var device = ""              // audioapparaat (naam); leeg = standaardapparaat
     var songsRoot = ""           // map met de nummers; leeg = ~/Tracks/Songs
+    var padsRoot = ""            // map met de pads; leeg = ~/Tracks/Pads
     let path: String
     init() { path = ProcessInfo.processInfo.environment["ARK_PLAYER_CONFIG"] ?? (NSHomeDirectory() + "/Library/Application Support/ArkPlayer/config.json") }
     func load() {
@@ -26,9 +27,10 @@ final class Config {
         lastPort = (j["freeshow_last_port"] as? NSNumber)?.intValue ?? lastPort
         device = j["device"] as? String ?? device
         songsRoot = j["songs_root"] as? String ?? songsRoot
+        padsRoot = j["pads_root"] as? String ?? padsRoot
     }
     func save() {
-        let j: [String: Any] = ["output_mode": outputMode, "jump_mode": jumpMode, "lead_beats": leadBeats, "freeshow_host": fsHost, "freeshow_port": fsPort, "freeshow_last_host": lastHost, "freeshow_last_port": lastPort, "device": device, "songs_root": songsRoot]
+        let j: [String: Any] = ["output_mode": outputMode, "jump_mode": jumpMode, "lead_beats": leadBeats, "freeshow_host": fsHost, "freeshow_port": fsPort, "freeshow_last_host": lastHost, "freeshow_last_port": lastPort, "device": device, "songs_root": songsRoot, "pads_root": padsRoot]
         try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         if let d = try? JSONSerialization.data(withJSONObject: j, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: URL(fileURLWithPath: path), options: .atomic) }
     }
@@ -79,6 +81,7 @@ final class Player {
         fsRuntimeHost = cfg.lastHost; fsRuntimePort = cfg.lastPort
         mixer.requested = cfg.outputMode; mixer.jumpMode = cfg.jumpMode
         if !cfg.songsRoot.isEmpty { songsRoot = cfg.songsRoot }
+        mixer.pads.root = cfg.padsRoot; mixer.pads.scan()
         scanLibrary()
         let t = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "ark-player.cues"))
         t.schedule(deadline: .now() + 0.1, repeating: .milliseconds(40))
@@ -102,6 +105,7 @@ final class Player {
         lock.lock(); defer { lock.unlock() }
         cfg.fsHost = host; if let p = port { cfg.fsPort = p }; cfg.save(); sent = nil
     }
+    func setPadsRoot(_ path: String) { cfg.padsRoot = path; cfg.save(); mixer.pads.root = path; mixer.pads.scan() }
     func setSongsRoot(_ path: String) { lock.lock(); songsRoot = path.isEmpty ? NSHomeDirectory() + "/Tracks/Songs" : path; cfg.songsRoot = path; cfg.save(); lock.unlock(); scanLibrary() }
     func setDevice(_ name: String) { lock.lock(); cfg.device = name; cfg.save(); lock.unlock() }
     func setOutputMode(_ m: String) { lock.lock(); defer { lock.unlock() }; mixer.requested = m; mixer.applyRouting(); cfg.outputMode = m; cfg.save() }

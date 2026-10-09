@@ -281,6 +281,7 @@ final class Mixer {
     var masterMuted = false
     var masterNow: Float = 1
     var outCh = 2
+    let pads = PadPlayer()          // pads lopen los van het nummer
     var sr = 48000.0
     var requested = "stereo"       // gevraagde uitgangsmodus: auto | multi | 2ch | 3ch | stereo
     var applied = "stereo"         // wat er echt gebeurt (hangt af van het aantal uitgangen)
@@ -424,6 +425,7 @@ final class Mixer {
             else if event == 3 { playing = false; pos = total; for st in song.stems { st.peak *= 0.9 }; break }
             if seg == 0 && event == 0 { break }
         }
+        pads.mix(frames: frames, out: out, mode: applied)
         let us = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1000
         blocks += 1; sumMicros += us; maxMicros = max(maxMicros, us)
     }

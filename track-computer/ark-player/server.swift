@@ -33,6 +33,10 @@ final class Server {
                 "stems": s.stems.map { ["name": $0.name, "bus": $0.bus, "bus_name": $0.busName, "mute": $0.mute, "solo": $0.solo, "live": $0.live, "monitor": $0.monitor, "gain_db": db($0.gain), "gain": Double($0.gain), "meter_db": db($0.peak)] },
                 "busses": defaultBusses.map { b in ["bus": b.out, "name": b.name, "mute": m.groupMute[b.out], "solo": m.groupSolo[b.out], "gain": Double(m.groupGain[b.out])] },
                 "render": ["blocks": m.blocks, "avg_us": m.blocks > 0 ? m.sumMicros / Double(m.blocks) : 0, "max_us": m.maxMicros]]
+        let pd = m.pads
+        d["pads"] = ["playing": pd.playing, "loading": pd.loading, "set": pd.set, "layer": pd.layer, "key": pd.key, "volume": Double(pd.volume), "output": m.applied,
+                     "device": p.output?.deviceName ?? "", "sets": pd.sets, "lastCmd": pd.lastCmd] as [String: Any]
+        if !pd.error.isEmpty { d["pads_error"] = pd.error }
         if let c = cur { d["section"] = c }
         if m.pendSection >= 0 { d["pending"] = m.pendSection; d["pending_at"] = Double(m.pendAt) / m.sr }
         if m.loopSec >= 0 { d["loop"] = m.loopSec }
@@ -117,12 +121,26 @@ final class Server {
             return (200, jsonString(["title": o.title, "lead": p.cfg.leadBeats,
                                      "sections": o.sections.map { ["id": $0.id, "name": $0.name, "start": $0.start, "finish": $0.end,
                                                                    "startQn": o.tempo.qn(sec: $0.start), "finishQn": o.tempo.qn(sec: $0.end)] }]))
+        case "/pad":
+            let pd = mixer.pads
+            pd.lastCmd = qs["id"] ?? String(Int(Date().timeIntervalSince1970 * 1000))
+            switch qs["op"] ?? "" {
+            case "play":
+                guard let s = qs["set"], let l = qs["layer"], let k = qs["key"], !s.isEmpty, !l.isEmpty, !k.isEmpty else { return bad("set, laag en toon ontbreken") }
+                pd.play(set: s, layer: l, key: k, fade: Double(qs["fade"] ?? "") ?? 4, sr: mixer.sr)
+            case "stop": pd.stop(fade: Double(qs["fade"] ?? "") ?? 4, sr: mixer.sr)
+            case "volume": pd.volume = Float(max(0, min(1, Double(qs["volume"] ?? "") ?? Double(pd.volume))))
+            case "rescan": pd.scan()
+            default: return bad("Onbekende pad-actie")
+            }
+            return ok()
         case "/configure":
             // instellingen van de speler wijzigen (apparaat, uitgangen, nummermap, FreeShow); moet op de hoofdthread draaien
             var deviceChanged = false
             if let d = qs["device"] { if d != p.cfg.device { deviceChanged = true }; p.setDevice(d) }
             if let m = qs["output_mode"], ["auto", "multi", "3ch", "2ch", "stereo"].contains(m) { p.setOutputMode(m) }
             if let r = qs["songs_root"] { p.setSongsRoot(r) }
+            if let r = qs["pads_root"] { p.setPadsRoot(r) }
             if let h = qs["freeshow_host"] { p.setFreeShow(host: h, port: Int(qs["freeshow_port"] ?? "")) }
             if deviceChanged, let o = p.output {
                 do { try o.start(device: p.cfg.device.isEmpty ? nil : p.cfg.device) } catch { return bad("Audio starten mislukt: \(error.localizedDescription)") }
@@ -131,7 +149,7 @@ final class Server {
         case "/devices":
             return (200, jsonString(["devices": allDevices().filter { $0.outCh > 0 }.map { ["name": $0.name, "outputs": $0.outCh] }, "current": p.output?.deviceName ?? ""]))
         case "/settings":
-            return (200, jsonString(["device": p.cfg.device, "songs_root": p.songsRoot, "freeshow_host": p.cfg.fsHost, "freeshow_port": p.cfg.fsPort,
+            return (200, jsonString(["device": p.cfg.device, "songs_root": p.songsRoot, "pads_root": p.cfg.padsRoot, "freeshow_host": p.cfg.fsHost, "freeshow_port": p.cfg.fsPort,
                                      "output_mode": p.cfg.outputMode, "lead_beats": p.cfg.leadBeats]))
         case "/library":
             p.lock.lock(); defer { p.lock.unlock() }

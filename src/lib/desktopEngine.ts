@@ -37,6 +37,7 @@ interface EngineState {
   busses: { bus: number; name: string; mute: boolean; solo: boolean; gain: number }[];
   section?: number; pending?: number; loop?: number; next_song?: string; pending_song?: string;
   recording?: boolean; rec_slide?: number; rec_slides?: number;
+  pads?: ReaperState["pads"]; pads_error?: string;
 }
 interface LibSong { name: string; path: string; loaded: boolean }
 
@@ -99,7 +100,7 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     regions: es.sections.map(s => ({ id: s.region, name: s.name, start: s.start, end: s.end })),
     busses,
     bridge,
-    pads: null,   // the pad player runs on the track computer for now
+    pads: es.pads ? { ...es.pads, error: es.pads_error || undefined } : null,
   };
 }
 
@@ -215,7 +216,13 @@ async function reaperAction(body: Record<string, any>): Promise<Response> {
         await engineCall("/cues", { path: taps.path, data: data.cues });
         return json({ success: true, sections: data.sections });
       }
-      case "pad": return json({ error: "De pads draaien op de track-computer en zijn niet beschikbaar in de desktop-app" }, 400);
+      case "pad": {
+        // value: { op: "play" | "stop" | "volume", set, layer, key, fade, volume }; the engine plays the pads itself, apart from the songs
+        const v = (body.value || {}) as Record<string, unknown>;
+        const r = await engineCall("/pad", { op: v.op, set: v.set, layer: v.layer, key: v.key, fade: v.fade, volume: v.volume });
+        if (r.error) return json(r, 400);
+        break;
+      }
       default: return json({ error: "Onbekende actie" }, 400);
     }
     void final;
@@ -284,6 +291,22 @@ export function ownMove(i: number, d: -1 | 1) {
   saveOwn(l);
 }
 
+// Links made by hand between a title of the service list and a song on this computer. They stay on this computer:
+// the server's links are for the track computer's songs and would not fit here.
+const LINKS_KEY = "ark-song-links";
+function ownLinks(): Record<string, string | null> { try { return JSON.parse(store.get(LINKS_KEY) || "{}"); } catch { return {}; } }
+function saveOwnLink(title: string, path: string | null) { const l = ownLinks(); l[norm(title)] = path; store.set(LINKS_KEY, JSON.stringify(l)); }
+function withOwnLinks<T extends { title: string; path: string | null; manual?: boolean }>(list: T[], lib: LibSong[]): T[] {
+  const links = ownLinks();
+  return list.map(i => {
+    const k = norm(i.title);
+    if (!(k in links)) return i;
+    const p = links[k];
+    if (p === null) return { ...i, path: null, manual: true };                      // "no track" chosen on purpose
+    return lib.some(l => l.path === p) ? { ...i, path: p, manual: true } : i;
+  });
+}
+
 // ------------------------------------------------------------- the stand-in for /api/reaper/setlist
 
 // Marks the songs of a list that are being fetched from the server right now, and starts fetching the missing ones
@@ -324,18 +347,23 @@ async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, u
     const res = await post({ action: "match", date: url.searchParams.get("date"), songs, loaded: es.setlist });
     if (!res.ok) return res;
     const data = await res.json();
-    data.setlist = await withFetching(data.setlist || []);
+    data.setlist = await withFetching(withOwnLinks(data.setlist || [], lib));
     return json(data);
   }
   if (body.action === "load") {
     const r = await post({ action: "match", date: body.date, songs, loaded: [] });
     const data = await r.json();
-    const paths: string[] = (data.setlist || []).map((s: { path: string | null }) => s.path).filter((p: string | null): p is string => !!p);
+    const paths: string[] = withOwnLinks(data.setlist || [], lib).map((s: { path: string | null }) => s.path).filter((p: string | null): p is string => !!p);
     if (!paths.length) return json({ error: "Geen songs uit deze setlist gevonden in de map met nummers op deze computer" }, 400);
     await engineCall("/setlist", { p: paths });
     return json({ success: true, loaded: paths.length });
   }
-  if (body.action === "link") return json({ error: "Handmatig koppelen kan in de desktop-app nog niet" }, 400);
+  if (body.action === "link") {
+    if (typeof body.title !== "string" || !body.title.trim()) return json({ error: "Titel ontbreekt" }, 400);
+    if (body.path !== null && !lib.some(l => l.path === body.path)) return json({ error: "Onbekende song" }, 400);
+    saveOwnLink(body.title, body.path);
+    return json({ success: true });
+  }
   return json({ error: "Onbekende actie" }, 400);
 }
 

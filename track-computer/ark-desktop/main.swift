@@ -415,27 +415,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 final class SettingsWindow: NSObject, NSWindowDelegate {
     let w: NSWindow
     unowned let app: AppDelegate
-    let server = NSTextField(), key = NSSecureTextField(), songs = NSTextField(), fsHost = NSTextField(), fsPort = NSTextField()
+    let server = NSTextField(), key = NSSecureTextField(), songs = NSTextField(), pads = NSTextField(), fsHost = NSTextField(), fsPort = NSTextField()
     let device = NSPopUpButton(), mode = NSPopUpButton()
     let offline = NSButton(checkboxWithTitle: "Zonder server werken", target: nil, action: nil)
     var firstRun = false
 
     init(app: AppDelegate) {
         self.app = app
-        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 400), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 440), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         super.init()
         w.title = "Instellingen"
         w.delegate = self
         let v = NSView(frame: w.contentRect(forFrameRect: w.frame))
         func label(_ s: String, _ y: CGFloat) { let l = NSTextField(labelWithString: s); l.frame = NSRect(x: 20, y: y, width: 150, height: 22); l.alignment = .right; v.addSubview(l) }
         func place(_ c: NSView, _ y: CGFloat, _ width: CGFloat = 340) { c.frame = NSRect(x: 180, y: y, width: width, height: 24); v.addSubview(c) }
-        label("Server van de webapp", 350); place(server, 348); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
-        label("Sleutel van de beheerder", 310); place(key, 308); key.placeholderString = "uit de webapp: Instellingen > Tracks (leeg als er geen is)"
-        label("Audioapparaat", 270); place(device, 268)
-        label("Uitgangen", 230); place(mode, 228, 260)
+        label("Server van de webapp", 390); place(server, 388); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
+        label("Sleutel van de beheerder", 350); place(key, 348); key.placeholderString = "uit de webapp: Instellingen > Tracks (leeg als er geen is)"
+        label("Audioapparaat", 310); place(device, 308)
+        label("Uitgangen", 270); place(mode, 268, 260)
         mode.addItems(withTitles: ["Automatisch", "8 kanalen (X32)", "3 kanalen (click+guide, tracks stereo)", "2 kanalen (click+guide, tracks)", "Stereo (test)"])
-        label("Map met nummers", 190); place(songs, 188, 250); songs.placeholderString = "standaard ~/Tracks/Songs"
-        let choose = NSButton(title: "Kies…", target: self, action: #selector(pickFolder)); choose.frame = NSRect(x: 436, y: 186, width: 84, height: 28); v.addSubview(choose)
+        label("Map met nummers", 230); place(songs, 228, 250); songs.placeholderString = "standaard ~/Tracks/Songs"
+        let choose = NSButton(title: "Kies…", target: self, action: #selector(pickFolder)); choose.frame = NSRect(x: 436, y: 226, width: 84, height: 28); v.addSubview(choose)
+        label("Map met pads", 190); place(pads, 188, 250); pads.placeholderString = "standaard ~/Tracks/Pads"
+        let choosePads = NSButton(title: "Kies…", target: self, action: #selector(pickPads)); choosePads.frame = NSRect(x: 436, y: 186, width: 84, height: 28); v.addSubview(choosePads)
         label("FreeShow (cues)", 150); place(fsHost, 148, 250); fsHost.placeholderString = "adres, leeg = zoals ingesteld in de webapp"
         fsPort.frame = NSRect(x: 436, y: 148, width: 84, height: 24); fsPort.placeholderString = "poort"; v.addSubview(fsPort)
         let hint = NSTextField(wrappingLabelWithString: "Er staat geen adres vast in de app. Het FreeShow-adres kun je hier opgeven (op deze Mac of een andere computer, poort 5506 voor de REST-listener van FreeShow); laat je het leeg, dan gebruikt de app het adres uit de instellingen van de webapp.")
@@ -455,6 +457,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         offline.state = ShellSettings.offline ? .on : .off
         key.stringValue = ShellSettings.key
         songs.stringValue = p.cfg.songsRoot
+        pads.stringValue = p.cfg.padsRoot
         fsHost.stringValue = p.cfg.fsHost
         fsPort.stringValue = p.cfg.fsHost.isEmpty ? "" : String(p.cfg.fsPort)
         device.removeAllItems(); device.addItem(withTitle: "Standaard van het systeem")
@@ -467,6 +470,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     @objc func pickFolder() {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         if panel.runModal() == .OK, let u = panel.url { songs.stringValue = u.path }
+    }
+    @objc func pickPads() {
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        if panel.runModal() == .OK, let u = panel.url { pads.stringValue = u.path }
     }
     @objc func cancelAction() { w.orderOut(nil) }
     func windowWillClose(_ n: Notification) {}
@@ -489,6 +496,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         p.cfg.fsHost = fsHost.stringValue.trimmingCharacters(in: .whitespaces)
         p.cfg.fsPort = Int(fsPort.stringValue) ?? 5506
         p.setSongsRoot(songs.stringValue.trimmingCharacters(in: .whitespaces))
+        p.setPadsRoot(pads.stringValue.trimmingCharacters(in: .whitespaces))
         w.orderOut(nil)
         app.settingsChanged(serverChanged: serverChanged)
     }

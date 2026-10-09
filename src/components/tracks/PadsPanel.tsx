@@ -24,7 +24,7 @@ function padKeyFor(songKey?: string): string | null {
   return KEYS.includes(key) ? key : null;
 }
 
-// Ambient pads per key, played by the pad player on the track computer
+// Ambient pads per key, played by the pad player (on the track computer, or in the desktop app itself)
 // (keeps sounding through song changes); switching keys crossfades.
 export default function PadsPanel({ state, onError, stage }: PadsPanelProps) {
   const pads = state?.pads;
@@ -70,6 +70,15 @@ export default function PadsPanel({ state, onError, stage }: PadsPanelProps) {
       <section className={`glass-card trk-pads${stage ? " stage" : ""}`}>
         <h3 className="trk-title"><Waves size={18} style={{ color: "#a855f7" }} /> Pads</h3>
         <p className="trk-empty" style={{ marginTop: 8 }}>De padspeler draait niet op de track-computer (ArkPads).</p>
+      </section>
+    );
+  }
+
+  if (setNames.length === 0) {
+    return (
+      <section className={`glass-card trk-pads${stage ? " stage" : ""}`}>
+        <h3 className="trk-title"><Waves size={18} style={{ color: "#a855f7" }} /> Pads</h3>
+        <p className="trk-empty" style={{ marginTop: 8 }}>Geen pads gevonden. Zet de map met pads (set/laag/toonsoort.wav) in de instellingen van de app (⌘,).</p>
       </section>
     );
   }

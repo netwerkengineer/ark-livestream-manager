@@ -203,12 +203,14 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
               </button>
               {!stage && (
                 <div className="trk-row-tools">
+                {!(desktop && isOffline()) && (<>
                 <button className="trk-icon-btn" onClick={() => setEditing(s)} disabled={!s.path} title="Tekst koppelen aan de secties van de track (FreeShow)">
                   <FileText size={14} /> Tekst
                 </button>
                 <button className="trk-icon-btn" onClick={() => setTiming(s)} disabled={!s.path} title="Timing van de FreeShow-dia's per sectie met de hand bijstellen">
                   <Timer size={14} /> Timing
                 </button>
+                </>)}
                 {data.own ? (
                   <>
                     <button className="trk-icon-btn" onClick={() => ownEdit(() => ownMove(i, -1))} disabled={i === 0} aria-label="Omhoog"><ChevronUp size={14} /></button>
