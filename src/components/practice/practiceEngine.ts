@@ -101,6 +101,10 @@ export class PracticeEngine {
   loop: PracticeSection | null = null;
   pending: { at: number; to: number; section: PracticeSection } | null = null;
   error: string | null = null;
+  // The audio clock doesn't run at real-time speed (e.g. a Bluetooth headset in call mode): not an app problem, say so
+  warning: string | null = null;
+  private clock: { ctx: number; perf: number } | null = null;
+  private clockBad = 0;
   onChange: () => void = () => {};
 
   private stems: StemMix[];
@@ -268,8 +272,31 @@ export class PracticeEngine {
     this.pieces.push(piece);
   }
 
+  // Compare the audio clock with the real clock while playing. A slow clock means the output device
+  // isn't running at the speed it says: the music sounds too low and slow, and stutters.
+  private checkClock() {
+    if (!this.clock) return;
+    const dp = (performance.now() - this.clock.perf) / 1000;
+    if (dp < 4) return;
+    const dc = this.ctx.currentTime - this.clock.ctx;
+    this.clock = { ctx: this.ctx.currentTime, perf: performance.now() };
+    const ratio = dc / dp;
+    if (ratio < 0.97 || ratio > 1.03) {
+      if (++this.clockBad >= 2 && !this.warning) {
+        this.warning = `Het geluid speelt niet op de juiste snelheid (nu ongeveer ${Math.round(ratio * 100)}%) en klinkt daardoor te laag of haperend. ` +
+          "Dit ligt niet aan de app maar aan je audio-apparaat: vaak is een Bluetooth-koptelefoon overgeschakeld naar gespreksmodus omdat iets " +
+          "(Teams, een videogesprek) de microfoon gebruikt. Kies de microfoon van je apparaat als invoer, sluit zo'n gesprek, of gebruik de speaker of een bedrade koptelefoon.";
+        this.onChange();
+      }
+    } else {
+      this.clockBad = 0;
+      if (this.warning) { this.warning = null; this.onChange(); }
+    }
+  }
+
   private tick = () => {
     if (!this.playing || !this.cursor) return;
+    this.checkClock();
     const now = this.ctx.currentTime;
     const xf = this.m.crossfade;
     this.pieces = this.pieces.filter(p => p.ctx + p.dur + xf + 0.1 > now);
@@ -414,6 +441,8 @@ export class PracticeEngine {
     if (!this.playing) return; // paused while loading
     this.buffering = false;
     this.cursor = { ctx: this.ctx.currentTime + START_DELAY, song: from };
+    this.clock = { ctx: this.ctx.currentTime, perf: performance.now() };
+    this.clockBad = 0;
     this.startTimer();
     this.tick();
     this.onChange();
@@ -426,6 +455,7 @@ export class PracticeEngine {
     this.cutAt(t + 0.01);
     this.playing = false;
     this.cursor = null;
+    this.clock = null;
     this.pending = null;
     this.stopTimer();
     this.onChange();

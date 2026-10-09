@@ -398,6 +398,7 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
 
           {songError && <p className="trk-warn"><AlertTriangle size={14} /> {songError}</p>}
           {engine?.error && <p className="trk-warn"><AlertTriangle size={14} /> {engine.error}</p>}
+          {engine?.warning && <p className="trk-warn"><AlertTriangle size={14} /> {engine.warning}</p>}
 
           {manifest && (
             <div className="prc-bar" onClick={seekBar} title="Tik om daarheen te gaan">
