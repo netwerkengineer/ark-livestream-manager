@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { AlertTriangle, SlidersHorizontal, Headphones } from "lucide-react";
 import TracksControl from "@/components/TracksControl";
 import PracticePlayer from "@/components/practice/PracticePlayer";
-import { hasDesktopEngine, installDesktopAdapter, engineCall } from "@/lib/desktopEngine";
+import { hasDesktopEngine, installDesktopAdapter, engineCall, isOffline } from "@/lib/desktopEngine";
 
 // In the desktop app the Tracks screens talk to the engine in the app instead of to REAPER;
 // this has to be in place before the screens start.
@@ -32,6 +32,7 @@ export default function DesktopPage() {
   const [settings, setSettings] = useState<any>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const [allowed, setAllowed] = useState<Tab[]>([]);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings", { cache: "no-store" })
@@ -42,10 +43,11 @@ export default function DesktopPage() {
         const admin = data.userRole === "admin";
         const tabs: Tab[] = [];
         if ((admin || perms.includes("tracks")) && data.reaperEnabled) tabs.push("tracks");
-        if (admin || perms.includes("oefenen") || perms.includes("tracks")) tabs.push("oefenen");
+        if (!isOffline() && (admin || perms.includes("oefenen") || perms.includes("tracks"))) tabs.push("oefenen");   // practice stems come from the server
         setSettings(data);
+        setOffline(isOffline());
         setAllowed(tabs);
-        if (hasDesktopEngine()) syncEngine(data);
+        if (hasDesktopEngine() && !isOffline()) syncEngine(data);
         const saved = (() => { try { return localStorage.getItem("ark-desktop-tab"); } catch { return null; } })();
         setTab(tabs.includes(saved as Tab) ? (saved as Tab) : tabs[0] ?? null);
         setStatus("ok");
@@ -78,6 +80,7 @@ export default function DesktopPage() {
         {allowed.includes("tracks") && (
           <button className={`trk-icon-btn${tab === "tracks" ? " pinned" : ""}`} onClick={() => choose("tracks")}><SlidersHorizontal size={14} /> Tracks</button>
         )}
+        {offline && <span className="trk-meta" style={{ alignSelf: "center", marginLeft: "auto" }} title="Alleen spelen: setlist, mixer en cues werken lokaal. Bewerken en ophalen kan weer met de server.">Zonder server</span>}
         {allowed.includes("oefenen") && (
           <button className={`trk-icon-btn${tab === "oefenen" ? " pinned" : ""}`} onClick={() => choose("oefenen")}><Headphones size={14} /> Oefenen</button>
         )}

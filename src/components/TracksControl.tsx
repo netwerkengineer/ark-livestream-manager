@@ -20,6 +20,8 @@ import SectionsPanel from "@/components/tracks/SectionsPanel";
 import TrackLibraryPanel from "@/components/tracks/TrackLibraryPanel";
 import TimingRecorder from "@/components/tracks/TimingRecorder";
 import PadsPanel from "@/components/tracks/PadsPanel";
+import LocalSongsPanel from "@/components/tracks/LocalSongsPanel";
+import { hasDesktopEngine, isOffline } from "@/lib/desktopEngine";
 import Fader from "@/components/tracks/Fader";
 import { volumeToFader, faderToVolume, formatDb, meterPercent } from "@/components/tracks/faderLaw";
 
@@ -47,7 +49,10 @@ export default function TracksControl({ settings }: TracksControlProps) {
   const isEnabled = !!settings?.reaperEnabled;
   const { state, setState, error } = useReaperState(isEnabled);
   const [openBus, setOpenBus] = useState<number | null>(null);
-  const [view, setView] = useState<"live" | "library">("live");
+  const [view, setView] = useState<"live" | "library" | "local">("live");
+  const [desktop, setDesktop] = useState(false);
+  const [offline, setOffline] = useState(false);
+  useEffect(() => { setDesktop(hasDesktopEngine()); setOffline(isOffline()); }, []);
   const [localFaders, setLocalFaders] = useState<{ [track: number]: number }>({});
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -190,15 +195,22 @@ export default function TracksControl({ settings }: TracksControlProps) {
         <button role="tab" aria-selected={view === "live"} className={`trk-view${view === "live" ? " on" : ""}`} onClick={() => setView("live")}>
           <Radio size={15} /> Live
         </button>
-        <button role="tab" aria-selected={view === "library"} className={`trk-view${view === "library" ? " on" : ""}`} onClick={() => setView("library")}>
+        {!offline && <button role="tab" aria-selected={view === "library"} className={`trk-view${view === "library" ? " on" : ""}`} onClick={() => setView("library")}>
           <Library size={15} /> Bibliotheek
-        </button>
-        <Link href="/tracks" className="trk-stage-link">
+        </button>}
+        {desktop && !offline && (
+          <button role="tab" aria-selected={view === "local"} className={`trk-view${view === "local" ? " on" : ""}`} onClick={() => setView("local")}>
+            <Library size={15} /> Op deze computer
+          </button>
+        )}
+        {!offline && <Link href="/tracks" className="trk-stage-link">
           <MonitorSmartphone size={16} /> Podiumweergave (telefoon/tablet)
-        </Link>
+        </Link>}
       </div>
 
-      {view === "library" ? (
+      {view === "local" ? (
+        <LocalSongsPanel onError={showError} onStatus={showSuccess} />
+      ) : view === "library" ? (
         <TrackLibraryPanel onError={showError} onStatus={showSuccess} />
       ) : (<>
       {error && (

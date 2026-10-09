@@ -10,6 +10,7 @@ final class Config {
     var outputMode = "stereo", jumpMode = "end"
     var leadBeats = 2.0
     var fsHost = "", fsPort = 5506
+    var lastHost = "", lastPort = 5506     // het adres dat de server het laatst opgaf: zonder server blijft dat bruikbaar
     var device = ""              // audioapparaat (naam); leeg = standaardapparaat
     var songsRoot = ""           // map met de nummers; leeg = ~/Tracks/Songs
     let path: String
@@ -21,11 +22,13 @@ final class Config {
         leadBeats = (j["lead_beats"] as? NSNumber)?.doubleValue ?? leadBeats
         fsHost = j["freeshow_host"] as? String ?? fsHost
         fsPort = (j["freeshow_port"] as? NSNumber)?.intValue ?? fsPort
+        lastHost = j["freeshow_last_host"] as? String ?? lastHost
+        lastPort = (j["freeshow_last_port"] as? NSNumber)?.intValue ?? lastPort
         device = j["device"] as? String ?? device
         songsRoot = j["songs_root"] as? String ?? songsRoot
     }
     func save() {
-        let j: [String: Any] = ["output_mode": outputMode, "jump_mode": jumpMode, "lead_beats": leadBeats, "freeshow_host": fsHost, "freeshow_port": fsPort, "device": device, "songs_root": songsRoot]
+        let j: [String: Any] = ["output_mode": outputMode, "jump_mode": jumpMode, "lead_beats": leadBeats, "freeshow_host": fsHost, "freeshow_port": fsPort, "freeshow_last_host": lastHost, "freeshow_last_port": lastPort, "device": device, "songs_root": songsRoot]
         try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         if let d = try? JSONSerialization.data(withJSONObject: j, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: URL(fileURLWithPath: path), options: .atomic) }
     }
@@ -73,6 +76,7 @@ final class Player {
     // ------------------------------------------------------------- instellingen
     func start() {
         cfg.load()
+        fsRuntimeHost = cfg.lastHost; fsRuntimePort = cfg.lastPort
         mixer.requested = cfg.outputMode; mixer.jumpMode = cfg.jumpMode
         if !cfg.songsRoot.isEmpty { songsRoot = cfg.songsRoot }
         scanLibrary()
@@ -89,7 +93,11 @@ final class Player {
     }
     var fsHost: String { cfg.fsHost.isEmpty ? fsRuntimeHost : cfg.fsHost }
     var fsPort: Int { cfg.fsHost.isEmpty ? fsRuntimePort : cfg.fsPort }
-    func setFreeShowRuntime(host: String, port: Int?) { lock.lock(); fsRuntimeHost = host; if let p = port { fsRuntimePort = p }; sent = nil; lock.unlock() }
+    func setFreeShowRuntime(host: String, port: Int?) {
+        lock.lock(); defer { lock.unlock() }
+        fsRuntimeHost = host; if let p = port { fsRuntimePort = p }; sent = nil
+        if !host.isEmpty, host != cfg.lastHost || fsRuntimePort != cfg.lastPort { cfg.lastHost = host; cfg.lastPort = fsRuntimePort; cfg.save() }
+    }
     func setFreeShow(host: String, port: Int?) {
         lock.lock(); defer { lock.unlock() }
         cfg.fsHost = host; if let p = port { cfg.fsPort = p }; cfg.save(); sent = nil

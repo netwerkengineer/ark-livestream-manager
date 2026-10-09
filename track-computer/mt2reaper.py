@@ -1120,6 +1120,66 @@ def write_player_file(root, title, als, rel_dir, stem_files, cfg, rpp_path=None)
     return path
 
 
+# ------------------------------- Beschrijving voor de desktop-app -------------
+def describe_zip(zip_path, cfg, title=None, rpp=None):
+    """Leest een MultiTracks-zip of eigen opname (alleen de .als of song.json, geen audio uitpakken) en geeft
+    het speelbestand voor ark-player terug (zelfde inhoud als write_player_file), met paden binnen de zip. De desktop-app
+    pakt de zip uit, zet dit als ark-player.json in de map "root" en maakt de eigen click zelf (zie "clicks")."""
+    import posixpath
+    with zipfile.ZipFile(zip_path) as z:
+        names = [n for n in z.namelist()
+                 if not n.endswith("/") and "__MACOSX" not in n and not posixpath.basename(n).startswith("._")]
+        meta = next((n for n in names if posixpath.basename(n).lower() == "song.json"), None) \
+            or next((n for n in names if n.lower().endswith(".als")), None)
+        if not meta:
+            raise SystemExit("Geen .als-bestand of song.json in de zip")
+        tmp = tempfile.mkdtemp()
+        try:
+            local = os.path.join(tmp, posixpath.basename(meta))
+            with z.open(meta) as src, open(local, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            song = read_song(local)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    root = posixpath.dirname(meta)
+    tm = TempoMap(song["tempo"])
+    by_base = {}
+    for n in names:
+        by_base.setdefault(posixpath.basename(n), n)
+    click_bus = pick_bus("click", cfg)
+    stems, missing, orig_click = [], [], False
+    for t in song["tracks"]:
+        if not t.get("file"):
+            continue
+        wav = os.path.splitext(t["file"])[0] + ".wav"
+        found = by_base.get(t["file"]) or by_base.get(wav)
+        if not found:
+            missing.append(t["file"])
+            continue
+        is_click = t["name"].lower().startswith("click") and pick_bus(t["name"], cfg) == click_bus
+        orig_click = orig_click or is_click
+        muted = True if (is_click and cfg.get("click", {}).get("enabled", True)) else is_live(t["name"], cfg)
+        stems.append({
+            "file": posixpath.relpath(found, root) if root else found,
+            "name": t["name"],
+            "offset": round(tm.beats_to_sec(t["start_beats"]), 6),
+            "mute": bool(muted),
+        })
+    markers = [m for m in song["markers"] if m[1]]
+    return {
+        "format": 2,
+        "title": title or song.get("title") or (posixpath.basename(root) if root else os.path.splitext(os.path.basename(zip_path))[0]),
+        "rpp": rpp,
+        "root": root,
+        "orig_click": orig_click,
+        "stems": stems,
+        "missing": missing,
+        "sections": [{"id": i, "name": name, "sec": round(tm.beats_to_sec(b), 6)} for i, (b, name) in enumerate(markers, 1)],
+        "tempo_qn": [[round(b, 6), round(bpm, 6)] for b, bpm in song["tempo"]],
+        "timesig": [[round(b, 6), n, d] for b, (n, d) in song["timesig"]],
+    }
+
+
 def safe(s):
     return re.sub(r'[\\/:*?"<>|]+', "_", s).strip() or "song"
 
@@ -1174,6 +1234,9 @@ def main():
     ap.add_argument("--add-click", action="store_true", help="alleen de eigen click (1/4, 1/8, 1/16) toevoegen aan een bestaand project")
     ap.add_argument("--check", action="store_true", help="alleen controleren (song.json of map): tempo, secties en stems tonen")
     ap.add_argument("--report-json", help="schrijf een JSON-rapport van de verwerkte nummers naar dit bestand")
+    ap.add_argument("--describe", action="store_true", help="alleen de beschrijving voor de desktop-app (JSON op stdout) van een zip lezen")
+    ap.add_argument("--title", help="bij --describe: titel van het nummer")
+    ap.add_argument("--rpp", help="bij --describe: naam van het project (voor de cuetabel)")
     a = ap.parse_args()
 
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))
@@ -1181,6 +1244,9 @@ def main():
         with open(a.config, encoding="utf-8") as f:
             cfg.update(json.load(f))
 
+    if a.describe:
+        print(json.dumps(describe_zip(a.source, cfg, a.title, a.rpp), ensure_ascii=False))
+        return
     if a.check:
         check_song(a.source, cfg)
         return

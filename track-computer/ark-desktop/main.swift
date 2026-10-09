@@ -39,10 +39,30 @@ struct ShellSettings {
         get { Keychain.get("desktop-key") }
         set { Keychain.set("desktop-key", newValue) }
     }
+    /// zonder server werken: de app toont de bewaarde kopie van het scherm en doet alles lokaal
+    static var offline: Bool {
+        get { UserDefaults.standard.bool(forKey: "offline") }
+        set { UserDefaults.standard.set(newValue, forKey: "offline") }
+    }
     static var server: String {
         get { UserDefaults.standard.string(forKey: "server") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "server") }
     }
+}
+
+/// Bewaart de eigen instellingen van de pagina (de sleutels "ark-…": eigen setlist e.d.) buiten de webview, zodat ze hetzelfde zijn
+/// met en zonder server (de webview geeft elk adres zijn eigen localStorage).
+enum LocalStore {
+    static var url: URL {
+        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArkTracks", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d.appendingPathComponent("page-settings.json")
+    }
+    static var values: [String: String] = {
+        guard let d = try? Data(contentsOf: url), let j = try? JSONSerialization.jsonObject(with: d) as? [String: String] else { return [:] }
+        return j
+    }()
+    static func save() { if let d = try? JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: url, options: .atomic) } }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply {
@@ -55,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var output: Output!
     var player: Player!
     var engine: Server!
+    var fetcher: SongFetcher!
 
     var audioTest = CommandLine.arguments.contains("--audio-test")
 
@@ -63,17 +84,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         player = Player(mixer: mixer, output: output)
         player.start()
         engine = Server(player: player)
+        fetcher = SongFetcher(app: self)
         do { try output.start(device: player.cfg.device.isEmpty ? nil : player.cfg.device) } catch { log("Audio starten mislukt: \(error.localizedDescription)") }
 
         let cfg = WKWebViewConfiguration()
         cfg.websiteDataStore = .default()                       // inloggen blijft bewaard
         cfg.mediaTypesRequiringUserActionForPlayback = []
         cfg.applicationNameForUserAgent = "Version/17.0 Safari/605.1.15 ArkTracksDesktop"
+        cfg.setURLSchemeHandler(OfflineScheme(), forURLScheme: OfflineMirror.scheme)
         cfg.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "engine")
         cfg.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "shellcall")
         cfg.userContentController.add(WeakHandler(self), name: "shell")
-        cfg.userContentController.addUserScript(WKUserScript(source: injectedScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: .zero, configuration: cfg)
+        installScript()
         web.navigationDelegate = self
         web.uiDelegate = self
         web.allowsBackForwardNavigationGestures = true
@@ -87,20 +110,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         if audioTest { runAudioTest(); return }
-        if ShellSettings.server.isEmpty { showSettings(firstRun: true) } else { load() }
+        if ShellSettings.server.isEmpty && !ShellSettings.offline { showSettings(firstRun: true) } else { load() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
 
+    /// Het script wordt opnieuw geplaatst als de bewaarde instellingen veranderen, zodat elke pagina de actuele waarden krijgt
+    func installScript() {
+        let ucc = web.configuration.userContentController
+        ucc.removeAllUserScripts()
+        ucc.addUserScript(WKUserScript(source: injectedScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    }
+
     // ---- de speler voor de webpagina
     var injectedScript: String { """
     window.arkDesktop = {
-      version: "0.3",
+      version: "0.4",
+      offline: location.protocol === "\(OfflineMirror.scheme):",
       server: \(jsString(ShellSettings.server)),
       openSettings: () => window.webkit.messageHandlers.shell.postMessage({ action: "settings" }),
       openExternal: (url) => window.webkit.messageHandlers.shell.postMessage({ action: "openExternal", url }),
       chooseFolder: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "chooseFolder" })),
+      // nummers van de server op deze computer zetten ({ id, folder, title, rpp }), de stand opvragen en een nummer weghalen (Prullenbak)
+      fetchSong: (song) => window.webkit.messageHandlers.shell.postMessage({ action: "fetchSong", song }),
+      fetchStatus: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "fetchStatus" })),
+      removeSong: async (folder) => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "removeSong", folder })),
     };
+    // eigen instellingen van de pagina ("ark-…") staan in de app, niet in de webview
+    (() => { try {
+      const kv = \(jsObject(LocalStore.values));
+      const post = (m) => window.webkit.messageHandlers.shell.postMessage(m);
+      const set = Storage.prototype.setItem, remove = Storage.prototype.removeItem;
+      if (kv.__init) {
+        for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith("ark-") && !(k in kv)) remove.call(localStorage, k); }
+        for (const k in kv) if (k.startsWith("ark-")) set.call(localStorage, k, kv[k]);
+      } else {
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith("ark-")) post({ action: "kvSet", key: k, value: localStorage.getItem(k) }); }
+        post({ action: "kvSet", key: "__init", value: "1" });
+      }
+      Storage.prototype.setItem = function (k, v) { set.call(this, k, v); if (this === localStorage && String(k).startsWith("ark-")) post({ action: "kvSet", key: String(k), value: String(v) }); };
+      Storage.prototype.removeItem = function (k) { remove.call(this, k); if (this === localStorage && String(k).startsWith("ark-")) post({ action: "kvRemove", key: String(k) }); };
+    } catch (e) {} })();
     window.arkEngine = {
       available: true,
       // path: bijvoorbeeld "/state" of "/jump"; params: { id: 3, mode: "bar" } (een lijst geeft herhaalde sleutels); geeft het JSON-antwoord terug
@@ -111,6 +161,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     };
     """ }
 
+    func jsObject(_ d: [String: String]) -> String {
+        (try? String(data: JSONSerialization.data(withJSONObject: d), encoding: .utf8)) ?? "{}"
+    }
     func jsString(_ s: String) -> String {
         (try? String(data: JSONSerialization.data(withJSONObject: [s]), encoding: .utf8)).flatMap { String($0.dropFirst().dropLast()) } ?? "\"\""
     }
@@ -121,6 +174,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.prompt = "Kies"
                 let ok = panel.runModal() == .OK
                 replyHandler(jsonString(["path": ok ? (panel.url?.path ?? "") : ""]), nil)
+            } else if let b = m.body as? [String: Any], b["action"] as? String == "fetchStatus" {
+                replyHandler(jsonString(["jobs": fetcher.status()]), nil)
+            } else if let b = m.body as? [String: Any], b["action"] as? String == "removeSong", let f = b["folder"] as? String {
+                DispatchQueue.global().async { [self] in let ok = fetcher.remove(folder: f); replyHandler(jsonString(["ok": ok]), nil) }
             } else { replyHandler(nil, "onbekend") }
             return
         }
@@ -142,15 +199,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
             guard let b = m.body as? [String: Any] else { return }
             if b["action"] as? String == "settings" { d?.showSettings(firstRun: false) }
+            if b["action"] as? String == "kvSet", let k = b["key"] as? String, let v = b["value"] as? String { d?.kvChanged { LocalStore.values[k] = v } }
+            if b["action"] as? String == "kvRemove", let k = b["key"] as? String { d?.kvChanged { LocalStore.values.removeValue(forKey: k) } }
+            if b["action"] as? String == "fetchSong", let song = b["song"] as? [String: Any] { d?.fetcher.start(song) }
             if b["action"] as? String == "openExternal", let u = (b["url"] as? String).flatMap(URL.init(string:)), u.scheme == "https" || u.scheme == "http" { NSWorkspace.shared.open(u) }
         }
     }
 
+    func kvChanged(_ change: () -> Void) {
+        change(); LocalStore.save(); installScript()
+    }
+
     // ---- laden
     func load() {
+        if ShellSettings.offline { loadOffline(); return }
         let base = ShellSettings.server.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         guard let url = URL(string: base + "/desktop") else { showSettings(firstRun: true); return }
         installKeyCookie(for: url) { [self] in web.load(URLRequest(url: url)) }
+    }
+
+    func loadOffline() {
+        if OfflineMirror.available { web.load(URLRequest(url: OfflineMirror.url)); return }
+        let html = "<body style='font-family:-apple-system;background:#0b1222;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'><div><h2>Nog geen kopie voor gebruik zonder server</h2><p>Verbind één keer met de server (Instellingen… > haal het vinkje bij \"Zonder server werken\" weg). De app bewaart dan zelf een kopie.</p></div></body>"
+        web.loadHTMLString(html, baseURL: nil)
+    }
+
+    /// Na een geslaagde start met server: de kopie voor gebruik zonder server bijwerken
+    var mirrored = false
+    func refreshMirror(force: Bool = false) {
+        guard !ShellSettings.offline, force || !mirrored, !ShellSettings.server.isEmpty else { return }
+        mirrored = true
+        OfflineMirror.sync(server: ShellSettings.server, key: ShellSettings.key) { err in
+            log(err == nil ? "Kopie voor gebruik zonder server is bijgewerkt" : "Kopie voor gebruik zonder server niet bijgewerkt: \(err!)")
+            if force { let a = NSAlert(); a.messageText = err == nil ? "De kopie voor gebruik zonder server is bijgewerkt." : "Bijwerken mislukt: \(err!)"; a.runModal() }
+        }
+    }
+
+    func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
+        if let u = w.url, u.scheme?.hasPrefix("http") == true, u.path.hasPrefix("/desktop") { refreshMirror() }
     }
 
     /// De sleutel gaat als cookie mee naar de server (alleen deze app zet hem): zonder dat bestaat /desktop daar niet
@@ -181,6 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     /// Instellingen toegepast: speler en venster bijwerken
     func settingsChanged(serverChanged: Bool) {
+        buildMenu()
         player.cfg.save()
         do { try output.start(device: player.cfg.device.isEmpty ? nil : player.cfg.device) } catch { log("Audio starten mislukt: \(error.localizedDescription)") }
         if serverChanged || web.url == nil { load() }
@@ -215,6 +302,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         view.addItem(item("Ververs", #selector(reload), "r", target: self))
         view.addItem(item("Terug", #selector(goBack), "[", target: self))
         view.addItem(item("Open in browser", #selector(openInBrowser), "", target: self))
+        let off = item("Zonder server werken", #selector(toggleOffline), "", target: self); off.state = ShellSettings.offline ? .on : .off
+        view.addItem(off)
+        view.addItem(item("Kopie voor gebruik zonder server bijwerken", #selector(updateMirror), "", target: self))
         view.addItem(.separator())
         view.addItem(item("Groter", #selector(zoomIn), "+", target: self))
         view.addItem(item("Kleiner", #selector(zoomOut), "-", target: self))
@@ -230,7 +320,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     @objc func openSettings() { showSettings(firstRun: false) }
-    @objc func reload() { web.reload() }
+    @objc func reload() {
+        if web.url?.scheme == OfflineMirror.scheme && !ShellSettings.offline { load() } else { web.reload() }    // zonder server door omstandigheden: opnieuw proberen te verbinden
+    }
+    @objc func toggleOffline() {
+        ShellSettings.offline.toggle()
+        buildMenu()
+        load()
+    }
+    @objc func updateMirror() { refreshMirror(force: true) }
     @objc func goBack() { if web.canGoBack { web.goBack() } }
     @objc func openInBrowser() { if let u = web.url { NSWorkspace.shared.open(u) } }
     @objc func zoomIn() { web.pageZoom = min(2.5, web.pageZoom + 0.1) }
@@ -266,9 +364,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func showError(_ e: Error) {
         // -999 = een navigatie werd vervangen door een volgende (een redirect, ook naar het inloggen): geen fout
         if (e as NSError).code == NSURLErrorCancelled { return }
+        // de server is er niet: met een bewaarde kopie kan de app gewoon doorwerken
+        if OfflineMirror.available, web.url?.scheme != OfflineMirror.scheme, [NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost,
+            NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorDNSLookupFailed].contains((e as NSError).code) {
+            web.load(URLRequest(url: OfflineMirror.url)); return
+        }
         let html = "<body style='font-family:-apple-system;background:#0b1222;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'><div><h2>Kan de server niet bereiken</h2><p>\(e.localizedDescription)</p><p>Adres: \(ShellSettings.server)<br>Pas het aan bij Ark Tracks > Instellingen… (⌘,) of ververs met ⌘R.</p></div></body>"
         web.loadHTMLString(html, baseURL: nil)
     }
+    // JavaScript dialogs (confirm/alert) show nothing in a WKWebView unless the app does it
+    func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame f: WKFrameInfo, completionHandler ch: @escaping (Bool) -> Void) {
+        let al = NSAlert(); al.messageText = message
+        al.addButton(withTitle: "OK"); al.addButton(withTitle: "Annuleer")
+        ch(al.runModal() == .alertFirstButtonReturn)
+    }
+    func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame f: WKFrameInfo, completionHandler ch: @escaping () -> Void) {
+        let al = NSAlert(); al.messageText = message; al.runModal(); ch()
+    }
+
     func webView(_ w: WKWebView, runOpenPanelWith p: WKOpenPanelParameters, initiatedByFrame f: WKFrameInfo, completionHandler ch: @escaping ([URL]?) -> Void) {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = p.allowsMultipleSelection
         ch(panel.runModal() == .OK ? panel.urls : nil)
@@ -304,6 +417,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     unowned let app: AppDelegate
     let server = NSTextField(), key = NSSecureTextField(), songs = NSTextField(), fsHost = NSTextField(), fsPort = NSTextField()
     let device = NSPopUpButton(), mode = NSPopUpButton()
+    let offline = NSButton(checkboxWithTitle: "Zonder server werken", target: nil, action: nil)
     var firstRun = false
 
     init(app: AppDelegate) {
@@ -328,6 +442,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         hint.frame = NSRect(x: 20, y: 60, width: 520, height: 70); hint.textColor = .secondaryLabelColor; v.addSubview(hint)
         let save = NSButton(title: "Bewaar", target: self, action: #selector(saveAction)); save.keyEquivalent = "\r"; save.frame = NSRect(x: 440, y: 16, width: 100, height: 32); v.addSubview(save)
         let cancel = NSButton(title: "Annuleer", target: self, action: #selector(cancelAction)); cancel.frame = NSRect(x: 330, y: 16, width: 100, height: 32); v.addSubview(cancel)
+        offline.frame = NSRect(x: 20, y: 22, width: 280, height: 22); v.addSubview(offline)
         w.contentView = v
     }
 
@@ -337,6 +452,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         self.firstRun = firstRun
         let p = app.player!
         server.stringValue = ShellSettings.server
+        offline.state = ShellSettings.offline ? .on : .off
         key.stringValue = ShellSettings.key
         songs.stringValue = p.cfg.songsRoot
         fsHost.stringValue = p.cfg.fsHost
@@ -357,10 +473,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     @objc func saveAction() {
         var s = server.stringValue.trimmingCharacters(in: .whitespaces)
-        if s.isEmpty { NSSound.beep(); return }
-        if !s.hasPrefix("http") { s = "https://" + s }
+        let wantOffline = offline.state == .on
+        if s.isEmpty && !wantOffline { NSSound.beep(); return }
+        if !s.isEmpty && !s.hasPrefix("http") { s = "https://" + s }
         let newKey = key.stringValue.trimmingCharacters(in: .whitespaces)
-        let serverChanged = s != ShellSettings.server || newKey != ShellSettings.key
+        let serverChanged = s != ShellSettings.server || newKey != ShellSettings.key || wantOffline != ShellSettings.offline
+        ShellSettings.offline = wantOffline
         ShellSettings.server = s
         ShellSettings.key = newKey
         let p = app.player!

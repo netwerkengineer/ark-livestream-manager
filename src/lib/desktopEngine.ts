@@ -9,16 +9,20 @@ import type { ReaperState, ReaperTrack, ReaperBus, BridgeState } from "./reaperC
 import { parseSongName } from "../components/tracks/songName";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+export interface FetchJob { id: string; title: string; state: "wachtrij" | "ophalen" | "uitpakken" | "click" | "klaar" | "fout"; progress: number; message: string }
+export interface ServerSong { id: string; title: string; key: string | null; bpm: number | null; size: number; own: boolean; rpp: string; folder: string; updatedAt: string }
 interface ArkEngine { available: boolean; call: (path: string, params?: Record<string, unknown>) => Promise<any> }
 declare global {
   interface Window {
     arkEngine?: ArkEngine;
-    arkDesktop?: { version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }> };
+    arkDesktop?: { offline?: boolean; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }> };
   }
 }
 
 export const hasDesktopEngine = () => typeof window !== "undefined" && !!window.arkEngine?.available;
 /** Where "back" goes: the desktop app has no dashboard, only its own page */
+/** The app runs from its own copy of the page, without a connection to the server */
+export const isOffline = () => typeof window !== "undefined" && !!window.arkDesktop?.offline;
 export const homeHref = () => (hasDesktopEngine() ? "/desktop" : "/");
 export const engineCall = (path: string, params?: Record<string, unknown>) => window.arkEngine!.call(path, params);
 
@@ -221,6 +225,43 @@ async function reaperAction(body: Record<string, any>): Promise<Response> {
   }
 }
 
+// ------------------------------------------------------------- songs from the server
+
+const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/\((feat|ft|with)[^)]*\)/g, " ").replace(/&/g, " and ").replace(/['’`]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+export const sameSong = (a: string, b: string) => { const x = norm(a), y = norm(b); return !!x && (x === y || y.startsWith(x + " ") || x.startsWith(y + " ")); };
+
+export async function serverSongs(): Promise<ServerSong[]> {
+  const res = await fetch("/api/tracks/desktop", { cache: "no-store" });
+  const json = await res.json();
+  if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
+  return json.songs;
+}
+export const fetchJobs = async (): Promise<FetchJob[]> => (await window.arkDesktop!.fetchStatus()).jobs;
+export const startFetch = (s: ServerSong) => window.arkDesktop!.fetchSong({ id: s.id, folder: s.folder, title: s.title, rpp: s.rpp });
+export const removeLocalSong = (folder: string) => window.arkDesktop!.removeSong(folder);
+const BUSY = ["wachtrij", "ophalen", "uitpakken", "click"];
+export const isFetching = (j: FetchJob) => BUSY.includes(j.state);
+
+const AUTO_KEY = "ark-auto-fetch";
+export const autoFetchEnabled = () => (store.get(AUTO_KEY) ?? "1") === "1";
+export const setAutoFetch = (v: boolean) => store.set(AUTO_KEY, v ? "1" : "0");
+
+/** Songs on the setlist that are not on this computer yet: fetch them from the server (when automatic fetching is on) */
+export async function autoFetchMissing(items: { title: string; path: string | null }[]) {
+  if (!hasDesktopEngine() || isOffline() || !autoFetchEnabled()) return;
+  const missing = items.filter(i => !i.path);
+  if (!missing.length) return;
+  try {
+    const [songs, jobs] = await Promise.all([serverSongs(), fetchJobs()]);
+    for (const m of missing) {
+      const song = songs.find(x => sameSong(m.title, x.title));
+      if (!song || jobs.some(j => j.id === song.id)) continue;      // not on the server, or already fetched/being fetched (a failed one is retried by hand)
+      startFetch(song);
+    }
+  } catch { /* the list on the screen shows what is missing */ }
+}
+
 // ------------------------------------------------------------- own setlist (no service in the web app needed)
 
 const OWN_KEY = "ark-own-setlist";
@@ -230,7 +271,7 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* no memory in a private window */ } },
 };
 
-export const getSetlistSource = (): "service" | "own" => (store.get(SOURCE_KEY) === "own" ? "own" : "service");
+export const getSetlistSource = (): "service" | "own" => (isOffline() || store.get(SOURCE_KEY) === "own" ? "own" : "service");
 export const setSetlistSource = (v: "service" | "own") => store.set(SOURCE_KEY, v);
 export function ownPaths(): string[] { try { return JSON.parse(store.get(OWN_KEY) || "[]"); } catch { return []; } }
 const saveOwn = (list: string[]) => store.set(OWN_KEY, JSON.stringify(list));
@@ -244,6 +285,14 @@ export function ownMove(i: number, d: -1 | 1) {
 }
 
 // ------------------------------------------------------------- the stand-in for /api/reaper/setlist
+
+// Marks the songs of a list that are being fetched from the server right now, and starts fetching the missing ones
+async function withFetching<T extends { title: string; path: string | null }>(list: T[]): Promise<(T & { fetching?: boolean })[]> {
+  let jobs: FetchJob[] = [];
+  try { jobs = await fetchJobs(); } catch { /* no fetcher */ }
+  autoFetchMissing(list);
+  return list.map(i => (i.path ? i : { ...i, fetching: jobs.some(j => isFetching(j) && sameSong(i.title, j.title)) }));
+}
 
 async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, url: URL): Promise<Response> {
   const method = (init?.method || "GET").toUpperCase();
@@ -261,7 +310,7 @@ async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, u
         const song = lib.find(l => l.path === p);
         return { id: p, title: song ? parseSongName(song.name).title : p.split("/").pop() || p, artist: "", section: "", path: song ? p : null, manual: true, local: null };
       });
-      return json({ today: "", dates: [], date: "own", setlist: list, songs, loaded: es.setlist, bridgeError: null, own: true });
+      return json({ today: "", dates: [], date: "own", setlist: await withFetching(list), songs, loaded: es.setlist, bridgeError: null, own: true });
     }
     if (body.action === "load") {
       const have = paths.filter(p => lib.some(l => l.path === p));
@@ -272,7 +321,11 @@ async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, u
   }
 
   if (method === "GET") {
-    return post({ action: "match", date: url.searchParams.get("date"), songs, loaded: es.setlist });
+    const res = await post({ action: "match", date: url.searchParams.get("date"), songs, loaded: es.setlist });
+    if (!res.ok) return res;
+    const data = await res.json();
+    data.setlist = await withFetching(data.setlist || []);
+    return json(data);
   }
   if (body.action === "load") {
     const r = await post({ action: "match", date: body.date, songs, loaded: [] });
@@ -313,6 +366,9 @@ async function withSections(realFetch: typeof fetch, url: URL, init: RequestInit
   return res;
 }
 
+// Without the server there are no settings to ask for: the local engine does it all (FreeShow address: the one it kept)
+const OFFLINE_SETTINGS = { userRole: "admin", userPermissions: ["tracks"], reaperEnabled: true, offline: true };
+
 // ------------------------------------------------------------- install
 
 let installed = false;
@@ -333,6 +389,10 @@ export function installDesktopAdapter() {
     const url = new URL(raw, window.location.origin);
     const method = (init?.method || "GET").toUpperCase();
     try {
+      if (isOffline() && url.pathname.startsWith("/api/") && url.pathname !== "/api/reaper" && url.pathname !== "/api/reaper/setlist") {
+        if (url.pathname === "/api/settings") return json(OFFLINE_SETTINGS);
+        return json({ error: "Dit kan alleen met een verbinding met de server" }, 503);
+      }
       if (url.pathname === "/api/reaper" && method === "POST") return await reaperAction(JSON.parse(String(init?.body || "{}")));
       if (url.pathname === "/api/reaper/setlist") return await setlist(realFetch, init, url);
       if (url.pathname === "/api/reaper/arrangement" || url.pathname === "/api/reaper/arrangement/timing") return await withSections(realFetch, url, init);

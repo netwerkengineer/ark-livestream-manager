@@ -7,7 +7,7 @@ import { reaperAction } from "./useReaper";
 import { parseSongName } from "./songName";
 import ArrangementEditor from "./ArrangementEditor";
 import TimingEditor from "./TimingEditor";
-import { hasDesktopEngine, getSetlistSource, setSetlistSource, ownAdd, ownRemove, ownMove, ownPaths } from "@/lib/desktopEngine";
+import { hasDesktopEngine, isOffline, getSetlistSource, setSetlistSource, ownAdd, ownRemove, ownMove, ownPaths } from "@/lib/desktopEngine";
 
 interface SetlistSong {
   id: string;
@@ -17,6 +17,7 @@ interface SetlistSong {
   path: string | null;
   manual: boolean;
   local: "full" | "slim" | null;
+  fetching?: boolean;   // desktop app: being fetched from the server
 }
 
 interface SetlistData {
@@ -140,7 +141,7 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     <section className={`glass-card trk-setlist${stage ? " stage" : ""}`}>
       <div className="trk-setlist-head">
         <h3 className="trk-title"><ListOrdered size={18} style={{ color: "var(--primary)" }} /> Setlist</h3>
-        {desktop && (
+        {desktop && !isOffline() && (
           <span className="trk-src">
             <button className={`trk-icon-btn${source === "service" ? " pinned" : ""}`} onClick={() => chooseSource("service")}>Dienst</button>
             <button className={`trk-icon-btn${source === "own" ? " pinned" : ""}`} onClick={() => chooseSource("own")}>Eigen setlist</button>
@@ -191,7 +192,8 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
                   <small>
                     {s.artist}
                     {info?.key && <> · {info.key} · {info.bpm} BPM</>}
-                    {!s.path && <> · geen track gevonden</>}
+                    {!s.path && !s.fetching && <> · geen track gevonden</>}
+                    {!s.path && s.fetching && <> · <span style={{ color: "#fbbf24" }}>wordt opgehaald van de server…</span></>}
                     {s.path && s.local === "slim" && <> · <span style={{ color: "#fbbf24" }}>audio wordt opgehaald…</span></>}
                   </small>
                 </span>
