@@ -56,7 +56,7 @@ final class SongFetcher {
     }
 
     // ---- een nummer ophalen
-    private func update(_ id: String, _ f: (inout FetchJob) -> Void) { lock.lock(); if var j = jobs[id] { f(&j); jobs[id] = j }; lock.unlock() }
+    func update(_ id: String, _ f: (inout FetchJob) -> Void) { lock.lock(); if var j = jobs[id] { f(&j); jobs[id] = j }; lock.unlock() }
 
     private func run(_ id: String) {
         lock.lock(); let current = jobs[id]; lock.unlock()
@@ -112,7 +112,7 @@ final class SongFetcher {
         }
     }
 
-    private func fail(_ m: String) -> NSError { NSError(domain: "ark", code: 1, userInfo: [NSLocalizedDescriptionKey: m]) }
+    func fail(_ m: String) -> NSError { NSError(domain: "ark", code: 1, userInfo: [NSLocalizedDescriptionKey: m]) }
 
     // ---- netwerk (met de inlog van het venster)
     private func cookieHeader(for url: URL) -> String {
@@ -176,7 +176,7 @@ final class SongFetcher {
     }
 
     // ---- eigen click (MultiTracks-geluid) in 1/4, 1/8 en 1/16
-    private func makeClicks(dir: String, desc: [String: Any]) throws -> [[String: Any]] {
+    func makeClicks(dir: String, desc: [String: Any]) throws -> [[String: Any]] {
         let tempo = (desc["tempo_qn"] as? [[Any]] ?? []).compactMap { r -> (qn: Double, bpm: Double)? in
             guard r.count == 2, let q = (r[0] as? NSNumber)?.doubleValue, let b = (r[1] as? NSNumber)?.doubleValue else { return nil }; return (q, b) }
         let sigs = (desc["timesig"] as? [[Any]] ?? []).compactMap { r -> (qn: Double, num: Double, den: Double)? in

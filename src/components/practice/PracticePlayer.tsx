@@ -3,10 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Play, Pause, Square, Repeat, Headphones, ListMusic, SlidersHorizontal, Search,
-  ChevronDown, ChevronUp, Loader2, AlertTriangle, RotateCcw, Music, CalendarDays, Minus, Plus, Gauge,
+  ChevronDown, ChevronUp, Loader2, AlertTriangle, RotateCcw, Music, CalendarDays, Minus, Plus, Gauge, Volume2, VolumeX,
 } from "lucide-react";
 import Fader from "../tracks/Fader";
-import { faderToVolume, volumeToFader, formatDb, meterPercent, UNITY } from "../tracks/faderLaw";
+import { faderToVolume, volumeToFader, dbToFader, formatDb, meterPercent, UNITY } from "../tracks/faderLaw";
 import { parseSongName, sectionColor } from "../tracks/songName";
 import { formatTime } from "../tracks/useReaper";
 import {
@@ -26,6 +26,8 @@ const MODES: { id: JumpMode; label: string; hint: string }[] = [
 
 const MIX_KEY = (id: string) => `practice-mix:${id}`;
 const TEMPO_KEY = (id: string) => `practice-tempo:${id}`;
+const MASTER_KEY = "ark-practice-master";     // one master for all songs: it is the volume of this listening place
+const MASTER_MAX = dbToFader(6);
 
 function readStorage(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -147,6 +149,7 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
       // Tempo of this song from last time
       const savedRate = Number(readStorage(TEMPO_KEY(id)));
       if (savedRate && engine.canTempo) engine.setRate(savedRate);
+      try { const mm = JSON.parse(readStorage(MASTER_KEY) || "null"); if (mm) engine.setMaster({ volume: Number(mm.volume) || 0, mute: !!mm.mute }); } catch { /* default: 0 dB */ }
     } catch (err) {
       setSongError(err instanceof UnauthorizedError ? "Je bent niet (meer) ingelogd." : err instanceof Error ? err.message : String(err));
     } finally {
@@ -237,6 +240,13 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
     );
     writeStorage(MIX_KEY(songId), null);
     setMixState({ ...en.mix });
+  };
+
+  const changeMaster = (patch: { volume?: number; mute?: boolean }) => {
+    const en = engineRef.current;
+    if (!en) return;
+    en.setMaster(patch);
+    writeStorage(MASTER_KEY, JSON.stringify({ volume: en.masterVolume, mute: en.masterMute }));
   };
 
   const changeRate = (rate: number) => {
@@ -388,6 +398,22 @@ export default function PracticePlayer({ stage }: { stage?: boolean }) {
                 </button>
                 <button className="prc-tempo-btn" onClick={() => changeRate((engine?.rate || 1) + 0.05)} disabled={!engine?.canTempo || (engine?.rate || 1) >= MAX_RATE} aria-label="Sneller"><Plus size={14} /></button>
               </div>
+            </div>
+            <div className={`trk-master prc-master${engine?.masterMute ? " muted" : ""}`} title="Master: alle sporen samen (dubbelklik op de schuif = 0 dB)">
+              <span className="trk-label">Master</span>
+              <button className={`trk-icon-btn${engine?.masterMute ? " pinned" : ""}`} onClick={() => changeMaster({ mute: !engine?.masterMute })} disabled={!engine} aria-label={engine?.masterMute ? "Master aan" : "Master dempen"}>
+                {engine?.masterMute ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
+              <input
+                className="trk-master-slider"
+                type="range" min={0} max={MASTER_MAX} step={0.002}
+                value={Math.min(MASTER_MAX, volumeToFader(engine?.masterVolume ?? 1))}
+                onChange={e => changeMaster({ volume: faderToVolume(parseFloat(e.target.value)) })}
+                onDoubleClick={() => changeMaster({ volume: 1 })}
+                disabled={!engine}
+                aria-label="Master volume"
+              />
+              <span className="trk-meta trk-master-db">{formatDb(Math.min(MASTER_MAX, volumeToFader(engine?.masterVolume ?? 1)))} dB</span>
             </div>
             <div className="trk-current">
               <span className="trk-label">Sectie</span>

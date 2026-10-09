@@ -198,7 +198,7 @@ export default function TracksControl({ settings }: TracksControlProps) {
         {!offline && <button role="tab" aria-selected={view === "library"} className={`trk-view${view === "library" ? " on" : ""}`} onClick={() => setView("library")}>
           <Library size={15} /> Bibliotheek
         </button>}
-        {desktop && !offline && (
+        {desktop && (
           <button role="tab" aria-selected={view === "local"} className={`trk-view${view === "local" ? " on" : ""}`} onClick={() => setView("local")}>
             <Library size={15} /> Op deze computer
           </button>

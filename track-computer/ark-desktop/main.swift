@@ -11,6 +11,7 @@ import WebKit
 import AVFoundation
 import CoreAudio
 import Security
+import UniformTypeIdentifiers
 
 let appName = "Ark Tracks"
 
@@ -110,6 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         if audioTest { runAudioTest(); return }
+        // proef zonder venster: ArkTracks --import-test <zip>  (zet het nummer in de nummermap en meldt de uitkomst)
+        if let i = CommandLine.arguments.firstIndex(of: "--import-test"), i + 1 < CommandLine.arguments.count {
+            fetcher.importZip(path: CommandLine.arguments[i + 1])
+            DispatchQueue.global().async { [self] in
+                for _ in 0..<600 {
+                    Thread.sleep(forTimeInterval: 0.5)
+                    if let j = fetcher.status().first, ["klaar", "fout"].contains(j["state"] as? String ?? "") { print("IMPORT \(j)"); fflush(stdout); exit(j["state"] as? String == "klaar" ? 0 : 1) }
+                }
+                print("IMPORT time-out"); exit(1)
+            }
+            return
+        }
         if ShellSettings.server.isEmpty && !ShellSettings.offline { showSettings(firstRun: true) } else { load() }
     }
 
@@ -134,6 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
       // nummers van de server op deze computer zetten ({ id, folder, title, rpp }), de stand opvragen en een nummer weghalen (Prullenbak)
       fetchSong: (song) => window.webkit.messageHandlers.shell.postMessage({ action: "fetchSong", song }),
       fetchStatus: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "fetchStatus" })),
+      // een zip (MultiTracks of eigen opname) kiezen en als nummer op deze computer zetten, zonder server
+      importZip: () => window.webkit.messageHandlers.shell.postMessage({ action: "importZip" }),
       removeSong: async (folder) => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "removeSong", folder })),
     };
     // eigen instellingen van de pagina ("ark-…") staan in de app, niet in de webview
@@ -201,6 +216,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             if b["action"] as? String == "settings" { d?.showSettings(firstRun: false) }
             if b["action"] as? String == "kvSet", let k = b["key"] as? String, let v = b["value"] as? String { d?.kvChanged { LocalStore.values[k] = v } }
             if b["action"] as? String == "kvRemove", let k = b["key"] as? String { d?.kvChanged { LocalStore.values.removeValue(forKey: k) } }
+            if b["action"] as? String == "importZip" {
+                let panel = NSOpenPanel(); panel.canChooseFiles = true; panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
+                panel.allowedContentTypes = [.zip]; panel.prompt = "Importeer"; panel.message = "Kies een MultiTracks-zip of een eigen opname (zip met song.json)"
+                if panel.runModal() == .OK { for u in panel.urls { d?.fetcher.importZip(path: u.path) } }
+            }
             if b["action"] as? String == "fetchSong", let song = b["song"] as? [String: Any] { d?.fetcher.start(song) }
             if b["action"] as? String == "openExternal", let u = (b["url"] as? String).flatMap(URL.init(string:)), u.scheme == "https" || u.scheme == "http" { NSWorkspace.shared.open(u) }
         }

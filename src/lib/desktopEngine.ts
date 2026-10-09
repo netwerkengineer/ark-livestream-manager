@@ -15,7 +15,7 @@ interface ArkEngine { available: boolean; call: (path: string, params?: Record<s
 declare global {
   interface Window {
     arkEngine?: ArkEngine;
-    arkDesktop?: { offline?: boolean; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }> };
+    arkDesktop?: { offline?: boolean; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }>; importZip: () => void };
   }
 }
 
@@ -246,6 +246,7 @@ export async function serverSongs(): Promise<ServerSong[]> {
 }
 export const fetchJobs = async (): Promise<FetchJob[]> => (await window.arkDesktop!.fetchStatus()).jobs;
 export const startFetch = (s: ServerSong) => window.arkDesktop!.fetchSong({ id: s.id, folder: s.folder, title: s.title, rpp: s.rpp });
+export const startImport = () => window.arkDesktop!.importZip();
 export const removeLocalSong = (folder: string) => window.arkDesktop!.removeSong(folder);
 const BUSY = ["wachtrij", "ophalen", "uitpakken", "click"];
 export const isFetching = (j: FetchJob) => BUSY.includes(j.state);

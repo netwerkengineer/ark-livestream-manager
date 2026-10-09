@@ -543,6 +543,16 @@ export class PracticeEngine {
     this.applyMix(false);
   }
 
+  // Master: everything together, after all faders (a gain of 1 = the mix as saved)
+  masterVolume = 1;
+  masterMute = false;
+  setMaster(patch: { volume?: number; mute?: boolean }) {
+    if (patch.volume !== undefined) this.masterVolume = Math.max(0, patch.volume);
+    if (patch.mute !== undefined) this.masterMute = patch.mute;
+    this.master.gain.setTargetAtTime(this.masterMute ? 0 : this.masterVolume, this.ctx.currentTime, 0.015);
+    this.onChange();
+  }
+
   setGroup(name: string, patch: Partial<GroupMix>) {
     this.groups = { ...this.groups, [name]: { ...this.groups[name], ...patch } };
     this.applyMix(false);
