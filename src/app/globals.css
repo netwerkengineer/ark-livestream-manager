@@ -950,6 +950,53 @@ textarea.input-field {
   .trk-arr-row { grid-template-columns: 1fr; }
 }
 
+.trk-src { display: inline-flex; gap: 4px; }
+.trk-own-add { margin: 6px 0 10px; }
+.trk-own-add select { width: 100%; }
+
+.trk-dset { max-width: 760px; display: flex; flex-direction: column; gap: 6px; }
+.trk-dset-row { display: flex; gap: 8px; }
+.trk-dset-row .input-field { flex: 1; }
+.trk-dset-row .trk-dset-port { flex: 0 0 90px; }
+
+/* Tracks: master volume in the transport bar */
+.trk-master { display: flex; align-items: center; gap: 8px; min-width: 220px; }
+.trk-master.muted .trk-master-slider { opacity: 0.4; }
+.trk-master-slider { flex: 1; min-width: 90px; accent-color: var(--primary); }
+.trk-master-db { min-width: 64px; text-align: right; }
+
+/* Tracks: timing of the FreeShow slides per section (hand placement) */
+.trk-tim-list { display: flex; flex-direction: column; gap: 10px; }
+.trk-tim-card { --sec: #3b82f6; padding: 10px 12px; border-radius: 10px; border-left: 4px solid var(--sec); background: color-mix(in srgb, var(--sec) 7%, transparent); }
+.trk-tim-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.trk-tim-head small { color: var(--muted); font-size: 0.75rem; }
+.trk-tim-head .trk-badge { margin-left: auto; }
+.trk-tim-line { position: relative; height: 40px; margin: 10px 14px 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); touch-action: none; }
+.trk-tim-tick { position: absolute; top: 14px; bottom: 14px; width: 1px; background: rgba(255, 255, 255, 0.12); pointer-events: none; }
+.trk-tim-tick.bar { top: 8px; bottom: 8px; background: rgba(255, 255, 255, 0.28); }
+.trk-tim-now { position: absolute; top: 0; bottom: 0; width: 2px; background: #22c55e; pointer-events: none; }
+.trk-tim-pin {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; cursor: grab; touch-action: none;
+  border: 2px solid color-mix(in srgb, var(--sec) 70%, white); background: #0b1222; color: var(--foreground);
+  font-size: 0.75rem; font-weight: 700; line-height: 1;
+}
+.trk-tim-pin.set { background: var(--sec); color: #fff; }
+.trk-tim-pin.fixed { cursor: default; opacity: 0.6; border-style: dashed; }
+.trk-tim-pin:active:not(.fixed) { cursor: grabbing; }
+.trk-tim-slides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.trk-tim-slides li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; font-size: 0.82rem; }
+.trk-tim-slides li.fixed { opacity: 0.7; }
+.trk-tim-n { width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; }
+.trk-tim-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trk-tim-ctl { display: inline-flex; align-items: center; gap: 4px; }
+.trk-tim-input { width: 72px; padding: 4px 6px; text-align: center; }
+.trk-tim-sec { min-width: 64px; text-align: right; }
+@media (max-width: 640px) {
+  .trk-tim-slides li { grid-template-columns: 24px 1fr; }
+  .trk-tim-slides li .trk-tim-ctl, .trk-tim-slides li > .trk-meta { grid-column: 1 / -1; justify-content: flex-end; }
+}
+
 /* Tracks: recording FreeShow timing */
 .trk-timing.recording { border-color: rgba(239, 68, 68, 0.5); }
 .trk-rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #ef4444; animation: trk-pulse-red 1s ease-in-out infinite; }

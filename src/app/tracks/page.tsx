@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { homeHref } from "@/lib/desktopEngine";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { useReaperState } from "@/components/tracks/useReaper";
 import TransportBar from "@/components/tracks/TransportBar";
@@ -14,6 +15,7 @@ import PadsPanel from "@/components/tracks/PadsPanel";
 // on stage can change the mix by accident.
 export default function TracksStagePage() {
   const [access, setAccess] = useState<"loading" | "login" | "denied" | "disabled" | "ok">("loading");
+  const home = homeHref();   // the desktop app has no dashboard to go back to
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const { state, error } = useReaperState(access === "ok");
 
@@ -61,7 +63,7 @@ export default function TracksStagePage() {
       <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "20px", padding: "20px", textAlign: "center" }}>
         {access !== "loading" && <AlertTriangle size={40} color="#f87171" />}
         <p style={{ color: "var(--muted)", maxWidth: "420px" }}>{messages[access]}</p>
-        {access !== "loading" && <Link href="/" className="btn-primary">Naar het dashboard</Link>}
+        {access !== "loading" && <Link href={home} className="btn-primary" suppressHydrationWarning>Terug</Link>}
       </div>
     );
   }
@@ -69,7 +71,7 @@ export default function TracksStagePage() {
   return (
     <div className="trk-stage-page">
       <header className="trk-stage-header">
-        <Link href="/" className="trk-icon-btn" aria-label="Dashboard"><ChevronLeft size={18} /></Link>
+        <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>
         <h1 className="gradient-text">Podium</h1>
         <span className={`trk-conn${error ? " off" : ""}`}>{error ? "REAPER niet bereikbaar" : "Verbonden"}</span>
       </header>

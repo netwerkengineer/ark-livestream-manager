@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ListOrdered, Download, RefreshCw, AlertTriangle, Check, FileText } from "lucide-react";
+import { ListOrdered, Download, RefreshCw, AlertTriangle, Check, FileText, Timer, ChevronUp, ChevronDown, X } from "lucide-react";
 import type { ReaperState, BridgeSong } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
 import { parseSongName } from "./songName";
 import ArrangementEditor from "./ArrangementEditor";
+import TimingEditor from "./TimingEditor";
+import { hasDesktopEngine, getSetlistSource, setSetlistSource, ownAdd, ownRemove, ownMove, ownPaths } from "@/lib/desktopEngine";
 
 interface SetlistSong {
   id: string;
@@ -25,6 +27,7 @@ interface SetlistData {
   songs: BridgeSong[];
   loaded: string[];
   bridgeError: string | null;
+  own?: boolean;     // the desktop app's own setlist (not a service from the web app)
 }
 
 interface SetlistPanelProps {
@@ -43,6 +46,10 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
   const [date, setDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<SetlistSong | null>(null);
+  const [timing, setTiming] = useState<SetlistSong | null>(null);
+  // Desktop app: a service setlist from the web app or an own list that is kept on this computer
+  const [desktop, setDesktop] = useState(false);
+  const [source, setSource] = useState<"service" | "own">("service");
   // Kept in a ref so a new onError from the parent doesn't re-trigger loading
   const onErrorRef = useRef(onError);
   useEffect(() => { onErrorRef.current = onError; });
@@ -59,7 +66,13 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     }
   }, []);
 
-  useEffect(() => { load(null); }, [load]);
+  useEffect(() => {
+    if (hasDesktopEngine()) { setDesktop(true); setSource(getSetlistSource()); }
+    load(null);
+  }, [load]);
+
+  const chooseSource = (v: "service" | "own") => { setSetlistSource(v); setSource(v); load(null); };
+  const ownEdit = async (fn: () => void) => { fn(); await load(date); };
 
   const activePath = state?.bridge?.tabs.find(t => t.active)?.path;
   const openPaths = new Set(state?.bridge?.tabs.map(t => t.path) || []);
@@ -115,6 +128,12 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     <section className={`glass-card trk-setlist${stage ? " stage" : ""}`}>
       <div className="trk-setlist-head">
         <h3 className="trk-title"><ListOrdered size={18} style={{ color: "var(--primary)" }} /> Setlist</h3>
+        {desktop && (
+          <span className="trk-src">
+            <button className={`trk-icon-btn${source === "service" ? " pinned" : ""}`} onClick={() => chooseSource("service")}>Dienst</button>
+            <button className={`trk-icon-btn${source === "own" ? " pinned" : ""}`} onClick={() => chooseSource("own")}>Eigen setlist</button>
+          </span>
+        )}
         {data && data.dates.length > 0 && (
           <select className="input-field trk-date" value={date || ""} onChange={(e) => load(e.target.value)}>
             {data.dates.map(d => (
@@ -128,9 +147,20 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
         </button>
       </div>
 
+      {data?.own && (
+        <div className="trk-own-add">
+          <select className="input-field" value="" onChange={e => { if (e.target.value) ownEdit(() => ownAdd(e.target.value)); }}>
+            <option value="">+ Nummer toevoegen aan je eigen setlist…</option>
+            {data.songs.filter(x => !ownPaths().includes(x.path)).map(x => (
+              <option key={x.path} value={x.path}>{parseSongName(x.name).title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {data?.own && data.setlist.length === 0 && <p className="trk-empty">Je eigen setlist is leeg. Voeg hierboven nummers toe uit de map met nummers op deze computer.</p>}
       {data?.bridgeError && <p className="trk-warn"><AlertTriangle size={14} /> {data.bridgeError}</p>}
-      {data && !data.date && <p className="trk-empty">Er is nog geen dienst met een setlist in de Planner.</p>}
-      {data?.date && data.setlist.length === 0 && <p className="trk-empty">Deze dienst heeft nog geen liederen.</p>}
+      {data && !data.date && !data.own && <p className="trk-empty">Er is nog geen dienst met een setlist in de Planner.</p>}
+      {data?.date && !data.own && data.setlist.length === 0 && <p className="trk-empty">Deze dienst heeft nog geen liederen.</p>}
 
       <ol className="trk-songs">
         {data?.setlist.map((s, i) => {
@@ -160,6 +190,16 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
                 <button className="trk-icon-btn" onClick={() => setEditing(s)} disabled={!s.path} title="Tekst koppelen aan de secties van de track (FreeShow)">
                   <FileText size={14} /> Tekst
                 </button>
+                <button className="trk-icon-btn" onClick={() => setTiming(s)} disabled={!s.path} title="Timing van de FreeShow-dia's per sectie met de hand bijstellen">
+                  <Timer size={14} /> Timing
+                </button>
+                {data.own ? (
+                  <>
+                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownMove(i, -1))} disabled={i === 0} aria-label="Omhoog"><ChevronUp size={14} /></button>
+                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownMove(i, 1))} disabled={i === data.setlist.length - 1} aria-label="Omlaag"><ChevronDown size={14} /></button>
+                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownRemove(i))} aria-label="Verwijder uit de setlist"><X size={14} /></button>
+                  </>
+                ) : (
                 <select
                   className="input-field trk-link"
                   value={s.path || ""}
@@ -171,12 +211,23 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
                     <option key={song.path} value={song.path}>{parseSongName(song.name).title} ({song.name})</option>
                   ))}
                 </select>
+                )}
                 </div>
               )}
             </li>
           );
         })}
       </ol>
+
+      {timing?.path && (
+        <TimingEditor
+          song={{ title: timing.title, artist: timing.artist, path: timing.path }}
+          state={state}
+          onClose={() => setTiming(null)}
+          onError={onError}
+          onStatus={onStatus}
+        />
+      )}
 
       {editing?.path && (
         <ArrangementEditor

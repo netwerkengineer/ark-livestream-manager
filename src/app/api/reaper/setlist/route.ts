@@ -34,6 +34,15 @@ function setlistFor(serviceDate: string, songs: BridgeSong[]) {
   });
 }
 
+function resolveDate(requested: string | null) {
+  const today = todayInAmsterdam();
+  const dates = getDraftServices().map(s => s.serviceDate);
+  const date = requested && dates.includes(requested)
+    ? requested
+    : dates.find(d => d >= today) || dates[dates.length - 1] || null;
+  return { today, dates, date };
+}
+
 // The service setlist (Planner / liturgy mail) matched to the songs on the
 // track computer. Defaults to the first service from today on.
 export async function GET(req: NextRequest) {
@@ -45,12 +54,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
   }
 
-  const today = todayInAmsterdam();
-  const dates = getDraftServices().map(s => s.serviceDate);
-  const requested = req.nextUrl.searchParams.get("date");
-  const date = requested && dates.includes(requested)
-    ? requested
-    : dates.find(d => d >= today) || dates[dates.length - 1] || null;
+  const { today, dates, date } = resolveDate(req.nextUrl.searchParams.get("date"));
 
   let songs: BridgeSong[] = [];
   let loaded: string[] = [];
@@ -88,7 +92,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { action, title, path, date } = await req.json();
+    const body = await req.json();
+    const { action, title, path, date } = body;
+
+    // The desktop app plays on its own computer: it sends the songs it has, we match the service
+    // setlist to them (the same matching as for the track computer; no REAPER bridge needed)
+    if (action === "match") {
+      const songs: BridgeSong[] = (Array.isArray(body.songs) ? body.songs : [])
+        .filter((s: unknown): s is BridgeSong => !!s && typeof (s as BridgeSong).name === "string" && typeof (s as BridgeSong).path === "string");
+      const loaded: string[] = (Array.isArray(body.loaded) ? body.loaded : []).filter((p: unknown): p is string => typeof p === "string");
+      const r = resolveDate(typeof date === "string" ? date : null);
+      return NextResponse.json({ ...r, setlist: r.date ? setlistFor(r.date, songs) : [], songs, loaded, bridgeError: null });
+    }
+
     const bridge = await getBridgeState();
     if (!bridge) return NextResponse.json({ error: "REAPER-bridge draait niet" }, { status: 502 });
 
