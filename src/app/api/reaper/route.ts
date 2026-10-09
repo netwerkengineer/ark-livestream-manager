@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { action, track, value, final, region, mode, path, pos } = await req.json();
+    const body = await req.json();
+    const { action, track, value, final, region, mode, path, pos } = body;
 
     if (typeof action === "string" && Object.hasOwn(REAPER_COMMANDS, action)) {
       await reaperRequest([String(REAPER_COMMANDS[action as keyof typeof REAPER_COMMANDS])]);
@@ -113,6 +114,16 @@ export async function POST(req: NextRequest) {
         return [b.track, ...b.stems.filter(s => !(ownClick && /^click/i.test(s.name)))];
       }).filter(t => t.muted);
       if (muted.length) await reaperRequest(muted.map(t => `SET/TRACK/${t.index}/MUTE/0`));
+    } else if (action === "master") {
+      // master volume (linear 0-2) and/or master mute for all busses together
+      const vol = value === undefined ? NaN : Number(value);
+      if (value !== undefined && (!Number.isFinite(vol) || vol < 0 || vol > 2)) return NextResponse.json({ error: "Ongeldig volume" }, { status: 400 });
+      await sendBridgeCommand("master", [Number.isFinite(vol) ? vol.toFixed(4) : "", body.mute === undefined ? "" : body.mute ? "1" : "0"]);
+    } else if (action === "seek") {
+      // timing screen: listen from a moment (seconds in the active project)
+      const to = Number(pos);
+      if (!Number.isFinite(to) || to < 0 || to > 36000) return NextResponse.json({ error: "Ongeldige positie" }, { status: 400 });
+      await reaperRequest([`SET/POS/${to.toFixed(3)}`]);
     } else if (action === "jump") {
       const id = Number(region);
       if (!Number.isInteger(id) || id < 0) {

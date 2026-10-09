@@ -56,6 +56,8 @@ export interface BridgeState {
   error?: string;
   outputMode?: string; // chosen output mode
   leadBeats?: number;  // FreeShow slides this many beats early
+  master?: number;     // master volume (linear, 1 = 0 dB) for all busses together
+  masterMute?: boolean;
   freeshow?: string;   // host:port of FreeShow's REST API the cues go to (none = MIDI)
   nextSong?: string;   // project path of the next song in the setlist (set up when this one ends)
   pendingSong?: string; // song a transition is waiting for (switches at the chosen moment)
@@ -139,6 +141,8 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       error: s.error ?? undefined,
       outputMode: s.outputMode ?? undefined,
       leadBeats: typeof s.leadBeats === 'number' ? s.leadBeats : undefined,
+      master: typeof s.master === 'number' ? s.master : undefined,
+      masterMute: !!s.masterMute,
       freeshow: s.freeshow ?? undefined,
       nextSong: s.nextSong ?? undefined,
       pendingSong: s.pendingSong ?? undefined,
@@ -285,6 +289,8 @@ export interface SongSection {
   name: string;
   start: number;
   finish?: number;
+  startQn?: number;   // quarter notes from the song start (tempo map of the project; the bridge adds these)
+  finishQn?: number;
 }
 
 // Sections (regions) of a song on the track computer, read by the bridge

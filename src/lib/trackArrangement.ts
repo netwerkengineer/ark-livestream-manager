@@ -2,7 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getSettings } from './settingsStore';
 import { slideLines, lineText, newSlideId, TRACKS_LAYOUT_NAME } from './slideSplit';
-import { getSongSections, sendBridgeCommand } from './reaperControl';
+import { getSongSections, getBridgeState, sendBridgeCommand, type SongSection } from './reaperControl';
+import { parseCues, timingSections, validateTiming, type TimingSection } from './trackTiming';
 
 // Links the lyrics of a FreeShow show to the sections (regions) of a REAPER
 // track and builds a "Tracks" layout in that show: a blank start slide, then
@@ -75,8 +76,18 @@ async function writeStore(store: Record<string, StoredArrangement>) {
   await fs.rename(tmp, STORE_FILE);
 }
 
+// The track computer and the desktop app keep the same song in different folders, so a song is
+// found by its path or else by the file name of its project.
+function findKey(store: Record<string, StoredArrangement>, rppPath: string): string | null {
+  if (store[rppPath]) return rppPath;
+  const base = path.basename(rppPath).toLowerCase();
+  return Object.keys(store).find(k => path.basename(k).toLowerCase() === base) ?? null;
+}
+
 export async function getStoredArrangement(rppPath: string): Promise<StoredArrangement | null> {
-  return (await readStore())[rppPath] || null;
+  const store = await readStore();
+  const key = findKey(store, rppPath);
+  return key ? store[key] : null;
 }
 
 // ------------------------------------------------------------- FreeShow catalogue
@@ -381,10 +392,11 @@ export async function saveRecordedTimings(
   rppPath: string,
   taps: Record<string, [number, number][]>,
   user: string,
+  givenSections?: SongSection[],
 ): Promise<BuildResult & { sections: string[] }> {
   const stored = await getStoredArrangement(rppPath);
   if (!stored) throw new Error('Koppel eerst de tekst aan de secties (knop "Tekst")');
-  const sections = await getSongSections(rppPath);
+  const sections = givenSections ?? await getSongSections(rppPath);
   const { slideCounts } = await buildTracksLayout(stored.showFile, sections, stored.mapping);
   const timings: SectionTimings = { ...(stored.timings || {}) };
   for (const [name, list] of Object.entries(taps)) {
@@ -468,10 +480,10 @@ export async function saveArrangement(
 ): Promise<BuildResult> {
   const store = await readStore();
   // Keep the recorded timing unless new timing is given
-  const useTimings = timings ?? store[rppPath]?.timings ?? {};
+  const useTimings = timings ?? store[findKey(store, rppPath) ?? rppPath]?.timings ?? {};
   const built = await buildTracksLayout(showFile, sections, mapping, useTimings);
   await writeShow(showFile, built.id, built.show);
-  store[rppPath] = { showFile, mapping, timings: useTimings, cues: built.cues, updatedAt: new Date().toISOString(), updatedBy: user };
+  store[findKey(store, rppPath) ?? rppPath] = { showFile, mapping, timings: useTimings, cues: built.cues, updatedAt: new Date().toISOString(), updatedBy: user };
   await writeStore(store);
   return { cues: built.cues, slides: built.slides, warnings: built.warnings };
 }
@@ -564,4 +576,51 @@ export async function practiceLyrics(
     });
   }
   return out.sort((a, b) => a.t - b.t);
+}
+
+// ------------------------------------------------------------- timing screen
+
+// Where every slide of every section appears now (recorded, edited or estimated), in beats
+// from the section start. Read from the cue table of the last save, so it is what the
+// bridge/player works with.
+export async function getTimingData(
+  rppPath: string,
+  given?: { sections: SongSection[]; lead?: number },
+): Promise<{ sections: TimingSection[]; lead: number; showFile: string }> {
+  const stored = await getStoredArrangement(rppPath);
+  if (!stored) throw new Error('Koppel eerst de tekst aan de secties (knop "Tekst")');
+  const sections = given?.sections ?? await getSongSections(rppPath);
+  const lead = given ? given.lead ?? 2 : (await getBridgeState().catch(() => null))?.leadBeats ?? 2;
+  const bpm = Number(rppPath.match(/-(\d+(?:\.\d+)?)bpm/i)?.[1]) || null;     // fallback when the project has no tempo map
+  const regions = sections.map(sec => ({ id: sec.id, name: sec.name, start: sec.start, finish: sec.finish, startQn: sec.startQn, finishQn: sec.finishQn }));
+  const list = timingSections(regions, parseCues(stored.cues).regions, lead, bpm).map(t => ({ ...t, instrumental: isInstrumental(t.name) }));
+  return { sections: list, lead, showFile: stored.showFile };
+}
+
+// Save the timing of one section by name (all its occurrences with the same number of slides
+// use it): at = slide number within the section (2, 3, ...) -> beat from the section start.
+// at = null goes back to the estimate. Rebuilds the layout and cue table like the text link does.
+export async function saveSectionTiming(
+  rppPath: string,
+  name: string,
+  at: Record<string, number> | null,
+  user: string,
+  given?: { sections: SongSection[]; lead?: number },
+): Promise<BuildResult> {
+  const stored = await getStoredArrangement(rppPath);
+  if (!stored) throw new Error('Koppel eerst de tekst aan de secties (knop "Tekst")');
+  const { sections: timed } = await getTimingData(rppPath, given);
+  const section = timed.find(t => t.name === name);
+  if (!section) throw new Error('Sectie niet gevonden');
+  const timings: SectionTimings = { ...(stored.timings || {}) };
+  if (at === null) delete timings[name];
+  else {
+    const count = section.slides.length;
+    if (count < 2) throw new Error('Deze sectie heeft maar één dia: er valt niets te timen');
+    const checked = validateTiming(count, section.lengthQn, at);
+    if ('error' in checked) throw new Error(checked.error);
+    timings[name] = { count, at: checked.at };
+  }
+  const sections = given?.sections ?? await getSongSections(rppPath);
+  return saveArrangement(rppPath, stored.showFile, sections, stored.mapping, user, timings);
 }
