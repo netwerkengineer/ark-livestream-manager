@@ -10,11 +10,35 @@ import Cocoa
 import WebKit
 import AVFoundation
 import CoreAudio
+import Security
 
 let appName = "Ark Tracks"
 
+/// De sleutel van de beheerder staat in de Keychain, niet in een gewoon bestand
+enum Keychain {
+    static let service = "nl.arkchurch.tracks-desktop"
+    static func get(_ account: String) -> String {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account,
+                                kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return "" }
+        return String(data: d, encoding: .utf8) ?? ""
+    }
+    static func set(_ account: String, _ value: String) {
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+        SecItemDelete(base as CFDictionary)
+        if value.isEmpty { return }
+        var add = base; add[kSecValueData as String] = Data(value.utf8)
+        SecItemAdd(add as CFDictionary, nil)
+    }
+}
+
 /// Instellingen van de schil (de rest staat in de config van de speler)
 struct ShellSettings {
+    static var key: String {
+        get { Keychain.get("desktop-key") }
+        set { Keychain.set("desktop-key", newValue) }
+    }
     static var server: String {
         get { UserDefaults.standard.string(forKey: "server") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "server") }
@@ -76,6 +100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
       openSettings: () => window.webkit.messageHandlers.shell.postMessage({ action: "settings" }),
       openExternal: (url) => window.webkit.messageHandlers.shell.postMessage({ action: "openExternal", url }),
       chooseFolder: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "chooseFolder" })),
+      getConnection: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "getConnection" })),
+      // wijzigt het adres van de server en/of de sleutel (key weglaten = sleutel laten zoals hij is) en laadt de pagina opnieuw
+      setConnection: (server, key) => window.webkit.messageHandlers.shellcall.postMessage({ action: "setConnection", server, key }),
     };
     window.arkEngine = {
       available: true,
@@ -97,6 +124,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.prompt = "Kies"
                 let ok = panel.runModal() == .OK
                 replyHandler(jsonString(["path": ok ? (panel.url?.path ?? "") : ""]), nil)
+            } else if let b = m.body as? [String: Any], b["action"] as? String == "getConnection" {
+                replyHandler(jsonString(["server": ShellSettings.server, "hasKey": !ShellSettings.key.isEmpty]), nil)
+            } else if let b = m.body as? [String: Any], b["action"] as? String == "setConnection" {
+                var v = ((b["server"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+                if !v.isEmpty && !v.hasPrefix("http") { v = "https://" + v }
+                if !v.isEmpty { ShellSettings.server = v }
+                if let k = b["key"] as? String { ShellSettings.key = k.trimmingCharacters(in: .whitespaces) }
+                replyHandler(jsonString(["ok": true]), nil)
+                DispatchQueue.main.async { [self] in load() }
             } else { replyHandler(nil, "onbekend") }
             return
         }
@@ -126,9 +162,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func load() {
         let base = ShellSettings.server.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         guard let url = URL(string: base + "/desktop") else { showSettings(firstRun: true); return }
-        web.load(URLRequest(url: url))
+        installKeyCookie(for: url) { [self] in web.load(URLRequest(url: url)) }
     }
 
+    /// De sleutel gaat als cookie mee naar de server (alleen deze app zet hem): zonder dat bestaat /desktop daar niet
+    func installKeyCookie(for url: URL, then done: @escaping () -> Void) {
+        let store = web.configuration.websiteDataStore.httpCookieStore
+        guard let host = url.host else { done(); return }
+        store.getAllCookies { cookies in
+            let old = cookies.filter { $0.name == "ark_desktop" && $0.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")) == host }
+            let remaining = DispatchGroup()
+            for c in old { remaining.enter(); store.delete(c) { remaining.leave() } }
+            remaining.notify(queue: .main) {
+                let key = ShellSettings.key
+                guard !key.isEmpty else { done(); return }
+                var props: [HTTPCookiePropertyKey: Any] = [.name: "ark_desktop", .value: key, .domain: host, .path: "/", .expires: Date(timeIntervalSinceNow: 365 * 86400)]
+                if url.scheme == "https" { props[.secure] = "TRUE" }
+                props[HTTPCookiePropertyKey("HttpOnly")] = "TRUE"
+                if let c = HTTPCookie(properties: props) { store.setCookie(c) { done() } } else { done() }
+            }
+        }
+    }
+
+    /// Het kleine verbindingsvenster (adres en sleutel van de server)
     func showSettings(firstRun: Bool) {
         if settingsWindow == nil {
             settingsWindow = SettingsWindow(app: self)
@@ -186,7 +242,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         NSApp.windowsMenu = win
     }
 
-    @objc func openSettings() { showSettings(firstRun: false) }
+    /// Instellingen: de tab in de app als de pagina geladen is; anders (geen server of niet bereikbaar) het kleine verbindingsvenster
+    @objc func openSettings() {
+        if web.url?.path.hasPrefix("/desktop") == true {
+            web.evaluateJavaScript("window.dispatchEvent(new Event('ark-open-settings'))", completionHandler: nil)
+        } else { showSettings(firstRun: false) }
+    }
     @objc func reload() { web.reload() }
     @objc func goBack() { if web.canGoBack { web.goBack() } }
     @objc func openInBrowser() { if let u = web.url { NSWorkspace.shared.open(u) } }
@@ -205,6 +266,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
            url.host == base.host, url.port == base.port, url.path == "" || url.path == "/" {
             decisionHandler(.cancel)
             load()
+            return
+        }
+        decisionHandler(.allow)
+    }
+    func webView(_ w: WKWebView, decidePolicyFor r: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if r.isForMainFrame, let http = r.response as? HTTPURLResponse, [403, 404].contains(http.statusCode), http.url?.path.hasPrefix("/desktop") == true {
+            decisionHandler(.cancel)
+            let html = "<body style='font-family:-apple-system;background:#0b1222;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center'><div><h2>De server accepteert deze app niet</h2><p>De sleutel ontbreekt of klopt niet, of de server is niet de goede.<br>Vraag de beheerder om de sleutel (webapp > Instellingen > Tracks) en vul die in bij Ark Tracks > Instellingen… (⌘,).<br>Server: \(ShellSettings.server)</p></div></body>"
+            web.loadHTMLString(html, baseURL: nil)
             return
         }
         decisionHandler(.allow)
@@ -246,78 +316,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 }
 
-// ------------------------------------------------------------- instellingen
-final class SettingsWindow: NSObject, NSWindowDelegate {
+// ------------------------------------------------------------- verbinding (adres en sleutel van de server)
+// De rest van de instellingen (audioapparaat, uitgangen, nummermap, FreeShow) staan in de tab Instellingen van de app zelf;
+// dit kleine venster is er alleen voor als de pagina nog niet kan laden (eerste keer, of de server is niet bereikbaar).
+final class SettingsWindow: NSObject {
     let w: NSWindow
     unowned let app: AppDelegate
-    let server = NSTextField(), songs = NSTextField(), fsHost = NSTextField(), fsPort = NSTextField()
-    let device = NSPopUpButton(), mode = NSPopUpButton()
-    var firstRun = false
+    let server = NSTextField(), key = NSSecureTextField()
 
     init(app: AppDelegate) {
         self.app = app
-        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 360), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 220), styleWindow: [.titled, .closable])
         super.init()
-        w.title = "Instellingen"
-        w.delegate = self
+        w.title = "Verbinding met de server"
         let v = NSView(frame: w.contentRect(forFrameRect: w.frame))
         func label(_ s: String, _ y: CGFloat) { let l = NSTextField(labelWithString: s); l.frame = NSRect(x: 20, y: y, width: 150, height: 22); l.alignment = .right; v.addSubview(l) }
-        func place(_ c: NSView, _ y: CGFloat, _ width: CGFloat = 340) { c.frame = NSRect(x: 180, y: y, width: width, height: 24); v.addSubview(c) }
-        label("Server van de webapp", 310); place(server, 308); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
-        label("Audioapparaat", 270); place(device, 268)
-        label("Uitgangen", 230); place(mode, 228, 260)
-        mode.addItems(withTitles: ["Automatisch", "8 kanalen (X32)", "3 kanalen (click+guide, tracks stereo)", "2 kanalen (click+guide, tracks)", "Stereo (test)"])
-        label("Map met nummers", 190); place(songs, 188, 250); songs.placeholderString = "standaard ~/Tracks/Songs"
-        let choose = NSButton(title: "Kies…", target: self, action: #selector(pickFolder)); choose.frame = NSRect(x: 436, y: 186, width: 84, height: 28); v.addSubview(choose)
-        label("FreeShow (cues)", 150); place(fsHost, 148, 250); fsHost.placeholderString = "adres, leeg = zoals ingesteld in de webapp"
-        fsPort.frame = NSRect(x: 436, y: 148, width: 84, height: 24); fsPort.placeholderString = "poort"; v.addSubview(fsPort)
-        let hint = NSTextField(wrappingLabelWithString: "Er staan geen adressen vast in de app. Het FreeShow-adres kun je hier opgeven (op deze Mac of een andere computer, poort 5506 voor de REST-listener van FreeShow); laat je het leeg, dan gebruikt de app het adres uit de instellingen van de webapp.")
-        hint.frame = NSRect(x: 20, y: 60, width: 520, height: 70); hint.textColor = .secondaryLabelColor; v.addSubview(hint)
+        func place(_ c: NSView, _ y: CGFloat) { c.frame = NSRect(x: 180, y: y, width: 340, height: 24); v.addSubview(c) }
+        label("Server van de webapp", 170); place(server, 168); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
+        label("Sleutel van de beheerder", 130); place(key, 128); key.placeholderString = "uit de webapp: Instellingen > Tracks (leeg als er geen is)"
+        let hint = NSTextField(wrappingLabelWithString: "Er staat geen adres vast in de app. Alle andere instellingen (audioapparaat, uitgangen, nummermap en FreeShow) vind je in de app zelf, in de tab Instellingen.")
+        hint.frame = NSRect(x: 20, y: 56, width: 520, height: 56); hint.textColor = .secondaryLabelColor; v.addSubview(hint)
         let save = NSButton(title: "Bewaar", target: self, action: #selector(saveAction)); save.keyEquivalent = "\r"; save.frame = NSRect(x: 440, y: 16, width: 100, height: 32); v.addSubview(save)
         let cancel = NSButton(title: "Annuleer", target: self, action: #selector(cancelAction)); cancel.frame = NSRect(x: 330, y: 16, width: 100, height: 32); v.addSubview(cancel)
         w.contentView = v
     }
 
-    static let modes = ["auto", "multi", "3ch", "2ch", "stereo"]
-
     func show(firstRun: Bool) {
-        self.firstRun = firstRun
-        let p = app.player!
         server.stringValue = ShellSettings.server
-        songs.stringValue = p.cfg.songsRoot
-        fsHost.stringValue = p.cfg.fsHost
-        fsPort.stringValue = p.cfg.fsHost.isEmpty ? "" : String(p.cfg.fsPort)
-        device.removeAllItems(); device.addItem(withTitle: "Standaard van het systeem")
-        for d in allDevices() where d.outCh > 0 { device.addItem(withTitle: "\(d.name) (\(d.outCh) uitgangen)") }
-        if !p.cfg.device.isEmpty, let i = device.itemTitles.firstIndex(where: { $0.hasPrefix(p.cfg.device + " (") }) { device.selectItem(at: i) }
-        mode.selectItem(at: SettingsWindow.modes.firstIndex(of: p.cfg.outputMode) ?? 0)
+        key.stringValue = ShellSettings.key
         w.center(); w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
-
-    @objc func pickFolder() {
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
-        if panel.runModal() == .OK, let u = panel.url { songs.stringValue = u.path }
-    }
     @objc func cancelAction() { w.orderOut(nil) }
-    func windowWillClose(_ n: Notification) {}
-
     @objc func saveAction() {
         var s = server.stringValue.trimmingCharacters(in: .whitespaces)
         if s.isEmpty { NSSound.beep(); return }
         if !s.hasPrefix("http") { s = "https://" + s }
-        let serverChanged = s != ShellSettings.server
         ShellSettings.server = s
-        let p = app.player!
-        let title = device.titleOfSelectedItem ?? ""
-        p.cfg.device = device.indexOfSelectedItem == 0 ? "" : (title.range(of: " (", options: .backwards).map { String(title[..<$0.lowerBound]) } ?? title)
-        let m = SettingsWindow.modes[max(0, mode.indexOfSelectedItem)]
-        p.cfg.outputMode = m; p.mixer.requested = m
-        p.cfg.fsHost = fsHost.stringValue.trimmingCharacters(in: .whitespaces)
-        p.cfg.fsPort = Int(fsPort.stringValue) ?? 5506
-        p.setSongsRoot(songs.stringValue.trimmingCharacters(in: .whitespaces))
+        ShellSettings.key = key.stringValue.trimmingCharacters(in: .whitespaces)
         w.orderOut(nil)
-        app.settingsChanged(serverChanged: serverChanged)
+        app.load()
     }
+}
+
+extension NSWindow {
+    convenience init(contentRect: NSRect, styleWindow mask: NSWindow.StyleMask) { self.init(contentRect: contentRect, styleMask: mask, backing: .buffered, defer: false) }
 }
 
 let app = NSApplication.shared

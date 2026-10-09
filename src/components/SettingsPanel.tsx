@@ -584,6 +584,22 @@ export default function SettingsPanel({
                       </button>
                     </div>
                     <p className="text-[10px] text-muted">Token voor de agent op de track-computer die geüploade MultiTracks ophaalt en omzet. Zet hem in ~/Tracks/_tools/agent.json op die Mac.</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+                      <input className="input-field" readOnly placeholder="Sleutel voor de desktop-app (nog niet ingesteld)" value={settings.desktopKey || ""} onFocus={(e) => e.target.select()} style={{ fontFamily: 'monospace', fontSize: '0.75rem' }} />
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                        onClick={() => {
+                          if (settings.desktopKey && !confirm("Nieuwe sleutel maken? De desktop-apps werken pas weer nadat je de nieuwe sleutel bij Instellingen in de app hebt ingevuld.")) return;
+                          const bytes = crypto.getRandomValues(new Uint8Array(24));
+                          onSettingsChange({...settings, desktopKey: Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')});
+                        }}
+                      >
+                        Nieuwe sleutel
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted">Sleutel voor de desktop-app. Met een sleutel bestaat de pagina /desktop alleen voor een app die de sleutel kent; zonder sleutel is alleen de herkenning van de app nodig. Vul dezelfde sleutel in bij Instellingen in de desktop-app.</p>
                   </div>
                 </div>
 

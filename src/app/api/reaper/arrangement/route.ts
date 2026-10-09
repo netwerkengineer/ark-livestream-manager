@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
+import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
 import { getSettings } from "@/lib/settingsStore";
 import { getBridgeState, getSongSections, sendBridgeCommand, type SongSection } from "@/lib/reaperControl";
 import {
@@ -97,6 +98,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { path: rawPath, showFile, mapping } = body;
     const given = givenSections(body.sections);
+    if (given && !hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) {
+      return NextResponse.json({ error: "Alleen voor de desktop-app" }, { status: 403 });
+    }
     // desktop app: read the arrangement of a song it has (sections come from its own engine)
     if (body.action === "read") {
       if (!given || typeof rawPath !== "string") return NextResponse.json({ error: "Secties ontbreken" }, { status: 400 });

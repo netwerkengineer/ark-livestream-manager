@@ -21,12 +21,17 @@ export default function DesktopSettings({ onStatus, onError }: { onStatus: (m: s
   const [form, setForm] = useState<EngineSettings | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [saving, setSaving] = useState(false);
+  const [server, setServer] = useState("");
+  const [key, setKey] = useState("");
+  const [hasKey, setHasKey] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const [s, d] = await Promise.all([engineCall("/settings"), engineCall("/devices")]);
       setForm(s);
       setDevices(d.devices || []);
+      const c = await window.arkDesktop?.getConnection();
+      if (c) { setServer(c.server); setHasKey(c.hasKey); }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Instellingen laden mislukt");
     }
@@ -90,13 +95,17 @@ export default function DesktopSettings({ onStatus, onError }: { onStatus: (m: s
         <button className="trk-load" onClick={save} disabled={saving}><Save size={14} /> {saving ? "Bezig…" : "Opslaan"}</button>
       </div>
 
-      <h3 className="trk-title" style={{ marginTop: 20 }}>Server</h3>
+      <h3 className="trk-title" style={{ marginTop: 20 }}>Verbinding met de server</h3>
       <p className="trk-arr-hint">
-        Deze app haalt de pagina&apos;s, de dienst-setlist en het koppelen van tekst en timing bij de webapp op: <strong>{window.arkDesktop?.server || "(geen server ingesteld)"}</strong>.
-        Het adres staat nergens vast in de app.
+        De pagina&apos;s, de dienst-setlist en het koppelen van tekst en timing komen van de webapp. Het adres staat nergens vast in de app.
+        Na het opslaan laadt de app opnieuw.
       </p>
+      <label className="trk-label">Server van de webapp</label>
+      <input className="input-field" value={server} placeholder="bijvoorbeeld https://naam.van.jouw.server" onChange={e => setServer(e.target.value)} />
+      <label className="trk-label">Sleutel van de beheerder {hasKey && !key && <i>(ingesteld; laat leeg om te behouden)</i>}</label>
+      <input className="input-field" type="password" value={key} placeholder="uit de webapp: Instellingen › Tracks" onChange={e => setKey(e.target.value)} autoComplete="off" />
       <div className="trk-arr-actions" style={{ justifyContent: "flex-start" }}>
-        <button className="trk-save" onClick={() => window.arkDesktop?.openSettings()}><Server size={14} /> Server wijzigen…</button>
+        <button className="trk-save" onClick={() => window.arkDesktop?.setConnection(server, key ? key : undefined)} disabled={!server.trim()}><Server size={14} /> Verbinding opslaan</button>
         <button className="trk-save" onClick={() => window.arkDesktop && window.arkDesktop.server && window.arkDesktop.openExternal(window.arkDesktop.server)}>
           <ExternalLink size={14} /> Webapp met alle instellingen openen in je browser
         </button>

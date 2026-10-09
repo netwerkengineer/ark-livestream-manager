@@ -8,6 +8,7 @@ import { getBridgeState, sendBridgeCommand, type BridgeSong } from "@/lib/reaper
 import { matchSong, saveSongLink } from "@/lib/trackSongMatch";
 import { getStoredArrangement, rebuildIfShowChanged } from "@/lib/trackArrangement";
 import { listTracks } from "@/lib/trackLibrary";
+import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -98,6 +99,9 @@ export async function POST(req: NextRequest) {
     // The desktop app plays on its own computer: it sends the songs it has, we match the service
     // setlist to them (the same matching as for the track computer; no REAPER bridge needed)
     if (action === "match") {
+      if (!hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) {
+        return NextResponse.json({ error: "Alleen voor de desktop-app" }, { status: 403 });
+      }
       const songs: BridgeSong[] = (Array.isArray(body.songs) ? body.songs : [])
         .filter((s: unknown): s is BridgeSong => !!s && typeof (s as BridgeSong).name === "string" && typeof (s as BridgeSong).path === "string");
       const loaded: string[] = (Array.isArray(body.loaded) ? body.loaded : []).filter((p: unknown): p is string => typeof p === "string");

@@ -58,6 +58,13 @@ export default function DesktopPage() {
       .catch(() => setStatus("login"));
   }, []);
 
+  // the app's menu (Instellingen… / ⌘,) opens the settings tab
+  useEffect(() => {
+    const open = () => { setTab("instellingen"); try { localStorage.setItem("ark-desktop-tab", "instellingen"); } catch { /* no memory */ } };
+    window.addEventListener("ark-open-settings", open);
+    return () => window.removeEventListener("ark-open-settings", open);
+  }, []);
+
   const choose = (t: Tab) => {
     setTab(t);
     try { localStorage.setItem("ark-desktop-tab", t); } catch { /* private window: no memory */ }

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
+import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
 import { getSettings } from "@/lib/settingsStore";
 import { getBridgeState, sendBridgeCommand, type SongSection } from "@/lib/reaperControl";
 import { getTimingData, saveRecordedTimings, saveSectionTiming } from "@/lib/trackArrangement";
@@ -47,6 +48,9 @@ export async function POST(req: NextRequest) {
     const given = givenSections(body.sections);
     const lead = typeof body.lead === "number" ? body.lead : 2;
     if (given) {
+      if (!hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) {
+        return NextResponse.json({ error: "Alleen voor de desktop-app" }, { status: 403 });
+      }
       if (typeof rawPath !== "string") return NextResponse.json({ error: "Onbekende song" }, { status: 400 });
       if (body.action === "read") return NextResponse.json(await getTimingData(rawPath, { sections: given, lead }));
       if (body.action === "recorded") {

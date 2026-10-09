@@ -62,6 +62,7 @@ export interface AppSettings {
   reaperOutputMode?: 'auto' | 'multi' | '2ch' | '3ch' | 'stereo';
   // FreeShow slides this many beats before the line is sung (0-4)
   reaperCueLeadBeats?: number;
+  desktopKey?: string;   // secret of the desktop app: without it /desktop and its local-mode requests are refused
   // Track computer keeps the audio of songs played in this many past weeks
   // (plus everything on upcoming setlists and pinned songs)
   trackKeepWeeks?: number;
