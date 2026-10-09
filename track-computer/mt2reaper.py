@@ -1015,6 +1015,10 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
             raise SystemExit(f"Geen stems gevonden in {root}; click niet gemaakt")
         clicks = generate_clicks(os.path.join(root, rel_dir), als, tm, song_len, orig_click)
         added = add_click_to_rpp(rpp_path, clicks, rel_dir)
+        for st in stem_files:
+            if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
+                st["muted"] = True
+        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in clicks], cfg)
         print(f"\n== {title}\n   Eigen click {'toegevoegd' if added else 'bijgewerkt (stond er al)'}\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True, "click": True}
     # Een bestaand project kan in REAPER aangepast en opgeslagen zijn (mix, mutes):
@@ -1025,6 +1029,10 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         if "Ark Click" in open(rpp_path, encoding="utf-8", errors="ignore").read() and song_len > 0 and \
                 any(not os.path.exists(os.path.join(click_dir, f)) for _, f, _ in CLICK_STEMS):
             generate_clicks(click_dir, als, tm, song_len, orig_click)
+        for st in stem_files:
+            if st["name"].lower().startswith("click") and pick_bus(st["name"], cfg) == pick_bus("click", cfg):
+                st["muted"] = True
+        write_player_file(root, title, als, rel_dir, stem_files + [dict(c, rel_dir=rel_dir) for c in click_entries(click_dir, orig_click)], cfg)
         print(f"\n== {title}\n   Bestaat al, overgeslagen (gebruik --force om opnieuw te maken)\n   -> {rpp_path}")
         return {"title": title, "rpp": rpp_path, "skipped": True}
 
@@ -1039,6 +1047,7 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
     rpp, per_bus, markers = build_rpp(title, als, rel_dir, stem_files, cfg, samplerate, root)
     with open(rpp_path, "w", encoding="utf-8") as f:
         f.write(rpp)
+    write_player_file(root, title, als, rel_dir, stem_files, cfg)
 
     # Rapport
     print(f"\n== {title}")
@@ -1065,6 +1074,47 @@ def convert(src, cfg, samplerate, out_dir=None, force=False, add_click=False):
         "missing": missing,
         "samplerates": sorted(srs),
     }
+
+
+# ------------------------------- Speelbestand voor ark-player ---------------
+def click_entries(click_dir, orig_click):
+    """De eigen click-stems die er staan, voor in het speelbestand (zelfde standaard-mute als generate_clicks)."""
+    out = []
+    for name, filename, muted in CLICK_STEMS:
+        if os.path.exists(os.path.join(click_dir, filename)):
+            out.append({"name": name, "file": filename, "position": 0.0, "muted": True if orig_click is None else muted})
+    return out
+
+
+def write_player_file(root, title, als, rel_dir, stem_files, cfg):
+    """Schrijft ark-player.json naast het project: alles wat de eigen speler (ark-player) nodig heeft - stems met
+    startpositie en standaard-mute, secties in seconden, tempo en maatsoort in kwartnoten. Het RPP blijft gewoon bestaan."""
+    tm = TempoMap(als["tempo"])
+    stems = []
+    for st in stem_files:
+        live = is_live(st["name"], cfg)
+        muted = st.get("muted", live)
+        stems.append({
+            "file": os.path.normpath(os.path.join(st.get("rel_dir", rel_dir), st["file"])).replace(os.sep, "/"),
+            "name": st["name"],
+            "offset": round(float(st.get("position", 0.0)), 6),
+            "mute": bool(muted),
+        })
+    sections = [{"name": name, "sec": round(tm.beats_to_sec(b), 6)} for b, name in als["markers"] if name]
+    data = {
+        "format": 1,
+        "title": title,
+        "stems": stems,
+        "sections": sections,
+        "tempo_qn": [[round(b, 6), round(bpm, 6)] for b, bpm in als["tempo"]],
+        "timesig": [[round(b, 6), n, d] for b, (n, d) in als["timesig"]],
+    }
+    path = os.path.join(root, "ark-player.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+    return path
 
 
 def safe(s):
