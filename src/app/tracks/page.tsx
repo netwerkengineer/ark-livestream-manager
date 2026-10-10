@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { homeHref } from "@/lib/desktopEngine";
+import { homeHref, installDesktopAdapter } from "@/lib/desktopEngine";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { useReaperState } from "@/components/tracks/useReaper";
 import TransportBar from "@/components/tracks/TransportBar";
@@ -11,6 +11,10 @@ import SectionsPanel from "@/components/tracks/SectionsPanel";
 import PadsPanel from "@/components/tracks/PadsPanel";
 import BackendBar from "@/components/tracks/BackendBar";
 
+// In the desktop app, and on a tablet or phone that uses the app's own local control (no server), this screen talks to the
+// app's player instead of to REAPER; this has to be in place before the screen starts.
+if (typeof window !== "undefined") installDesktopAdapter();
+
 // Stage view for the worship leader / music director: pick a song from the
 // service setlist and change the arrangement live. No faders here, so nothing
 // on stage can change the mix by accident.
@@ -18,9 +22,11 @@ export default function TracksStagePage() {
   const [access, setAccess] = useState<"loading" | "login" | "denied" | "disabled" | "ok">("loading");
   const home = homeHref();   // the desktop app has no dashboard to go back to
   // installed on a tablet's home screen: the stage view is the whole app, a way back to the dashboard is only in the way there
+  const lan = useSyncExternalStore(() => () => undefined, () => !!(window.arkDesktop as { lan?: boolean } | undefined)?.lan, () => false);   // local control of the app (tablet/phone)
   const standalone = useSyncExternalStore(
     () => () => undefined,
-    () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true,
+    // (also on a tablet that uses the app's local control: the app serves only this page, there is no dashboard to go back to)
+    () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true || !!(window.arkDesktop as { lan?: boolean } | undefined)?.lan,
     () => false,
   );
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -85,6 +91,7 @@ export default function TracksStagePage() {
       <header className="trk-stage-header">
         {!standalone && <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>}
         <h1 className="gradient-text">Podium</h1>
+        {lan && <a href="/desktop" className="trk-icon-btn" title="Het volledige Tracks-scherm met de mixer">Mixer</a>}
         <span className={`trk-conn${error ? " off" : ""}`}>{error ? "Niet verbonden" : "Verbonden"}</span>
       </header>
       <BackendBar onError={showError} onStatus={showSuccess} />

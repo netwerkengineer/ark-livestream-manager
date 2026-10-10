@@ -32,7 +32,7 @@ final class RemoteReporter {
 
     func refresh() {
         stop()
-        guard ShellSettings.remote, !ShellSettings.offline, !ShellSettings.server.isEmpty else { return }
+        guard ShellSettings.remote, !ShellSettings.offline, !ShellSettings.server.isEmpty, !LocalRemote.testMode else { return }
         failures = 0; nextTry = .distantPast; reported = false; listenFails = 0
         if !listening { listening = true; queue.asyncAfter(deadline: .now() + 1) { [weak self] in self?.listen() } }
         let t = DispatchSource.makeTimerSource(queue: queue)

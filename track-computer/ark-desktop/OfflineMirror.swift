@@ -12,7 +12,8 @@ enum OfflineMirror {
     static var url: URL { URL(string: "\(scheme)://app/desktop")! }
 
     static var dir: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArkTracks/offline", isDirectory: true)
+        if let d = ProcessInfo.processInfo.environment["ARK_MIRROR_DIR"], !d.isEmpty { return URL(fileURLWithPath: d, isDirectory: true) }      // voor de proeven
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArkTracks/offline", isDirectory: true)
     }
     static var available: Bool { FileManager.default.fileExists(atPath: dir.appendingPathComponent("desktop.html").path) }
     static var syncing = false
@@ -52,6 +53,7 @@ enum OfflineMirror {
             try fm.createDirectory(at: fresh, withIntermediateDirectories: true)
             let html = try await get(server, "/desktop", key: key)
             guard let text = String(data: html, encoding: .utf8), text.contains("/_next/") else { return "de pagina /desktop is niet zoals verwacht" }
+            let podium = try? await get(server, "/tracks", key: key)          // het Podium, voor de lokale bediening (zonder server)
             let list = try JSONSerialization.jsonObject(with: try await get(server, "/api/tracks/desktop/bundle", key: key)) as? [String: Any]
             let files = (list?["files"] as? [String]) ?? []
             guard !files.isEmpty else { return "de server gaf geen lijst met bestanden" }
@@ -77,6 +79,7 @@ enum OfflineMirror {
             }
             if failed > 0 { try? fm.removeItem(at: fresh); return "\(failed) bestanden konden niet worden opgehaald" }
             try html.write(to: fresh.appendingPathComponent("desktop.html"))
+            if let p = podium, String(data: p, encoding: .utf8)?.contains("/_next/") == true { try p.write(to: fresh.appendingPathComponent("tracks.html")) }
             try? fm.removeItem(at: dir)
             try fm.moveItem(at: fresh, to: dir)
             return nil
@@ -98,6 +101,7 @@ final class OfflineScheme: NSObject, WKURLSchemeHandler {
         var file: URL?
         let isRSC = task.request.value(forHTTPHeaderField: "RSC") != nil || (url.query ?? "").contains("_rsc")
         if !isRSC && (path == "" || path == "/" || path == "/desktop") { file = OfflineMirror.dir.appendingPathComponent("desktop.html") }
+        else if !isRSC && path == "/tracks" { file = OfflineMirror.dir.appendingPathComponent("tracks.html") }
         else if path.hasPrefix("/_next/static/") && !path.contains("..") { file = OfflineMirror.dir.appendingPathComponent(path) }
         var status = 404
         var data = Data()

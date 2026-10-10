@@ -54,6 +54,15 @@ struct ShellSettings {
         get { UserDefaults.standard.string(forKey: "deviceName") ?? Host.current().localizedName ?? "Ark Tracks" }
         set { UserDefaults.standard.set(newValue.isEmpty ? Host.current().localizedName ?? "Ark Tracks" : newValue, forKey: "deviceName") }
     }
+    /// lokale bediening (zonder server): aan/uit en poort
+    static var lan: Bool {
+        get { UserDefaults.standard.bool(forKey: "lan") }
+        set { UserDefaults.standard.set(newValue, forKey: "lan") }
+    }
+    static var lanPort: Int {
+        get { let p = UserDefaults.standard.integer(forKey: "lanPort"); return p == 0 ? 8765 : p }
+        set { UserDefaults.standard.set(newValue, forKey: "lanPort") }
+    }
     static var server: String {
         get { UserDefaults.standard.string(forKey: "server") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "server") }
@@ -87,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var engine: Server!
     var fetcher: SongFetcher!
     var reporter: RemoteReporter!
+    var remote: LocalRemote!
+    var lanWindow: LanWindow?
     var activity: NSObjectProtocol?
 
     var audioTest = CommandLine.arguments.contains("--audio-test")
@@ -101,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         engine = Server(player: player)
         fetcher = SongFetcher(app: self)
         reporter = RemoteReporter(app: self)
+        remote = LocalRemote(app: self)
         do { try output.start(device: player.cfg.device.isEmpty ? nil : player.cfg.device) } catch { log("Audio starten mislukt: \(error.localizedDescription)") }
 
         let cfg = WKWebViewConfiguration()
@@ -126,7 +138,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         reporter.refresh()
+        remote.refresh()
         if audioTest { runAudioTest(); return }
+        // proef zonder venster: ArkTracks --lan-test <poort>  (lokale bediening aan, koppelen wordt vanzelf toegestaan, niets naar de Keychain)
+        if let i = CommandLine.arguments.firstIndex(of: "--lan-test"), i + 1 < CommandLine.arguments.count, let port = Int(CommandLine.arguments[i + 1]) {
+            LanDevices.memory = []; remote.testAutoAllow = true; remote.start(port: port)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 60) { exit(0) }
+            return
+        }
         // proef zonder venster: ArkTracks --remote-test  (laadt het eerste nummer in de nummermap en voert Podium-commando's uit)
         if CommandLine.arguments.contains("--remote-test") { DispatchQueue.global().async { [self] in remoteTest() }; return }
         // proef zonder venster: ArkTracks --import-test <zip>  (zet het nummer in de nummermap en meldt de uitkomst)
@@ -324,6 +343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         appMenu.addItem(item("Over \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
         appMenu.addItem(.separator())
         appMenu.addItem(item("Instellingen…", #selector(openSettings), ",", target: self))
+        appMenu.addItem(item("Bediening op afstand…", #selector(openLan), "", target: self))
         appMenu.addItem(.separator())
         appMenu.addItem(item("Verberg \(appName)", #selector(NSApplication.hide(_:)), "h"))
         appMenu.addItem(item("Stop \(appName)", #selector(NSApplication.terminate(_:)), "q"))
@@ -361,6 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     @objc func openSettings() { showSettings(firstRun: false) }
+    @objc func openLan() { if lanWindow == nil { lanWindow = LanWindow(app: self) }; lanWindow?.show() }
     @objc func reload() {
         if web.url?.scheme == OfflineMirror.scheme && !ShellSettings.offline { load() } else { web.reload() }    // zonder server door omstandigheden: opnieuw proberen te verbinden
     }

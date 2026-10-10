@@ -52,7 +52,11 @@ export default function TracksControl({ settings }: TracksControlProps) {
   const [view, setView] = useState<"live" | "library" | "local">("live");
   const [desktop, setDesktop] = useState(false);
   const [offline, setOffline] = useState(false);
-  useEffect(() => { setDesktop(hasDesktopEngine()); setOffline(isOffline()); }, []);
+  const [lan, setLan] = useState(false);       // a tablet or phone using the app's local control: no files to manage here, a link to the stage view instead
+  useEffect(() => {
+    const onLan = !!(window.arkDesktop as { lan?: boolean } | undefined)?.lan;
+    setLan(onLan); setDesktop(hasDesktopEngine() && !onLan); setOffline(isOffline());
+  }, []);
   const [localFaders, setLocalFaders] = useState<{ [track: number]: number }>({});
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -203,6 +207,7 @@ export default function TracksControl({ settings }: TracksControlProps) {
             <Library size={15} /> Op deze computer
           </button>
         )}
+        {lan && <a href="/tracks" className="trk-stage-link"><MonitorSmartphone size={16} /> Podium</a>}
         {!offline && <Link href="/tracks" className="trk-stage-link">
           <MonitorSmartphone size={16} /> Podiumweergave (telefoon/tablet)
         </Link>}
