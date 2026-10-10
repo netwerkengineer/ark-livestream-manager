@@ -696,9 +696,11 @@ fn main() {
             let url = format!("{}/desktop", s.base());
             let px = proxy.clone();
             std::thread::spawn(move || {
-                let reachable = match ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(4)).timeout_read(std::time::Duration::from_secs(6)).build().get(&url).set("Cookie", &format!("ark_desktop={}", s.key)).call() {
+                // Onbereikbaar is alleen: de naam niet te vinden of niet kunnen verbinden. Een trage server (of een wifi die even slaapt) is er wel:
+                // dan laden we de gewone pagina in plaats van de kopie.
+                let reachable = match ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(6)).timeout_read(std::time::Duration::from_secs(20)).build().get(&url).set("Cookie", &format!("ark_desktop={}", s.key)).call() {
                     Ok(_) | Err(ureq::Error::Status(_, _)) => true, // elk antwoord van de server telt: hij is er
-                    Err(_) => false,
+                    Err(ureq::Error::Transport(t)) => !matches!(t.kind(), ureq::ErrorKind::Dns | ureq::ErrorKind::ConnectionFailed | ureq::ErrorKind::InvalidUrl),
                 };
                 if reachable {
                     let _ = px.send_event(Ev::Navigate(url.clone()));

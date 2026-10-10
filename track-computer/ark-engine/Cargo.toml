@@ -1,6 +1,6 @@
 [package]
 name = "ark-engine"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "De speler van Ark Tracks voor Windows en Linux (en straks overal): mixer, sprongen op de maat, tempokaart, cues. Voorproef M0/M1."
 
