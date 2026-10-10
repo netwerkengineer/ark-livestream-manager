@@ -155,7 +155,7 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
           </select>
         )}
         <button className="trk-icon-btn" onClick={() => load(date)} title="Vernieuwen"><RefreshCw size={14} /></button>
-        {!desktop && (
+        {!desktop && state?.source !== "desktop" && (
           <button className="trk-load" onClick={loadIntoReaper} disabled={busy || !matched || playing} title="Alle gevonden songs openen als projecttabs in REAPER">
             <Download size={14} /> {busy ? "Bezig…" : "Klaarzetten in REAPER"}
           </button>

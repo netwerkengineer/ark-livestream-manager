@@ -12,12 +12,12 @@ interface LinkStatus {
   last: { user: string; device: string; action: string; at: number; ms?: number | null } | null;
 }
 
-interface Props { onError: (m: string) => void; onStatus: (m: string) => void }
+interface Props { onError: (m: string) => void; onStatus: (m: string) => void; compact?: boolean }
 
 // Which player the web app controls (REAPER on the track computer, or a desktop app), who is connected,
 // and the deliberate switch between them. There is no automatic fall-back to REAPER: a second source
 // could start playing while the app is still going.
-export default function BackendBar({ onError, onStatus }: Props) {
+export default function BackendBar({ onError, onStatus, compact }: Props) {
   const [s, setS] = useState<LinkStatus | null>(null);
 
   const load = useCallback(async () => {
@@ -55,7 +55,7 @@ export default function BackendBar({ onError, onStatus }: Props) {
   const others = s.controllers.length;
   const desktop = s.backend === "desktop";
   return (
-    <div className="trk-link">
+    <div className={`trk-link${compact ? " compact" : ""}`}>
       <span className="trk-link-who">
         {desktop ? <MonitorSmartphone size={14} /> : <Server size={14} />}
         Bediening: <strong>{desktop ? (s.player?.name || "desktop-app") : "REAPER"}</strong>
@@ -67,8 +67,9 @@ export default function BackendBar({ onError, onStatus }: Props) {
         </span>
       )}
       {desktop && s.player?.online && (
-        <span className="trk-meta" title="Tijd tussen twee meldingen van de app (grootste in de laatste minuut) en hoe snel de app op het laatste commando reageerde">
-          melding ≤{Math.round((s.player.maxGapMs || 0) / 100) / 10} s{s.last?.ms != null ? ` · reactie ${s.last.ms} ms` : ""}
+        // the figures are only in the way while all is well: visible when the connection is slow, otherwise in the tooltip
+        <span className="trk-meta" title={`Tijd tussen twee meldingen van de app (grootste in de laatste minuut) en hoe snel de app op het laatste commando reageerde: melding ≤${Math.round((s.player.maxGapMs || 0) / 100) / 10} s${s.last?.ms != null ? `, reactie ${s.last.ms} ms` : ""}`}>
+          {((s.player.maxGapMs || 0) > 3000 || (s.last?.ms ?? 0) > 800) && <>melding ≤{Math.round((s.player.maxGapMs || 0) / 100) / 10} s{s.last?.ms != null ? ` · reactie ${s.last.ms} ms` : ""}</>}
         </span>
       )}
       {desktop && !s.player?.online && (

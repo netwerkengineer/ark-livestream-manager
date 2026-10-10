@@ -1369,3 +1369,77 @@ textarea.input-field {
 .trk-link-dot { width: 8px; height: 8px; border-radius: 50%; background: #f87171; }
 .trk-link-dot.on { background: #4ade80; }
 .trk-link-warn { display: inline-flex; align-items: center; gap: 8px; color: #fbbf24; }
+
+/* ---------- Stage view (/tracks) on a tablet: everything on one screen, no scrolling ----------
+   The page is as high as the screen; the parts share the height, and only a long list (many sections, a long
+   setlist) scrolls inside its own panel. */
+.trk-stage-page {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  padding: 10px 14px 12px;
+  gap: 10px;
+  overflow: hidden;
+}
+.trk-stage-page .glass-card { padding: 12px 16px; border-radius: 14px; }
+.trk-stage-header { flex: 0 0 auto; gap: 10px; }
+.trk-stage-header h1 { font-size: 1.15rem; }
+.trk-stage-page .trk-link { margin: 0; padding: 5px 10px; flex: 0 0 auto; }
+
+/* transport: one row */
+.trk-stage-page .trk-transport.stage { flex: 0 0 auto; flex-wrap: nowrap; gap: 14px; }
+.trk-stage-page .trk-transport.stage .trk-song { min-width: 0; flex: 1 1 0; }
+.trk-stage-page .trk-transport.stage .trk-song strong { font-size: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trk-stage-page .trk-transport.stage .trk-t-btn { width: 56px; height: 56px; }
+.trk-stage-page .trk-transport.stage .trk-time { font-size: 2rem; }
+.trk-stage-page .trk-transport.stage .trk-current { flex: 0 1 auto; min-width: 90px; }
+.trk-stage-page .trk-transport.stage .trk-current strong { font-size: 1.1rem; white-space: nowrap; }
+.trk-stage-page .trk-transport.stage .trk-master { min-width: 0; flex: 0 1 230px; gap: 6px; }
+.trk-stage-page .trk-transport.stage .trk-master-slider { min-width: 60px; }
+.trk-stage-page .trk-transport.stage .trk-master-db { min-width: 0; font-size: 0.72rem; white-space: nowrap; }
+.trk-stage-page .trk-transport.stage .trk-master .trk-label { display: none; }
+
+/* the middle: sections and setlist share what is left */
+.trk-stage-page .trk-stage-grid { flex: 1 1 0; min-height: 0; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: stretch; gap: 10px; }
+.trk-stage-page .trk-stage-grid > section { min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.trk-stage-page .trk-sections-head, .trk-stage-page .trk-setlist-head { margin-bottom: 8px; gap: 8px; }
+.trk-stage-page .trk-sections.stage .trk-section-grid { flex: 1 1 0; min-height: 0; overflow: auto; align-content: start; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); grid-auto-rows: minmax(50px, 92px); gap: 6px; }
+.trk-stage-page .trk-sections.stage .trk-section { min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.trk-stage-page .trk-sections.stage .trk-section { padding: 8px 10px 10px; border-radius: 10px; }
+.trk-stage-page .trk-sections.stage .trk-section-name { font-size: 0.95rem; line-height: 1.15; }
+.trk-stage-page .trk-sections.stage .trk-mode, .trk-stage-page .trk-sections.stage .trk-loop { padding: 8px 10px; font-size: 0.72rem; }
+.trk-stage-page .trk-setlist.stage .trk-songs { overflow: auto; min-height: 0; flex: 1 1 0; }
+.trk-stage-page .trk-setlist.stage .trk-song-main { padding: 8px 6px; }
+.trk-stage-page .trk-setlist.stage .trk-song-text strong { font-size: 1rem; }
+
+/* pads: title and layers on one line with the buttons, the twelve keys under it */
+.trk-stage-page .trk-pads.stage { flex: 0 0 auto; display: grid; grid-template-columns: auto 1fr; grid-template-areas: "head row" "keys keys"; column-gap: 12px; row-gap: 8px; align-items: center; }
+.trk-stage-page .trk-pads.stage > .trk-setlist-head { grid-area: head; margin: 0; flex-wrap: nowrap; }
+.trk-stage-page .trk-pads.stage > .trk-pad-keys { grid-area: keys; margin: 0; gap: 5px; }
+.trk-stage-page .trk-pads.stage > .trk-pad-row { grid-area: row; justify-content: flex-end; flex-wrap: nowrap; }
+.trk-stage-page .trk-pads.stage > .trk-title { grid-column: 1 / -1; }
+.trk-stage-page .trk-pads.stage .trk-pad-key { padding: 11px 0; font-size: 1.05rem; }
+.trk-stage-page .trk-pads.stage .trk-pad-volume { min-width: 150px; margin-left: 0; }
+
+/* portrait tablet: sections on top, setlist under it */
+@media (max-width: 900px) {
+  .trk-stage-page .trk-stage-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .trk-stage-page .trk-transport.stage { gap: 10px; flex-wrap: wrap; }
+  .trk-stage-page .trk-transport.stage .trk-song { flex: 1 1 100%; }
+  .trk-stage-page .trk-transport.stage .trk-t-btn { width: 50px; height: 50px; }
+  .trk-stage-page .trk-pads.stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "keys" "row"; }
+  .trk-stage-page .trk-pads.stage > .trk-pad-row { justify-content: flex-start; }
+}
+
+/* the backend bar sits in the stage header's row (title, bar, link, connection) */
+.trk-stage-header .trk-link.compact { flex: 1 1 0; min-width: 0; background: none; padding: 0; font-size: 0.8rem; gap: 8px; }
+.trk-stage-header h1 { flex: 0 0 auto; }
+
+/* installed on a tablet's home screen (full screen, content under the status bar): keep clear of the edges of the screen */
+.trk-stage-page {
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}

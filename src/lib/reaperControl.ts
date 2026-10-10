@@ -93,6 +93,7 @@ export interface ReaperState {
   busses: ReaperBus[];
   bridge: BridgeState | null; // null = bridge script not running in REAPER
   pads: PadState | null;      // null = pad player not running
+  source?: 'desktop';         // the state comes from the desktop app's own player (not from REAPER on the track computer)
   receivedAt?: number;        // set in the browser: when this state arrived
 }
 

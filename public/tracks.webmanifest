@@ -1,0 +1,12 @@
+{
+  "name": "Podium",
+  "short_name": "Podium",
+  "description": "Podiumweergave van Tracks: spelen, secties kiezen, setlist en pads",
+  "start_url": "/tracks",
+  "scope": "/tracks",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1222",
+  "theme_color": "#0b1222",
+  "icons": [{ "src": "/logo.png?v=2", "sizes": "1563x1563", "type": "image/png", "purpose": "any" }]
+}

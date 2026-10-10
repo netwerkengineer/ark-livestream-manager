@@ -38,10 +38,13 @@ function setlistFor(serviceDate: string, songs: BridgeSong[]) {
 
 function resolveDate(requested: string | null) {
   const today = todayInAmsterdam();
-  const dates = getDraftServices().map(s => s.serviceDate);
+  const services = getDraftServices();
+  const dates = services.map(s => s.serviceDate);
+  const hasSongs = (d: string) => (services.find(s => s.serviceDate === d)?.songs?.length ?? 0) > 0;
+  // without a choice: the next service that has songs (a service without songs is not worth opening first), else the next one
   const date = requested && dates.includes(requested)
     ? requested
-    : dates.find(d => d >= today) || dates[dates.length - 1] || null;
+    : dates.find(d => d >= today && hasSongs(d)) || dates.find(d => d >= today) || dates[dates.length - 1] || null;
   return { today, dates, date };
 }
 

@@ -101,6 +101,7 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     busses,
     bridge,
     pads: es.pads ? { ...es.pads, error: es.pads_error || undefined } : null,
+    source: "desktop",
   };
 }
 
@@ -371,7 +372,7 @@ async function refreshServiceCache(post: (payload: unknown) => Promise<Response>
 function cachedService(lib: LibSong[], requested: string | null) {
   const c = readCache()!;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam" }).format(new Date());
-  const date = requested && c.dates.includes(requested) ? requested : c.dates.find(d => d >= today) || c.dates[c.dates.length - 1];
+  const date = requested && c.dates.includes(requested) ? requested : c.dates.find(d => d >= today && (c.byDate[d] || []).length > 0) || c.dates.find(d => d >= today) || c.dates[c.dates.length - 1];
   const items = (c.byDate[date] || []).map(it => {
     const song = lib.find(l => sameSong(it.title, parseSongName(l.name).title));
     return { ...it, path: song ? song.path : null, manual: false, local: null };
