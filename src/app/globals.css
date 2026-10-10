@@ -1461,3 +1461,92 @@ textarea.input-field {
 .trk-stage-page .trk-mixer-rack .mx-fader { flex: 1 1 0; min-height: 100px; height: auto; padding: 4px 0; }
 .trk-stage-page .trk-mixer-rack .mx-name { font-size: 0.8rem; text-align: center; line-height: 1.15; max-height: 2.4em; overflow: hidden; }
 .trk-stage-page .trk-mixer-rack .mx-tags { min-height: 0; }
+
+/* ---------- Stage view on a phone ----------
+   Tabs (sections | setlist | pads) under the transport; the panel that is picked gets the rest of the screen. Also for a phone held
+   sideways (little height). Wider and higher screens (tablet) show everything and no tabs. */
+.trk-phone-tabs { display: none; }
+@media (max-width: 640px), (max-height: 520px) {
+  .trk-phone-tabs { display: flex; flex: 0 0 auto; gap: 6px; }
+  .trk-phone-tab { flex: 1 1 0; padding: 9px 0; border-radius: 10px; font-size: 0.85rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: var(--muted); cursor: pointer; }
+  .trk-phone-tab.on { color: var(--primary); border-color: var(--primary); background: rgba(56, 189, 248, 0.12); }
+  .trk-stage-page[data-panel="sections"] .trk-setlist, .trk-stage-page[data-panel="sections"] .trk-pads { display: none; }
+  .trk-stage-page[data-panel="setlist"] .trk-sections, .trk-stage-page[data-panel="setlist"] .trk-pads { display: none; }
+  .trk-stage-page[data-panel="pads"] .trk-stage-grid { display: none; }
+  .trk-stage-page[data-panel="pads"] .trk-pads.stage { flex: 1 1 0; min-height: 0; align-content: start; }
+  .trk-stage-page .trk-stage-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .trk-stage-page .trk-pads.stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "keys" "row"; }
+  .trk-stage-page .trk-pads.stage > .trk-pad-row { justify-content: flex-start; flex-wrap: wrap; }
+  .trk-stage-page .trk-pads.stage .trk-pad-volume { min-width: 0; flex: 1 1 140px; }
+  .trk-stage-page .trk-pads.stage .trk-pad-key { padding: 20px 0; }
+  .trk-stage-page .trk-pad-keys { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .trk-stage-page { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); gap: 8px; }
+  .trk-stage-header { flex-wrap: wrap; row-gap: 4px; }
+  .trk-stage-page .trk-link .trk-meta { display: none; }
+  /* transport (a grid): song title with the section, then the buttons with the time, then the master */
+  .trk-stage-page .trk-transport.stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "song current" "buttons clock" "master master"; gap: 6px 10px; padding: 10px 12px; align-items: center; }
+  .trk-stage-page .trk-transport.stage .trk-song { grid-area: song; min-width: 0; flex-direction: row; align-items: baseline; }
+  .trk-stage-page .trk-transport.stage .trk-song strong { font-size: 1.05rem; }
+  .trk-stage-page .trk-transport.stage .trk-song .trk-label, .trk-stage-page .trk-transport.stage .trk-song .trk-meta { display: none; }
+  .trk-stage-page .trk-transport.stage .trk-current { grid-area: current; min-width: 0; align-items: flex-end; text-align: right; }
+  .trk-stage-page .trk-transport.stage .trk-current .trk-label { display: none; }
+  .trk-stage-page .trk-transport.stage .trk-current strong { font-size: 1rem; white-space: nowrap; }
+  .trk-stage-page .trk-transport.stage .trk-transport-buttons { grid-area: buttons; gap: 6px; }
+  .trk-stage-page .trk-transport.stage .trk-t-btn { width: 46px; height: 46px; border-radius: 10px; }
+  .trk-stage-page .trk-transport.stage .trk-clock { grid-area: clock; align-items: flex-end; text-align: right; }
+  .trk-stage-page .trk-transport.stage .trk-time { font-size: 1.5rem; }
+  .trk-stage-page .trk-transport.stage .trk-master { grid-area: master; }
+  /* sections: three across, small */
+  .trk-stage-page .trk-sections-head .trk-title { display: none; }
+  .trk-stage-page .trk-sections-head { margin-bottom: 6px; gap: 6px; flex-wrap: nowrap; }
+  .trk-stage-page .trk-sections.stage .trk-mode, .trk-stage-page .trk-sections.stage .trk-loop { padding: 8px 8px; font-size: 0.68rem; white-space: nowrap; }
+  .trk-stage-page .trk-sections.stage .trk-section-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(46px, 70px); gap: 6px; }
+  .trk-stage-page .trk-sections.stage .trk-section { padding: 6px 8px 8px; }
+  .trk-stage-page .trk-sections.stage .trk-section-name { font-size: 0.85rem; }
+  .trk-stage-page .glass-card { padding: 10px 12px; }
+  .trk-stage-page .trk-pads.stage > .trk-setlist-head .trk-title { display: none; }
+}
+
+/* a phone held sideways (little height): everything small, so the panel under the tabs gets most of the screen */
+@media (max-height: 520px) {
+  .trk-stage-page { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); gap: 6px; }
+  .trk-stage-header h1 { font-size: 1rem; }
+  .trk-stage-page .trk-link .trk-meta { display: none; }
+  .trk-stage-page .trk-transport.stage { gap: 10px; padding: 6px 12px; flex-wrap: nowrap; }
+  .trk-stage-page .trk-transport.stage .trk-song strong { font-size: 1rem; }
+  .trk-stage-page .trk-transport.stage .trk-song .trk-label, .trk-stage-page .trk-transport.stage .trk-song .trk-meta { display: none; }
+  .trk-stage-page .trk-transport.stage .trk-t-btn { width: 40px; height: 40px; border-radius: 9px; }
+  .trk-stage-page .trk-transport.stage .trk-time { font-size: 1.3rem; }
+  .trk-stage-page .trk-transport.stage .trk-clock .trk-meta { font-size: 0.65rem; }
+  .trk-stage-page .trk-transport.stage .trk-current .trk-label { display: none; }
+  .trk-stage-page .trk-transport.stage .trk-current strong { font-size: 0.95rem; }
+  .trk-stage-page .trk-transport.stage .trk-song { flex: 0 1 200px; min-width: 0; }
+  .trk-stage-page .trk-transport.stage .trk-master { flex: 1 1 0; min-width: 150px; }
+  .trk-phone-tab { padding: 6px 0; font-size: 0.8rem; }
+  .trk-stage-page .glass-card { padding: 8px 12px; }
+  .trk-stage-page .trk-sections-head .trk-title, .trk-stage-page .trk-setlist-head .trk-title { display: none; }
+  .trk-stage-page .trk-sections-head, .trk-stage-page .trk-setlist-head { margin-bottom: 6px; }
+  .trk-stage-page .trk-sections.stage .trk-section-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); grid-auto-rows: minmax(44px, 56px); gap: 5px; }
+  .trk-stage-page .trk-sections.stage .trk-section { padding: 5px 8px 6px; }
+  .trk-stage-page .trk-sections.stage .trk-section-name { font-size: 0.82rem; }
+  .trk-stage-page .trk-pads.stage { row-gap: 6px; }
+  .trk-stage-page .trk-pad-keys { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+  .trk-stage-page .trk-pads.stage .trk-pad-key { padding: 10px 0; font-size: 0.95rem; }
+}
+
+/* mixer page of a phone held sideways: the faders get the height (no output badges, small buttons and headings) */
+@media (max-height: 520px) {
+  .trk-stage-page .trk-mixer-rack .mx-head .trk-title { display: none; }
+  .trk-stage-page .trk-mixer-rack .mx-head { margin-bottom: 2px; justify-content: flex-start; gap: 6px; }
+  .trk-stage-page .trk-mixer-rack .mx-head .mx-unmute, .trk-stage-page .trk-mixer-rack .mx-head .trk-warn { display: none; }
+  .trk-stage-page .trk-mixer-rack .mx-scale { display: none; }
+  .trk-stage-page .trk-mixer-rack .mx-tags { display: none; }
+  .trk-stage-page .trk-mixer-rack .mx-strip { padding: 4px 4px; gap: 3px; }
+  .trk-stage-page .trk-mixer-rack .mx-value { font-size: 0.7rem; padding: 1px 4px; min-width: 44px; }
+  .trk-stage-page .trk-mixer-rack .mx-fader { min-height: 60px; padding: 2px 0; }
+  .trk-stage-page .trk-mixer-rack .mx-btn { padding: 4px 8px; font-size: 0.7rem; }
+  .trk-stage-page .trk-mixer-rack .mx-name { font-size: 0.68rem; }
+  .trk-stage-page .trk-mixer-rack .mx-stems { padding: 2px 6px; font-size: 0.62rem; }
+}

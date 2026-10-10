@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         // proef zonder venster: ArkTracks --lan-test <poort>  (lokale bediening aan, koppelen wordt vanzelf toegestaan, niets naar de Keychain)
         if let i = CommandLine.arguments.firstIndex(of: "--lan-test"), i + 1 < CommandLine.arguments.count, let port = Int(CommandLine.arguments[i + 1]) {
             LanDevices.memory = []; remote.testAutoAllow = true; remote.start(port: port)
-            DispatchQueue.global().asyncAfter(deadline: .now() + 60) { exit(0) }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 900) { exit(0) }
             return
         }
         // proef zonder venster: ArkTracks --remote-test  (laadt het eerste nummer in de nummermap en voert Podium-commando's uit)

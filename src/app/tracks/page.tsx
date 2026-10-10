@@ -30,6 +30,8 @@ export default function TracksStagePage() {
     () => false,
   );
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // On a phone not everything fits on one screen: tabs pick sections, setlist or pads (the transport stays on top). A wider screen shows all.
+  const [panel, setPanel] = useState<"sections" | "setlist" | "pads">("sections");
   const { state, error } = useReaperState(access === "ok");
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function TracksStagePage() {
   }
 
   return (
-    <div className="trk-stage-page">
+    <div className="trk-stage-page" data-panel={panel}>
       <header className="trk-stage-header">
         {!standalone && <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>}
         <h1 className="gradient-text">Podium</h1>
@@ -98,6 +100,11 @@ export default function TracksStagePage() {
       </header>
 
       <TransportBar state={state} onError={showError} stage />
+      <div className="trk-phone-tabs" role="tablist" aria-label="Onderdeel">
+        {([["sections", "Secties"], ["setlist", "Setlist"], ["pads", "Pads"]] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={panel === id} className={`trk-phone-tab${panel === id ? " on" : ""}`} onClick={() => setPanel(id)}>{label}</button>
+        ))}
+      </div>
       <div className="trk-stage-grid">
         <SectionsPanel state={state} onError={showError} stage />
         <SetlistPanel state={state} onError={showError} onStatus={showSuccess} stage />
