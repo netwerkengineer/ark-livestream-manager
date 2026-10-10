@@ -554,6 +554,59 @@ fn ca_test(dir: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn vault_test() -> Result<(), String> {
+    use ark_engine::{lanca::Ca, vault};
+    std::env::set_var("ARK_VAULT_SERVICE", format!("nl.arkchurch.tracks-desktop.test-{}", std::process::id())); // eigen proefnaam: de echte items blijven ongemoeid
+    let mut fails = 0;
+    let mut check = |ok: bool, what: &str| {
+        println!("{} {}", if ok { "ok   " } else { "FOUT " }, what);
+        if !ok {
+            fails += 1;
+        }
+    };
+    let have = vault::available();
+    println!("sleutelbos beschikbaar: {have}");
+    if have {
+        check(vault::set("proef", "geheim-1"), "waarde bewaren");
+        check(vault::get("proef").as_deref() == Some("geheim-1"), "waarde teruglezen");
+        check(vault::set("proef", "geheim-2") && vault::get("proef").as_deref() == Some("geheim-2"), "waarde vervangen");
+        vault::delete("proef");
+        check(vault::get("proef").is_none(), "waarde verwijderen");
+    }
+    // certificaatsleutel: een oud bestand met sleutel wordt overgezet (met sleutelbos) of blijft staan (zonder)
+    let dir = std::env::temp_dir().join(format!("ark-vault-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let ca = Ca::new(Some(dir.clone()));
+    ca.ensure("Proef")?;
+    let key_file = dir.join("ca.key.pem");
+    if have {
+        check(!key_file.exists(), "CA: privésleutel staat niet in een bestand");
+        check(vault::get("lan-ca-key").map(|k| k.contains("PRIVATE KEY")).unwrap_or(false), "CA: privésleutel staat in de sleutelbos");
+    } else {
+        check(key_file.exists(), "CA: zonder sleutelbos blijft de sleutel in het bestand");
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&key_file).map(|m| m.permissions().mode() & 0o777).unwrap_or(0);
+            check(mode == 0o600, &format!("CA: rechten van het sleutelbestand zijn 600 (nu {mode:o})"));
+        }
+    }
+    check(ca.leaf(&["pc.local".to_string()], &["192.168.1.5".to_string()], "Proef").is_ok(), "CA: certificaat maken met de bewaarde sleutel");
+    // oud bestand met sleutel: overzetten
+    if have {
+        let key = vault::get("lan-ca-key").unwrap_or_default();
+        vault::delete("lan-ca-key");
+        std::fs::write(&key_file, &key).map_err(|e| e.to_string())?;
+        let ca2 = Ca::new(Some(dir.clone()));
+        check(ca2.leaf(&["pc.local".to_string()], &[], "Proef").is_ok(), "CA: oud sleutelbestand blijft bruikbaar");
+        check(!key_file.exists() && vault::get("lan-ca-key").is_some(), "CA: sleutel uit het oude bestand is naar de sleutelbos verhuisd en het bestand is gewist");
+    }
+    ca.reset();
+    check(!ca.exists() && vault::get("lan-ca-key").is_none() && !key_file.exists(), "CA: opnieuw maken wist alles");
+    let _ = std::fs::remove_dir_all(&dir);
+    println!("{}", if fails == 0 { "SLEUTELBOSTEST GESLAAGD".to_string() } else { format!("SLEUTELBOSTEST: {fails} fouten") });
+    if fails == 0 { Ok(()) } else { Err("sleutelbostest mislukt".into()) }
+}
+
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
@@ -672,6 +725,7 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_secs(900));
             Ok(())
         }
+        "vault-test" => vault_test(),
         "padtest" => padtest(args.first().map(|s| s.as_str()).unwrap_or("")),
         "cuetest" => cuetest(args.first().map(|s| s.as_str()).unwrap_or("")),
         "transtest" => transtest(args.first().map(|s| s.as_str()).unwrap_or(""), args.get(1).map(|s| s.as_str()).unwrap_or("")),

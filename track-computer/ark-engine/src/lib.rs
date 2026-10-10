@@ -19,6 +19,7 @@ pub mod lan;
 pub mod lanca;
 pub mod mixer;
 pub mod song;
+pub mod vault;
 pub mod stats;
 pub mod tempo;
 #[cfg(feature = "audio")]

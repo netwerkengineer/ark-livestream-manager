@@ -51,15 +51,41 @@ fn shell_path() -> String {
 impl Shell {
     fn load() -> Shell {
         let j: Value = std::fs::read(shell_path()).ok().and_then(|d| serde_json::from_slice(&d).ok()).unwrap_or(json!({}));
-        Shell { server: j["server"].as_str().unwrap_or("").to_string(), key: j["key"].as_str().unwrap_or("").to_string(), offline: j["offline"].as_bool().unwrap_or(false), lan: j["lan"].as_bool().unwrap_or(false), lan_tls: j["lan_tls"].as_bool().unwrap_or(true), lan_port: j["lan_port"].as_u64().filter(|p| (1024..=65535).contains(p)).unwrap_or(8765) as u16, name: j["name"].as_str().filter(|n| !n.is_empty()).map(String::from).unwrap_or_else(|| gethostname::gethostname().to_string_lossy().to_string()) }
+        let file_key = j["key"].as_str().unwrap_or("").to_string();
+        let vault_key = ark_engine::vault::get("desktop-key");
+        // de sleutel staat in de sleutelbos van het systeem; een sleutel uit een oud bestand wordt daarheen overgezet
+        let key = vault_key.clone().unwrap_or_else(|| file_key.clone());
+        let s = Shell {
+            server: j["server"].as_str().unwrap_or("").to_string(),
+            key,
+            offline: j["offline"].as_bool().unwrap_or(false),
+            lan: j["lan"].as_bool().unwrap_or(false),
+            lan_tls: j["lan_tls"].as_bool().unwrap_or(true),
+            lan_port: j["lan_port"].as_u64().filter(|p| (1024..=65535).contains(p)).unwrap_or(8765) as u16,
+            name: j["name"].as_str().filter(|n| !n.is_empty()).map(String::from).unwrap_or_else(|| gethostname::gethostname().to_string_lossy().to_string()),
+        };
+        if !file_key.is_empty() {
+            // het bestand bevat nog een sleutel: opnieuw bewaren (zet hem in de sleutelbos en schrijft het bestand zonder sleutel)
+            if vault_key.is_none() && ark_engine::vault::available() {
+                log("Sleutel van de app overgezet naar de sleutelbos van het systeem");
+            }
+            s.save();
+        }
+        s
     }
     fn save(&self) {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::create_dir_all(config_dir());
         let path = shell_path();
         let tmp = format!("{path}.tmp");
-        if std::fs::write(&tmp, json!({"server": self.server, "key": self.key, "offline": self.offline, "lan": self.lan, "lan_tls": self.lan_tls, "lan_port": self.lan_port, "name": self.name}).to_string()).is_ok() {
-            let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)); // de sleutel: alleen deze gebruiker
+        // een lege sleutel wissen we nooit uit de sleutelbos: hij kan ook leeg zijn omdat de sleutelbos even niet te lezen was
+        let in_vault = if self.key.is_empty() { ark_engine::vault::available() } else { ark_engine::vault::set("desktop-key", &self.key) };
+        let mut j = json!({"server": self.server, "offline": self.offline, "lan": self.lan, "lan_tls": self.lan_tls, "lan_port": self.lan_port, "name": self.name});
+        if !in_vault {
+            j["key"] = json!(self.key); // geen sleutelbos: in het bestand (alleen leesbaar voor deze gebruiker)
+        }
+        if std::fs::write(&tmp, j.to_string()).is_ok() {
+            let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
             let _ = std::fs::rename(&tmp, &path);
         }
     }
@@ -183,7 +209,7 @@ button.g{background:#1e293b;margin-left:10px}.msg{margin-top:16px;color:#86efac}
 <label for="server">Server</label><input id="server" placeholder="https://ops.arkchurch.nl" autocomplete="off">
 <small>Het adres van de webapp. Laat leeg om alleen met de eigen nummers te werken (nog niet beschikbaar zonder server).</small>
 <label for="key">Sleutel van deze computer</label><input id="key" type="password" autocomplete="off" placeholder="(laat leeg om de bewaarde sleutel te houden)">
-<small>Maak de sleutel aan in de webapp onder Instellingen › Desktop-app. Hij wordt alleen op deze computer bewaard.</small>
+<small>Maak de sleutel aan in de webapp onder Instellingen › Desktop-app. <span id="vaultnote">Hij wordt alleen op deze computer bewaard.</span></small>
 <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="offline" style="width:auto"> Zonder server werken</label>
 <small id="mirror"></small><button class="g" id="upd" style="margin:8px 0 0">Kopie voor gebruik zonder server nu bijwerken</button>
 <label for="songs">Map met nummers</label><input id="songs" placeholder="~/Tracks/Songs">
@@ -199,7 +225,7 @@ const call=(a,p)=>window.arkShell(Object.assign({action:a},p||{}));
  $("server").value=s.server; $("key").placeholder=s.hasKey?"(sleutel is bewaard; laat leeg om hem te houden)":"plak hier de sleutel";
  $("songs").value=s.songs_root; $("mode").value=s.output_mode; $("fs").value=s.freeshow_host?(s.freeshow_host+":"+s.freeshow_port):"";
  for(const d of s.devices){const o=document.createElement("option");o.value=d.name;o.textContent=d.name+" ("+d.outputs+" uitgangen)";$("device").appendChild(o)}
- $("device").value=s.device; $("offline").checked=s.offline;
+ $("device").value=s.device; $("offline").checked=s.offline; $("vaultnote").textContent=s.vault?"Hij staat in de sleutelbos van deze computer, niet in een bestand.":"Er is geen sleutelbos beschikbaar: de sleutel staat in een bestand dat alleen jij kunt lezen.";
  $("mirror").textContent=s.mirror?"Er is een kopie van de pagina bewaard; zonder server (of bij een storing) werkt de app daarmee.":"Er is nog geen kopie. Verbind één keer met de server: de app bewaart dan zelf een kopie.";
  $("cancel").style.display=s.configured?"":"none";
 })();
@@ -613,7 +639,7 @@ fn main() {
                         let devices = st.list_devices.as_ref().map(|f| f()).unwrap_or_default();
                         reply(
                             json!({"version": env!("CARGO_PKG_VERSION"), "log": std::env::var("ARK_LOG").unwrap_or_else(|_| format!("{}/.local/state/ArkTracks/ArkTracks.log", std::env::var("HOME").unwrap_or_default())),
-                                "server": s.base(), "hasKey": !s.key.is_empty(), "configured": !s.base().is_empty() && !s.key.is_empty() || s.offline, "offline": s.offline, "mirror": offline::available(),
+                                "server": s.base(), "hasKey": !s.key.is_empty(), "vault": ark_engine::vault::available(), "configured": !s.base().is_empty() && !s.key.is_empty() || s.offline, "offline": s.offline, "mirror": offline::available(),
                                 "songs_root": st.cfg.songs_root, "device": st.cfg.device, "output_mode": st.cfg.output_mode,
                                 "freeshow_host": st.cfg.fs_host, "freeshow_port": st.cfg.fs_port,
                                 "devices": devices.iter().filter(|d| d.1 > 0).map(|d| json!({"name": d.0, "outputs": d.1})).collect::<Vec<_>>()})

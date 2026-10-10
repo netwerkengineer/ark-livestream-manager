@@ -12,6 +12,8 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+const KEY_NAME: &str = "lan-ca-key";
+
 pub struct Ca {
     dir: Option<PathBuf>, // None: alleen in het geheugen (voor de proeven)
     mem: Mutex<Option<(String, String)>>, // (cert pem, sleutel pem)
@@ -31,8 +33,25 @@ impl Ca {
             None => self.mem.lock().unwrap().clone(),
             Some(d) => {
                 let cert = std::fs::read_to_string(d.join("ca.crt.pem")).ok()?;
-                let key = std::fs::read_to_string(d.join("ca.key.pem")).ok()?;
-                if cert.is_empty() || key.is_empty() { None } else { Some((cert, key)) }
+                if cert.is_empty() {
+                    return None;
+                }
+                // de privésleutel: sleutelbos, anders het bestand (en dan meteen proberen over te zetten naar de sleutelbos)
+                let file_key = std::fs::read_to_string(d.join("ca.key.pem")).unwrap_or_default();
+                if let Some(k) = crate::vault::get(KEY_NAME) {
+                    if !file_key.is_empty() {
+                        let _ = std::fs::remove_file(d.join("ca.key.pem")); // staat veilig in de sleutelbos: het bestand kan weg
+                    }
+                    return Some((cert, k));
+                }
+                if file_key.is_empty() {
+                    return None;
+                }
+                if crate::vault::set(KEY_NAME, &file_key) {
+                    let _ = std::fs::remove_file(d.join("ca.key.pem"));
+                    crate::player::log("Certificaatsleutel overgezet naar de sleutelbos van het systeem");
+                }
+                Some((cert, file_key))
             }
         }
     }
@@ -47,8 +66,12 @@ impl Ca {
                 std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
                 std::fs::write(d.join("ca.crt.pem"), cert).map_err(|e| e.to_string())?;
                 let kp = d.join("ca.key.pem");
-                std::fs::write(&kp, key).map_err(|e| e.to_string())?;
-                let _ = std::fs::set_permissions(&kp, std::fs::Permissions::from_mode(0o600)); // alleen deze gebruiker
+                if crate::vault::set(KEY_NAME, key) {
+                    let _ = std::fs::remove_file(&kp);
+                } else {
+                    std::fs::write(&kp, key).map_err(|e| e.to_string())?;
+                    let _ = std::fs::set_permissions(&kp, std::fs::Permissions::from_mode(0o600)); // alleen deze gebruiker
+                }
                 Ok(())
             }
         }
@@ -65,6 +88,7 @@ impl Ca {
             Some(d) => {
                 let _ = std::fs::remove_file(d.join("ca.crt.pem"));
                 let _ = std::fs::remove_file(d.join("ca.key.pem"));
+                crate::vault::delete(KEY_NAME);
             }
         }
     }
@@ -73,6 +97,13 @@ impl Ca {
     pub fn ensure(&self, name: &str) -> Result<(), String> {
         if self.exists() {
             return Ok(());
+        }
+        // Staat het certificaat er wel maar is de sleutel niet te lezen (bijvoorbeeld een vergrendelde sleutelbos), dan NIET stilletjes een
+        // nieuwe CA maken: alle apparaten zouden dan opnieuw het certificaat moeten installeren.
+        if let Some(d) = &self.dir {
+            if d.join("ca.crt.pem").exists() {
+                return Err("De sleutel van het certificaat is niet te lezen (is de sleutelbos vergrendeld?). Ontgrendel de sleutelbos en start de app opnieuw, of maak bewust een nieuw certificaat.".into());
+            }
         }
         let cn: String = name.chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '.').take(40).collect();
         let mut p = CertificateParams::default();
