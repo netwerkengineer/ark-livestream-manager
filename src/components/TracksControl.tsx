@@ -27,6 +27,8 @@ import { volumeToFader, faderToVolume, formatDb, meterPercent } from "@/componen
 
 interface TracksControlProps {
   settings: any;
+  /** only the faders (transport and master on top, the groups under it): the mixer page of a tablet */
+  mixerOnly?: boolean;
 }
 
 // After a fader is released REAPER may still report the old value for a
@@ -45,7 +47,7 @@ const OUTPUT_LABEL: Record<string, string> = {
 };
 const stemLabel = (name: string) => name.replace(/\s*\[LIVE\]\s*/i, "").trim();
 
-export default function TracksControl({ settings }: TracksControlProps) {
+export default function TracksControl({ settings, mixerOnly }: TracksControlProps) {
   const isEnabled = !!settings?.reaperEnabled;
   const { state, setState, error } = useReaperState(isEnabled);
   const [openBus, setOpenBus] = useState<number | null>(null);
@@ -192,6 +194,32 @@ export default function TracksControl({ settings }: TracksControlProps) {
       </div>
     );
   };
+
+  // The mixer page of a tablet: transport (with master) on top, all faders under it, nothing else. The parent is a column that is as
+  // high as the screen (.trk-stage-page); the strips share the height.
+  if (mixerOnly) {
+    return (
+      <>
+        <TransportBar state={state} onError={showError} stage />
+        <section className="glass-card trk-mixer-rack">
+          <div className="mx-head">
+            {openBusData ? (
+              <button className="trk-icon-btn" onClick={() => setOpenBus(null)}><ChevronDown size={14} style={{ transform: "rotate(90deg)" }} /> Groepen</button>
+            ) : null}
+            <h3 className="trk-title"><SlidersHorizontal size={16} style={{ color: openBusData ? "#f97316" : "var(--primary)" }} /> {openBusData ? `Stems – ${openBusData.label}` : "Groepen"}</h3>
+            {error && <span className="trk-warn" style={{ margin: 0 }}><AlertTriangle size={14} /> Niet verbonden</span>}
+            <button className="mx-unmute" onClick={unmuteAll} disabled={!state?.busses.some(b => b.track.muted || b.stems.some(s => s.muted))}>Alles unmuten</button>
+          </div>
+          <div className="mx-rack">
+            {openBusData
+              ? openBusData.stems.map(s => renderFader(s, stemLabel(s.name), { live: isLiveStem(s.name) }))
+              : state?.busses.map(b => renderFader(b.track, b.label, { sub: b.out ? `Out ${b.out}` : undefined, bus: true, stemCount: b.stems.length }))}
+          </div>
+        </section>
+        {statusMessage && <div className={`trk-toast ${statusMessage.type}`}>{statusMessage.text}</div>}
+      </>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>

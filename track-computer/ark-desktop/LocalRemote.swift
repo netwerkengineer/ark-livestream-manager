@@ -126,8 +126,9 @@ final class LocalRemote {
         guard let comps = URLComponents(string: r.target) else { c.cancel(); return }
         let path = comps.path
         if r.method == "GET" && (path == "/" || path == "/podium") { return redirect(c, "/tracks") }
-        if r.method == "GET" && path == "/mixer" { return redirect(c, "/desktop") }
+        if r.method == "GET" && path == "/mixer" { return redirect(c, "/tracks/mixer") }
         if r.method == "GET" && path == "/tracks" { return page(c, "tracks.html") }
+        if r.method == "GET" && path == "/tracks/mixer" { return page(c, "mixer.html") }       // alleen de faders
         if r.method == "GET" && path == "/desktop" { return page(c, "desktop.html") }       // het volledige Tracks-scherm met de mixer
         if r.method == "GET" && path.hasPrefix("/_next/static/") { return file(c, path) }
         if r.method == "POST" && path == "/_pair" { return pair(c, r) }
@@ -271,14 +272,16 @@ final class LocalRemote {
             };
             if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
           }
+          let unpaired = false;      // not coupled: do not keep asking (the page polls the player several times a second)
           async function call(path, params) {
+            if (unpaired) throw new Error("Niet gekoppeld");
             const qs = new URLSearchParams();
             for (const [k, v] of Object.entries(params || {})) {
               if (Array.isArray(v)) v.forEach(x => qs.append(k, x));
               else if (v !== undefined && v !== null) qs.append(k, typeof v === "boolean" ? (v ? "1" : "0") : String(v));
             }
             const r = await fetch("/_engine" + path + (qs.toString() ? "?" + qs : ""), { headers: auth() });
-            if (r.status === 401) { pair(); throw new Error("Niet gekoppeld"); }
+            if (r.status === 401) { unpaired = true; pair(); throw new Error("Niet gekoppeld"); }
             return r.json();
           }
           window.arkEngine = { available: true, call };

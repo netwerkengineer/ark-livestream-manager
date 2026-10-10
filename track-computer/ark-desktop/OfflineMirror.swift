@@ -53,7 +53,8 @@ enum OfflineMirror {
             try fm.createDirectory(at: fresh, withIntermediateDirectories: true)
             let html = try await get(server, "/desktop", key: key)
             guard let text = String(data: html, encoding: .utf8), text.contains("/_next/") else { return "de pagina /desktop is niet zoals verwacht" }
-            let podium = try? await get(server, "/tracks", key: key)          // het Podium, voor de lokale bediening (zonder server)
+            let podium = try? await get(server, "/tracks", key: key)          // het Podium en de mixer, voor de lokale bediening (zonder server)
+            let mixer = try? await get(server, "/tracks/mixer", key: key)
             let list = try JSONSerialization.jsonObject(with: try await get(server, "/api/tracks/desktop/bundle", key: key)) as? [String: Any]
             let files = (list?["files"] as? [String]) ?? []
             guard !files.isEmpty else { return "de server gaf geen lijst met bestanden" }
@@ -80,6 +81,7 @@ enum OfflineMirror {
             if failed > 0 { try? fm.removeItem(at: fresh); return "\(failed) bestanden konden niet worden opgehaald" }
             try html.write(to: fresh.appendingPathComponent("desktop.html"))
             if let p = podium, String(data: p, encoding: .utf8)?.contains("/_next/") == true { try p.write(to: fresh.appendingPathComponent("tracks.html")) }
+            if let m = mixer, String(data: m, encoding: .utf8)?.contains("/_next/") == true { try m.write(to: fresh.appendingPathComponent("mixer.html")) }
             try? fm.removeItem(at: dir)
             try fm.moveItem(at: fresh, to: dir)
             return nil

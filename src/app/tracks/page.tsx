@@ -92,7 +92,8 @@ export default function TracksStagePage() {
         {!standalone && <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>}
         <h1 className="gradient-text">Podium</h1>
         <BackendBar onError={showError} onStatus={showSuccess} compact />
-        {lan && <a href="/desktop" className="trk-icon-btn" title="Het volledige Tracks-scherm met de mixer">Mixer</a>}
+        {/* the stage view has no faders on purpose; this leads to the mixer page (the app's own web server has it too) */}
+        <a href="/tracks/mixer" className="trk-icon-btn" title="De faders">Mixer</a>
         <span className={`trk-conn${error ? " off" : ""}`}>{error ? "Niet verbonden" : "Verbonden"}</span>
       </header>
 
