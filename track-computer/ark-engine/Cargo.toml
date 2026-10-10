@@ -1,6 +1,6 @@
 [package]
 name = "ark-engine"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "De speler van Ark Tracks voor Windows en Linux (en straks overal): mixer, sprongen op de maat, tempokaart, cues. Voorproef M0/M1."
 
@@ -55,3 +55,20 @@ required-features = ["app"]
 [profile.release]
 opt-level = 3
 lto = true
+
+# .deb-pakket voor Linux (cargo install cargo-deb; cargo deb -- --features app)
+[package.metadata.deb]
+name = "ark-tracks"
+maintainer = "Ark Church <jeffrey@netwerkengineer.nl>"
+copyright = "Ark Church"
+section = "sound"
+priority = "optional"
+extended-description = """\
+Ark Tracks speelt de tracks van de kerkband af (stems, sprongen op de maat, pads, cues naar FreeShow) en toont de Tracks-pagina van de webapp.
+Werkt ook zonder server en kan vanaf een tablet of telefoon bediend worden."""
+depends = "libwebkit2gtk-4.1-0, libgtk-3-0, libasound2t64 | libasound2, zenity"
+assets = [
+    ["target/release/ark-tracks", "usr/bin/ark-tracks", "755"],
+    ["linux/ark-tracks.desktop", "usr/share/applications/ark-tracks.desktop", "644"],
+    ["linux/ark-tracks.svg", "usr/share/icons/hicolor/scalable/apps/ark-tracks.svg", "644"],
+]

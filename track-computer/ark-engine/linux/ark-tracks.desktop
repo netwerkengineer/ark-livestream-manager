@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Ark Tracks
+Comment=Tracks afspelen en bedienen
+Exec=ark-tracks
+Icon=ark-tracks
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupWMClass=ark-tracks

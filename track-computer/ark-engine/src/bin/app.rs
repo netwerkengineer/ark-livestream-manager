@@ -217,7 +217,7 @@ fn init_script(shell: &Shell) -> String {
     format!(
         r#"
 window.arkDesktop = {{
-  version: "0.1-linux", platform: "linux", offline: location.protocol === "arkoffline:",
+  version: "{version}-linux", platform: "linux", offline: location.protocol === "arkoffline:",
   remote: {{ enabled: false, name: "" }}, server: {server},
   openSettings: () => window.arkShell({{ action: "openSettings" }}),
   openExternal: (url) => window.arkShell({{ action: "openExternal", url }}),
@@ -271,7 +271,8 @@ window.arkDesktop = {{
   }}, true);
 }})();
 "#,
-        server = serde_json::to_string(&shell.base()).unwrap()
+        server = serde_json::to_string(&shell.base()).unwrap(),
+        version = env!("CARGO_PKG_VERSION")
     )
 }
 
@@ -611,7 +612,7 @@ fn main() {
                         let st = p.lock();
                         let devices = st.list_devices.as_ref().map(|f| f()).unwrap_or_default();
                         reply(
-                            json!({"version": "0.1", "log": std::env::var("ARK_LOG").unwrap_or_else(|_| format!("{}/.local/state/ArkTracks/ArkTracks.log", std::env::var("HOME").unwrap_or_default())),
+                            json!({"version": env!("CARGO_PKG_VERSION"), "log": std::env::var("ARK_LOG").unwrap_or_else(|_| format!("{}/.local/state/ArkTracks/ArkTracks.log", std::env::var("HOME").unwrap_or_default())),
                                 "server": s.base(), "hasKey": !s.key.is_empty(), "configured": !s.base().is_empty() && !s.key.is_empty() || s.offline, "offline": s.offline, "mirror": offline::available(),
                                 "songs_root": st.cfg.songs_root, "device": st.cfg.device, "output_mode": st.cfg.output_mode,
                                 "freeshow_host": st.cfg.fs_host, "freeshow_port": st.cfg.fs_port,

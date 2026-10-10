@@ -1,0 +1,49 @@
+# Bouwt Ark Tracks voor Linux (.deb) en draait de proeven. Handmatig te starten (Actions > Run workflow),
+# of door een tag "ark-tracks-v0.2.0" te pushen; dan komt het pakket ook bij de release.
+name: Ark Tracks voor Linux
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["ark-tracks-v*"]
+    paths: ["track-computer/ark-engine/**", ".github/workflows/ark-tracks-linux.yml"]
+
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: track-computer/ark-engine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bibliotheken voor het venster en het geluid
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libasound2-dev libxdo-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            track-computer/ark-engine/target
+          key: ark-engine-${{ runner.os }}-${{ hashFiles('track-computer/ark-engine/Cargo.lock') }}
+      - name: Proeven
+        run: cargo test --release
+      - name: Pakket bouwen
+        run: |
+          cargo install cargo-deb --locked
+          cargo deb -- --features app
+      - name: Controleren
+        run: |
+          dpkg-deb -I target/debian/ark-tracks_*.deb
+          dpkg-deb -c target/debian/ark-tracks_*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ark-tracks-deb
+          path: track-computer/ark-engine/target/debian/*.deb
+      - name: Bij de release zetten
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: track-computer/ark-engine/target/debian/*.deb
