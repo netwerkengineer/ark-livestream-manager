@@ -15,22 +15,64 @@ import UniformTypeIdentifiers
 
 let appName = "Ark Tracks"
 
-/// De sleutel van de beheerder staat in de Keychain, niet in een gewoon bestand
+/// De geheimen (sleutel van de beheerder, certificaat en sleutel van de lokale bediening, gekoppelde apparaten) staan in de Keychain, niet in een gewoon bestand.
+/// Alles zit in ÉÉN Keychain-item: macOS vraagt per item toestemming (en na elke nieuwe versie van de app opnieuw), dus zo is het één vraag in plaats van meer.
+/// Een geheim dat nog in een eigen item van een oudere versie staat, wordt bij de eerste keer overgenomen en daarna verwijderd.
 enum Keychain {
-    static let service = "nl.arkchurch.tracks-desktop"
-    static func get(_ account: String) -> String {
+    static var service = "nl.arkchurch.tracks-desktop"
+    static let vaultAccount = "vault"
+    private static var vault: [String: String]?
+    private static var legacyChecked = Set<String>()
+    private static let lock = NSLock()
+    /// Schrijven gaat op een eigen wachtrij: vraagt macOS om toestemming, dan wacht alleen dat schrijven, niet de app of de bediening
+    private static let writer = DispatchQueue(label: "ark.keychain.writer")
+    static func flush() { writer.sync {} }
+
+    static func rawGet(_ account: String) -> String {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account,
                                 kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
         var out: AnyObject?
         guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return "" }
         return String(data: d, encoding: .utf8) ?? ""
     }
-    static func set(_ account: String, _ value: String) {
+    static func rawSet(_ account: String, _ value: String) {
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
         SecItemDelete(base as CFDictionary)
         if value.isEmpty { return }
         var add = base; add[kSecValueData as String] = Data(value.utf8)
         SecItemAdd(add as CFDictionary, nil)
+    }
+    private static func loadVault() -> [String: String] {
+        if let v = vault { return v }
+        let raw = rawGet(vaultAccount)
+        let v = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: String] ?? [:]
+        vault = v
+        return v
+    }
+    private static func saveVault(_ v: [String: String], dropLegacy: String? = nil) {
+        vault = v
+        let text = (try? String(data: JSONSerialization.data(withJSONObject: v), encoding: .utf8)) ?? ""
+        writer.async { rawSet(vaultAccount, text); if let a = dropLegacy { rawSet(a, "") } }
+    }
+    /// Alleen voor de proef: vergeet wat in het geheugen staat
+    static func forgetCache() { flush(); lock.lock(); vault = nil; legacyChecked = []; lock.unlock() }
+
+    static func get(_ account: String) -> String {
+        lock.lock(); defer { lock.unlock() }
+        var v = loadVault()
+        if let x = v[account] { return x }
+        if legacyChecked.contains(account) { return "" }
+        legacyChecked.insert(account)
+        let old = rawGet(account)                                 // een eigen item van een oudere versie: overnemen
+        if !old.isEmpty { v[account] = old; saveVault(v, dropLegacy: account) }
+        return old
+    }
+    static func set(_ account: String, _ value: String) {
+        lock.lock(); defer { lock.unlock() }
+        var v = loadVault()
+        if value.isEmpty { v.removeValue(forKey: account) } else { v[account] = value }
+        legacyChecked.insert(account)
+        saveVault(v, dropLegacy: account)                         // (een eventueel oud eigen item verdwijnt ook)
     }
 }
 
@@ -58,6 +100,11 @@ struct ShellSettings {
     static var lan: Bool {
         get { UserDefaults.standard.bool(forKey: "lan") }
         set { UserDefaults.standard.set(newValue, forKey: "lan") }
+    }
+    /// versleuteld (https) met een eigen certificaat; staat standaard aan
+    static var lanTLS: Bool {
+        get { UserDefaults.standard.object(forKey: "lanTLS") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "lanTLS") }
     }
     static var lanPort: Int {
         get { let p = UserDefaults.standard.integer(forKey: "lanPort"); return p == 0 ? 8765 : p }
@@ -142,9 +189,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if audioTest { runAudioTest(); return }
         // proef zonder venster: ArkTracks --lan-test <poort>  (lokale bediening aan, koppelen wordt vanzelf toegestaan, niets naar de Keychain)
         if let i = CommandLine.arguments.firstIndex(of: "--lan-test"), i + 1 < CommandLine.arguments.count, let port = Int(CommandLine.arguments[i + 1]) {
-            LanDevices.memory = []; remote.testAutoAllow = true; remote.start(port: port)
+            LanDevices.memory = []; LocalCA.memory = [:]; remote.testAutoAllow = true; remote.start(port: port, tls: CommandLine.arguments.contains("--tls"))
             DispatchQueue.global().asyncAfter(deadline: .now() + 900) { exit(0) }
             return
+        }
+        // proef met het venster "Bediening op afstand": ArkTracks --lan-window (niets naar de Keychain, echte instellingen alleen gelezen)
+        if CommandLine.arguments.contains("--lan-window") {
+            LanDevices.memory = [LanDevice(id: "x", name: "iPad van Anna", hash: "h", created: Date(), lastSeen: Date())]; LocalCA.memory = [:]; LanWindow.forceOn = true
+            remote.start(port: 8799, tls: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in openLan() }
+            // de inhoud van het venster naar een afbeelding (zonder schermopname): ARK_WINDOW_PNG=/pad/naar.png
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [self] in
+                if let path = ProcessInfo.processInfo.environment["ARK_WINDOW_PNG"], let v = lanWindow?.w?.contentView, let rep = { v.appearance = NSAppearance(named: .aqua); v.layoutSubtreeIfNeeded(); return v.bitmapImageRepForCachingDisplay(in: v.bounds) }() {
+                    v.cacheDisplay(in: v.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    print("PNG opgeslagen \(Int(v.bounds.width))x\(Int(v.bounds.height))")
+                }
+                exit(0)
+            }
+            return
+        }
+        // proef van de Keychain-opslag met een eigen proef-service (de echte items blijven ongemoeid): ArkTracks --keychain-test
+        if CommandLine.arguments.contains("--keychain-test") {
+            Keychain.service = "nl.arkchurch.tracks-desktop.test-\(UUID().uuidString)"
+            var fails = 0
+            func check(_ ok: Bool, _ what: String) { print(ok ? "ok   " : "FOUT ", what); if !ok { fails += 1 } }
+            Keychain.rawSet("desktop-key", "oude-sleutel")                                  // een oud eigen item van een vorige versie
+            Keychain.forgetCache()
+            check(Keychain.get("desktop-key") == "oude-sleutel", "oud item wordt overgenomen")
+            Keychain.flush()
+            check(Keychain.rawGet("desktop-key").isEmpty, "oud item is daarna verwijderd")
+            Keychain.set("lan-ca-key", "KEY"); Keychain.set("lan-ca-cert", "CERT"); Keychain.set("lan-devices", "[]")
+            Keychain.flush(); Keychain.forgetCache()
+            check(Keychain.get("lan-ca-key") == "KEY" && Keychain.get("lan-ca-cert") == "CERT" && Keychain.get("desktop-key") == "oude-sleutel", "alles blijft bewaard na opnieuw laden")
+            Keychain.flush()
+            check(Keychain.rawGet("lan-ca-key").isEmpty && Keychain.rawGet("lan-ca-cert").isEmpty && !Keychain.rawGet("vault").isEmpty, "alles zit in één item (vault)")
+            Keychain.set("lan-devices", "")
+            Keychain.flush(); Keychain.forgetCache()
+            check(Keychain.get("lan-devices").isEmpty, "verwijderen werkt")
+            Keychain.flush(); Keychain.rawSet("vault", "")                                                    // opruimen: onze eigen proef-items
+            print(fails == 0 ? "KEYCHAINTEST GESLAAGD" : "KEYCHAINTEST: \(fails) fouten"); fflush(stdout); exit(fails == 0 ? 0 : 1)
         }
         // proef zonder venster: ArkTracks --remote-test  (laadt het eerste nummer in de nummermap en voert Podium-commando's uit)
         if CommandLine.arguments.contains("--remote-test") { DispatchQueue.global().async { [self] in remoteTest() }; return }

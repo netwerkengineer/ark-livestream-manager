@@ -20,9 +20,20 @@ import CoreAudio
 import Foundation
 import Network
 
+private let logQueue = DispatchQueue(label: "ark.log")
 func log(_ s: String) {
     let f = DateFormatter(); f.dateFormat = "HH:mm:ss.SSS"
-    FileHandle.standardError.write(Data("\(f.string(from: Date())) \(s)\n".utf8))
+    let line = "\(f.string(from: Date())) \(s)\n"
+    FileHandle.standardError.write(Data(line.utf8))
+    // ook in een bestand (~/Library/Logs/ArkTracks.log, klein gehouden), zodat een probleem achteraf te bekijken is
+    logQueue.async {
+        let dir = NSHomeDirectory() + "/Library/Logs", path = dir + "/ArkTracks.log"
+        let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd "
+        let fm = FileManager.default
+        if let size = (try? fm.attributesOfItem(atPath: path))?[.size] as? Int, size > 1_000_000 { try? fm.removeItem(atPath: path + ".1"); try? fm.moveItem(atPath: path, toPath: path + ".1") }
+        if !fm.fileExists(atPath: path) { fm.createFile(atPath: path, contents: nil) }
+        if let h = FileHandle(forWritingAtPath: path) { h.seekToEndOfFile(); h.write(Data((day.string(from: Date()) + line).utf8)); try? h.close() }
+    }
 }
 
 // ------------------------------------------------------------- bus-indeling (zoals busses.example.json)
