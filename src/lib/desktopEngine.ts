@@ -294,7 +294,22 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* no memory in a private window */ } },
 };
 
-export const getSetlistSource = (): "service" | "own" => (isOffline() || store.get(SOURCE_KEY) === "own" ? "own" : "service");
+// The service setlists, remembered while the app is connected to the server: without the server (the app's own web server for
+// a tablet or phone, or no network) the services can still be picked. Only titles are kept; the songs are matched to this computer's library.
+const CACHE_KEY = "ark-service-cache";
+interface CachedItem { id: string; title: string; artist: string; section: string }
+interface ServiceCache { at: number; today: string; dates: string[]; byDate: Record<string, CachedItem[]> }
+function readCache(): ServiceCache | null {
+  try { const c = JSON.parse(store.get(CACHE_KEY) || "null"); return c && Array.isArray(c.dates) && c.dates.length ? c : null; } catch { return null; }
+}
+/** True when there are remembered services to choose from without the server */
+export const hasServiceCache = () => !!readCache();
+
+export const getSetlistSource = (): "service" | "own" => {
+  const chosen = store.get(SOURCE_KEY);
+  if (isOffline()) return hasServiceCache() && chosen !== "own" ? "service" : "own";
+  return chosen === "own" ? "own" : "service";
+};
 export const setSetlistSource = (v: "service" | "own") => store.set(SOURCE_KEY, v);
 export function ownPaths(): string[] { try { return JSON.parse(store.get(OWN_KEY) || "[]"); } catch { return []; } }
 const saveOwn = (list: string[]) => store.set(OWN_KEY, JSON.stringify(list));
@@ -333,6 +348,37 @@ async function withFetching<T extends { title: string; path: string | null }>(li
   return list.map(i => (i.path ? i : { ...i, fetching: jobs.some(j => isFetching(j) && sameSong(i.title, j.title)) }));
 }
 
+let cacheRefreshing = false;
+/** While connected: remember the upcoming services (all dates, titles only) now and then, for use without the server */
+async function refreshServiceCache(post: (payload: unknown) => Promise<Response>, current: { today?: string; dates?: string[] }, songs: unknown[]) {
+  const old = readCache();
+  if (cacheRefreshing || (old && Date.now() - old.at < 10 * 60 * 1000)) return;
+  cacheRefreshing = true;
+  try {
+    const dates = (current.dates || []).filter(d => !current.today || d >= current.today).slice(0, 8);
+    const byDate: Record<string, CachedItem[]> = {};
+    for (const d of dates) {
+      const r = await post({ action: "match", date: d, songs, loaded: [] });
+      if (!r.ok) continue;
+      const data = await r.json();
+      byDate[d] = (data.setlist || []).map((s: CachedItem) => ({ id: String(s.id), title: s.title, artist: s.artist || "", section: s.section || "" }));
+    }
+    if (dates.length) store.set(CACHE_KEY, JSON.stringify({ at: Date.now(), today: current.today || "", dates, byDate }));
+  } catch { /* the next time */ } finally { cacheRefreshing = false; }
+}
+
+/** The service setlist from the remembered services, matched to the songs on this computer */
+function cachedService(lib: LibSong[], requested: string | null) {
+  const c = readCache()!;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam" }).format(new Date());
+  const date = requested && c.dates.includes(requested) ? requested : c.dates.find(d => d >= today) || c.dates[c.dates.length - 1];
+  const items = (c.byDate[date] || []).map(it => {
+    const song = lib.find(l => sameSong(it.title, parseSongName(l.name).title));
+    return { ...it, path: song ? song.path : null, manual: false, local: null };
+  });
+  return { today, dates: c.dates, date, setlist: withOwnLinks(items, lib) };
+}
+
 async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, url: URL): Promise<Response> {
   const method = (init?.method || "GET").toUpperCase();
   const body = method === "POST" ? JSON.parse(String(init?.body || "{}")) : {};
@@ -359,10 +405,22 @@ async function setlist(realFetch: typeof fetch, init: RequestInit | undefined, u
     }
   }
 
+  if (isOffline()) {
+    // no server: the remembered services
+    if (!hasServiceCache()) return json({ error: "Er zijn nog geen diensten onthouden (die komen van de server)" }, 400);
+    if (method === "GET") return json({ ...cachedService(lib, url.searchParams.get("date")), songs, loaded: es.setlist, bridgeError: null });
+    if (body.action === "load") {
+      const paths = cachedService(lib, body.date).setlist.map(s => s.path).filter((p): p is string => !!p);
+      if (!paths.length) return json({ error: "Geen songs uit deze setlist gevonden in de map met nummers op deze computer" }, 400);
+      await engineCall("/setlist", { p: paths });
+      return json({ success: true, loaded: paths.length });
+    }
+  }
   if (method === "GET") {
     const res = await post({ action: "match", date: url.searchParams.get("date"), songs, loaded: es.setlist });
     if (!res.ok) return res;
     const data = await res.json();
+    refreshServiceCache(post, data, songs);
     data.setlist = await withFetching(withOwnLinks(data.setlist || [], lib));
     return json(data);
   }

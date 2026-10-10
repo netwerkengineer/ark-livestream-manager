@@ -7,7 +7,7 @@ import { reaperAction } from "./useReaper";
 import { parseSongName } from "./songName";
 import ArrangementEditor from "./ArrangementEditor";
 import TimingEditor from "./TimingEditor";
-import { hasDesktopEngine, isOffline, getSetlistSource, setSetlistSource, ownAdd, ownRemove, ownMove, ownPaths } from "@/lib/desktopEngine";
+import { hasDesktopEngine, isOffline, hasServiceCache, getSetlistSource, setSetlistSource, ownAdd, ownRemove, ownMove, ownPaths } from "@/lib/desktopEngine";
 
 interface SetlistSong {
   id: string;
@@ -141,7 +141,7 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     <section className={`glass-card trk-setlist${stage ? " stage" : ""}`}>
       <div className="trk-setlist-head">
         <h3 className="trk-title"><ListOrdered size={18} style={{ color: "var(--primary)" }} /> Setlist</h3>
-        {desktop && !isOffline() && (
+        {desktop && (!isOffline() || hasServiceCache()) && (
           <span className="trk-src">
             <button className={`trk-icon-btn${source === "service" ? " pinned" : ""}`} onClick={() => chooseSource("service")}>Dienst</button>
             <button className={`trk-icon-btn${source === "own" ? " pinned" : ""}`} onClick={() => chooseSource("own")}>Eigen setlist</button>
