@@ -20,7 +20,8 @@ async function knownSong(path: unknown): Promise<string> {
 export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, "tracks");
   if (!authSession) return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
-  if (!getSettings().reaperEnabled) return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
+  // "Tracks (REAPER)" is about the track computer; the desktop app plays on its own computer and does not need it
+  if (!getSettings().reaperEnabled && !hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
   try {
     const path = await knownSong(req.nextUrl.searchParams.get("path"));
     return NextResponse.json(await getTimingData(path));
@@ -41,7 +42,8 @@ function givenSections(raw: unknown): SongSection[] | null {
 export async function POST(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, "tracks");
   if (!authSession) return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
-  if (!getSettings().reaperEnabled) return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
+  // "Tracks (REAPER)" is about the track computer; the desktop app plays on its own computer and does not need it
+  if (!getSettings().reaperEnabled && !hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
   try {
     const body = await req.json();
     const { path: rawPath, name, at } = body;

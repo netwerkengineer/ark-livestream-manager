@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
-  if (!getSettings().reaperEnabled) {
+  if (!getSettings().reaperEnabled && !hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) {   // the desktop app plays on its own computer
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
   }
 

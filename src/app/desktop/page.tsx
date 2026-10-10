@@ -42,7 +42,7 @@ export default function DesktopPage() {
         const perms: string[] = data.userPermissions || [];
         const admin = data.userRole === "admin";
         const tabs: Tab[] = [];
-        if ((admin || perms.includes("tracks")) && data.reaperEnabled) tabs.push("tracks");
+        if (admin || perms.includes("tracks")) tabs.push("tracks");      // Tracks (REAPER) in the settings is about the track computer: the app plays on its own
         if (!isOffline() && (admin || perms.includes("oefenen") || perms.includes("tracks"))) tabs.push("oefenen");   // practice stems come from the server
         setSettings(data);
         setOffline(isOffline());
@@ -85,7 +85,7 @@ export default function DesktopPage() {
           <button className={`trk-icon-btn${tab === "oefenen" ? " pinned" : ""}`} onClick={() => choose("oefenen")}><Headphones size={14} /> Oefenen</button>
         )}
       </nav>
-      {tab === "tracks" ? <TracksControl settings={settings} /> : <PracticePlayer />}
+      {tab === "tracks" ? <TracksControl settings={{ ...settings, reaperEnabled: true }} /> : <PracticePlayer />}
     </div>
   );
 }
