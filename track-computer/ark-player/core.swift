@@ -184,6 +184,7 @@ func loadStem(url: URL, name: String, offsetFrames: Int = 0) throws -> Stem {
     let fmt = f.processingFormat                       // float32, niet-geinterleaved
     let n = Int(f.length), chn = min(2, Int(fmt.channelCount))
     let lead = max(0, offsetFrames)                    // een stem die later begint: stilte ervoor
+    if fmt.sampleRate != 48000 { return try loadStemResampled(file: f, name: name, lead: lead, chn: chn) }
     var ch: [UnsafeMutablePointer<Float>] = []
     for _ in 0..<chn { let p = UnsafeMutablePointer<Float>.allocate(capacity: max(n + lead, 1)); p.initialize(repeating: 0, count: max(n + lead, 1)); ch.append(p) }
     let block: AVAudioFrameCount = 1 << 16
@@ -195,8 +196,49 @@ func loadStem(url: URL, name: String, offsetFrames: Int = 0) throws -> Stem {
         for c in 0..<chn { memcpy(ch[c] + lead + done, buf.floatChannelData![c], got * 4) }
         done += got
     }
-    if fmt.sampleRate != 48000 { log("LET OP: \(name) heeft \(Int(fmt.sampleRate)) Hz (verwacht 48000; omrekenen is nog niet gebouwd)") }
     return Stem(name: name, frames: lead + done, ch: ch)
+}
+
+/// Een stem met een andere samplefrequentie (MultiTracks: 44,1 kHz) naar 48 kHz omrekenen, in het geheugen, met de beste kwaliteit.
+/// De speler werkt altijd op 48 kHz; zonder omrekenen klinkt zo'n nummer te snel en te hoog.
+func loadStemResampled(file f: AVAudioFile, name: String, lead: Int, chn: Int) throws -> Stem {
+    let inFmt = f.processingFormat
+    guard let outFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: AVAudioChannelCount(chn), interleaved: false),
+          let conv = AVAudioConverter(from: inFmt, to: outFmt) else { throw NSError(domain: "ark", code: 4, userInfo: [NSLocalizedDescriptionKey: "\(name): omrekenen naar 48 kHz niet mogelijk"]) }
+    conv.sampleRateConverterQuality = AVAudioQuality.max.rawValue
+    let nIn = Int(f.length)
+    let want = Int((Double(nIn) * 48000 / inFmt.sampleRate).rounded())
+    let block: AVAudioFrameCount = 1 << 15
+    guard let inBuf = AVAudioPCMBuffer(pcmFormat: inFmt, frameCapacity: block), let outBuf = AVAudioPCMBuffer(pcmFormat: outFmt, frameCapacity: 1 << 16) else { throw NSError(domain: "ark", code: 1) }
+    var out = [[Float]](repeating: [], count: chn)
+    for c in 0..<chn { out[c].reserveCapacity(want + 4096) }
+    var readFrames = 0
+    var readError: Error?
+    while true {
+        var err: NSError?
+        let status = conv.convert(to: outBuf, error: &err) { _, inStatus in
+            if readFrames >= nIn || readError != nil { inStatus.pointee = .endOfStream; return nil }
+            do { try f.read(into: inBuf, frameCount: min(block, AVAudioFrameCount(nIn - readFrames))) } catch { readError = error; inStatus.pointee = .endOfStream; return nil }
+            if inBuf.frameLength == 0 { inStatus.pointee = .endOfStream; return nil }
+            readFrames += Int(inBuf.frameLength)
+            inStatus.pointee = .haveData
+            return inBuf
+        }
+        if let e = readError ?? err { throw e }
+        let got = Int(outBuf.frameLength)
+        if got > 0 { for c in 0..<chn { out[c].append(contentsOf: UnsafeBufferPointer(start: outBuf.floatChannelData![c], count: got)) } }
+        if status == .endOfStream || status == .error || (status == .inputRanDry && got == 0) { break }
+    }
+    // precies de verwachte lengte (afronden): de rest weg of met stilte aanvullen
+    let total = want + lead
+    var ch: [UnsafeMutablePointer<Float>] = []
+    for c in 0..<chn {
+        let p = UnsafeMutablePointer<Float>.allocate(capacity: max(total, 1)); p.initialize(repeating: 0, count: max(total, 1))
+        let n = min(want, out[c].count)
+        out[c].withUnsafeBufferPointer { _ = memcpy(p + lead, $0.baseAddress!, n * 4) }
+        ch.append(p)
+    }
+    return Stem(name: name, frames: total, ch: ch)
 }
 
 func loadSong(folder: String) throws -> Song {
@@ -219,7 +261,9 @@ func loadPlayerFile(folder: String, json j: [String: Any]) throws -> Song {
     }
     var loaded = [Stem?](repeating: nil, count: entries.count)
     let lock = NSLock(); var failure: String?
+    let gate = DispatchSemaphore(value: 3)        // niet alle stems tegelijk: elke stem heeft tijdens het omrekenen even het dubbele aan geheugen nodig
     DispatchQueue.concurrentPerform(iterations: entries.count) { i in
+        gate.wait(); defer { gate.signal() }
         do { let st = try loadStem(url: base.appendingPathComponent(entries[i].file), name: entries[i].name, offsetFrames: entries[i].offset)
              st.mute = entries[i].mute; lock.lock(); loaded[i] = st; lock.unlock() }
         catch { lock.lock(); failure = "\(entries[i].file): \(error.localizedDescription)"; lock.unlock() }
@@ -265,7 +309,9 @@ func loadSongJson(folder: String) throws -> Song {
     for c in ark where all.contains(c.file) && !entries.contains(where: { $0.file == c.file }) { entries.append(c) }
     var loaded = [Stem?](repeating: nil, count: entries.count)
     let lock = NSLock(); var failure: String?
+    let gate = DispatchSemaphore(value: 3)        // niet alle stems tegelijk: elke stem heeft tijdens het omrekenen even het dubbele aan geheugen nodig
     DispatchQueue.concurrentPerform(iterations: entries.count) { i in
+        gate.wait(); defer { gate.signal() }
         do { let s = try loadStem(url: base.appendingPathComponent(entries[i].file), name: entries[i].name); lock.lock(); loaded[i] = s; lock.unlock() }
         catch { lock.lock(); failure = "\(entries[i].file): \(error.localizedDescription)"; lock.unlock() }
     }

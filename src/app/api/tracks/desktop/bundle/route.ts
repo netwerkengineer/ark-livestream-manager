@@ -9,6 +9,7 @@ import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
 // Tracks screen without a connection to the server. They are public files of the web app; only the desktop app asks.
 function walk(dir: string, prefix: string, out: string[]) {
   for (const name of readdirSync(dir)) {
+    if (name.startsWith("._")) continue;     // macOS metadata files on external disks: not part of the build
     const full = path.join(dir, name);
     if (statSync(full).isDirectory()) walk(full, `${prefix}/${name}`, out);
     else if (!name.endsWith(".map")) out.push(`${prefix}/${name}`);

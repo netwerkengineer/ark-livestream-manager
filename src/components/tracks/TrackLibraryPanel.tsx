@@ -144,7 +144,9 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
   });
 
   const act = async (action: "retry" | "delete" | "pin", item: LibraryItem) => {
-    if (action === "delete" && !confirm(`"${item.fileName}" verwijderen? Ook de kopie op de track-computer gaat naar de prullenbak (~/Tracks/_trash).`)) return;
+    if (action === "delete" && !confirm(agent
+      ? `"${item.fileName}" verwijderen? Ook de kopie op de track-computer gaat naar de prullenbak (~/Tracks/_trash).`
+      : `"${item.fileName}" van de server verwijderen? Kopieën die al op een computer staan (desktop-app) blijven daar staan.`)) return;
     try {
       await reaperAction({ action, id: item.id, value: action === "pin" ? !item.pinned : undefined }, "/api/tracks/library");
       load();
@@ -200,11 +202,11 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
       <ul className="trk-lib-list">
         {items.map(item => {
           const song = parseSongName(item.fileName.replace(/\.zip$/i, ""));
-          const busy = item.status === "stored" || item.status === "downloading" || item.status === "converting";
-          const open = expanded === item.id;
           // no track computer ever connected to this server: nothing is "waiting for the Mac". The song is stored and
-          // can be fetched by the desktop app and practised right away.
+          // can be fetched by the desktop app and practised right away (and can be deleted).
           const noMac = item.status === "stored" && !agent;
+          const busy = (item.status === "stored" && !noMac) || item.status === "downloading" || item.status === "converting";
+          const open = expanded === item.id;
           return (
             <li key={item.id} className={`trk-lib-item ${item.status}`}>
               <div className="trk-lib-row">

@@ -73,7 +73,7 @@ export default function DesktopPage() {
         {status !== "loading" && <AlertTriangle size={40} color="#f87171" />}
         <p style={{ color: "var(--muted)", maxWidth: "420px" }}>{status === "ok" ? "Je hebt geen rechten voor Tracks of Oefenen. Vraag een beheerder om het recht 'Tracks (REAPER)' of 'Oefenen (band)'." : text}</p>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        {status === "login" && <a href="/api/auth/signin" className="btn-primary">Inloggen</a>}
+        {status === "login" && <a href="/api/auth/signin?callbackUrl=%2Fdesktop" className="btn-primary">Inloggen</a>}
       </div>
     );
   }
