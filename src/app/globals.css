@@ -1362,3 +1362,10 @@ textarea.input-field {
 }
 .own-btn.primary { background: #16a34a; border-color: #22c55e; color: #fff; }
 .own-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* which player the web app controls (REAPER or a desktop app) */
+.trk-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: rgba(148, 163, 184, 0.08); font-size: 0.85rem; }
+.trk-link-who { display: inline-flex; align-items: center; gap: 6px; }
+.trk-link-dot { width: 8px; height: 8px; border-radius: 50%; background: #f87171; }
+.trk-link-dot.on { background: #4ade80; }
+.trk-link-warn { display: inline-flex; align-items: center; gap: 8px; color: #fbbf24; }

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/authHelper";
 import { getSettings } from "@/lib/settingsStore";
 import { saveRecordedTimings } from "@/lib/trackArrangement";
+import { isDesktopBackend, playerState, sendCommand, checkCommand, deviceLabel } from "@/lib/desktopLink";
 import {
   reaperRequest,
   parseReaperState,
@@ -21,6 +22,10 @@ export async function GET(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, "tracks");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+  if (isDesktopBackend()) {
+    const p = playerState();
+    return p.online && p.state ? NextResponse.json(p.state) : NextResponse.json({ error: "Desktop-app niet verbonden" }, { status: 502 });
   }
   if (!getSettings().reaperEnabled) {
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
@@ -43,6 +48,18 @@ export async function POST(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, "tracks");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+  if (isDesktopBackend()) {
+    // the desktop app plays: the command goes to the app (a fixed set only; it expires if the app does not carry it out in time)
+    try {
+      const body = await req.json();
+      const bad = checkCommand("reaper", body);
+      if (bad) return NextResponse.json({ error: bad }, { status: 400 });
+      await sendCommand("reaper", body, authSession.username, deviceLabel(req.headers.get("user-agent")));
+      return NextResponse.json({ success: true });
+    } catch (err) {
+      return NextResponse.json({ error: errorMessage(err) }, { status: 502 });
+    }
   }
   if (!getSettings().reaperEnabled) {
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });

@@ -5,6 +5,7 @@ import { isAuthorized } from "@/lib/authHelper";
 import { getSettings } from "@/lib/settingsStore";
 import { reaperRequest, parseReaperState, sendBridgeCommand, STATE_COMMANDS } from "@/lib/reaperControl";
 import { rebuildIfShowChanged } from "@/lib/trackArrangement";
+import { isDesktopBackend, playerState, watch, deviceLabel } from "@/lib/desktopLink";
 
 const INTERVAL_MS = 300;
 
@@ -54,7 +55,8 @@ export async function GET(req: NextRequest) {
 
   const encoder = new TextEncoder();
   let closed = false;
-  req.signal.addEventListener("abort", () => { closed = true; });
+  const unwatch = watch(authSession.username, deviceLabel(req.headers.get("user-agent")));
+  req.signal.addEventListener("abort", () => { closed = true; unwatch(); });
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -70,7 +72,12 @@ export async function GET(req: NextRequest) {
       controller.enqueue(encoder.encode("retry: 3000\n\n"));
 
       while (!closed) {
-        if (!getSettings().reaperEnabled) {
+        if (isDesktopBackend()) {
+          // the desktop app is the player: its state comes from the app (it reports in a few times a second)
+          const p = playerState();
+          if (p.online && p.state) send(null, p.state);
+          else send("reaper-error", { error: p.name ? `Desktop-app (${p.name}) is niet verbonden` : "Geen desktop-app verbonden" });
+        } else if (!getSettings().reaperEnabled) {
           send("reaper-error", { error: "Tracks (REAPER) is uitgeschakeld" });
         } else {
           try {
@@ -91,6 +98,7 @@ export async function GET(req: NextRequest) {
     },
     cancel() {
       closed = true;
+      unwatch();
     },
   });
 

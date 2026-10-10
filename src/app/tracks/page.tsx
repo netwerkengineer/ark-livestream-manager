@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { homeHref } from "@/lib/desktopEngine";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
@@ -9,6 +9,7 @@ import TransportBar from "@/components/tracks/TransportBar";
 import SetlistPanel from "@/components/tracks/SetlistPanel";
 import SectionsPanel from "@/components/tracks/SectionsPanel";
 import PadsPanel from "@/components/tracks/PadsPanel";
+import BackendBar from "@/components/tracks/BackendBar";
 
 // Stage view for the worship leader / music director: pick a song from the
 // service setlist and change the arrangement live. No faders here, so nothing
@@ -16,6 +17,12 @@ import PadsPanel from "@/components/tracks/PadsPanel";
 export default function TracksStagePage() {
   const [access, setAccess] = useState<"loading" | "login" | "denied" | "disabled" | "ok">("loading");
   const home = homeHref();   // the desktop app has no dashboard to go back to
+  // installed on a tablet's home screen: the stage view is the whole app, a way back to the dashboard is only in the way there
+  const standalone = useSyncExternalStore(
+    () => () => undefined,
+    () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true,
+    () => false,
+  );
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const { state, error } = useReaperState(access === "ok");
 
@@ -26,7 +33,12 @@ export default function TracksStagePage() {
         const data = await res.json();
         const perms: string[] = data.userPermissions || [];
         if (data.userRole !== "admin" && !perms.includes("tracks")) return setAccess("denied");
-        setAccess(data.reaperEnabled ? "ok" : "disabled");
+        // REAPER may be off in the settings (no track computer) while a desktop app is the player
+        let desktopPlayer = false;
+        if (!data.reaperEnabled) {
+          try { const l = await (await fetch("/api/desktop-link", { cache: "no-store" })).json(); desktopPlayer = l.backend === "desktop" || (l.players || []).length > 0; } catch { /* none */ }
+        }
+        setAccess(data.reaperEnabled || desktopPlayer ? "ok" : "disabled");
       })
       .catch(() => setAccess("login"));
   }, []);
@@ -71,10 +83,11 @@ export default function TracksStagePage() {
   return (
     <div className="trk-stage-page">
       <header className="trk-stage-header">
-        <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>
+        {!standalone && <Link href={home} className="trk-icon-btn" aria-label="Terug" suppressHydrationWarning><ChevronLeft size={18} /></Link>}
         <h1 className="gradient-text">Podium</h1>
-        <span className={`trk-conn${error ? " off" : ""}`}>{error ? "REAPER niet bereikbaar" : "Verbonden"}</span>
+        <span className={`trk-conn${error ? " off" : ""}`}>{error ? "Niet verbonden" : "Verbonden"}</span>
       </header>
+      <BackendBar onError={showError} onStatus={showSuccess} />
 
       <TransportBar state={state} onError={showError} stage />
       <div className="trk-stage-grid">

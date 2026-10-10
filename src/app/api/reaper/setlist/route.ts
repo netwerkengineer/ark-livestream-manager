@@ -6,6 +6,7 @@ import { getSettings } from "@/lib/settingsStore";
 import { getDraftServices, getDraftService } from "@/lib/draftServicesStore";
 import { getBridgeState, sendBridgeCommand, type BridgeSong } from "@/lib/reaperControl";
 import { matchSong, saveSongLink } from "@/lib/trackSongMatch";
+import { isDesktopBackend, playerState, sendCommand, checkCommand, deviceLabel } from "@/lib/desktopLink";
 import { getStoredArrangement, rebuildIfShowChanged } from "@/lib/trackArrangement";
 import { listTracks } from "@/lib/trackLibrary";
 import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
@@ -51,6 +52,22 @@ export async function GET(req: NextRequest) {
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
   }
+  if (isDesktopBackend()) {
+    // the setlist the desktop app reports (its own list or the service, with the paths of that computer)
+    const p = playerState();
+    if (!p.online || !p.setlist) return NextResponse.json({ error: "Desktop-app niet verbonden" }, { status: 502 });
+    // another service picked in the stage view: matched to the songs on the app's computer here on the server
+    // (the app itself keeps showing its own date until a setlist is loaded)
+    const snap = p.setlist as { own?: boolean; songs?: BridgeSong[]; loaded?: string[] };
+    const wanted = req.nextUrl.searchParams.get("date");
+    const bridge = (p.state as { bridge?: { songs?: BridgeSong[]; setlist?: string[] } } | null)?.bridge;
+    if (wanted && !snap.own) {
+      const songs = bridge?.songs || snap.songs || [];
+      const r = resolveDate(wanted);
+      return NextResponse.json({ ...snap, ...r, setlist: r.date ? setlistFor(r.date, songs) : [], songs, loaded: bridge?.setlist ?? snap.loaded ?? [], bridgeError: null });
+    }
+    return NextResponse.json(p.setlist);
+  }
   if (!getSettings().reaperEnabled) {
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });
   }
@@ -87,6 +104,19 @@ export async function POST(req: NextRequest) {
   const authSession = await isAuthorized(req, undefined, "tracks");
   if (!authSession) {
     return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
+  }
+  if (isDesktopBackend()) {
+    const peek = await req.clone().json().catch(() => ({}));
+    if (peek?.action !== "match") {      // "match" is the app itself asking for its service list
+      const bad = checkCommand("setlist", peek || {});
+      if (bad) return NextResponse.json({ error: bad === "Dit kan niet vanaf afstand" ? "Koppelen kan alleen in de desktop-app" : bad }, { status: 400 });
+      try {
+        await sendCommand("setlist", peek, authSession.username, deviceLabel(req.headers.get("user-agent")));
+        return NextResponse.json({ success: true });
+      } catch (err) {
+        return NextResponse.json({ error: errorMessage(err) }, { status: 502 });
+      }
+    }
   }
   if (!getSettings().reaperEnabled && !hasDesktopAccess(req.headers.get("user-agent"), req.cookies.get(DESKTOP_COOKIE)?.value)) {   // the desktop app plays on its own computer
     return NextResponse.json({ error: "Tracks (REAPER) is uitgeschakeld" }, { status: 409 });

@@ -115,7 +115,7 @@ final class SongFetcher {
     func fail(_ m: String) -> NSError { NSError(domain: "ark", code: 1, userInfo: [NSLocalizedDescriptionKey: m]) }
 
     // ---- netwerk (met de inlog van het venster)
-    private func cookieHeader(for url: URL) -> String {
+    func cookieHeader(for url: URL) -> String {
         var header = ""
         let sem = DispatchSemaphore(value: 0)
         DispatchQueue.main.async {
@@ -130,7 +130,7 @@ final class SongFetcher {
         return header
     }
 
-    private func request(_ s: String) throws -> URLRequest {
+    func request(_ s: String) throws -> URLRequest {
         guard let url = URL(string: s) else { throw fail("Ongeldig adres") }
         var r = URLRequest(url: url, timeoutInterval: 60)
         r.setValue(cookieHeader(for: url), forHTTPHeaderField: "Cookie")

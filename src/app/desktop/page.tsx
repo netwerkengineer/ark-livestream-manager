@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { AlertTriangle, SlidersHorizontal, Headphones } from "lucide-react";
 import TracksControl from "@/components/TracksControl";
 import PracticePlayer from "@/components/practice/PracticePlayer";
+import { startRemoteLink } from "@/lib/remoteLink";
 import { hasDesktopEngine, installDesktopAdapter, engineCall, isOffline } from "@/lib/desktopEngine";
 
 // In the desktop app the Tracks screens talk to the engine in the app instead of to REAPER;
@@ -54,6 +55,9 @@ export default function DesktopPage() {
       })
       .catch(() => setStatus("login"));
   }, []);
+
+  // the stage view (tablet, phone) can control this app via the server when that is allowed in the app's settings
+  useEffect(() => startRemoteLink(), []);
 
   const choose = (t: Tab) => {
     setTab(t);

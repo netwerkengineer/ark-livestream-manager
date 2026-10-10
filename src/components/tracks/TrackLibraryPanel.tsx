@@ -202,11 +202,14 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
           const song = parseSongName(item.fileName.replace(/\.zip$/i, ""));
           const busy = item.status === "stored" || item.status === "downloading" || item.status === "converting";
           const open = expanded === item.id;
+          // no track computer ever connected to this server: nothing is "waiting for the Mac". The song is stored and
+          // can be fetched by the desktop app and practised right away.
+          const noMac = item.status === "stored" && !agent;
           return (
             <li key={item.id} className={`trk-lib-item ${item.status}`}>
               <div className="trk-lib-row">
                 <span className="trk-lib-icon">
-                  {item.status === "ready" ? <CheckCircle2 size={18} color="#4ade80" />
+                  {item.status === "ready" || noMac ? <CheckCircle2 size={18} color="#4ade80" />
                     : item.status === "error" || item.status === "uploading" ? <AlertTriangle size={18} color="#f87171" />
                     : <Loader2 size={18} className="trk-spin" color="var(--primary)" />}
                 </span>
@@ -217,7 +220,7 @@ export default function TrackLibraryPanel({ onError, onStatus }: TrackLibraryPan
                     {mb(item.size)} · {item.uploadedBy} · {new Date(item.uploadedAt).toLocaleDateString("nl-NL")}
                   </small>
                   <small className="trk-lib-msg">
-                    {STATUS_LABEL[item.status]}{item.message ? ` – ${item.message}` : ""}
+                    {noMac ? "Opgeslagen – geen track-computer gekoppeld (de desktop-app kan het ophalen)" : <>{STATUS_LABEL[item.status]}{item.message ? ` – ${item.message}` : ""}</>}
                     {item.status === "uploading" && item.received !== undefined && (item.own ? ` (${mb(item.received)} ontvangen; maak dezelfde opname opnieuw om verder te gaan)` : ` (${mb(item.received)} ontvangen; kies hetzelfde bestand opnieuw om verder te gaan)`)}
                   </small>
                 </span>

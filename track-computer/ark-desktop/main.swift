@@ -45,6 +45,15 @@ struct ShellSettings {
         get { UserDefaults.standard.bool(forKey: "offline") }
         set { UserDefaults.standard.set(newValue, forKey: "offline") }
     }
+    /// afstandsbediening via de server toestaan (standaard uit) en hoe deze Mac op het Podium heet
+    static var remote: Bool {
+        get { UserDefaults.standard.bool(forKey: "remote") }
+        set { UserDefaults.standard.set(newValue, forKey: "remote") }
+    }
+    static var deviceName: String {
+        get { UserDefaults.standard.string(forKey: "deviceName") ?? Host.current().localizedName ?? "Ark Tracks" }
+        set { UserDefaults.standard.set(newValue.isEmpty ? Host.current().localizedName ?? "Ark Tracks" : newValue, forKey: "deviceName") }
+    }
     static var server: String {
         get { UserDefaults.standard.string(forKey: "server") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "server") }
@@ -77,15 +86,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var player: Player!
     var engine: Server!
     var fetcher: SongFetcher!
+    var reporter: RemoteReporter!
+    var activity: NSObjectProtocol?
 
     var audioTest = CommandLine.arguments.contains("--audio-test")
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        // macOS mag de app niet in slaap sussen: audio en afstandsbediening moeten op tijd blijven reageren
+        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "Audio afspelen en afstandsbediening")
+        _ = RemoteReporter.playerId()                     // het id van deze app staat vast voordat de pagina laadt
         output = Output(mixer: mixer)
         player = Player(mixer: mixer, output: output)
         player.start()
         engine = Server(player: player)
         fetcher = SongFetcher(app: self)
+        reporter = RemoteReporter(app: self)
         do { try output.start(device: player.cfg.device.isEmpty ? nil : player.cfg.device) } catch { log("Audio starten mislukt: \(error.localizedDescription)") }
 
         let cfg = WKWebViewConfiguration()
@@ -110,7 +125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.makeKeyAndOrderFront(nil)
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
+        reporter.refresh()
         if audioTest { runAudioTest(); return }
+        // proef zonder venster: ArkTracks --remote-test  (laadt het eerste nummer in de nummermap en voert Podium-commando's uit)
+        if CommandLine.arguments.contains("--remote-test") { DispatchQueue.global().async { [self] in remoteTest() }; return }
         // proef zonder venster: ArkTracks --import-test <zip>  (zet het nummer in de nummermap en meldt de uitkomst)
         if let i = CommandLine.arguments.firstIndex(of: "--import-test"), i + 1 < CommandLine.arguments.count {
             fetcher.importZip(path: CommandLine.arguments[i + 1])
@@ -140,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     window.arkDesktop = {
       version: "0.4",
       offline: location.protocol === "\(OfflineMirror.scheme):",
+      remote: { enabled: \(ShellSettings.remote), name: \(jsString(ShellSettings.deviceName)) },
       server: \(jsString(ShellSettings.server)),
       openSettings: () => window.webkit.messageHandlers.shell.postMessage({ action: "settings" }),
       openExternal: (url) => window.webkit.messageHandlers.shell.postMessage({ action: "openExternal", url }),
@@ -288,6 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     /// Instellingen toegepast: speler en venster bijwerken
     func settingsChanged(serverChanged: Bool) {
         buildMenu()
+        installScript()
+        reporter.refresh()
         player.cfg.save()
         do { try output.start(device: player.cfg.device.isEmpty ? nil : player.cfg.device) } catch { log("Audio starten mislukt: \(error.localizedDescription)") }
         if serverChanged || web.url == nil { load() }
@@ -407,6 +428,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         ch(panel.runModal() == .OK ? panel.urls : nil)
     }
 
+    func remoteTest() {
+        var fails = 0
+        func check(_ ok: Bool, _ what: String) { print(ok ? "ok   " : "FOUT ", what); if !ok { fails += 1 } }
+        func run(_ b: [String: Any]) -> (Bool, String) { var r = (false, ""); DispatchQueue.main.sync { r = reporter.execute(b) }; return r }
+        func st() -> [String: Any] { var s: [String: Any] = [:]; DispatchQueue.main.sync { s = engine.state() }; return s }
+        Thread.sleep(forTimeInterval: 1)
+        guard let song = player.library.first else { print("FOUT geen nummer in de map"); exit(1) }
+        let lr = run(["action": "song", "path": song.path]); check(lr.0, "nummer laden (\(lr.1))")
+        for _ in 0..<60 { if st()["loading"] as? Bool == false && (st()["sections"] as? [Any])?.isEmpty == false { break }; Thread.sleep(forTimeInterval: 0.5) }
+        check(run(["action": "master", "value": 0.001]).0 && (st()["master_db"] as? Double ?? 0) < -50, "master zacht zetten")
+        check(run(["action": "play"]).0, "play"); Thread.sleep(forTimeInterval: 0.4)
+        check(st()["state"] as? String == "playing", "speelt")
+        let secs = st()["sections"] as? [[String: Any]] ?? []
+        if let s = secs.last, let region = s["region"] as? Int {
+            check(run(["action": "jump", "region": region, "mode": "now"]).0, "springen naar sectie \(region)")
+            Thread.sleep(forTimeInterval: 0.4)
+            check(st()["section"] as? Int == s["id"] as? Int, "in de gekozen sectie")
+        }
+        check(!run(["action": "jump", "region": 99]).0, "onbekende sectie geweigerd")
+        check(run(["action": "volume", "track": 2, "value": 0.5]).0, "volume van track 2")
+        let before = (st()["stems"] as? [[String: Any]]) ?? []
+        check(run(["action": "mute", "track": 3, "value": true]).0, "mute track 3")
+        let after = (st()["stems"] as? [[String: Any]]) ?? []
+        check(zip(before, after).contains { ($0["mute"] as? Bool) != ($1["mute"] as? Bool) } || after.contains { $0["mute"] as? Bool == true }, "een stem staat gedempt")
+        check(run(["action": "mute", "track": 1, "value": true]).0 && (st()["busses"] as? [[String: Any]])?.first?["mute"] as? Bool == true, "bus 1 gedempt (track 1)")
+        check(run(["action": "mute", "track": 1, "value": false]).0 && (st()["busses"] as? [[String: Any]])?.first?["mute"] as? Bool == false, "bus 1 weer aan")
+        check(run(["action": "unmuteAll"]).0, "alles unmuten")
+        check(run(["action": "loop", "value": false]).0, "loop uit")
+        check(run(["action": "mode", "mode": "bar"]).0 && st()["jump_mode"] as? String == "bar", "sprongmoment: volgende maat")
+        check(!run(["action": "mode", "mode": "later"]).0, "ongeldige modus geweigerd")
+        check(!run(["action": "volume", "track": 2, "value": 9]).0, "volume 9 geweigerd")
+        check(!run(["action": "volume", "track": 999, "value": 1]).0, "onbekend tracknummer geweigerd")
+        check(!run(["action": "recordStart"]).0, "opnemen geweigerd")
+        check(run(["action": "pad", "value": ["op": "volume", "volume": 0.5]]).0, "padvolume")
+        check(!run(["action": "pad", "value": ["op": "format"]]).0, "onbekende pad-actie geweigerd")
+        check(run(["action": "pause"]).0 && { Thread.sleep(forTimeInterval: 0.3); return st()["state"] as? String == "paused" }(), "pauze")
+        check(run(["action": "start"]).0, "naar het begin")
+        check(run(["action": "stop"]).0, "stop")
+        print(fails == 0 ? "REMOTETEST GESLAAGD" : "REMOTETEST: \(fails) fouten"); fflush(stdout); exit(fails == 0 ? 0 : 1)
+    }
+
     /// Meet of de klok van een AudioContext gelijk loopt met de echte tijd (ArkTracks --audio-test)
     func runAudioTest() {
         let js = """
@@ -438,33 +500,37 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     let server = NSTextField(), key = NSSecureTextField(), songs = NSTextField(), pads = NSTextField(), fsHost = NSTextField(), fsPort = NSTextField()
     let device = NSPopUpButton(), mode = NSPopUpButton()
     let offline = NSButton(checkboxWithTitle: "Zonder server werken", target: nil, action: nil)
+    let remote = NSButton(checkboxWithTitle: "Afstandsbediening toestaan", target: nil, action: nil)
+    let deviceName = NSTextField()
     var firstRun = false
 
     init(app: AppDelegate) {
         self.app = app
-        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 440), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 540), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         super.init()
         w.title = "Instellingen"
         w.delegate = self
         let v = NSView(frame: w.contentRect(forFrameRect: w.frame))
         func label(_ s: String, _ y: CGFloat) { let l = NSTextField(labelWithString: s); l.frame = NSRect(x: 20, y: y, width: 150, height: 22); l.alignment = .right; v.addSubview(l) }
         func place(_ c: NSView, _ y: CGFloat, _ width: CGFloat = 340) { c.frame = NSRect(x: 180, y: y, width: width, height: 24); v.addSubview(c) }
-        label("Server van de webapp", 390); place(server, 388); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
-        label("Sleutel van de beheerder", 350); place(key, 348); key.placeholderString = "uit de webapp: Instellingen > Tracks (leeg als er geen is)"
-        label("Audioapparaat", 310); place(device, 308)
-        label("Uitgangen", 270); place(mode, 268, 260)
+        label("Server van de webapp", 460); place(server, 458); server.placeholderString = "bijvoorbeeld https://naam.van.jouw.server"
+        label("Sleutel van de beheerder", 420); place(key, 418); key.placeholderString = "uit de webapp: Instellingen > Tracks (leeg als er geen is)"
+        label("Audioapparaat", 380); place(device, 378)
+        label("Uitgangen", 340); place(mode, 338, 260)
         mode.addItems(withTitles: ["Automatisch", "8 kanalen (X32)", "3 kanalen (click+guide, tracks stereo)", "2 kanalen (click+guide, tracks)", "Stereo (test)"])
-        label("Map met nummers", 230); place(songs, 228, 250); songs.placeholderString = "standaard ~/Tracks/Songs"
-        let choose = NSButton(title: "Kies…", target: self, action: #selector(pickFolder)); choose.frame = NSRect(x: 436, y: 226, width: 84, height: 28); v.addSubview(choose)
-        label("Map met pads", 190); place(pads, 188, 250); pads.placeholderString = "standaard ~/Tracks/Pads"
-        let choosePads = NSButton(title: "Kies…", target: self, action: #selector(pickPads)); choosePads.frame = NSRect(x: 436, y: 186, width: 84, height: 28); v.addSubview(choosePads)
-        label("FreeShow (cues)", 150); place(fsHost, 148, 250); fsHost.placeholderString = "adres, leeg = zoals ingesteld in de webapp"
-        fsPort.frame = NSRect(x: 436, y: 148, width: 84, height: 24); fsPort.placeholderString = "poort"; v.addSubview(fsPort)
-        let hint = NSTextField(wrappingLabelWithString: "Er staat geen adres vast in de app. Het FreeShow-adres kun je hier opgeven (op deze Mac of een andere computer, poort 5506 voor de REST-listener van FreeShow); laat je het leeg, dan gebruikt de app het adres uit de instellingen van de webapp.")
-        hint.frame = NSRect(x: 20, y: 60, width: 520, height: 70); hint.textColor = .secondaryLabelColor; v.addSubview(hint)
+        label("Map met nummers", 300); place(songs, 298, 250); songs.placeholderString = "standaard ~/Tracks/Songs"
+        let choose = NSButton(title: "Kies…", target: self, action: #selector(pickFolder)); choose.frame = NSRect(x: 436, y: 296, width: 84, height: 28); v.addSubview(choose)
+        label("Map met pads", 260); place(pads, 258, 250); pads.placeholderString = "standaard ~/Tracks/Pads"
+        let choosePads = NSButton(title: "Kies…", target: self, action: #selector(pickPads)); choosePads.frame = NSRect(x: 436, y: 256, width: 84, height: 28); v.addSubview(choosePads)
+        label("FreeShow (cues)", 220); place(fsHost, 218, 250); fsHost.placeholderString = "adres, leeg = zoals ingesteld in de webapp"
+        fsPort.frame = NSRect(x: 436, y: 218, width: 84, height: 24); fsPort.placeholderString = "poort"; v.addSubview(fsPort)
+        let hint = NSTextField(wrappingLabelWithString: "Er staat geen adres vast in de app. Het FreeShow-adres kun je hier opgeven (op deze Mac of een andere computer, poort 5506 voor de REST-listener van FreeShow); laat je het leeg, dan gebruikt de app het adres uit de instellingen van de webapp. Met \"Afstandsbediening toestaan\" kan een tablet of telefoon op het Podium van de webapp deze app bedienen (alleen met een verbinding met de server).")
+        hint.frame = NSRect(x: 20, y: 122, width: 520, height: 88); hint.textColor = .secondaryLabelColor; v.addSubview(hint)
         let save = NSButton(title: "Bewaar", target: self, action: #selector(saveAction)); save.keyEquivalent = "\r"; save.frame = NSRect(x: 440, y: 16, width: 100, height: 32); v.addSubview(save)
         let cancel = NSButton(title: "Annuleer", target: self, action: #selector(cancelAction)); cancel.frame = NSRect(x: 330, y: 16, width: 100, height: 32); v.addSubview(cancel)
-        offline.frame = NSRect(x: 20, y: 22, width: 280, height: 22); v.addSubview(offline)
+        offline.frame = NSRect(x: 20, y: 64, width: 250, height: 22); v.addSubview(offline)
+        remote.frame = NSRect(x: 260, y: 64, width: 280, height: 22); v.addSubview(remote)
+        label("Naam van dit apparaat", 96); place(deviceName, 94, 250); deviceName.placeholderString = "zo zien bedieners deze Mac op het Podium"
         w.contentView = v
     }
 
@@ -475,6 +541,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let p = app.player!
         server.stringValue = ShellSettings.server
         offline.state = ShellSettings.offline ? .on : .off
+        remote.state = ShellSettings.remote ? .on : .off
+        deviceName.stringValue = ShellSettings.deviceName
         key.stringValue = ShellSettings.key
         songs.stringValue = p.cfg.songsRoot
         pads.stringValue = p.cfg.padsRoot
@@ -504,8 +572,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         if s.isEmpty && !wantOffline { NSSound.beep(); return }
         if !s.isEmpty && !s.hasPrefix("http") { s = "https://" + s }
         let newKey = key.stringValue.trimmingCharacters(in: .whitespaces)
-        let serverChanged = s != ShellSettings.server || newKey != ShellSettings.key || wantOffline != ShellSettings.offline
+        let remoteChanged = (remote.state == .on) != ShellSettings.remote || deviceName.stringValue.trimmingCharacters(in: .whitespaces) != ShellSettings.deviceName
+        let serverChanged = s != ShellSettings.server || newKey != ShellSettings.key || wantOffline != ShellSettings.offline || remoteChanged
         ShellSettings.offline = wantOffline
+        ShellSettings.remote = remote.state == .on
+        ShellSettings.deviceName = deviceName.stringValue.trimmingCharacters(in: .whitespaces)
         ShellSettings.server = s
         ShellSettings.key = newKey
         let p = app.player!

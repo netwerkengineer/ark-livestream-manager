@@ -15,7 +15,7 @@ interface ArkEngine { available: boolean; call: (path: string, params?: Record<s
 declare global {
   interface Window {
     arkEngine?: ArkEngine;
-    arkDesktop?: { offline?: boolean; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }>; importZip: () => void };
+    arkDesktop?: { offline?: boolean; remote?: { enabled: boolean; name: string }; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }>; importZip: () => void };
   }
 }
 
@@ -102,6 +102,21 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     bridge,
     pads: es.pads ? { ...es.pads, error: es.pads_error || undefined } : null,
   };
+}
+
+/** The state of the player as the screens know it (also what the app reports to the server for the remote control) */
+let snapshotLibAt = 0;
+export async function snapshot(): Promise<ReaperState> {
+  const es: EngineState = await engineCall("/state");
+  if (Date.now() - snapshotLibAt > 3000) { library = (await engineCall("/library")).songs as LibSong[]; snapshotLibAt = Date.now(); }
+  return toReaperState(es, library);
+}
+
+/** Id of this app for the remote control: stays the same (it lives with the app's own settings) */
+export function playerId(): string {
+  let id = store.get("ark-player-id");
+  if (!id) { id = crypto.randomUUID(); store.set("ark-player-id", id); }
+  return id;
 }
 
 // ------------------------------------------------------------- the stand-in for the state stream
