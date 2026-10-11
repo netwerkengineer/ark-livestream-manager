@@ -152,10 +152,10 @@ In **Instellingen** staan het adres van de server, de sleutel van deze computer,
 - Bij de eerste start vraagt Windows om de **firewall** voor Ark Tracks toe te staan (nodig voor de lokale bediening).
 - Koppelen vraagt om toestemming in een venster op de computer (wacht maximaal 90 seconden).
 
-## 13. Mac mini in de kerk (zonder iemand erbij)
+## 13. Een Mac zonder iemand erbij (bijvoorbeeld een Mac mini in de zaal)
 
-- De Mac mini logt **automatisch in** als het account `arktracks` en start **ArkTracks** vanzelf (inlogonderdeel) en **REAPER** (launch agent, op de achtergrond; ArkTracks wordt daarna naar voren gehaald). REAPER blijft als reserve.
-- Na een stroomonderbreking start de Mac vanzelf op (`pmset autorestart`). **Let op:** een Mac die echt is **afgesloten** start niet zelf op als de stroom terugkomt en Wake-on-LAN werkt dan niet. Daarom gebruikt de webapp voor de Mac mini bij *Netjes afsluiten* geen shutdown, maar: apps netjes stoppen, schijf wegschrijven, slaapstand, en daarna de stekker uit. Zo start de Mac weer op als de stekker aan gaat.
+- De Mac logt **automatisch in** met een eigen account voor de app en start **ArkTracks** vanzelf (als inlogonderdeel). REAPER kan als reserve naast de app draaien (launch agent, op de achtergrond; ArkTracks wordt daarna naar voren gehaald).
+- Na een stroomonderbreking start de Mac vanzelf op (`pmset autorestart`). **Let op:** een Mac die echt is **afgesloten** start niet zelf op als de stroom terugkomt en Wake-on-LAN werkt dan niet. Daarom gebruikt de webapp voor zo'n Mac bij *Netjes afsluiten* geen shutdown, maar: apps netjes stoppen, schijf wegschrijven, slaapstand, en daarna de stekker uit. Zo start de Mac weer op als de stekker aan gaat.
 - Een Mac die zelf inlogt heeft een **vergrendelde Keychain**. ArkTracks vraagt daar niet om, maar bewaart zijn sleutel ook in `vault.json` (zie hierboven). Na een nieuwe installatie vul je de sleutel eenmalig in onder Instellingen.
-- Meekijken op afstand: Schermdeling (poort 5900) met een **VNC-wachtwoord**, via de VPN. Gebruik een viewer die het gewone VNC-wachtwoord ondersteunt (bijvoorbeeld TigerVNC met `-SecurityTypes VncAuth`). Zet het VNC-wachtwoord weer uit als je het niet meer nodig hebt.
-- De stekker in de webapp: poort 2 van de Offgridtec-stekker, Host IP van de Mac mini en als SSH-gebruiker `arktracks`. De SSH-sleutel van de NAS staat in `authorized_keys` van dat account.
+- Meekijken op afstand kan via Schermdeling, bij voorkeur alleen over een VPN. Werkt inloggen met gebruikersnaam en wachtwoord niet, dan werkt vaak wel een apart VNC-wachtwoord met een viewer die dat ondersteunt (bijvoorbeeld TigerVNC met `-SecurityTypes VncAuth`). Zet dat wachtwoord weer uit als je het niet meer nodig hebt.
+- Voor het netjes afsluiten via de webapp (per stekker in de instellingen): het adres van de computer, de SSH-gebruiker en een SSH-sleutel van de server die op die computer is toegestaan.
