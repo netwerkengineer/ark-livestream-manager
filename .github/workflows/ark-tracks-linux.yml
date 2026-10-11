@@ -11,6 +11,8 @@ on:
 jobs:
   deb:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # nodig om het pakket bij een release te zetten
     defaults:
       run:
         working-directory: track-computer/ark-engine

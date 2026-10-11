@@ -10,6 +10,8 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    permissions:
+      contents: write   # nodig om de bestanden bij een release te zetten
     defaults:
       run:
         working-directory: track-computer/ark-engine
@@ -17,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Gereedschap (NASM voor de cryptografie, WiX voor het .msi)
+        run: |
+          if (-not (Get-Command nasm -ErrorAction SilentlyContinue) -and -not (Test-Path "C:\Program Files\NASM\nasm.exe")) { choco install nasm -y --no-progress }
+          "C:\Program Files\NASM" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          $wix = "${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin"
+          if (-not (Test-Path "$wix\candle.exe")) { choco install wixtoolset -y --no-progress }
+          if (-not (Test-Path "$wix\candle.exe")) { throw "WiX niet gevonden op $wix" }
+          "$wix" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
       - uses: actions/cache@v4
         with:
           path: |
@@ -25,16 +35,24 @@ jobs:
             track-computer/ark-engine/target
           key: ark-engine-windows-${{ hashFiles('track-computer/ark-engine/Cargo.lock') }}
       - name: Proeven
-        run: cargo test --release
+        run: |
+          cargo test --release
+          if ($LASTEXITCODE -ne 0) { throw "de proeven zijn mislukt" }
       - name: Programma bouwen
-        run: cargo build --release --features app --bin ark-tracks
+        run: |
+          cargo build --release --features app --bin ark-tracks
+          if ($LASTEXITCODE -ne 0) { throw "het bouwen is mislukt" }
       - name: Installatiebestand (.msi)
         run: |
           $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
           $wix = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
           New-Item -ItemType Directory -Force target/wix | Out-Null
-          & "$wix\candle.exe" -nologo -arch x64 "-dVersion=$version" -dExePath=target\release\ark-tracks.exe -dIconPath=wix\ArkTracks.ico -out target\wix\main.wixobj wix\main.wxs
+          # let op: argumenten met een punt (ark-tracks.exe) moeten tussen aanhalingstekens, anders splitst PowerShell ze
+          & "$wix\candle.exe" -nologo -arch x64 "-dVersion=$version" "-dExePath=target\release\ark-tracks.exe" "-dIconPath=wix\ArkTracks.ico" -out target\wix\main.wixobj wix\main.wxs
+          if ($LASTEXITCODE -ne 0) { throw "candle is mislukt ($LASTEXITCODE)" }
           & "$wix\light.exe" -nologo -sval -out "target\wix\ark-tracks-$version-x64.msi" target\wix\main.wixobj
+          if ($LASTEXITCODE -ne 0) { throw "light is mislukt ($LASTEXITCODE)" }
+          if (-not (Test-Path "target\wix\ark-tracks-$version-x64.msi")) { throw "het .msi is niet gemaakt" }
       - name: Zip met het programma
         run: Compress-Archive -Path target/release/ark-tracks.exe -DestinationPath target/ark-tracks-windows-x64.zip
       - uses: actions/upload-artifact@v4
