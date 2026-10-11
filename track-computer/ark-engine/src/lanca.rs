@@ -62,7 +62,6 @@ impl Ca {
                 Ok(())
             }
             Some(d) => {
-                use std::os::unix::fs::PermissionsExt;
                 std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
                 std::fs::write(d.join("ca.crt.pem"), cert).map_err(|e| e.to_string())?;
                 let kp = d.join("ca.key.pem");
@@ -70,7 +69,7 @@ impl Ca {
                     let _ = std::fs::remove_file(&kp);
                 } else {
                     std::fs::write(&kp, key).map_err(|e| e.to_string())?;
-                    let _ = std::fs::set_permissions(&kp, std::fs::Permissions::from_mode(0o600)); // alleen deze gebruiker
+                    crate::platform::make_private(&kp); // alleen deze gebruiker
                 }
                 Ok(())
             }

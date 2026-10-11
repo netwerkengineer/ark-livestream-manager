@@ -28,19 +28,7 @@ pub fn log(s: &str) {
     }
 }
 
-pub fn home() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| ".".into())
-}
-fn log_path() -> String {
-    std::env::var("ARK_LOG").unwrap_or_else(|_| {
-        let base = std::env::var("XDG_STATE_HOME").unwrap_or_else(|_| format!("{}/.local/state", home()));
-        format!("{base}/ArkTracks/ArkTracks.log")
-    })
-}
-pub fn config_dir() -> String {
-    let base = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", home()));
-    format!("{base}/ArkTracks")
-}
+pub use crate::platform::{config_dir, home, log_path};
 
 pub struct LibSong {
     pub name: String,
@@ -152,10 +140,13 @@ pub struct Player {
 
 pub fn folder_of(path: &str) -> String {
     let f = if path.to_lowercase().ends_with(".rpp") { Path::new(path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default() } else { path.to_string() };
-    // standardizingPath: dubbele en afsluitende schuine strepen weg
+    // standardizingPath: dubbele en afsluitende schuine strepen weg; ook Windows-paden (C:\Map\Nummer) worden C:/Map/Nummer
+    let n = f.replace('\\', "/");
     let mut out = String::new();
-    for part in f.split('/').filter(|p| !p.is_empty() && *p != ".") {
-        out.push('/');
+    for part in n.split('/').filter(|p| !p.is_empty() && *p != ".") {
+        if !out.is_empty() || n.starts_with('/') {
+            out.push('/');
+        }
         out.push_str(part);
     }
     if out.is_empty() { "/".into() } else { out }
@@ -169,7 +160,7 @@ impl Player {
     pub fn new(mixer: Arc<Mutex<Mixer>>) -> Arc<Player> {
         let mut cfg = Config::new();
         cfg.load();
-        let songs_root = if cfg.songs_root.is_empty() { format!("{}/Tracks/Songs", home()) } else { cfg.songs_root.clone() };
+        let songs_root = if cfg.songs_root.is_empty() { crate::platform::default_songs_dir() } else { cfg.songs_root.clone() };
         {
             let mut m = locked(&mixer);
             m.requested = cfg.output_mode.clone();
@@ -283,7 +274,7 @@ impl Player {
     pub fn set_songs_root(self: &Arc<Self>, path: &str) {
         {
             let mut st = self.lock();
-            st.songs_root = if path.is_empty() { format!("{}/Tracks/Songs", home()) } else { path.to_string() };
+            st.songs_root = if path.is_empty() { crate::platform::default_songs_dir() } else { path.to_string() };
             st.cfg.songs_root = path.to_string();
             st.cfg.save();
         }

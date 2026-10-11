@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")] // geen zwart consolevenster naast de app
+
 //! Ark Tracks voor Linux (en straks Windows): een venster met de Tracks-pagina van de webapp en de speler erachter.
 //! De pagina praat met de speler via `window.arkEngine.call(pad, params)` (zelfde brug als de Mac-app).
 
@@ -20,6 +22,18 @@ use wry::{http::Response, WebContext, WebViewBuilder};
 use tao::platform::unix::WindowExtUnix;
 #[cfg(target_os = "linux")]
 use wry::WebViewBuilderExtUnix;
+
+/// Het adres van de eigen pagina's van de app (instellingen, bediening op afstand). Op Windows (WebView2) wordt een eigen protocol een https-adres.
+#[cfg(windows)]
+const ARK_ORIGIN: &str = "https://ark.localhost";
+#[cfg(not(windows))]
+const ARK_ORIGIN: &str = "ark://localhost";
+fn ark_url(path: &str) -> String {
+    format!("{ARK_ORIGIN}{path}")
+}
+fn is_ark(u: &str) -> bool {
+    u == ARK_ORIGIN || u.starts_with(&format!("{ARK_ORIGIN}/")) || u.starts_with(&format!("{ARK_ORIGIN}?"))
+}
 
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 ArkTracksDesktop";
 
@@ -74,7 +88,6 @@ impl Shell {
         s
     }
     fn save(&self) {
-        use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::create_dir_all(config_dir());
         let path = shell_path();
         let tmp = format!("{path}.tmp");
@@ -85,7 +98,7 @@ impl Shell {
             j["key"] = json!(self.key); // geen sleutelbos: in het bestand (alleen leesbaar voor deze gebruiker)
         }
         if std::fs::write(&tmp, j.to_string()).is_ok() {
-            let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+            ark_engine::platform::make_private(std::path::Path::new(&tmp));
             let _ = std::fs::rename(&tmp, &path);
         }
     }
@@ -242,8 +255,10 @@ $("upd").onclick=async()=>{ $("msg").className="msg"; $("msg").textContent="Bezi
 fn init_script(shell: &Shell) -> String {
     format!(
         r#"
+const IS_OFF = location.protocol === "arkoffline:" || location.hostname === "arkoffline.localhost";
+const IS_ARK = location.protocol === "ark:" || location.hostname === "ark.localhost";
 window.arkDesktop = {{
-  version: "{version}-linux", platform: "linux", offline: location.protocol === "arkoffline:",
+  version: "{version}-linux", platform: "linux", offline: IS_OFF,
   remote: {{ enabled: false, name: "" }}, server: {server},
   openSettings: () => window.arkShell({{ action: "openSettings" }}),
   openExternal: (url) => window.arkShell({{ action: "openExternal", url }}),
@@ -269,10 +284,10 @@ window.arkDesktop = {{
   // eigen instellingen van de pagina ("ark-…", zoals de eigen setlist) worden ook in de app bewaard, zodat ze er zijn in de kopie
   // zonder server en op de tablet. De online pagina houdt zijn eigen opslag en stuurt wijzigingen door; de kopie zonder server haalt ze bij het openen op.
   (() => {{ try {{
-    if (location.protocol === "ark:") return;
+    if (IS_ARK) return;
     const post = (m) => window.ipc.postMessage(JSON.stringify(Object.assign({{ id: 0 }}, m)));
     const set = Storage.prototype.setItem, remove = Storage.prototype.removeItem;
-    if (location.protocol === "arkoffline:") {{
+    if (IS_OFF) {{
       let kv = null;
       try {{ const x = new XMLHttpRequest(); x.open("GET", "/_kv", false); x.send(); if (x.status === 200) kv = JSON.parse(x.responseText); }} catch (e) {{}}
       if (kv) {{
@@ -286,7 +301,7 @@ window.arkDesktop = {{
     Storage.prototype.removeItem = function (k) {{ remove.call(this, k); if (this === localStorage && String(k).startsWith("ark-")) post({{ action: "kvRemove", key: String(k) }}); }};
   }} catch (e) {{}} }})();
   window.addEventListener("keydown", (e) => {{
-    if (e.key === "F5" || (e.ctrlKey && e.key.toLowerCase() === "r")) {{ e.preventDefault(); if (location.protocol === "arkoffline:") window.arkShell({{ action: "openMain" }}); else location.reload(); }}
+    if (e.key === "F5" || (e.ctrlKey && e.key.toLowerCase() === "r")) {{ e.preventDefault(); if (IS_OFF) window.arkShell({{ action: "openMain" }}); else location.reload(); }}
     else if (e.ctrlKey && e.key === ",") {{ e.preventDefault(); window.arkShell({{ action: "openSettings" }}); }}
     else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "l") {{ e.preventDefault(); window.arkShell({{ action: "openLan" }}); }}
     else if (e.key === "F11") {{ e.preventDefault(); window.arkShell({{ action: "fullscreen" }}); }}
@@ -326,9 +341,7 @@ fn params_to_items(params: &Value) -> Vec<(String, String)> {
 }
 
 fn open_external(url: &str) {
-    if url.starts_with("https://") || url.starts_with("http://") {
-        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
-    }
+    ark_engine::platform::open_external(url);
 }
 
 
@@ -495,7 +508,7 @@ fn main() {
             Response::builder().status(status).header("Content-Type", ctype).header("Cache-Control", "no-store").body(data.into()).unwrap()
         })
         .with_navigation_handler(move |url| {
-            if !(url.starts_with("https://") || url.starts_with("http://") || url.starts_with("ark://") || url.starts_with("arkoffline://") || url.starts_with("about:")) {
+            if !(url.starts_with("https://") || url.starts_with("http://") || is_ark(&url) || offline::is_offline(&url) || url.starts_with("about:")) {
                 return false;
             }
             // de app toont alleen /desktop van de eigen server: na het inloggen landt de server op de startpagina, die sturen we terug
@@ -526,12 +539,12 @@ fn main() {
             let (p, sh, px, fe) = (p_ipc.clone(), sh_ipc.clone(), px_ipc.clone(), f_ipc.clone());
             let (lan_l, kv_i) = (lan_ipc.clone(), kv_ipc.clone());
             let origin = sh.lock().unwrap().origin();
-            let trusted_page = page.starts_with("ark://") || page.starts_with("arkoffline://") || (!origin.is_empty() && page.starts_with(&origin));
+            let trusted_page = is_ark(&page) || offline::is_offline(&page) || (!origin.is_empty() && (page == origin || page.starts_with(&format!("{origin}/"))));
             if !trusted_page {
                 log(&format!("Bericht van een onbekende pagina genegeerd: {page}"));
                 return;
             }
-            let from_settings = page.starts_with("ark://");
+            let from_settings = is_ark(&page);
             let reply = move |v: String| {
                 let _ = px.send_event(Ev::Eval(format!("window.__arkRes({id},{})", serde_json::to_string(&v).unwrap())));
             };
@@ -545,11 +558,11 @@ fn main() {
                 }
                 match msg["action"].as_str().unwrap_or("") {
                     "openSettings" => {
-                        let _ = px_send(&p, Ev::Navigate("ark://app/settings".into()));
+                        let _ = px_send(&p, Ev::Navigate(ark_url("/settings")));
                         reply("{}".into());
                     }
                     "openLan" if from_settings => {
-                        let _ = px_send(&p, Ev::Navigate("ark://app/lan".into()));
+                        let _ = px_send(&p, Ev::Navigate(ark_url("/lan")));
                         reply("{}".into());
                     }
                     "lanGet" if from_settings => reply(lan_state(&sh.lock().unwrap(), &lan_l)),
@@ -638,7 +651,7 @@ fn main() {
                         let st = p.lock();
                         let devices = st.list_devices.as_ref().map(|f| f()).unwrap_or_default();
                         reply(
-                            json!({"version": env!("CARGO_PKG_VERSION"), "log": std::env::var("ARK_LOG").unwrap_or_else(|_| format!("{}/.local/state/ArkTracks/ArkTracks.log", std::env::var("HOME").unwrap_or_default())),
+                            json!({"version": env!("CARGO_PKG_VERSION"), "log": ark_engine::platform::log_path(),
                                 "server": s.base(), "hasKey": !s.key.is_empty(), "vault": ark_engine::vault::available(), "configured": !s.base().is_empty() && !s.key.is_empty() || s.offline, "offline": s.offline, "mirror": offline::available(),
                                 "songs_root": st.cfg.songs_root, "device": st.cfg.device, "output_mode": st.cfg.output_mode,
                                 "freeshow_host": st.cfg.fs_host, "freeshow_port": st.cfg.fs_port,
@@ -676,6 +689,8 @@ fn main() {
                 }
             });
         });
+    #[cfg(windows)]
+    let builder = wry::WebViewBuilderExtWindows::with_https_scheme(builder, true);
     #[cfg(target_os = "linux")]
     let webview = builder.build_gtk(window.default_vbox().unwrap()).expect("webview");
     #[cfg(not(target_os = "linux"))]
@@ -698,14 +713,14 @@ fn main() {
             if s.offline {
                 // zonder server werken: de bewaarde kopie van de pagina
                 if offline::available() {
-                    let _ = wv.load_url(offline::URL);
+                    let _ = wv.load_url(&offline::url());
                 } else {
-                    let _ = wv.load_url("ark://app/settings");
+                    let _ = wv.load_url(&ark_url("/settings"));
                 }
                 return;
             }
             if s.base().is_empty() || s.key.is_empty() {
-                let _ = wv.load_url("ark://app/settings");
+                let _ = wv.load_url(&ark_url("/settings"));
                 return;
             }
             // de sleutel gaat als cookie mee naar de server: zonder dat bestaat /desktop daar niet
@@ -737,7 +752,7 @@ fn main() {
                     }
                 } else if offline::available() {
                     log("Server niet bereikbaar: verder met de kopie zonder server");
-                    let _ = px.send_event(Ev::Navigate(offline::URL.into()));
+                    let _ = px.send_event(Ev::Navigate(offline::url()));
                 } else {
                     let _ = px.send_event(Ev::Navigate(url));
                 }

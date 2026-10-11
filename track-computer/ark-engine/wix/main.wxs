@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!-- Installatiebestand (.msi) voor Ark Tracks op Windows; gemaakt met cargo-wix (WiX 3). Bouwen: zie .github/workflows/ark-tracks-windows.yml -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Ark Tracks" UpgradeCode="FD0335AE-3829-405A-A2E5-0B2595A1EFBD" Manufacturer="Ark Church" Language="1033" Codepage="1252" Version="$(var.Version)">
+    <Package Id="*" Keywords="Installer" Description="Ark Tracks" Manufacturer="Ark Church" InstallerVersion="450" Languages="1033" Compressed="yes" InstallScope="perMachine" SummaryCodepage="1252"/>
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="Er is al een nieuwere versie van Ark Tracks ge&#239;nstalleerd."/>
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1"/>
+    <Property Id="DiskPrompt" Value="Ark Tracks installatie"/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="APPLICATIONFOLDER" Name="Ark Tracks">
+          <Component Id="MainExe" Guid="*" Win64="yes">
+            <File Id="ArkTracksExe" Name="ark-tracks.exe" DiskId="1" Source="$(var.ExePath)" KeyPath="yes">
+              <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Ark Tracks" WorkingDirectory="APPLICATIONFOLDER" Advertise="yes" Icon="ArkTracks.ico"/>
+              <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Ark Tracks" WorkingDirectory="APPLICATIONFOLDER" Advertise="yes" Icon="ArkTracks.ico"/>
+            </File>
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder"/>
+      <Directory Id="DesktopFolder"/>
+    </Directory>
+
+    <Icon Id="ArkTracks.ico" SourceFile="$(var.IconPath)"/>
+    <Feature Id="Complete" Title="Ark Tracks" Level="1" ConfigurableDirectory="APPLICATIONFOLDER">
+      <ComponentRef Id="MainExe"/>
+    </Feature>
+  </Product>
+</Wix>

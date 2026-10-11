@@ -584,6 +584,7 @@ fn vault_test() -> Result<(), String> {
         check(vault::get("lan-ca-key").map(|k| k.contains("PRIVATE KEY")).unwrap_or(false), "CA: privésleutel staat in de sleutelbos");
     } else {
         check(key_file.exists(), "CA: zonder sleutelbos blijft de sleutel in het bestand");
+        #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mode = std::fs::metadata(&key_file).map(|m| m.permissions().mode() & 0o777).unwrap_or(0);

@@ -111,14 +111,13 @@ impl Devices {
     fn persist(&mut self) {
         self.last_save = Instant::now();
         let Some(p) = &self.path else { return };
-        use std::os::unix::fs::PermissionsExt;
         let j: Vec<Value> = self.list.iter().map(|d| json!({"id": d.id, "name": d.name, "hash": d.hash, "created": d.created, "lastSeen": d.last_seen})).collect();
         if let Some(d) = p.parent() {
             let _ = std::fs::create_dir_all(d);
         }
         let tmp = PathBuf::from(format!("{}.tmp", p.display()));
         if std::fs::write(&tmp, serde_json::to_vec(&j).unwrap()).is_ok() {
-            let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+            crate::platform::make_private(&tmp);
             let _ = std::fs::rename(&tmp, p);
         }
     }
@@ -160,12 +159,28 @@ pub fn host_local_name() -> String {
     format!("{h}.local")
 }
 
+/// Is dit een netwerkkaart waarop tablets en telefoons ons kunnen bereiken? (geen loopback, geen virtuele kaarten van Docker, WSL, VPN's of virtuele machines)
+fn usable_adapter(name: &str) -> bool {
+    let n = name.to_lowercase();
+    let virtual_ = ["docker", "veth", "br-", "virbr", "vmnet", "vmware", "virtualbox", "vethernet", "wsl", "hyper-v", "loopback", "tailscale", "zerotier", "tun", "tap", "utun", "awdl", "llw", "bridge"];
+    if virtual_.iter().any(|v| n.contains(v)) {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        true // Windows noemt ze "Wi-Fi", "Ethernet", "Ethernet 2", ...
+    }
+    #[cfg(not(windows))]
+    {
+        n.starts_with("en") || n.starts_with("eth") || n.starts_with("wl")
+    }
+}
+
 pub fn local_ips() -> Vec<String> {
     let mut out = Vec::new();
     if let Ok(list) = if_addrs::get_if_addrs() {
         for i in list {
-            let n = i.name.to_lowercase();
-            if i.is_loopback() || !(n.starts_with("en") || n.starts_with("eth") || n.starts_with("wl")) {
+            if i.is_loopback() || !usable_adapter(&i.name) {
                 continue;
             }
             if let if_addrs::IfAddr::V4(a) = i.addr {

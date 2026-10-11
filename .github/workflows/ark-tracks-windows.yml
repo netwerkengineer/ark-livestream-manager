@@ -1,0 +1,52 @@
+# Bouwt Ark Tracks voor Windows (.exe in een zip, en een .msi) en draait de proeven. Handmatig te starten (Actions > Run workflow),
+# of door een tag "ark-tracks-v0.4.0" te pushen; dan komen de bestanden ook bij de release.
+name: Ark Tracks voor Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["ark-tracks-v*"]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: track-computer/ark-engine
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            track-computer/ark-engine/target
+          key: ark-engine-windows-${{ hashFiles('track-computer/ark-engine/Cargo.lock') }}
+      - name: Proeven
+        run: cargo test --release
+      - name: Programma bouwen
+        run: cargo build --release --features app --bin ark-tracks
+      - name: Installatiebestand (.msi)
+        run: |
+          $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
+          $wix = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          New-Item -ItemType Directory -Force target/wix | Out-Null
+          & "$wix\candle.exe" -nologo -arch x64 "-dVersion=$version" -dExePath=target\release\ark-tracks.exe -dIconPath=wix\ArkTracks.ico -out target\wix\main.wixobj wix\main.wxs
+          & "$wix\light.exe" -nologo -sval -out "target\wix\ark-tracks-$version-x64.msi" target\wix\main.wixobj
+      - name: Zip met het programma
+        run: Compress-Archive -Path target/release/ark-tracks.exe -DestinationPath target/ark-tracks-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ark-tracks-windows
+          path: |
+            track-computer/ark-engine/target/wix/*.msi
+            track-computer/ark-engine/target/ark-tracks-windows-x64.zip
+      - name: Bij de release zetten
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            track-computer/ark-engine/target/wix/*.msi
+            track-computer/ark-engine/target/ark-tracks-windows-x64.zip

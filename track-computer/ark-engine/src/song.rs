@@ -146,16 +146,12 @@ fn load_stem(path: &Path, name: &str, offset: usize) -> Result<Stem, String> {
     Ok(Stem::new(name, ch))
 }
 
-/// Beschikbaar werkgeheugen in bytes (Linux: MemAvailable; elders onbekend)
+/// Beschikbaar en totaal werkgeheugen in bytes (waar het systeem dat laat zien)
 pub fn mem_available() -> Option<u64> {
-    let t = std::fs::read_to_string("/proc/meminfo").ok()?;
-    let kb: u64 = t.lines().find(|l| l.starts_with("MemAvailable:"))?.split_whitespace().nth(1)?.parse().ok()?;
-    Some(kb * 1024)
+    crate::platform::memory().0
 }
 pub fn mem_total() -> Option<u64> {
-    let t = std::fs::read_to_string("/proc/meminfo").ok()?;
-    let kb: u64 = t.lines().find(|l| l.starts_with("MemTotal:"))?.split_whitespace().nth(1)?.parse().ok()?;
-    Some(kb * 1024)
+    crate::platform::memory().1
 }
 
 /// Stems laden met een beperkt aantal tegelijk: elke stem heeft tijdens het decoderen en omrekenen even het dubbele nodig,

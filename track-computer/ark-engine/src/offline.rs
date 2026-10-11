@@ -9,7 +9,18 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 
 pub const SCHEME: &str = "arkoffline";
-pub const URL: &str = "arkoffline://app/desktop";
+/// Het adres waaronder de pagina's van de kopie worden aangeboden. Op Windows (WebView2) wordt een eigen protocol een https-adres.
+#[cfg(windows)]
+pub const ORIGIN: &str = "https://arkoffline.localhost";
+#[cfg(not(windows))]
+pub const ORIGIN: &str = "arkoffline://localhost";
+pub fn url() -> String {
+    format!("{ORIGIN}/desktop")
+}
+/// Is dit adres van de kopie (precies deze herkomst, niet een andere site die er mee begint)?
+pub fn is_offline(u: &str) -> bool {
+    u == ORIGIN || u.starts_with(&format!("{ORIGIN}/")) || u.starts_with(&format!("{ORIGIN}?"))
+}
 const AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 ArkTracksDesktop";
 
 pub fn dir() -> PathBuf {

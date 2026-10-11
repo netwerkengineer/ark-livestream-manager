@@ -5,7 +5,6 @@
 //! De pad wordt volledig in het geheugen geladen (op de achtergrond) en daarna met een crossfade ingewisseld.
 
 use crate::decode::decode_file;
-use crate::player::home;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -74,7 +73,7 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 impl PadPlayer {
     pub fn dir(&self) -> String {
         let r = lock(&self.shared.meta).root.clone();
-        if r.is_empty() { format!("{}/Tracks/Pads", home()) } else { r }
+        if r.is_empty() { crate::platform::default_pads_dir() } else { r }
     }
     pub fn set_root(&self, root: &str) {
         lock(&self.shared.meta).root = root.to_string();

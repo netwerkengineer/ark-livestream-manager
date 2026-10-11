@@ -22,7 +22,6 @@ roxmltree = "0.20"
 flate2 = "1"
 base64 = "0.22"
 trash = "5"
-rfd = { version = "0.15", optional = true, default-features = false, features = ["gtk3"] }
 cpal = { version = "0.15", optional = true }
 wry = { version = "0.57", optional = true }
 tao = { version = "0.37", optional = true }
@@ -39,15 +38,18 @@ time = "0.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["async-secret-service", "async-io", "crypto-rust"] }
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = "0.15"
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
 [target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation"] }
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
 
 [features]
 default = []
 audio = ["dep:cpal"]
-app = ["audio", "dep:wry", "dep:tao", "dep:rfd"]
+app = ["audio", "dep:wry", "dep:tao"]
 
 [[bin]]
 name = "ark-engine-play"

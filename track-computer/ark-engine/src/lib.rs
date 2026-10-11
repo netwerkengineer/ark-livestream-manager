@@ -12,6 +12,7 @@ pub mod importer;
 pub mod decode;
 pub mod offline;
 pub mod pads;
+pub mod platform;
 pub mod player;
 pub mod resample;
 pub mod server;
