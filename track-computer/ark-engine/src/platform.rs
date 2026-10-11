@@ -85,6 +85,23 @@ pub fn open_external(url: &str) {
     }
 }
 
+/// Een bestand tonen in de bestandsbeheerder (Linux: de map, Windows: het bestand geselecteerd, macOS: in Finder)
+pub fn reveal(path: &str) {
+    #[cfg(target_os = "linux")]
+    {
+        let dir = Path::new(path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| ".".into());
+        let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").args(["-R", path]).spawn();
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(format!("/select,{}", path.replace('/', "\\"))).spawn();
+    }
+}
+
 /// (beschikbaar, totaal) werkgeheugen in bytes, voor zover het systeem dat laat zien
 pub fn memory() -> (Option<u64>, Option<u64>) {
     #[cfg(target_os = "linux")]

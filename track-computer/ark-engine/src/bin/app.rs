@@ -45,6 +45,8 @@ enum Ev {
     RestartAudio(String),
     Fullscreen,
     Zoom(f64),
+    #[allow(dead_code)]
+    Menu(String),
 }
 
 // ------------------------------------------------------------- instellingen van de schil (server en sleutel)
@@ -392,6 +394,58 @@ mod dialogs {
     }
 }
 
+
+// ------------------------------------------------------------- menubalk (Windows en Linux; op de Mac zit er een in de Swift-app)
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod appmenu {
+    use muda::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+    use std::collections::HashMap;
+
+    pub struct AppMenu {
+        pub menu: Menu,
+        pub actions: HashMap<muda::MenuId, &'static str>,
+        pub offline: CheckMenuItem,
+    }
+
+    pub fn build(offline: bool) -> AppMenu {
+        let mut actions: HashMap<muda::MenuId, &'static str> = HashMap::new();
+        let mut item = |text: &str, action: &'static str| -> MenuItem {
+            let i = MenuItem::new(text, true, None);
+            actions.insert(i.id().clone(), action);
+            i
+        };
+        let settings = item("&Instellingen…   (Ctrl+,)", "settings");
+        let lan = item("&Bediening op afstand…   (Ctrl+Shift+L)", "lan");
+        let quit = item("&Afsluiten", "quit");
+        let reload = item("&Ververs   (F5)", "reload");
+        let back = item("&Terug   (Alt+←)", "back");
+        let mirror = item("&Kopie voor gebruik zonder server bijwerken", "mirror");
+        let zin = item("&Groter   (Ctrl++)", "zoom_in");
+        let zout = item("&Kleiner   (Ctrl+-)", "zoom_out");
+        let zreset = item("&Normale grootte   (Ctrl+0)", "zoom_reset");
+        let full = item("&Beeldvullend   (F11)", "fullscreen");
+        let log = item("&Logbestand tonen", "log");
+        let off = CheckMenuItem::new("&Zonder server werken", true, offline, None);
+        actions.insert(off.id().clone(), "offline");
+
+        let m_app = Submenu::new("&Ark Tracks", true);
+        let _ = m_app.append_items(&[&settings, &lan, &PredefinedMenuItem::separator(), &quit]);
+        let m_view = Submenu::new("&Weergave", true);
+        let _ = m_view.append_items(&[&reload, &back, &PredefinedMenuItem::separator(), &off, &mirror, &PredefinedMenuItem::separator(), &zin, &zout, &zreset, &full]);
+        let m_help = Submenu::new("&Help", true);
+        let _ = m_help.append_items(&[&log]);
+        let menu = Menu::new();
+        let _ = menu.append_items(&[&m_app, &m_view, &m_help]);
+        AppMenu { menu, actions, offline: off }
+    }
+
+    pub fn forward(proxy: std::sync::Mutex<tao::event_loop::EventLoopProxy<super::Ev>>) {
+        MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
+            let _ = proxy.lock().unwrap().send_event(super::Ev::Menu(e.id.0.clone()));
+        }));
+    }
+}
+
 fn apply_lan(s: &Shell, lan: &Arc<Lan>) {
     if s.lan {
         lan.start(s.lan_port, s.lan_tls, &s.name);
@@ -463,6 +517,22 @@ fn main() {
     }
 
     let window = WindowBuilder::new().with_title("Ark Tracks").with_inner_size(LogicalSize::new(1280.0, 860.0)).build(&event_loop).expect("venster");
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let app_menu = {
+        let m = appmenu::build(shell.lock().unwrap().offline);
+        #[cfg(target_os = "linux")]
+        {
+            let _ = m.menu.init_for_gtk_window(window.gtk_window(), window.default_vbox());
+        }
+        #[cfg(windows)]
+        {
+            // SAFETY: de hwnd komt van het zojuist gemaakte venster
+            let _ = unsafe { m.menu.init_for_hwnd(tao::platform::windows::WindowExtWindows::hwnd(&window)) };
+        }
+        appmenu::forward(Mutex::new(proxy.clone()));
+        m
+    };
 
     let data_dir = std::path::PathBuf::from(config_dir()).join("webdata");
     let _ = std::fs::create_dir_all(&data_dir);
@@ -771,11 +841,64 @@ fn main() {
 
     let mut zoom = 1.0f64;
     let (player2, mixer2, fetcher2) = (player.clone(), mixer.clone(), fetcher.clone());
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let shell2 = shell.clone();
     event_loop.run(move |event, _, flow| {
         *flow = ControlFlow::Wait;
         match event {
             Event::UserEvent(Ev::Eval(js)) => {
                 let _ = webview.evaluate_script(&js);
+            }
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            Event::UserEvent(Ev::Menu(id)) => {
+                let action = app_menu.actions.get(&muda::MenuId(id)).copied().unwrap_or("");
+                match action {
+                    "settings" => {
+                        let _ = webview.load_url(&ark_url("/settings"));
+                    }
+                    "lan" => {
+                        let _ = webview.load_url(&ark_url("/lan"));
+                    }
+                    "quit" => *flow = ControlFlow::Exit,
+                    "reload" => {
+                        let _ = webview.evaluate_script("(location.protocol==='arkoffline:'||location.hostname==='arkoffline.localhost')?window.arkShell({action:'openMain'}):location.reload()");
+                    }
+                    "back" => {
+                        let _ = webview.evaluate_script("history.back()");
+                    }
+                    "offline" => {
+                        {
+                            let mut s = shell2.lock().unwrap();
+                            s.offline = !s.offline;
+                            s.save();
+                            app_menu.offline.set_checked(s.offline);
+                        }
+                        go_main(&webview);
+                    }
+                    "mirror" => {
+                        let s = shell2.lock().unwrap().clone();
+                        std::thread::spawn(move || {
+                            let _ = offline::sync(&s.base(), &s.key);
+                        });
+                    }
+                    "zoom_in" => {
+                        zoom = (zoom + 0.1).clamp(0.5, 3.0);
+                        let _ = webview.zoom(zoom);
+                    }
+                    "zoom_out" => {
+                        zoom = (zoom - 0.1).clamp(0.5, 3.0);
+                        let _ = webview.zoom(zoom);
+                    }
+                    "zoom_reset" => {
+                        zoom = 1.0;
+                        let _ = webview.zoom(zoom);
+                    }
+                    "fullscreen" => {
+                        window.set_fullscreen(if window.fullscreen().is_some() { None } else { Some(Fullscreen::Borderless(None)) });
+                    }
+                    "log" => ark_engine::platform::reveal(&ark_engine::platform::log_path()),
+                    _ => {}
+                }
             }
             Event::UserEvent(Ev::Cookies(url, tx)) => {
                 let header = webview.cookies_for_url(&url).map(|v| v.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; ")).unwrap_or_default();
