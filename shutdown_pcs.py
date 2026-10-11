@@ -30,6 +30,16 @@ def get_ssh_user(host_ip):
         return "admin"
     return "jeffreygo"
 
+# A Mac that was really shut down does NOT start by itself when the power comes back (autorestart only applies after a power
+# failure while it was running), and Wake-on-LAN does not work from a full shutdown. So for a Mac we stop the apps cleanly, flush
+# the disk and put it to sleep: it is then idle, and cutting the plug afterwards counts as a power failure, so it boots again when the
+# plug is switched on. (The launch agent for REAPER has KeepAlive, so it is booted out instead of killed.)
+MACOS_QUIET_CMD = (
+    "launchctl bootout gui/$(id -u)/nl.arkchurch.reaper 2>/dev/null; "
+    "pkill -TERM -x ArkTracks 2>/dev/null; sleep 4; "
+    "sync; sleep 1; pmset sleepnow"
+)
+
 def ssh_user_for(plug, host_ip):
     # a user set on the plug itself wins; otherwise the old per-host defaults
     return (plug.get("sshUser") or "").strip() or get_ssh_user(host_ip)
@@ -119,7 +129,7 @@ def shutdown_single_plug_sequence(plug, settings):
         if os_type == "windows":
             cmd = "shutdown /s /f /t 0"
         elif os_type == "macos":
-            cmd = "sudo -n /sbin/shutdown -h now"  # a real shutdown (needs a NOPASSWD sudoers rule for /sbin/shutdown on the Mac)
+            cmd = MACOS_QUIET_CMD
         else:
             cmd = "sudo /sbin/shutdown -h now"
 
@@ -212,7 +222,7 @@ def main():
             if os_type == "windows":
                 cmd = "shutdown /s /f /t 0"
             elif os_type == "macos":
-                cmd = "sudo -n /sbin/shutdown -h now"  # a real shutdown (needs a NOPASSWD sudoers rule for /sbin/shutdown on the Mac)
+                cmd = MACOS_QUIET_CMD
             else:
                 cmd = "sudo /sbin/shutdown -h now"
 
