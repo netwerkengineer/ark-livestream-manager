@@ -202,6 +202,8 @@ export interface TuyaPlug {
   localKey: string;
   version: number;
   hostIp?: string;
+  // SSH user for the clean shutdown of hostIp; empty = the old defaults per host (see shutdown_pcs.py)
+  sshUser?: string;
   // Which outlet/gang this entry controls, for multi-socket devices (e.g. a
   // 4-way power strip) that share one ip/deviceId/localKey but expose each
   // socket as its own DPS index. Omitted/1 keeps existing single-socket

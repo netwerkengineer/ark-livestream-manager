@@ -874,6 +874,19 @@ export default function SettingsPanel({
                         />
                       </div>
                       <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>SSH-gebruiker op de host (voor netjes afsluiten)</label>
+                        <input
+                          className="input-field"
+                          placeholder="Leeg = standaard voor deze host"
+                          value={plug.sshUser || ""}
+                          onChange={(e) => {
+                            const updatedPlugs = [...settings.tuyaPlugs];
+                            updatedPlugs[idx] = { ...plug, sshUser: e.target.value.trim() };
+                            onSettingsChange({ ...settings, tuyaPlugs: updatedPlugs });
+                          }}
+                        />
+                      </div>
+                      <div>
                         <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Protocol Versie</label>
                         <select
                           className="input-field"

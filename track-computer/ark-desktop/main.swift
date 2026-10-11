@@ -28,31 +28,75 @@ enum Keychain {
     private static let writer = DispatchQueue(label: "ark.keychain.writer")
     static func flush() { writer.sync {} }
 
-    static func rawGet(_ account: String) -> String {
+    /// Alles hieronder gaat zonder vraag aan de gebruiker: is de Keychain vergrendeld (een Mac die zelf inlogt, zonder wachtwoord) of wil macOS
+    /// toestemming vragen, dan mislukt de aanroep gewoon en gebruikt de app een eigen bestand (alleen leesbaar voor deze gebruiker).
+    static var simulateLocked = false                              // alleen voor de proef: doe alsof de Keychain vergrendeld is
+    private static func quiet<T>(_ body: () -> T) -> T {
+        SecKeychainSetUserInteractionAllowed(false)
+        defer { SecKeychainSetUserInteractionAllowed(true) }
+        return body()
+    }
+    static func rawGetStatus(_ account: String) -> (String, OSStatus) {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account,
                                 kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
         var out: AnyObject?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return "" }
-        return String(data: d, encoding: .utf8) ?? ""
+        if simulateLocked { return ("", errSecInteractionNotAllowed) }
+        let st = quiet { SecItemCopyMatching(q as CFDictionary, &out) }
+        guard st == errSecSuccess, let d = out as? Data else { return ("", st) }
+        return (String(data: d, encoding: .utf8) ?? "", st)
     }
-    static func rawSet(_ account: String, _ value: String) {
+    static func rawGet(_ account: String) -> String { rawGetStatus(account).0 }
+    @discardableResult static func rawSet(_ account: String, _ value: String) -> Bool {
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
-        SecItemDelete(base as CFDictionary)
-        if value.isEmpty { return }
-        var add = base; add[kSecValueData as String] = Data(value.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        if simulateLocked { return false }
+        return quiet {
+            let del = SecItemDelete(base as CFDictionary)
+            if value.isEmpty { return del == errSecSuccess || del == errSecItemNotFound }
+            var add = base; add[kSecValueData as String] = Data(value.utf8)
+            return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        }
+    }
+
+    // ---- terugval: een eigen bestand (rechten 0600) voor als de Keychain niet zonder vraag te gebruiken is
+    static var fileURL: URL {
+        if let p = ProcessInfo.processInfo.environment["ARK_VAULT_FILE"], !p.isEmpty { return URL(fileURLWithPath: p) }      // voor de proeven
+        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ArkTracks", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return d.appendingPathComponent("vault.json")
+    }
+    private static func readFile() -> [String: String] {
+        guard let d = try? Data(contentsOf: fileURL) else { return [:] }
+        return (try? JSONSerialization.jsonObject(with: d)) as? [String: String] ?? [:]
+    }
+    private static func writeFile(_ v: [String: String]) {
+        guard let d = try? JSONSerialization.data(withJSONObject: v) else { return }
+        try? d.write(to: fileURL, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    }
+    private static func removeFile() { try? FileManager.default.removeItem(at: fileURL) }
+
+    /// Opslaan: in de Keychain én in het bestand. Na een herstart van een Mac die zelf inlogt is de Keychain vergrendeld; dan is het bestand er nog.
+    private static func persist(_ v: [String: String]) {
+        let text = (try? String(data: JSONSerialization.data(withJSONObject: v), encoding: .utf8)) ?? ""
+        if v.isEmpty { rawSet(vaultAccount, ""); removeFile(); return }
+        rawSet(vaultAccount, text)
+        writeFile(v)
     }
     private static func loadVault() -> [String: String] {
         if let v = vault { return v }
-        let raw = rawGet(vaultAccount)
-        let v = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: String] ?? [:]
+        let (raw, st) = rawGetStatus(vaultAccount)
+        var v = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: String] ?? [:]
+        let file = readFile()
+        if !file.isEmpty {
+            for (k, x) in file { v[k] = x }                                                          // het bestand is leidend (de Keychain kan verouderd zijn)
+            if st == errSecSuccess || st == errSecItemNotFound { writer.async { persist(v) } }       // de Keychain is er weer: bijwerken
+        } else if st == errSecSuccess && !v.isEmpty { writer.async { writeFile(v) } }               // alleen in de Keychain gevonden: ook als bestand bewaren
         vault = v
         return v
     }
     private static func saveVault(_ v: [String: String], dropLegacy: String? = nil) {
         vault = v
-        let text = (try? String(data: JSONSerialization.data(withJSONObject: v), encoding: .utf8)) ?? ""
-        writer.async { rawSet(vaultAccount, text); if let a = dropLegacy { rawSet(a, "") } }
+        writer.async { persist(v); if let a = dropLegacy { rawSet(a, "") } }
     }
     /// Alleen voor de proef: vergeet wat in het geheugen staat
     static func forgetCache() { flush(); lock.lock(); vault = nil; legacyChecked = []; lock.unlock() }
@@ -227,7 +271,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             Keychain.set("lan-devices", "")
             Keychain.flush(); Keychain.forgetCache()
             check(Keychain.get("lan-devices").isEmpty, "verwijderen werkt")
-            Keychain.flush(); Keychain.rawSet("vault", "")                                                    // opruimen: onze eigen proef-items
+            // terugval: vergrendelde Keychain (zoals op een Mac die zelf inlogt)
+            let vf = NSTemporaryDirectory() + "ark-vault-test-\(UUID().uuidString).json"; setenv("ARK_VAULT_FILE", vf, 1)
+            Keychain.flush(); Keychain.rawSet("vault", ""); Keychain.forgetCache()
+            Keychain.simulateLocked = true
+            Keychain.set("desktop-key", "SLEUTEL"); Keychain.flush(); Keychain.forgetCache()
+            let perm = ((try? FileManager.default.attributesOfItem(atPath: vf))?[.posixPermissions] as? Int) ?? -1
+            check(FileManager.default.fileExists(atPath: vf) && perm == 0o600, "vergrendeld: geheim staat in een bestand met rechten 0600")
+            check(Keychain.get("desktop-key") == "SLEUTEL", "vergrendeld: geheim is na opnieuw laden te lezen (zonder vraag)")
+            Keychain.simulateLocked = false; Keychain.forgetCache()
+            check(Keychain.get("desktop-key") == "SLEUTEL", "Keychain weer open: geheim blijft beschikbaar")
+            Keychain.flush()
+            check(FileManager.default.fileExists(atPath: vf) && !Keychain.rawGet("vault").isEmpty, "Keychain weer open: geheim in de Keychain én in het bestand")
+            Keychain.flush(); Keychain.rawSet("vault", ""); try? FileManager.default.removeItem(atPath: vf)
+            Keychain.set("desktop-key", "TWEE"); Keychain.flush()
+            check(FileManager.default.fileExists(atPath: vf) && !Keychain.rawGet("vault").isEmpty, "nieuw geheim: staat in de Keychain én in het bestand")
+            Keychain.simulateLocked = true; Keychain.forgetCache()
+            check(Keychain.get("desktop-key") == "TWEE", "herstart met vergrendelde Keychain: geheim is er")
+            Keychain.simulateLocked = false
+            Keychain.flush(); Keychain.rawSet("vault", ""); try? FileManager.default.removeItem(atPath: vf)   // opruimen: onze eigen proef-items
             print(fails == 0 ? "KEYCHAINTEST GESLAAGD" : "KEYCHAINTEST: \(fails) fouten"); fflush(stdout); exit(fails == 0 ? 0 : 1)
         }
         // proef zonder venster: ArkTracks --remote-test  (laadt het eerste nummer in de nummermap en voert Podium-commando's uit)

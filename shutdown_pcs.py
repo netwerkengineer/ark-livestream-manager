@@ -30,6 +30,10 @@ def get_ssh_user(host_ip):
         return "admin"
     return "jeffreygo"
 
+def ssh_user_for(plug, host_ip):
+    # a user set on the plug itself wins; otherwise the old per-host defaults
+    return (plug.get("sshUser") or "").strip() or get_ssh_user(host_ip)
+
 def get_ssh_key_args():
     candidates = [
         "/app/data/id_rsa",
@@ -103,7 +107,7 @@ def shutdown_single_plug_sequence(plug, settings):
         elif plug_id == "plug_beamer":
             host_ip = settings.get("freeShowHost")
             
-    user = get_ssh_user(host_ip)
+    user = ssh_user_for(plug, host_ip)
     
     print(f"=== Starting Shutdown for Plug: {name} (ID: {plug_id}) ===")
     
@@ -115,7 +119,7 @@ def shutdown_single_plug_sequence(plug, settings):
         if os_type == "windows":
             cmd = "shutdown /s /f /t 0"
         elif os_type == "macos":
-            cmd = "pmset sleepnow"
+            cmd = "sudo -n /sbin/shutdown -h now"  # a real shutdown (needs a NOPASSWD sudoers rule for /sbin/shutdown on the Mac)
         else:
             cmd = "sudo /sbin/shutdown -h now"
 
@@ -197,7 +201,7 @@ def main():
             elif p_id == "plug_beamer":
                 host_ip = settings.get("freeShowHost")
                 
-        user = get_ssh_user(host_ip)
+        user = ssh_user_for(plug, host_ip)
         
         if host_ip and host_ip != "":
             hosts_shutting_down = True
@@ -208,7 +212,7 @@ def main():
             if os_type == "windows":
                 cmd = "shutdown /s /f /t 0"
             elif os_type == "macos":
-                cmd = "pmset sleepnow"
+                cmd = "sudo -n /sbin/shutdown -h now"  # a real shutdown (needs a NOPASSWD sudoers rule for /sbin/shutdown on the Mac)
             else:
                 cmd = "sudo /sbin/shutdown -h now"
 
