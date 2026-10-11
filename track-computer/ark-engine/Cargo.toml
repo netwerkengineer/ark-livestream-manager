@@ -4,6 +4,8 @@ version = "0.4.1"
 edition = "2021"
 description = "De speler van Ark Tracks voor Windows en Linux (en straks overal): mixer, sprongen op de maat, tempokaart, cues. Voorproef M0/M1."
 
+build = "build.rs"
+
 [lib]
 name = "ark_engine"
 path = "src/lib.rs"
@@ -35,6 +37,9 @@ qrcode = "0.14"
 gethostname = "0.5"
 
 time = "0.3"
+
+[build-dependencies]
+winresource = "0.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["async-secret-service", "async-io", "crypto-rust"] }

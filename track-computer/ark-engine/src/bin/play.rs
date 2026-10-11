@@ -26,8 +26,14 @@ fn main() {
     }
     let cmd = args.remove(0);
     if cmd == "devices" {
+        let verbose = args.iter().any(|a| a == "--verbose");
         for (n, c) in output::list_devices() {
             println!("{n}  (max {c} uitgangen)");
+            if verbose {
+                for (ch, lo, hi, fmt) in output::list_formats(&n) {
+                    println!("    {ch} kanalen, {lo}-{hi} Hz, {fmt}");
+                }
+            }
         }
         return;
     }

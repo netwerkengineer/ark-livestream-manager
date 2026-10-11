@@ -1,0 +1,3 @@
+# Windows: de C-bibliotheek in het programma zelf opnemen, zodat er geen "Microsoft Visual C++ Redistributable" nodig is op de computer
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -106,3 +106,10 @@ pub fn start(mixer: Arc<Mutex<Mixer>>, name: Option<&str>, want_ch: Option<usize
     stream.play().map_err(|e| e.to_string())?;
     Ok(Output { stream, device_name, channels })
 }
+
+/// Alle formaten die het apparaat aanbiedt (voor het uitzoeken van meerkanaals uitvoer): (kanalen, min Hz, max Hz, sampleformaat)
+pub fn list_formats(name: &str) -> Vec<(u16, u32, u32, String)> {
+    let host = cpal::default_host();
+    let Some(d) = host.output_devices().ok().and_then(|mut it| it.find(|d| d.name().map(|n| n == name).unwrap_or(false))) else { return vec![] };
+    d.supported_output_configs().map(|c| c.map(|c| (c.channels(), c.min_sample_rate().0, c.max_sample_rate().0, format!("{:?}", c.sample_format()))).collect()).unwrap_or_default()
+}
