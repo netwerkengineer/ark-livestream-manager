@@ -258,7 +258,7 @@ fn init_script(shell: &Shell) -> String {
 const IS_OFF = location.protocol === "arkoffline:" || location.hostname === "arkoffline.localhost";
 const IS_ARK = location.protocol === "ark:" || location.hostname === "ark.localhost";
 window.arkDesktop = {{
-  version: "{version}-linux", platform: "linux", offline: IS_OFF,
+  version: "{version}-{platform}", platform: "{platform}", offline: IS_OFF,
   remote: {{ enabled: false, name: "" }}, server: {server},
   openSettings: () => window.arkShell({{ action: "openSettings" }}),
   openExternal: (url) => window.arkShell({{ action: "openExternal", url }}),
@@ -313,7 +313,8 @@ window.arkDesktop = {{
 }})();
 "#,
         server = serde_json::to_string(&shell.base()).unwrap(),
-        version = env!("CARGO_PKG_VERSION")
+        version = env!("CARGO_PKG_VERSION"),
+        platform = std::env::consts::OS
     )
 }
 
@@ -373,8 +374,15 @@ mod dialogs {
 }
 #[cfg(not(target_os = "linux"))]
 mod dialogs {
-    pub fn confirm(title: &str, text: &str, _secs: u32) -> bool {
-        matches!(rfd::MessageDialog::new().set_title(title).set_description(text).set_buttons(rfd::MessageButtons::YesNo).show(), rfd::MessageDialogResult::Yes)
+    /// De vraag blijft in beeld tot iemand antwoordt; wij wachten maximaal `secs` seconden (daarna telt het als geweigerd, en kan een volgend verzoek weer)
+    pub fn confirm(title: &str, text: &str, secs: u32) -> bool {
+        let (title, text) = (title.to_string(), text.to_string());
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let a = matches!(rfd::MessageDialog::new().set_title(&title).set_description(&text).set_buttons(rfd::MessageButtons::YesNo).show(), rfd::MessageDialogResult::Yes);
+            let _ = tx.send(a);
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(secs as u64)).unwrap_or(false)
     }
     pub fn pick_files(title: &str, _filter: &str) -> Vec<String> {
         rfd::FileDialog::new().set_title(title).add_filter("Zip", &["zip"]).pick_files().unwrap_or_default().iter().map(|p| p.to_string_lossy().to_string()).collect()

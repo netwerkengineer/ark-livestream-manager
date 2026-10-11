@@ -130,6 +130,9 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
         "/state" => (200, state(p).to_string()),
         "/play" => {
             let mut m = mx();
+            if m.song.stems.is_empty() {
+                return ok(); // zonder nummer valt er niets af te spelen; niet in een "speelt"-stand blijven hangen
+            }
             if m.pos >= m.song.total() {
                 m.pos = 0;
             }

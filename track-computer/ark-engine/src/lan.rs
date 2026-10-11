@@ -155,8 +155,9 @@ struct Status {
 
 pub fn host_local_name() -> String {
     let h = gethostname::gethostname().to_string_lossy().to_lowercase();
-    let h = h.trim_end_matches(".local").to_string();
-    format!("{h}.local")
+    // een geldige DNS-naam: letters, cijfers en streepjes (een computernaam als "Acer_laptop" heeft een underscore, die in .local-namen niet mag)
+    let h: String = h.trim_end_matches(".local").chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' }).collect();
+    format!("{}.local", h.trim_matches('-'))
 }
 
 /// Is dit een netwerkkaart waarop tablets en telefoons ons kunnen bereiken? (geen loopback, geen virtuele kaarten van Docker, WSL, VPN's of virtuele machines)

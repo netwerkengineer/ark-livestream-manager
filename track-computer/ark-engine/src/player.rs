@@ -519,7 +519,8 @@ impl Player {
             }
         }
         st.switch_target = None;
-        let playing = self.mx().playing;
+        // een overgang op een muzikaal moment kan alleen als er een nummer klinkt; zonder actief nummer meteen wisselen (anders blijft hij wachten)
+        let playing = { let m = self.mx(); m.playing && !m.song.stems.is_empty() };
         if let (true, Some(md)) = (playing, mode) {
             if ["end", "bar", "now"].contains(&md) && f != st.active_folder {
                 let Some(mut n) = st.cache.remove(&f) else { return Err("Dit nummer staat nog niet klaar (zet de setlist klaar)".into()) };
