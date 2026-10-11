@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Waves, Square, Music } from "lucide-react";
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
@@ -28,6 +28,12 @@ function padKeyFor(songKey?: string): string | null {
 // (keeps sounding through song changes); switching keys crossfades.
 export default function PadsPanel({ state, onError, stage }: PadsPanelProps) {
   const pads = state?.pads;
+  // the desktop app on Windows and Linux opens its settings with Ctrl+, (the Mac app has the usual menu shortcut)
+  const [settingsKey, setSettingsKey] = useState("⌘,");
+  useEffect(() => {
+    const platform = (window as unknown as { arkDesktop?: { platform?: string } }).arkDesktop?.platform;
+    if (platform && platform !== "macos") setSettingsKey("Ctrl+,");
+  }, []);
   const sets = pads?.sets || {};
   const setNames = Object.keys(sets);
   const [chosenSet, setSet] = useState<string | null>(null);
@@ -78,7 +84,7 @@ export default function PadsPanel({ state, onError, stage }: PadsPanelProps) {
     return (
       <section className={`glass-card trk-pads${stage ? " stage" : ""}`}>
         <h3 className="trk-title"><Waves size={18} style={{ color: "#a855f7" }} /> Pads</h3>
-        <p className="trk-empty" style={{ marginTop: 8 }}>Geen pads gevonden. Zet de map met pads (set/laag/toonsoort.wav) in de instellingen van de app (⌘,).</p>
+        <p className="trk-empty" style={{ marginTop: 8 }}>Geen pads gevonden. Zet de map met pads (set/laag/toonsoort.wav) in de instellingen van de app ({settingsKey}).</p>
       </section>
     );
   }
