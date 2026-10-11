@@ -339,17 +339,46 @@ def wav_info(path):
                 f.seek(size + (size % 2), 1)
 
 
+def _decoders():
+    """Programma's waarmee een .m4a naar WAV kan: afconvert (macOS), ffmpeg, of de decoder van Ark Tracks (ark-engine-cli)."""
+    out = []
+    if shutil.which("afconvert"):
+        out.append(("afconvert", lambda src, dst: ["afconvert", "-f", "WAVE", "-d", "LEI24", src, dst]))
+    if shutil.which("ffmpeg"):
+        out.append(("ffmpeg", lambda src, dst: ["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-c:a", "pcm_s24le", "-f", "wav", dst]))
+    cli = os.environ.get("ARK_ENGINE_CLI") or shutil.which("ark-engine-cli")
+    if not cli:
+        for c in (os.path.expanduser("~/ark-engine/target/release/ark-engine-cli"), "/usr/local/bin/ark-engine-cli"):
+            if os.path.exists(c):
+                cli = c
+                break
+    if cli:
+        out.append(("ark-engine-cli", lambda src, dst: [cli, "decode", src, dst]))
+    return out
+
+
 def as_wav(path):
-    """MultiTracks levert stems soms als .m4a (AAC). Die worden (eenmalig) omgezet
-    naar een WAV ernaast met macOS' eigen afconvert: WAV speelt het betrouwbaarst af."""
+    """MultiTracks levert stems soms als .m4a (AAC). Die worden (eenmalig) omgezet naar een WAV ernaast:
+    WAV speelt het betrouwbaarst af, en REAPER op Linux kan AAC niet lezen. Volgorde: afconvert (macOS), ffmpeg, ark-engine-cli."""
     if path.lower().endswith(".wav"):
         return path
     wav = os.path.splitext(path)[0] + ".wav"
     if not os.path.exists(wav):
+        decoders = _decoders()
+        if not decoders:
+            raise SystemExit("Geen programma om .m4a naar WAV om te zetten gevonden (afconvert, ffmpeg of ark-engine-cli). "
+                             "Installeer ffmpeg of zet ARK_ENGINE_CLI naar het pad van ark-engine-cli.")
         tmp = wav + ".part"
-        res = subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI24", path, tmp], capture_output=True, text=True)
-        if res.returncode != 0 or not os.path.exists(tmp):
-            raise SystemExit(f"Omzetten naar WAV mislukt voor {os.path.basename(path)}: {res.stderr.strip()}")
+        last = ""
+        for name, cmd in decoders:
+            res = subprocess.run(cmd(path, tmp), capture_output=True, text=True)
+            if res.returncode == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 44:
+                break
+            last = f"{name}: {res.stderr.strip() or res.stdout.strip()}"
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        else:
+            raise SystemExit(f"Omzetten naar WAV mislukt voor {os.path.basename(path)}: {last}")
         os.replace(tmp, wav)
     return wav
 
