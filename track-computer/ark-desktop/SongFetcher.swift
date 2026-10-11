@@ -43,8 +43,22 @@ final class SongFetcher {
     /// Nummer van deze computer halen: naar de Prullenbak (niet definitief verwijderen)
     func remove(folder: String) -> Bool {
         let root = app.player.songsRoot
-        let path = (root as NSString).appendingPathComponent(folder)
-        guard path.hasPrefix(root), FileManager.default.fileExists(atPath: path) else { return false }
+        guard !folder.isEmpty, !folder.contains(".."), !folder.contains("/") else { return false }
+        var path = (root as NSString).appendingPathComponent(folder)
+        if !FileManager.default.fileExists(atPath: path) {
+            // de naam die de pagina kent hoeft niet gelijk te zijn aan de map op schijf (de buitenste map heet naar de server, de map erbinnen naar de zip):
+            // zoek de bovenste map onder de nummermap waarin een nummer staat met een map met deze naam
+            app.player.lock.lock(); let dirs = app.player.library.map { $0.folder }; app.player.lock.unlock()
+            let prefix = root.hasSuffix("/") ? root : root + "/"
+            let top = dirs.compactMap { d -> String? in
+                guard d.hasPrefix(prefix) else { return nil }
+                let parts = d.dropFirst(prefix.count).split(separator: "/").map(String.init)
+                return parts.last == folder ? parts.first : nil
+            }.first
+            guard let t = top else { return false }
+            path = (root as NSString).appendingPathComponent(t)
+        }
+        guard path.hasPrefix(root), path != root, FileManager.default.fileExists(atPath: path) else { return false }
         var ok = false
         let sem = DispatchSemaphore(value: 0)
         DispatchQueue.main.async {
