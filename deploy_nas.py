@@ -196,7 +196,7 @@ def deploy():
         f.write(f'{{\n  "sha": "{git_sha}"\n}}\n')
 
     print(f"\n>>> Lokaal: Project inpakken (exclusief node_modules en build data) ...")
-    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
+    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "--exclude", "track-computer/ark-engine/target", "--exclude", "track-computer/ark-desktop/build", "--exclude", "__pycache__", "--exclude", ".claude", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
     env = os.environ.copy()
     env["COPYFILE_DISABLE"] = "1"
     subprocess.check_call(tar_cmd, env=env)
@@ -286,7 +286,7 @@ def deploy():
         f"sed -i \"s|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g\" docker-compose.yml && "
         f"echo \"[DEBUG NAS] Sed gelukt\" && "
         # rechten: alles van de NAS-gebruiker en niet beschrijfbaar voor anderen; data/ en companion-data/ blijven buiten schot (die zijn van de containers)
-        f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -exec chown {nas_user}:users {{}} + && "
+        f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -exec chown -h {nas_user}:users {{}} + && "
         f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type d -exec chmod 755 {{}} + && "
         f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type f -exec chmod go-w,go+r {{}} + && "
         f"echo \"[DEBUG NAS] Permissies gelukt\" && "

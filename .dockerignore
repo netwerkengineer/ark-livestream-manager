@@ -11,3 +11,7 @@ websites
 temp_build
 temp_companion
 data
+track-computer/ark-engine/target
+track-computer/ark-desktop/build
+__pycache__
+.claude
