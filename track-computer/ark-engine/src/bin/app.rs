@@ -218,7 +218,7 @@ const SETTINGS_HTML: &str = r#"<!doctype html><html lang="nl"><head><meta charse
 main{width:min(640px,92vw);padding:28px 0 60px}h1{font-size:22px;margin:0 0 6px}p.s{color:#94a3b8;margin:0 0 22px}
 label{display:block;margin:16px 0 6px;font-weight:600}input,select{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#111b31;color:inherit;font:inherit}
 small{display:block;color:#94a3b8;margin-top:5px}button{margin-top:26px;padding:11px 22px;border:0;border-radius:8px;background:#2563eb;color:#fff;font:inherit;font-weight:600;cursor:pointer}
-button.g{background:#1e293b;margin-left:10px}.msg{margin-top:16px;color:#86efac}.err{color:#fca5a5}
+button.g{background:#1e293b;margin-left:10px}.row{display:flex;gap:0;align-items:center}.row input{flex:1}.row button{margin:0 0 0 10px;padding:10px 16px}code{color:#7dd3fc}.msg{margin-top:16px;color:#86efac}.err{color:#fca5a5}
 </style></head><body><main>
 <h1>Ark Tracks – instellingen</h1><p class="s" id="ver"></p>
 <label for="server">Server</label><input id="server" placeholder="https://ops.arkchurch.nl" autocomplete="off">
@@ -227,7 +227,9 @@ button.g{background:#1e293b;margin-left:10px}.msg{margin-top:16px;color:#86efac}
 <small>Maak de sleutel aan in de webapp onder Instellingen › Desktop-app. <span id="vaultnote">Hij wordt alleen op deze computer bewaard.</span></small>
 <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="offline" style="width:auto"> Zonder server werken</label>
 <small id="mirror"></small><button class="g" id="upd" style="margin:8px 0 0">Kopie voor gebruik zonder server nu bijwerken</button>
-<label for="songs">Map met nummers</label><input id="songs" placeholder="~/Tracks/Songs">
+<label for="songs">Map met nummers</label><div class="row"><input id="songs" placeholder="(standaard: Tracks/Songs in je gebruikersmap)"><button class="g" id="pickSongs" type="button">Kies…</button></div>
+<label for="pads">Map met pads</label><div class="row"><input id="pads" placeholder="(standaard: Tracks/Pads in je gebruikersmap)"><button class="g" id="pickPads" type="button">Kies…</button></div>
+<small>In de padmap staan mappen per set, daarin mappen per laag, daarin de bestanden per toonsoort (bijvoorbeeld <code>Fundamental/Deep/Eb.wav</code>).</small>
 <label for="device">Audio-uitgang</label><select id="device"><option value="">Standaard van het systeem</option></select>
 <label for="mode">Uitgangen</label><select id="mode"><option value="stereo">Stereo (2 kanalen)</option><option value="2ch">2 kanalen (muziek rechts, click/guide links)</option><option value="3ch">3 kanalen (click/guide, muziek stereo)</option><option value="multi">8 kanalen (X32, per groep)</option><option value="auto">Automatisch</option></select>
 <label for="fs">FreeShow (adres:poort)</label><input id="fs" placeholder="leeg = zoals de server het opgeeft">
@@ -238,7 +240,7 @@ const call=(a,p)=>window.arkShell(Object.assign({action:a},p||{}));
 (async()=>{
  const s=await call("getSettings"); $("ver").textContent="Versie "+s.version+" · logbestand: "+s.log;
  $("server").value=s.server; $("key").placeholder=s.hasKey?"(sleutel is bewaard; laat leeg om hem te houden)":"plak hier de sleutel";
- $("songs").value=s.songs_root; $("mode").value=s.output_mode; $("fs").value=s.freeshow_host?(s.freeshow_host+":"+s.freeshow_port):"";
+ $("songs").value=s.songs_root; $("pads").value=s.pads_root; $("mode").value=s.output_mode; $("fs").value=s.freeshow_host?(s.freeshow_host+":"+s.freeshow_port):"";
  for(const d of s.devices){const o=document.createElement("option");o.value=d.name;o.textContent=d.name+" ("+d.outputs+" uitgangen)";$("device").appendChild(o)}
  $("device").value=s.device; $("offline").checked=s.offline; $("vaultnote").textContent=s.vault?"Hij staat in de sleutelbos van deze computer, niet in een bestand.":"Er is geen sleutelbos beschikbaar: de sleutel staat in een bestand dat alleen jij kunt lezen.";
  $("mirror").textContent=s.mirror?"Er is een kopie van de pagina bewaard; zonder server (of bij een storing) werkt de app daarmee.":"Er is nog geen kopie. Verbind één keer met de server: de app bewaart dan zelf een kopie.";
@@ -246,9 +248,11 @@ const call=(a,p)=>window.arkShell(Object.assign({action:a},p||{}));
 })();
 $("save").onclick=async()=>{
  const fs=$("fs").value.trim().split(":");
- const r=await call("saveSettings",{offline:$("offline").checked,server:$("server").value.trim(),key:$("key").value.trim(),songs_root:$("songs").value.trim(),device:$("device").value,output_mode:$("mode").value,freeshow_host:fs[0]||"",freeshow_port:fs[1]||""});
+ const r=await call("saveSettings",{offline:$("offline").checked,server:$("server").value.trim(),key:$("key").value.trim(),songs_root:$("songs").value.trim(),pads_root:$("pads").value.trim(),device:$("device").value,output_mode:$("mode").value,freeshow_host:fs[0]||"",freeshow_port:fs[1]||""});
  $("msg").className="msg"+(r.ok?"":" err"); $("msg").textContent=r.ok?"Opgeslagen.":(r.error||"Mislukt");
 };
+$("pickSongs").onclick=async()=>{const r=await call("chooseFolder"); if(r&&r.path) $("songs").value=r.path;};
+$("pickPads").onclick=async()=>{const r=await call("chooseFolder"); if(r&&r.path) $("pads").value=r.path;};
 $("cancel").onclick=()=>call("openMain");
 $("lan").onclick=()=>call("openLan");
 $("upd").onclick=async()=>{ $("msg").className="msg"; $("msg").textContent="Bezig met bijwerken…"; const r=await call("updateMirror"); $("msg").className="msg"+(r.ok?"":" err"); $("msg").textContent=r.ok?"De kopie is bijgewerkt.":("Bijwerken mislukt: "+(r.error||"")); };
@@ -731,7 +735,7 @@ fn main() {
                         reply(
                             json!({"version": env!("CARGO_PKG_VERSION"), "log": ark_engine::platform::log_path(),
                                 "server": s.base(), "hasKey": !s.key.is_empty(), "vault": ark_engine::vault::available(), "configured": !s.base().is_empty() && !s.key.is_empty() || s.offline, "offline": s.offline, "mirror": offline::available(),
-                                "songs_root": st.cfg.songs_root, "device": st.cfg.device, "output_mode": st.cfg.output_mode,
+                                "songs_root": st.cfg.songs_root, "pads_root": st.cfg.pads_root, "device": st.cfg.device, "output_mode": st.cfg.output_mode,
                                 "freeshow_host": st.cfg.fs_host, "freeshow_port": st.cfg.fs_port,
                                 "devices": devices.iter().filter(|d| d.1 > 0).map(|d| json!({"name": d.0, "outputs": d.1})).collect::<Vec<_>>()})
                             .to_string(),
@@ -749,6 +753,7 @@ fn main() {
                         }
                         let mut items = vec![
                             ("songs_root".to_string(), msg["songs_root"].as_str().unwrap_or("").to_string()),
+                            ("pads_root".to_string(), msg["pads_root"].as_str().unwrap_or("").to_string()),
                             ("device".to_string(), msg["device"].as_str().unwrap_or("").to_string()),
                             ("output_mode".to_string(), msg["output_mode"].as_str().unwrap_or("stereo").to_string()),
                             ("freeshow_host".to_string(), msg["freeshow_host"].as_str().unwrap_or("").to_string()),

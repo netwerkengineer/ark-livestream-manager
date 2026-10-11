@@ -82,17 +82,45 @@ impl Fetcher {
         });
     }
 
-    /// Nummer van deze computer halen: naar de prullenbak (niet definitief verwijderen)
+    /// Nummer van deze computer halen: naar de prullenbak (niet definitief verwijderen).
+    /// `folder` is de naam die de pagina kent; die hoeft niet gelijk te zijn aan de map op schijf (de buitenste map heet naar de server,
+    /// de map erbinnen naar de zip), dus zo nodig zoeken we de map via het nummer in de bibliotheek.
     pub fn remove(&self, folder: &str) -> bool {
-        let root = self.player.lock().songs_root.clone();
-        if folder.is_empty() || folder.contains("..") {
+        let root = self.player.lock().songs_root.replace('\\', "/");
+        if folder.is_empty() || folder.contains("..") || folder.contains('/') || folder.contains('\\') {
             return false;
         }
-        let path = Path::new(&root).join(folder);
-        if !path.starts_with(&root) || !path.exists() {
+        let rootp = Path::new(&root);
+        let mut target = rootp.join(folder);
+        if !target.exists() {
+            // de bovenste map onder de nummermap waarin een nummer staat met een map met deze naam
+            let dirs: Vec<String> = self.player.lock().library.iter().map(|s| s.folder.replace('\\', "/")).collect();
+            let found = dirs.iter().find_map(|d| {
+                let rel = d.strip_prefix(&format!("{}/", root.trim_end_matches('/')))?;
+                let last = rel.rsplit('/').next()?;
+                if last != folder {
+                    return None;
+                }
+                Some(rel.split('/').next()?.to_string())
+            });
+            match found {
+                Some(top) => target = rootp.join(top),
+                None => {
+                    log(&format!("Verwijderen: geen map gevonden voor \"{folder}\" in {root}"));
+                    return false;
+                }
+            }
+        }
+        if !target.starts_with(rootp) || target == rootp || !target.exists() {
             return false;
         }
-        let ok = trash::delete(&path).is_ok();
+        let ok = match trash::delete(&target) {
+            Ok(()) => true,
+            Err(e) => {
+                log(&format!("Naar de prullenbak mislukt ({}): {e}", target.display()));
+                false
+            }
+        };
         self.player.scan_library();
         ok
     }
