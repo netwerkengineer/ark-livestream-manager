@@ -184,7 +184,7 @@ final class Player {
         lock.lock(); defer { lock.unlock() }
         let f = folderOf(path)
         mixer.pendSongAt = -1; mixer.pendSongObj = nil; switchTarget = nil
-        if mixer.playing, let m = mode, ["end", "bar", "now"].contains(m), f != activeFolder {
+        if mixer.playing, !mixer.song.stems.isEmpty, let m = mode, ["end", "bar", "now"].contains(m), f != activeFolder {      // zonder actief nummer meteen wisselen
             guard let n = cache[f] else { throw PlayerError("Dit nummer staat nog niet klaar (zet de setlist klaar)") }
             let cur = mixer.song, pos = mixer.posSec, tm = cur.tempo
             var at: Double

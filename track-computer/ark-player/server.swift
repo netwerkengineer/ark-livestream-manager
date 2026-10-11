@@ -55,7 +55,7 @@ final class Server {
         switch path {
         case "/state": return (200, jsonString(state()))
         case "/play":
-            p.lock.lock(); if mixer.pos >= mixer.song.total { mixer.pos = 0 }; mixer.playing = true; p.lock.unlock(); return ok()
+            p.lock.lock(); if !mixer.song.stems.isEmpty { if mixer.pos >= mixer.song.total { mixer.pos = 0 }; mixer.playing = true }; p.lock.unlock(); return ok()
         case "/pause": mixer.playing = false; return ok()
         case "/stop": mixer.playing = false; mixer.pos = 0; mixer.stopLoop(); mixer.cancelPending(); p.cancelSong(); return ok()
         case "/seek":
