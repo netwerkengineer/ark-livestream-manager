@@ -8,6 +8,8 @@ import json
 import termios
 import sys
 import atexit
+import re
+import shlex
 
 # PADEN DETECTIE
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +36,7 @@ def save_config(config):
             del config_to_save['NAS_PASS']
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config_to_save, f, indent=4)
+        os.chmod(CONFIG_FILE, 0o600)
     except:
         pass
 
@@ -93,6 +96,18 @@ def setup_environment():
     config['REMOTE_TEMP_ARCHIVE'] = f"{config['REMOTE_APP_PATH']}/deploy.tar.gz"
     return config
 
+# Alleen een echte wachtwoordvraag (regel eindigt op "password ...:" of "wachtwoord ...:"), niet het woord ergens in gewone uitvoer.
+PASSWORD_PROMPT = re.compile(r"(password|wachtwoord)[^\n]{0,60}:\s*$", re.IGNORECASE)
+
+def sudo(inner):
+    """Eén sudo-aanroep voor een heel shellscript. Het wachtwoord staat nergens in een opdrachtregel (dus niet in `ps`, niet in de terminal):
+    sudo vraagt erom op de PTY en run_with_pty() antwoordt daarop."""
+    return "sudo -p 'Password:' env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin sh -c " + shlex.quote(inner)
+
+def remote(ssh_base, target, command):
+    """Een opdracht op de NAS, zonder lokale shell (alles netjes gequote)."""
+    return ssh_base + [target, command]
+
 def run_with_pty(cmd, description, nas_pass, socket_path):
     print(f"\n>>> NAS: {description} ...")
     master, slave = pty.openpty()
@@ -108,6 +123,7 @@ def run_with_pty(cmd, description, nas_pass, socket_path):
     os.close(slave)
     
     last_sent_time = 0
+    tail = ""
     start_time = time.time()
 
     while proc.poll() is None:
@@ -118,7 +134,9 @@ def run_with_pty(cmd, description, nas_pass, socket_path):
                 print(data, end="")
                 
                 # Check voor password prompt
-                if ("password" in data.lower() or "wachtwoord" in data.lower()) and (time.time() - last_sent_time > 0.5):
+                tail = (tail + data)[-200:]
+                if PASSWORD_PROMPT.search(tail) and (time.time() - last_sent_time > 0.5):
+                    tail = ""
                     time.sleep(0.3)
                     os.write(master, (nas_pass + "\n").encode())
                     last_sent_time = time.time()
@@ -159,7 +177,7 @@ def deploy():
     global global_ssh_mux_socket
     global_ssh_mux_socket = os.path.join(SSH_MUX_SOCKET_DIR, f"ark_mux_{config['NAS_IP'].replace('.', '_')}")
 
-    ssh_base_list = ["ssh", "-tt", "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=" + global_ssh_mux_socket, "-o", "ControlPersist=10m"]
+    ssh_base_list = ["ssh", "-tt", "-o", "StrictHostKeyChecking=accept-new", "-o", "ControlMaster=auto", "-o", "ControlPath=" + global_ssh_mux_socket, "-o", "ControlPersist=10m"]
     if config['SSH_KEY']: ssh_base_list += ["-i", config['SSH_KEY']]
 
     # 1. SSH MASTER START
@@ -186,40 +204,58 @@ def deploy():
     subprocess.check_call(["git", "-C", config['LOCAL_APP_PATH'], "checkout", "--", "src/lib/gitSha.generated.json"])
 
     # 3. NAS MAP VOORBEREIDEN
-    ssh_p = f"ssh -S {global_ssh_mux_socket}"
-    # We maken zowel de app-map, de data-map, companion-data als de Media-map aan
-    freeshow_path = "/volume1/Beamer/FreeShow"
-    prep_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {config['REMOTE_APP_PATH']}/companion-data && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Media && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Shows && echo '{config['NAS_PASS']}' | sudo -S mkdir -p {freeshow_path}/Config && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {config['REMOTE_APP_PATH']} && echo '{config['NAS_PASS']}' | sudo -S chmod -R 777 {freeshow_path}\""
-    run_with_pty(prep_cmd, "Mappen checken en aanmaken op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+    # Geen wachtwoord in opdrachtregels en geen chmod 777: de app-map is van de NAS-gebruiker (leesbaar voor anderen, niet beschrijfbaar),
+    # data/ is van de gebruiker in de container (uid 1001) en niet leesbaar voor anderen; sleutels zijn 600. companion-data blijft zoals het is.
+    ssh_t = ssh_base_list[:]
+    ssh_t[ssh_t.index("ControlMaster=auto")] = "ControlMaster=no"
+    ssh_t += ["-S", global_ssh_mux_socket]
+    # zonder -tt (geen PTY) voor alles waar gegevens doorheen gaan: bestanden en uitvoer van `echo ~`
+    ssh_plain = ["ssh", "-o", "ControlMaster=no", "-S", global_ssh_mux_socket]
+    target = f"{config['NAS_USER']}@{config['NAS_IP']}"
+    app = shlex.quote(config['REMOTE_APP_PATH'])
+    fs = shlex.quote("/volume1/Beamer/FreeShow")
+    nas_user = shlex.quote(config['NAS_USER'])
+    prep_script = (
+        f"mkdir -p {app}/data {app}/companion-data {fs}/Media {fs}/Shows {fs}/Config && "
+        f"chown {nas_user}:users {app} && chmod 755 {app} && "
+        f"chown 1001:users {app}/data && chmod 750 {app}/data && "
+        f"(find {app}/data -maxdepth 1 -name 'id_*' ! -name '*.pub' -exec chown 1001:users {{}} + -exec chmod 600 {{}} + 2>/dev/null || true) && "
+        f"(find {app}/data -maxdepth 1 -name 'id_*.pub' -exec chown 1001:users {{}} + -exec chmod 644 {{}} + 2>/dev/null || true) && "
+        f"chown {nas_user}:users {fs}/Media {fs}/Shows {fs}/Config"
+    )
+    run_with_pty(remote(ssh_t, target, sudo(prep_script)), "Mappen controleren en rechten goed zetten op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
     # Remote SSH key genereren indien niet aanwezig om container crash te voorkomen
-    key_path = f"{config['REMOTE_APP_PATH']}/data/id_ed25519"
-    key_gen_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"if [ ! -f {key_path} ]; then echo 'SSH sleutel aanmaken op de NAS...'; ssh-keygen -t ed25519 -f {key_path} -N '' -q && echo '{config['NAS_PASS']}' | sudo -S chown 1001:1001 {key_path}* && echo '{config['NAS_PASS']}' | sudo -S chmod 600 {key_path} && echo '{config['NAS_PASS']}' | sudo -S chmod 644 {key_path}.pub; fi\""
-    run_with_pty(key_gen_cmd, "SSH sleutel controleren/genereren op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
+    key_path = shlex.quote(f"{config['REMOTE_APP_PATH']}/data/id_ed25519")
+    key_script = (f"if [ ! -f {key_path} ]; then ssh-keygen -t ed25519 -f {key_path} -N '' -q && chown 1001:users {key_path} {key_path}.pub "
+                  f"&& chmod 600 {key_path} && chmod 644 {key_path}.pub; fi")
+    run_with_pty(remote(ssh_t, target, sudo(key_script)), "SSH sleutel controleren/genereren op de NAS", config['NAS_PASS'], global_ssh_mux_socket)
 
     # 4. OVERZETTEN NAAR NAS
-    inject_cmd = f"cat {config['LOCAL_TEMP_ARCHIVE']} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {config['REMOTE_TEMP_ARCHIVE']}\""
-    subprocess.check_call(inject_cmd, shell=True)
+    def send_file(local, remote_path):
+        with open(local, "rb") as fh:
+            subprocess.check_call(ssh_plain + [target, f"cat > {shlex.quote(remote_path)}"], stdin=fh)
+    send_file(config['LOCAL_TEMP_ARCHIVE'], config['REMOTE_TEMP_ARCHIVE'])
     print("✓ Project succesvol overgebracht naar de NAS.")
 
-    # 4.1 FALLBACK TEMPLATE OVERZETTEN NAAR NAS
+    # 4.1 FALLBACK TEMPLATE OVERZETTEN NAAR NAS (data/ is van de container; we zetten het bestand eerst in de app-map en verplaatsen het met sudo)
     print(">>> Lokaal: Fallback template.project overbrengen naar de NAS...")
     local_template = os.path.join(config['LOCAL_APP_PATH'], "data", "template.project")
-    remote_template = f"{config['REMOTE_APP_PATH']}/data/template.project"
-    send_template_cmd = f"cat {local_template} | {ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"cat > {remote_template}\""
-    subprocess.check_call(send_template_cmd, shell=True)
-    print("✓ Fallback template.project succesvol overgebracht naar de NAS.")
+    stage = f"{config['REMOTE_APP_PATH']}/template.project.upload"
+    send_file(local_template, stage)
+    move_script = f"mv -f {shlex.quote(stage)} {app}/data/template.project && chown 1001:users {app}/data/template.project && chmod 640 {app}/data/template.project"
+    if not run_with_pty(remote(ssh_t, target, sudo(move_script)), "Template op zijn plek zetten", config['NAS_PASS'], global_ssh_mux_socket):
+        print("⚠️ Template kon niet worden geplaatst.")
+    else:
+        print("✓ Fallback template.project succesvol overgebracht naar de NAS.")
 
     # 5. UITPAKKEN & DOCKER START
     D_PATH = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    sudo_p = f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH}"
     
     # Detect home directory of NAS user to mount SSH keys
     print(f"\n>>> NAS: Home directory van {config['NAS_USER']} detecteren ...")
-    ssh_p = f"ssh -S {global_ssh_mux_socket}"
-    detect_home_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"echo ~\""
     try:
-        user_home = subprocess.check_output(detect_home_cmd, shell=True).decode().strip()
+        user_home = subprocess.check_output(ssh_plain + [target, "echo ~"]).decode().strip()
         print(f"✓ Gevonden home directory: {user_home}")
     except Exception as e:
         user_home = f"/volume1/homes/{config['NAS_USER']}"
@@ -240,30 +276,29 @@ def deploy():
         
     services_to_deploy = " ".join(services_list)
     cleanup_emulators = "" if config.get('DEPLOY_EMULATORS') else "(docker stop x32-emulator atem-emulator 2>/dev/null || true) && (docker rm -f x32-emulator atem-emulator 2>/dev/null || true) && "
-    deploy_cmd = (
-        f"export {D_PATH} && "
-        f"echo '{config['NAS_PASS']}' | sudo -S env {D_PATH} sh -x -c '"
-        f"cd {config['REMOTE_APP_PATH']} && "
+    rapp = config['REMOTE_APP_PATH']
+    inner = (
+        f"cd {app} && "
         f"echo \"[DEBUG NAS] Start deployment script in $(pwd)\" && "
-        f"tar -v -xzf {config['REMOTE_TEMP_ARCHIVE']} -C {config['REMOTE_APP_PATH']} && "
+        f"tar -v -xzf {shlex.quote(config['REMOTE_TEMP_ARCHIVE'])} -C {app} && "
         f"echo \"[DEBUG NAS] Tar gelukt\" && "
-        f"rm -f {config['REMOTE_TEMP_ARCHIVE']} && "
-        f"sed -i \\\"s|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g\\\" docker-compose.yml && "
+        f"rm -f {shlex.quote(config['REMOTE_TEMP_ARCHIVE'])} && "
+        f"sed -i \"s|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g\" docker-compose.yml && "
         f"echo \"[DEBUG NAS] Sed gelukt\" && "
-        f"chown -R {config['NAS_USER']}:users {config['REMOTE_APP_PATH']} && "
-        f"chmod -R 777 {config['REMOTE_APP_PATH']} && "
+        # rechten: alles van de NAS-gebruiker en niet beschrijfbaar voor anderen; data/ en companion-data/ blijven buiten schot (die zijn van de containers)
+        f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -exec chown {nas_user}:users {{}} + && "
+        f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type d -exec chmod 755 {{}} + && "
+        f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type f -exec chmod go-w,go+r {{}} + && "
         f"echo \"[DEBUG NAS] Permissies gelukt\" && "
         f"(pkill -f '[t]uya_http_server.py' || true) && "
         f"echo \"[DEBUG NAS] Oude Tuya server gestopt\" && "
         f"{cleanup_emulators}"
-        f"(env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={user_home}/.ssh docker compose up -d --build {services_to_deploy} || env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={user_home}/.ssh docker-compose up -d --build {services_to_deploy}) && "
+        f"(env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={shlex.quote(user_home)}/.ssh docker compose up -d --build {services_to_deploy} || env COMPOSE_PARALLEL_LIMIT=1 SSH_KEY_DIR={shlex.quote(user_home)}/.ssh docker-compose up -d --build {services_to_deploy}) && "
         f"echo \"[DEBUG NAS] Docker compose gelukt\" && "
-        f"docker image prune -f"
-        f" 2>&1'"
+        f"docker image prune -f 2>&1"
     )
-    
-    final_cmd = f"{ssh_p} {config['NAS_USER']}@{config['NAS_IP']} \"{deploy_cmd}\""
-    print(f"\n[DEBUG] Running command:\n{final_cmd}\n")
+    final_cmd = remote(ssh_t, target, sudo(inner))
+    print("\n>>> Deploy-opdracht naar de NAS (zonder wachtwoord in de opdrachtregel).")
     if not run_with_pty(final_cmd, "Project uitpakken en Docker bouwen/herstarten", config['NAS_PASS'], global_ssh_mux_socket):
         print("\n❌ Fout tijdens deployment op de NAS.")
     else:
