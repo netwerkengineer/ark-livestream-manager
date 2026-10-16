@@ -93,7 +93,9 @@ async function syncThumbnailFromUrl(url: string) {
     // share), so the "Welkom" show there won't see this update until a
     // sync propagates it. Trigger one now instead of leaving it to the
     // once-a-day scheduled sync or requiring the operator to remember.
-    // keepOn stays at its default (true/never-shutdown) here deliberately -
+    // keepOn stays at its default (true) here deliberately, with shutdownIfStarted: a PC that was already on is never
+    // shut down, but a PC this sync had to power on itself goes off again afterwards (otherwise a thumbnail change at
+    // an odd hour left the Beamer PC running until someone noticed). Earlier reasoning for keepOn:
     // this function also runs from a passive 10-minute background interval
     // AND once on every app startup (initThumbnailSync()), neither of which
     // reflects "the operator just scheduled a stream" the way create/route.ts's
@@ -106,7 +108,7 @@ async function syncThumbnailFromUrl(url: string) {
     // targetKeys: ['primary'] - same reasoning as create/route.ts: this is
     // an automated trigger, and additional targets only ever sync when
     // someone explicitly picks them via the manual sync button.
-    triggerFreeShowSync({ targetKeys: ['primary'] }).catch(err => {
+    triggerFreeShowSync({ targetKeys: ['primary'], shutdownIfStarted: true }).catch(err => {
       console.error("[Thumbnail Sync] Kon sync niet triggeren:", err);
       logActivity("error", `Thumbnail-sync: het triggeren van de FreeShow-sync naar de Beamer-PC is mislukt (${err?.message || err}). thema.jpg staat wel klaar op de NAS.`);
       sendOpsAlertEmail(

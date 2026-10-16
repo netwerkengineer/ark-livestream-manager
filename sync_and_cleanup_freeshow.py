@@ -1101,9 +1101,17 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
 
     return new_shows_state, {"copied_to_nas": copied_to_nas, "copied_to_remote": copied_to_remote}
 
+def leave_beamer_on(keep_on, shutdown_if_started, we_started_plug):
+    """Blijft de Beamer-PC na de sync aan staan? --keep-on = ja (iemand zit eraan). Met --shutdown-if-started
+    (automatische triggers zoals de thumbnail-sync) alleen als de PC al aan stond: heeft deze sync de stekker zelf
+    aangezet, dan zet hij de PC na afloop ook weer uit."""
+    return bool(keep_on) and not (bool(shutdown_if_started) and bool(we_started_plug))
+
+
 def main():
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] === STARTING FREESHOW SYNC & CLEANUP AUTOMATION ===")
-    log_activity("sync", f"Sync gestart ({'blijft aan' if '--keep-on' in sys.argv else 'automatisch, sluit af'})")
+    _mode = 'automatisch, sluit af' if '--keep-on' not in sys.argv else ('blijft aan als de pc al aan stond' if '--shutdown-if-started' in sys.argv else 'blijft aan')
+    log_activity("sync", f"Sync gestart ({_mode})")
     settings = get_settings()
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1112,7 +1120,10 @@ def main():
         print("WIPE MODE: Direct deletion of ALL scripture shows requested.")
 
     keep_on = "--keep-on" in sys.argv
-    if keep_on:
+    shutdown_if_started = "--shutdown-if-started" in sys.argv
+    if keep_on and shutdown_if_started:
+        print("KEEP-ON MODE (alleen als de PC al aan stond): zet deze sync de stekker zelf aan, dan gaat de PC na afloop weer uit.")
+    elif keep_on:
         print("KEEP-ON MODE: Beamer PC / smart plug will be left on after this run.")
 
     skip_media = "--skip-media" in sys.argv
@@ -1440,7 +1451,7 @@ def main():
 
             # STAP 4 (afsluiten/stroom uit) blijft exclusief voor het hoofd-doel.
             if target["is_primary"]:
-                if keep_on:
+                if leave_beamer_on(keep_on, shutdown_if_started, we_started_beamer_plug):
                     print("\n--- STAP 4: AFSLUITEN OVERGESLAGEN (--keep-on) ---")
                 else:
                     print("\n--- STAP 4: BEAMER PC NETJES AFSLUITEN ---")
@@ -1471,7 +1482,7 @@ def main():
     # dan blijft de stekker anders voor onbepaalde tijd aanstaan terwijl de
     # PC niet eens gesynchroniseerd is. Niet van toepassing bij --keep-on
     # (dan is "aan laten staan" precies de bedoeling).
-    if we_started_beamer_plug and not keep_on and not beamer_plug_turned_off:
+    if we_started_beamer_plug and not leave_beamer_on(keep_on, shutdown_if_started, we_started_beamer_plug) and not beamer_plug_turned_off:
         print("\n--- VEILIGHEIDSNET: stekker 'plug_beamer' alsnog uitzetten ---")
         print("Beamer PC kwam niet op tijd online of de sync gaf een fout na het zelf "
               "aanzetten van de stekker - stekker wordt voor de zekerheid weer uitgezet.")

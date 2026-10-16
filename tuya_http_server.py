@@ -221,7 +221,10 @@ class TuyaHandler(BaseHTTPRequestHandler):
             # never-shuts-down manual-button behavior.
             keep_on = query_params.get('keep_on', ['1'])[0] != '0'
             targets_param = query_params.get('targets', [''])[0].strip()
-            print(f"Received HTTP request: Trigger FreeShow sync (keep_on={keep_on}, targets={targets_param or 'all'})")
+            # shutdown_if_started=1 (automatic triggers such as the thumbnail sync): keep the PC on only when it was already
+            # on; when this sync had to switch the plug on itself, shut it down again afterwards.
+            shutdown_if_started = query_params.get('shutdown_if_started', ['0'])[0] == '1'
+            print(f"Received HTTP request: Trigger FreeShow sync (keep_on={keep_on}, shutdown_if_started={shutdown_if_started}, targets={targets_param or 'all'})")
             log_path = os.path.join(SCRIPT_DIR, "data", "sync_cleanup.log")
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
             trigger_label = "MANUAL" if keep_on else "AUTO (UNATTENDED)"
@@ -241,6 +244,8 @@ class TuyaHandler(BaseHTTPRequestHandler):
             sync_args = ["python3", os.path.join(SCRIPT_DIR, "sync_and_cleanup_freeshow.py")]
             if keep_on:
                 sync_args.append("--keep-on")
+                if shutdown_if_started:
+                    sync_args.append("--shutdown-if-started")
             if targets_param:
                 sync_args.append(f"--only-targets={targets_param}")
             log_file_handle = open(log_path, 'a')

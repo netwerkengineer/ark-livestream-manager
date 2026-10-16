@@ -25,9 +25,13 @@ import fs from 'fs';
 // explicitly picks them via the manual sync button's checkboxes. Omit this
 // to sync every enabled target, which only the manual button's "select
 // all" case should do.
-export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?: string[] } = {}): Promise<{ success: boolean; message: string }> {
+export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?: string[]; shutdownIfStarted?: boolean } = {}): Promise<{ success: boolean; message: string }> {
   const keepOn = opts.keepOn !== false;
   const targetKeys = opts.targetKeys;
+  // Automatic triggers (thumbnail sync): leave the PC on only if it was already on; a sync that had to switch the plug on
+  // itself shuts the PC down again afterwards (see sync_and_cleanup_freeshow.py --shutdown-if-started).
+  const shutdownIfStarted = !!opts.shutdownIfStarted && keepOn;
+  const syncLabel = keepOn ? (shutdownIfStarted ? 'blijft aan als de pc al aan stond' : 'handmatig/blijft aan') : 'automatisch';
   const settings = getSettings() as any;
 
   const rawHosts = [];
@@ -48,7 +52,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
   for (const host of hostsToTry) {
     if (!host) continue;
     try {
-      let url = `http://${host}:8088/sync?keep_on=${keepOn ? '1' : '0'}`;
+      let url = `http://${host}:8088/sync?keep_on=${keepOn ? '1' : '0'}${shutdownIfStarted ? '&shutdown_if_started=1' : ''}`;
       if (targetKeys && targetKeys.length > 0) {
         url += `&targets=${encodeURIComponent(targetKeys.join(','))}`;
       }
@@ -56,7 +60,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
       if (res.ok) {
         const responseText = await res.text();
         console.log(`[Sync Trigger] Successfully triggered sync on host: ${host}. Response: ${responseText}`);
-        logActivity('sync', `Sync getriggerd (${keepOn ? 'handmatig/blijft aan' : 'automatisch'})`, { targets: targetKeys, host });
+        logActivity('sync', `Sync getriggerd (${syncLabel})`, { targets: targetKeys, host });
         return { success: true, message: responseText };
       }
       console.log(`[Sync Trigger] Host ${host} returned non-ok status: ${res.status}`);
@@ -90,6 +94,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
     // fs.createWriteStream() which opens asynchronously.
     const scriptArgs = [scriptPath];
     if (keepOn) scriptArgs.push('--keep-on');
+    if (shutdownIfStarted) scriptArgs.push('--shutdown-if-started');
     if (targetKeys && targetKeys.length > 0) scriptArgs.push(`--only-targets=${targetKeys.join(',')}`);
     const logFd = fs.openSync(logPath, 'a');
     const child = spawn('python3', scriptArgs, {
@@ -100,7 +105,7 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
     child.unref();
 
     console.log(`[Sync Trigger] Direct execution started: ${scriptPath}`);
-    logActivity('sync', `Sync getriggerd via direct script (daemon onbereikbaar) (${keepOn ? 'blijft aan' : 'automatisch'})`, { targets: targetKeys });
+    logActivity('sync', `Sync getriggerd via direct script (daemon onbereikbaar) (${keepOn ? (shutdownIfStarted ? 'blijft aan als de pc al aan stond' : 'blijft aan') : 'automatisch'})`, { targets: targetKeys });
     return { success: true, message: 'OK: sync started via direct execution (no daemon)' };
   } catch (e: any) {
     console.log(`[Sync Trigger] Direct execution failed:`, e.message || e);
