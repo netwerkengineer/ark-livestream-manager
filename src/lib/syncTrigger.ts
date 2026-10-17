@@ -113,3 +113,48 @@ export async function triggerFreeShowSync(opts: { keepOn?: boolean; targetKeys?:
     return { success: false, message: e.message || 'Direct execution failed' };
   }
 }
+
+
+// Na "Project aanmaken/bijwerken": het project en de plaatjes naar de Beamer-pc brengen, maar ALLEEN als die al aan staat
+// (zo gaat een pc niet onverwacht aan voor een projectwijziging). Een lopende sync wordt niet dubbel gestart.
+// Geeft een korte zin terug die achter de melding van de knop komt.
+export async function syncAfterProjectSave(): Promise<string> {
+  try {
+    const settings = getSettings() as any;
+    const hosts = Array.from(new Set([settings.tuyaApiHost, '127.0.0.1', settings.companionHost, '172.17.0.1'].filter(Boolean)));
+
+    let plugState: string | null = null;
+    for (const host of hosts) {
+      try {
+        const res = await fetch(`http://${host}:8088/status_json`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          const plugs: any[] = await res.json();
+          const beamer = plugs.find(p => p.id === 'plug_beamer');
+          plugState = beamer && beamer.is_online ? (beamer.state === 'on' ? 'on' : 'off') : 'unknown';
+          break;
+        }
+      } catch {
+        // volgende host
+      }
+    }
+
+    if (plugState === 'off') return ' Sync niet gestart: de Beamer-pc staat uit. Start de pc en doe daarna een sync.';
+    if (plugState !== 'on') return ' Sync niet gestart: de stand van de Beamer-pc is onbekend. Start zo nodig zelf een sync.';
+
+    try {
+      const status = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'sync_status.json'), 'utf-8'));
+      const started = Date.parse(String(status.started_at || '').replace(' ', 'T'));
+      if (status.running && (!Number.isFinite(started) || Date.now() - started < 30 * 60_000)) {
+        return ' Er loopt al een sync; start daarna nog een sync om dit project mee te nemen.';
+      }
+    } catch {
+      // geen of onleesbaar statusbestand: gewoon doorgaan
+    }
+
+    const result = await triggerFreeShowSync({ targetKeys: ['primary'], shutdownIfStarted: true });
+    return result.success ? ' Sync naar de Beamer-pc gestart.' : ' Sync starten mislukt; start hem zelf.';
+  } catch (err: any) {
+    console.error('[Sync na project] mislukt:', err);
+    return ' Sync starten mislukt; start hem zelf.';
+  }
+}

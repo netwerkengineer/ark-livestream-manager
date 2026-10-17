@@ -132,6 +132,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genConflict, setGenConflict] = useState(false);   // project is buiten de app gewijzigd: expliciet overschrijven aanbieden
   const [genMessage, setGenMessage] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [sendPanelOpen, setSendPanelOpen] = useState(false);
@@ -623,6 +624,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         body: JSON.stringify({ serviceDate, force })
       });
       const data = await res.json();
+      setGenConflict(!!data.conflict);
       if (data.success) {
         setGenMessage('✅ ' + (data.message || 'Project bijgewerkt'));
         await fetchDraft(serviceDate);
@@ -1092,6 +1094,20 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                 >
                   📤 Verstuur naar team
                 </button>
+                {genConflict && (
+                  <button
+                    className="button"
+                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: '#b45309', color: '#fff' }}
+                    onClick={() => {
+                      if (window.confirm('Het project is buiten de app gewijzigd (bijvoorbeeld in FreeShow of in de Builder). Wil je het toch overschrijven met de huidige dienstvoorbereiding? Wijzigingen die alleen in het project staan gaan verloren.')) {
+                        generateProject(true);
+                      }
+                    }}
+                    disabled={generating}
+                  >
+                    ⚠️ Toch overschrijven
+                  </button>
+                )}
                 <button
                   className="button"
                   style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', background: 'var(--primary)', color: '#020617' }}

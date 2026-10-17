@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
 import { getDraftService } from '@/lib/draftServicesStore';
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
+import { syncAfterProjectSave } from '@/lib/syncTrigger';
 
 // Manually (re)generates the FreeShow project for one draft service - used
 // both for the initial "Project aanmaken" action and "Project bijwerken"
@@ -25,6 +26,10 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await generateProjectForDraft(draft, { force: !!force });
+    if (result.success) {
+      // Project (en de plaatjes erbij) naar de Beamer-pc brengen, maar alleen als die al aan staat
+      result.message = `${result.message || 'Project opgeslagen'}.${await syncAfterProjectSave()}`;
+    }
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('[Project Generator] Fout:', error);

@@ -169,7 +169,7 @@ function estimateLines(verses: { verse: string; text: string }[]): number {
   return lines;
 }
 
-function groupVersesForSlides(verses: { verse: string; text: string }[]): { verse: string; text: string }[][] {
+export function groupVersesForSlides(verses: { verse: string; text: string }[]): { verse: string; text: string }[][] {
   const groups: { verse: string; text: string }[][] = [];
   let current: { verse: string; text: string }[] = [];
   for (const v of verses) {
@@ -183,6 +183,56 @@ function groupVersesForSlides(verses: { verse: string; text: string }[]): { vers
   }
   if (current.length > 0) groups.push(current);
   return groups;
+}
+
+/**
+ * Bouwt voor een bijbeltekst die geen verzen-indeling (`bibleData.chunks`) meebrengt - bijvoorbeeld een item dat in de Builder
+ * uit de lokale catalogus komt ("status: local") met alleen platte tekst - dezelfde `refData` en `text` als de dienstvoorbereiding.
+ * Zonder chunks viel de generator terug op de gewone liedtekst-route: aparte dia's voor versnummer, tekst en verwijzing, 100 px, geen vlak.
+ * Volgorde: verwijzing opzoeken in de Bijbel van FreeShow; lukt dat niet, dan de verzen uit de platte tekst ("1\ntekst\n2\ntekst") halen.
+ */
+export async function buildBibleRefData(ref: string, translationHint: string | undefined, plainText: string | undefined): Promise<{ refData: any; text: string } | null> {
+  const m = /^\s*(.+?)\s+(\d+):(\d+)(?:\s*-\s*(\d+))?(?:\s*-\s*(\S+))?\s*$/.exec(ref || '');
+  const book = m?.[1];
+  const chapter = m ? parseInt(m[2], 10) : NaN;
+  const verseStart = m ? parseInt(m[3], 10) : NaN;
+  const verseEnd = m && m[4] ? parseInt(m[4], 10) : verseStart;
+  const translation = (translationHint || m?.[5] || 'BB').trim();
+
+  let verses: { verse: string; text: string }[] = [];
+  let extra: any = {};
+  if (book && Number.isFinite(chapter) && Number.isFinite(verseStart)) {
+    try {
+      const res = await getBibleVerses(translation, book, chapter, verseStart, verseEnd);
+      if (res.verses?.length) {
+        verses = res.verses;
+        extra = { collectionId: res.collectionId, metadata: res.metadata, book: res.bookInfo?.name || book, bookNumber: res.bookInfo?.number, bookAbbr: res.bookInfo?.abbreviation, translationName: res.translationName };
+      }
+    } catch (err) {
+      console.error('[Bible] Opzoeken mislukt, val terug op de platte tekst:', err);
+    }
+  }
+  if (verses.length === 0 && plainText) {
+    // "1\nEerste vers...\n2\nTweede vers..." -> losse verzen
+    const lines = plainText.split('\n');
+    let current: { verse: string; text: string } | null = null;
+    for (const line of lines) {
+      if (/^\d+$/.test(line.trim())) {
+        if (current) verses.push(current);
+        current = { verse: line.trim(), text: '' };
+      } else if (current) {
+        current.text += (current.text ? ' ' : '') + line.trim();
+      }
+    }
+    if (current) verses.push(current);
+    verses = verses.filter(v => v.text);
+    extra = { book: book || '', translationName: translation };
+  }
+  if (verses.length === 0 || !book) return null;
+
+  const chunks = groupVersesForSlides(verses);
+  const text = chunks.map(chunk => chunk.map(v => `${v.verse}. ${v.text}`).join('\n')).join('\n\n');
+  return { refData: { book, chapter, verses, chunks, ...extra }, text };
 }
 
 // Mirrors /api/preview's bible resolution exactly (same chunking/text shape)

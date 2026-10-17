@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath } from '@/lib/freeshowUtils';
+import { buildBibleRefData } from '@/lib/draftProjectGenerator';
+import { syncAfterProjectSave } from '@/lib/syncTrigger';
 import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
@@ -24,6 +26,16 @@ export async function POST(req: NextRequest) {
     const livestreamOutputId = (settings.livestreamStyleOutputId || '').trim();
     const videoStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_VIDEO_STYLE_NAME) : null;
     const songStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_SONG_STYLE_NAME) : null;
+
+    // Bijbelteksten zonder verzen-indeling (bv. uit de lokale catalogus): opnieuw opbouwen, zodat de opmaak gelijk is aan de
+    // dienstvoorbereiding (een dia per vers/blok, vlak, versnummer, verwijzing) in plaats van de gewone liedtekst-opmaak.
+    const rebuiltBibles = new Map<string, { refData: any; text: string }>();
+    for (const item of items) {
+      if (item.type === 'bible' && !(item.bibleData?.chunks?.length)) {
+        const rebuilt = await buildBibleRefData(item.ref, item.translation, item.text);
+        if (rebuilt) rebuiltBibles.set(String(item.id), rebuilt);
+      }
+    }
 
     // 1. Find the template path to use
     let DEFAULT_TEMPLATE_PATH = "";
@@ -95,14 +107,14 @@ export async function POST(req: NextRequest) {
       } else if (item.type === 'bible') {
         showsList.push({
           ...baseShow,
-          refData: item.bibleData,
+          refData: rebuiltBibles.get(String(item.id))?.refData ?? item.bibleData,
           backgroundMedia: toClientPath(item.backgroundMedia),
           backgroundType: item.backgroundType,
           ...(livestreamOutputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: livestreamOutputId } : {}),
           data: {
             name: sanitizeName(`${item.ref} - ${item.translation}`),
             category: "scripture",
-            text: item.text
+            text: rebuiltBibles.get(String(item.id))?.text ?? item.text
           }
         });
       } else if (item.type === 'youtube') {
@@ -169,7 +181,8 @@ export async function POST(req: NextRequest) {
         await fs.mkdir(projectPath, { recursive: true });
         const filePath = path.join(projectPath, filename);
         await fs.writeFile(filePath, serialized);
-        return NextResponse.json({ success: true, message: `Saved as ${filename}` });
+        const syncNote = await syncAfterProjectSave();
+        return NextResponse.json({ success: true, message: `Saved as ${filename}.${syncNote}` });
       } catch (fsError: any) {
         console.error("FS Error:", fsError);
         return NextResponse.json({ success: false, error: `Cannot write to ${projectPath}: ${fsError.message}` });
