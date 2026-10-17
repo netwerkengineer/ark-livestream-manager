@@ -31,7 +31,12 @@ export function foldDiacritics(value: string): string {
 export function toFreeShowClientPath(serverPath: string, serverRoot?: string, clientRoot?: string): string {
   if (!serverPath || !serverRoot || !clientRoot || serverRoot === clientRoot) return serverPath;
   if (serverPath.startsWith(serverRoot)) {
-    return clientRoot + serverPath.slice(serverRoot.length);
+    const tail = serverPath.slice(serverRoot.length);
+    // FreeShow op Windows schrijft en leest alleen paden met backslashes (C:\Users\Admin\Documents\FreeShow\Media\x.jpg).
+    // Een gemengd pad (...\FreeShow/Media/x.jpg) kan het niet openen: de dia blijft zwart. Dus de rest van het pad meenemen in
+    // de schrijfwijze van de client (backslashes als de clientmap backslashes gebruikt).
+    const windowsClient = clientRoot.includes('\\');
+    return clientRoot + (windowsClient ? tail.replace(/\//g, '\\') : tail);
   }
   return serverPath;
 }
