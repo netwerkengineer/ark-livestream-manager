@@ -178,6 +178,7 @@ export default function FreeshowGenerator() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<any>(null);
   const [previewShow, setPreviewShow] = useState<any>(null);
+  const [previewFilename, setPreviewFilename] = useState<string | null>(null);
   const [currentPreviewSlideIdx, setCurrentPreviewSlideIdx] = useState<number>(0);
 
   const fetchTemplates = async () => {
@@ -199,6 +200,7 @@ export default function FreeshowGenerator() {
       const data = await res.json();
       if (data.success) {
         setPreviewShow(data.show[1]);
+        setPreviewFilename(filename);
         setCurrentPreviewSlideIdx(0);
         setSelectedPreviewTemplate(null);
       } else {
@@ -2690,12 +2692,14 @@ export default function FreeshowGenerator() {
       {/* Slide Preview Modal */}
       <PreviewModal
         previewShow={previewShow}
+        showFilename={previewFilename}
+        onShowUpdated={setPreviewShow}
         templates={templates}
         selectedPreviewTemplate={selectedPreviewTemplate}
         setSelectedPreviewTemplate={setSelectedPreviewTemplate}
         currentPreviewSlideIdx={currentPreviewSlideIdx}
         setCurrentPreviewSlideIdx={setCurrentPreviewSlideIdx}
-        onClose={() => setPreviewShow(null)}
+        onClose={() => { setPreviewShow(null); setPreviewFilename(null); }}
       />
 
       <datalist id="available-songs">

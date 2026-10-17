@@ -13,6 +13,10 @@ import {
 
 interface PreviewModalProps {
   previewShow: any | null;
+  /** bestandsnaam van de show (voor het opslaan van arrangementen) */
+  showFilename?: string | null;
+  /** nieuwe versie van de show na het aanpassen van arrangementen */
+  onShowUpdated?: (show: any) => void;
   templates: any[];
   selectedPreviewTemplate: any | null;
   setSelectedPreviewTemplate: (template: any | null) => void;
@@ -22,7 +26,9 @@ interface PreviewModalProps {
 }
 
 export default function PreviewModal({
-  previewShow,
+  previewShow: baseShow,
+  showFilename,
+  onShowUpdated,
   templates,
   selectedPreviewTemplate,
   setSelectedPreviewTemplate,
@@ -32,6 +38,91 @@ export default function PreviewModal({
 }: PreviewModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = React.useState(1);
+
+  // Arrangement (layout) dat in het voorbeeld getoond wordt; standaard het actieve arrangement van de show
+  const [layoutId, setLayoutId] = React.useState<string | null>(null);
+  const [editor, setEditor] = React.useState<null | { mode: 'create' | 'edit'; name: string; entries: any[] }>(null);
+  const [addSlideId, setAddSlideId] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [note, setNote] = React.useState('');
+
+  const layouts: [string, any][] = baseShow?.layouts ? Object.entries(baseShow.layouts) : [];
+  const effectiveLayoutId = layoutId && baseShow?.layouts?.[layoutId] ? layoutId : (baseShow?.settings?.activeLayout || layouts[0]?.[0] || null);
+  const previewShow = React.useMemo(() => {
+    if (!baseShow) return null;
+    return { ...baseShow, settings: { ...(baseShow.settings || {}), activeLayout: effectiveLayoutId } };
+  }, [baseShow, effectiveLayoutId]);
+  const protectedLayout = effectiveLayoutId ? String(baseShow?.layouts?.[effectiveLayoutId]?.name) === 'Tracks' : false;
+
+  const slideLabel = (slideId: string): string => {
+    const sl = baseShow?.slides?.[slideId];
+    if (!sl) return slideId;
+    if (sl.group) return String(sl.group);
+    const first = sl.items?.map((it: any) => (it.lines || []).map((ln: any) => (ln.text || []).map((t: any) => t.value).join('')).join(' ')).join(' ').trim();
+    return first ? first.slice(0, 40) : '(lege dia)';
+  };
+  const parentSlideIds = (): string[] => {
+    const children = new Set<string>();
+    for (const sl of Object.values<any>(baseShow?.slides || {})) for (const c of (sl.children || [])) children.add(c);
+    return Object.keys(baseShow?.slides || {}).filter(id => !children.has(id));
+  };
+
+  const callLayouts = async (payload: any) => {
+    if (!showFilename) { setNote('❌ Bestandsnaam van de show onbekend'); return null; }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/shows/${encodeURIComponent(showFilename)}/layouts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!data.success) { setNote('❌ ' + (data.error || 'Opslaan mislukt')); return null; }
+      onShowUpdated?.(data.show[1]);
+      return data;
+    } catch (e: any) {
+      setNote('❌ ' + (e?.message || 'Verbindingsfout'));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startCreate = () => {
+    const current = effectiveLayoutId ? baseShow.layouts[effectiveLayoutId] : null;
+    setEditor({ mode: 'create', name: 'Nieuw arrangement', entries: JSON.parse(JSON.stringify(current?.slides || [])) });
+    setNote('');
+  };
+  const startEdit = () => {
+    const current = effectiveLayoutId ? baseShow.layouts[effectiveLayoutId] : null;
+    if (!current) return;
+    setEditor({ mode: 'edit', name: String(current.name || ''), entries: JSON.parse(JSON.stringify(current.slides || [])) });
+    setNote('');
+  };
+  const saveEditor = async () => {
+    if (!editor) return;
+    const data = editor.mode === 'create'
+      ? await callLayouts({ action: 'create', name: editor.name, slides: editor.entries })
+      : await callLayouts({ action: 'update', layoutId: effectiveLayoutId, name: editor.name, slides: editor.entries });
+    if (data) {
+      setLayoutId(data.layoutId);
+      setCurrentPreviewSlideIdx(0);
+      setEditor(null);
+      setNote('✅ Opgeslagen. Doe een sync om het arrangement op de Beamer-pc te krijgen (sluit FreeShow eerst).');
+    }
+  };
+  const deleteCurrent = async () => {
+    if (!effectiveLayoutId) return;
+    const name = String(baseShow.layouts[effectiveLayoutId]?.name || '');
+    if (!window.confirm(`Arrangement "${name}" verwijderen? De dia's zelf blijven bestaan.`)) return;
+    const data = await callLayouts({ action: 'delete', layoutId: effectiveLayoutId });
+    if (data) { setLayoutId(null); setCurrentPreviewSlideIdx(0); setNote('✅ Arrangement verwijderd.'); }
+  };
+  const moveEntry = (i: number, d: number) => setEditor(ed => {
+    if (!ed) return ed;
+    const j = i + d; if (j < 0 || j >= ed.entries.length) return ed;
+    const next = [...ed.entries]; [next[i], next[j]] = [next[j], next[i]];
+    return { ...ed, entries: next };
+  });
+
+  // andere show of ander arrangement: bewerkpaneel sluiten
+  useEffect(() => { setLayoutId(null); setEditor(null); setNote(''); }, [baseShow?.name]);
 
   // Resize listener for scaling the slide preview container
   useEffect(() => {
@@ -112,6 +203,65 @@ export default function PreviewModal({
             <button className="button" style={{ background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1rem' }} onClick={onClose}>Sluiten</button>
           </div>
         </div>
+
+        {/* Arrangementen (layouts) van deze show */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Arrangement:</span>
+          {layouts.map(([lid, l]) => (
+            <button
+              key={lid}
+              className="button"
+              style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', background: lid === effectiveLayoutId ? 'var(--primary)' : 'rgba(255,255,255,0.08)', color: lid === effectiveLayoutId ? '#020617' : '#fff' }}
+              onClick={() => { setLayoutId(lid); setCurrentPreviewSlideIdx(0); setEditor(null); setNote(''); }}
+            >
+              {l.name || '(zonder naam)'}{String(l.name) === 'Tracks' ? ' 🎚️' : ''} <span style={{ opacity: 0.6 }}>({(l.slides || []).length})</span>
+            </button>
+          ))}
+          {showFilename && (
+            <>
+              <button className="button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }} onClick={startCreate} disabled={busy}>➕ Nieuw arrangement</button>
+              {!protectedLayout && effectiveLayoutId && (
+                <>
+                  <button className="button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }} onClick={startEdit} disabled={busy}>✏️ Bewerken</button>
+                  <button className="button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', background: 'rgba(239,68,68,0.25)' }} onClick={deleteCurrent} disabled={busy}>🗑️ Verwijderen</button>
+                </>
+              )}
+            </>
+          )}
+          {protectedLayout && <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Dit arrangement hoort bij de Tracks-tab (alleen bekijken)</span>}
+          {note && <span style={{ fontSize: '0.8rem' }}>{note}</span>}
+        </div>
+
+        {editor && (
+          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem' }}>{editor.mode === 'create' ? 'Nieuw arrangement (start als kopie van het getoonde arrangement)' : 'Arrangement bewerken'}</span>
+              <input className="input" style={{ margin: 0, padding: '0.3rem 0.6rem', width: '260px' }} value={editor.name} onChange={e => setEditor({ ...editor, name: e.target.value })} placeholder="Naam" />
+            </div>
+            <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {editor.entries.map((entry, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', padding: '0.2rem 0.5rem' }}>
+                  <span style={{ opacity: 0.5, width: '1.8rem' }}>{i + 1}</span>
+                  <span style={{ flex: 1 }}>{slideLabel(entry.id)}</span>
+                  <button className="button" style={{ padding: '0 0.5rem' }} onClick={() => moveEntry(i, -1)} disabled={i === 0}>↑</button>
+                  <button className="button" style={{ padding: '0 0.5rem' }} onClick={() => moveEntry(i, 1)} disabled={i === editor.entries.length - 1}>↓</button>
+                  <button className="button" style={{ padding: '0 0.5rem', background: 'rgba(239,68,68,0.25)' }} onClick={() => setEditor({ ...editor, entries: editor.entries.filter((_, k) => k !== i) })}>✕</button>
+                </div>
+              ))}
+              {editor.entries.length === 0 && <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>Nog geen dia's: voeg er hieronder een toe.</div>}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select className="input" style={{ margin: 0, padding: '0.3rem 0.6rem', width: '320px' }} value={addSlideId} onChange={e => setAddSlideId(e.target.value)}>
+                <option value="">Dia toevoegen…</option>
+                {parentSlideIds().map(id => <option key={id} value={id}>{slideLabel(id)}</option>)}
+              </select>
+              <button className="button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} disabled={!addSlideId} onClick={() => { setEditor({ ...editor, entries: [...editor.entries, { id: addSlideId }] }); setAddSlideId(''); }}>Toevoegen</button>
+              <span style={{ flex: 1 }} />
+              <button className="button" style={{ padding: '0.3rem 1rem', background: 'var(--primary)', color: '#020617' }} onClick={saveEditor} disabled={busy || !editor.name.trim()}>{busy ? 'Bezig…' : 'Opslaan'}</button>
+              <button className="button" style={{ padding: '0.3rem 1rem', background: 'rgba(255,255,255,0.08)' }} onClick={() => setEditor(null)} disabled={busy}>Annuleren</button>
+            </div>
+          </div>
+        )}
 
         {/* Main Carousel Area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'center' }}>
