@@ -54,6 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     show.layouts = show.layouts || {};
     show.slides = show.slides || {};
 
+    const cleanNotes = (n: any) => String(n ?? '').replace(/\r\n/g, '\n').slice(0, 4000);
     const cleanName = (n: any) => String(n ?? '').replace(/[\\/:*?"<>|]/g, ' ').trim().slice(0, 60);
     const nameTaken = (name: string, exceptId?: string) =>
       Object.entries<any>(show.layouts).some(([lid, l]) => lid !== exceptId && String(l.name || '').toLowerCase() === name.toLowerCase());
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const checked = checkedEntries(body.slides ?? []);
       if (checked.error) return NextResponse.json({ success: false, error: checked.error }, { status: 400 });
       const layoutId = newLayoutId(new Set(Object.keys(show.layouts)));
-      show.layouts[layoutId] = { name, notes: '', slides: checked.entries };
+      show.layouts[layoutId] = { name, notes: cleanNotes(body.notes), slides: checked.entries };
       show.timestamps = { ...(show.timestamps || {}), modified: Date.now() };
       await fs.writeFile(filePath, JSON.stringify([showId, show], null, 2), 'utf-8');
       return NextResponse.json({ success: true, layoutId, show: [showId, show] });
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (PROTECTED_LAYOUT_NAMES.includes(name)) return NextResponse.json({ success: false, error: `De naam "${name}" is gereserveerd voor de Tracks-tab` }, { status: 400 });
         layout.name = name;
       }
+      if (body.notes !== undefined) layout.notes = cleanNotes(body.notes);
       if (body.slides !== undefined) {
         const checked = checkedEntries(body.slides);
         if (checked.error) return NextResponse.json({ success: false, error: checked.error }, { status: 400 });

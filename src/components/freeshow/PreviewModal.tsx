@@ -41,7 +41,7 @@ export default function PreviewModal({
 
   // Arrangement (layout) dat in het voorbeeld getoond wordt; standaard het actieve arrangement van de show
   const [layoutId, setLayoutId] = React.useState<string | null>(null);
-  const [editor, setEditor] = React.useState<null | { mode: 'create' | 'edit'; name: string; entries: any[] }>(null);
+  const [editor, setEditor] = React.useState<null | { mode: 'create' | 'edit'; name: string; notes: string; entries: any[] }>(null);
   const [addSlideId, setAddSlideId] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState('');
@@ -86,20 +86,20 @@ export default function PreviewModal({
 
   const startCreate = () => {
     const current = effectiveLayoutId ? baseShow.layouts[effectiveLayoutId] : null;
-    setEditor({ mode: 'create', name: 'Nieuw arrangement', entries: JSON.parse(JSON.stringify(current?.slides || [])) });
+    setEditor({ mode: 'create', name: 'Nieuw arrangement', notes: '', entries: JSON.parse(JSON.stringify(current?.slides || [])) });
     setNote('');
   };
   const startEdit = () => {
     const current = effectiveLayoutId ? baseShow.layouts[effectiveLayoutId] : null;
     if (!current) return;
-    setEditor({ mode: 'edit', name: String(current.name || ''), entries: JSON.parse(JSON.stringify(current.slides || [])) });
+    setEditor({ mode: 'edit', name: String(current.name || ''), notes: String(current.notes || ''), entries: JSON.parse(JSON.stringify(current.slides || [])) });
     setNote('');
   };
   const saveEditor = async () => {
     if (!editor) return;
     const data = editor.mode === 'create'
-      ? await callLayouts({ action: 'create', name: editor.name, slides: editor.entries })
-      : await callLayouts({ action: 'update', layoutId: effectiveLayoutId, name: editor.name, slides: editor.entries });
+      ? await callLayouts({ action: 'create', name: editor.name, notes: editor.notes, slides: editor.entries })
+      : await callLayouts({ action: 'update', layoutId: effectiveLayoutId, name: editor.name, notes: editor.notes, slides: editor.entries });
     if (data) {
       setLayoutId(data.layoutId);
       setCurrentPreviewSlideIdx(0);
@@ -120,6 +120,31 @@ export default function PreviewModal({
     const next = [...ed.entries]; [next[i], next[j]] = [next[j], next[i]];
     return { ...ed, entries: next };
   });
+
+  // Notitie bij de getoonde dia (hoort bij de dia zelf, dus in elk arrangement hetzelfde)
+  const [noteEditing, setNoteEditing] = React.useState(false);
+  const [noteDraft, setNoteDraft] = React.useState('');
+  const currentLayoutSlide = previewShow ? getOrderedSlides(previewShow)[currentPreviewSlideIdx] : null;
+  const currentSlideId: string | null = currentLayoutSlide?.id ?? null;
+  const currentNote: string = currentSlideId ? String(baseShow?.slides?.[currentSlideId]?.notes || '') : '';
+  const slidesWithNotes = Object.values<any>(baseShow?.slides || {}).filter(sl => String(sl?.notes || '').trim()).length;
+  useEffect(() => { setNoteEditing(false); }, [currentPreviewSlideIdx, effectiveLayoutId, baseShow?.name]);
+  const saveNote = async () => {
+    if (!currentSlideId || !showFilename) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/shows/${encodeURIComponent(showFilename)}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slideId: currentSlideId, notes: noteDraft }) });
+      const data = await res.json();
+      if (!data.success) { setNote('❌ ' + (data.error || 'Notitie opslaan mislukt')); return; }
+      onShowUpdated?.(data.show[1]);
+      setNoteEditing(false);
+      setNote(noteDraft.trim() ? '✅ Notitie opgeslagen. Doe een sync om hem op de Beamer-pc te krijgen (sluit FreeShow eerst).' : '✅ Notitie gewist.');
+    } catch (e: any) {
+      setNote('❌ ' + (e?.message || 'Verbindingsfout'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // andere show of ander arrangement: bewerkpaneel sluiten
   useEffect(() => { setLayoutId(null); setEditor(null); setNote(''); }, [baseShow?.name]);
@@ -149,6 +174,8 @@ export default function PreviewModal({
   useEffect(() => {
     if (!previewShow) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;   // tijdens het typen van een notitie niet bladeren of sluiten
       const ordered = getOrderedSlides(previewShow);
       if (e.key === 'ArrowLeft') {
         setCurrentPreviewSlideIdx(prev => Math.max(0, prev - 1));
@@ -232,12 +259,17 @@ export default function PreviewModal({
           {note && <span style={{ fontSize: '0.8rem' }}>{note}</span>}
         </div>
 
+        {!editor && effectiveLayoutId && String(baseShow?.layouts?.[effectiveLayoutId]?.notes || '').trim() && (
+          <div style={{ fontSize: '0.8rem', opacity: 0.7, whiteSpace: 'pre-wrap' }}>📝 Notitie bij dit arrangement: {String(baseShow.layouts[effectiveLayoutId].notes)}</div>
+        )}
+
         {editor && (
           <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <span style={{ fontSize: '0.85rem' }}>{editor.mode === 'create' ? 'Nieuw arrangement (start als kopie van het getoonde arrangement)' : 'Arrangement bewerken'}</span>
               <input className="input" style={{ margin: 0, padding: '0.3rem 0.6rem', width: '260px' }} value={editor.name} onChange={e => setEditor({ ...editor, name: e.target.value })} placeholder="Naam" />
             </div>
+            <textarea className="input" style={{ margin: 0, padding: '0.4rem 0.6rem', minHeight: '52px', fontSize: '0.8rem', resize: 'vertical' }} value={editor.notes} onChange={e => setEditor({ ...editor, notes: e.target.value })} placeholder="Notitie bij dit arrangement (optioneel)" maxLength={4000} />
             <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               {editor.entries.map((entry, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', padding: '0.2rem 0.5rem' }}>
@@ -395,6 +427,33 @@ export default function PreviewModal({
           >
             ›
           </button>
+        </div>
+
+        {/* Notitie bij de getoonde dia */}
+        <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '0.8rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
+            <strong>📝 Notitie bij deze dia</strong>
+            <span style={{ opacity: 0.5 }}>{slidesWithNotes > 0 ? `${slidesWithNotes} dia${slidesWithNotes === 1 ? '' : "'s"} in deze show ${slidesWithNotes === 1 ? 'heeft' : 'hebben'} een notitie` : 'nog geen notities in deze show'}</span>
+            <span style={{ flex: 1 }} />
+            {showFilename && currentSlideId && !noteEditing && (
+              <button className="button" style={{ padding: '0.25rem 0.8rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }} disabled={busy} onClick={() => { setNoteDraft(currentNote); setNoteEditing(true); setNote(''); }}>
+                {currentNote ? '✏️ Aanpassen' : '➕ Notitie toevoegen'}
+              </button>
+            )}
+          </div>
+          {noteEditing ? (
+            <>
+              <textarea className="input" autoFocus style={{ margin: 0, padding: '0.5rem 0.7rem', minHeight: '90px', resize: 'vertical' }} value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Bijvoorbeeld: stil beginnen, band valt in bij het refrein…" maxLength={4000} />
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="button" style={{ padding: '0.3rem 1rem', background: 'var(--primary)', color: '#020617' }} disabled={busy} onClick={saveNote}>{busy ? 'Bezig…' : 'Opslaan'}</button>
+                <button className="button" style={{ padding: '0.3rem 1rem', background: 'rgba(255,255,255,0.08)' }} disabled={busy} onClick={() => setNoteEditing(false)}>Annuleren</button>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>Leeg opslaan wist de notitie</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', opacity: currentNote ? 1 : 0.4 }}>{currentNote || 'Geen notitie bij deze dia.'}</div>
+          )}
         </div>
 
         {/* Footer / Info */}
