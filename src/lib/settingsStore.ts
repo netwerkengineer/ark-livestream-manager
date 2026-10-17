@@ -255,6 +255,9 @@ export interface BroadcastButton {
   midiOutNote?: number;
   midiOutChannel?: number;
   requiredPermission?: string;
+  // Start/stop-knop van een pc: id van de stekker (tuyaPlugs). De knop kiest dan zelf aan/uit op basis van de echte stand van de stekker
+  // (zie /api/tuya/power) in plaats van een wisselknop in Companion te bedienen. Leeg: standaardkoppeling in BroadcastControlCenter.
+  plugId?: string;
 }
 
 

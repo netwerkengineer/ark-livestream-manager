@@ -21,6 +21,12 @@ interface ServiceStatus {
   port: number;
 }
 
+// Dashboardknoppen die een pc starten/stoppen via zijn slimme stekker (knop-id -> stekker-id). Een eigen `plugId` bij de knop gaat voor.
+const DEFAULT_PLUG_BY_BUTTON: Record<string, string> = {
+  qww7gkpem: "plug_obs",     // "OBS PC"
+  qj3e7j7tu: "plug_beamer",  // "Beamer PC"
+};
+
 interface BroadcastControlCenterProps {
   settings: any;
   userRole?: string;
@@ -35,6 +41,7 @@ export default function BroadcastControlCenter({ settings, userRole, userPermiss
   const [plugsLoading, setPlugsLoading] = useState(true);
   const [time, setTime] = useState(new Date());
   const [activeButtons, setActiveButtons] = useState<Record<string, boolean>>({});
+  const [actionNote, setActionNote] = useState<string>("");
 
   const fetchStatus = async () => {
     try {
@@ -62,24 +69,21 @@ export default function BroadcastControlCenter({ settings, userRole, userPermiss
           const updated = { ...prev };
           let changed = false;
           
-          const obsPlug = fetchedPlugs.find((p: any) => p.id === "plug_obs");
-          if (obsPlug && obsPlug.is_online) {
-            const isObsOn = obsPlug.state === "on";
-            if (updated["qww7gkpem"] !== isObsOn) { // "qww7gkpem" is "OBS PC Starten"
-              updated["qww7gkpem"] = isObsOn;
-              changed = true;
+          const plugButtons: Record<string, string> = { ...DEFAULT_PLUG_BY_BUTTON };
+          for (const btn of (settings?.broadcastButtons || [])) {
+            if (btn.plugId) plugButtons[btn.id] = btn.plugId;
+          }
+          for (const [buttonId, plugId] of Object.entries(plugButtons)) {
+            const plug = fetchedPlugs.find((p: any) => p.id === plugId);
+            if (plug && plug.is_online) {
+              const isOn = plug.state === "on";
+              if (updated[buttonId] !== isOn) {
+                updated[buttonId] = isOn;
+                changed = true;
+              }
             }
           }
-          
-          const beamerPlug = fetchedPlugs.find((p: any) => p.id === "plug_beamer");
-          if (beamerPlug && beamerPlug.is_online) {
-            const isBeamerOn = beamerPlug.state === "on";
-            if (updated["qj3e7j7tu"] !== isBeamerOn) { // "qj3e7j7tu" is "Beamer PC starten"
-              updated["qj3e7j7tu"] = isBeamerOn;
-              changed = true;
-            }
-          }
-          
+
           if (changed) {
             localStorage.setItem("acoc_active_buttons", JSON.stringify(updated));
             return updated;
@@ -122,6 +126,27 @@ export default function BroadcastControlCenter({ settings, userRole, userPermiss
 
 
   const handleEmergencyAction = async (actionId: string, actionName: string, page: number, row: number, col: number) => {
+    // Start/stop van een pc: de server kiest aan of uit op basis van de ECHTE stand van de stekker (niet van een onthouden wisselknop)
+    const configured = (settings?.broadcastButtons || []).find((b: any) => b.id === actionId)?.plugId;
+    const plugId = configured || DEFAULT_PLUG_BY_BUTTON[actionId];
+    if (plugId) {
+      try {
+        const response = await fetch('/api/tuya/power', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plugId }),
+        });
+        const data = await response.json();
+        setActionNote(`${actionName}: ${data.message || data.error || (data.success ? 'gedaan' : 'mislukt')}`);
+      } catch (error: any) {
+        setActionNote(`${actionName}: ${error?.message || 'mislukt'}`);
+      } finally {
+        setTimeout(fetchPlugsStatus, 1500);            // stand van de knop direct bijwerken
+        setTimeout(() => setActionNote(""), 15000);
+      }
+      return;
+    }
+
     // Toggle de visuele status direct bij klikken (niet wachten op Companion response)
     setActiveButtons(prev => {
       const updated = { ...prev, [actionId]: !prev[actionId] };
@@ -366,6 +391,10 @@ export default function BroadcastControlCenter({ settings, userRole, userPermiss
             </div>
           )}
         </section>
+      )}
+
+      {actionNote && (
+        <div style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 8px' }}>{actionNote}</div>
       )}
 
       {/* Emergency Buttons Row */}
