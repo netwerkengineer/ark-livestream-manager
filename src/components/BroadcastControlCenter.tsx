@@ -25,6 +25,7 @@ interface ServiceStatus {
 const DEFAULT_PLUG_BY_BUTTON: Record<string, string> = {
   qww7gkpem: "plug_obs",     // "OBS PC"
   qj3e7j7tu: "plug_beamer",  // "Beamer PC"
+  "722r2rj1r": "plug_offgridtec_mac_mini",   // "Ark Tracks" (Mac mini): afsluiten = apps stoppen, slaapstand, stekker uit; aan = stekker aan
 };
 
 interface BroadcastControlCenterProps {
