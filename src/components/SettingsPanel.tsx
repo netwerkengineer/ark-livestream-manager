@@ -1,5 +1,6 @@
 "use client";
 
+import { plugIdForButton } from "@/lib/dashboardPlugs";
 import { useState } from "react";
 import {
   Settings,
@@ -1299,6 +1300,12 @@ export default function SettingsPanel({
                 </button>
               </div>
 
+              <div style={{ fontSize: '0.85rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+                Knoppen met het label <strong>🔌 Interne stekkerbediening</strong> starten en stoppen een pc rechtstreeks via de slimme stekker (intern script,
+                op basis van de echte stand van de stekker). Die knoppen gebruiken <strong>niet</strong> Companion; Pagina, Rij en Kolom zijn voor die knoppen
+                dus niet in gebruik. Alle andere knoppen drukken nog op de bijbehorende knop in Companion.
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
                 {(settings.broadcastButtons || []).map((btn: any, idx: number) => (
                   <div key={btn.id} className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1316,6 +1323,17 @@ export default function SettingsPanel({
                         onSettingsChange({...settings, broadcastButtons: newBtns});
                       }} style={{ color: '#f87171', background: 'rgba(248, 113, 113, 0.1)', border: 'none', padding: '6px', borderRadius: '8px', cursor: 'pointer', height: 'fit-content', marginTop: '22px' }}><X size={18} /></button>
                     </div>
+
+                    {(() => {
+                      const pid = plugIdForButton(btn);
+                      if (!pid) return null;
+                      const plugName = (settings.tuyaPlugs || []).find((p: any) => p.id === pid)?.name || pid;
+                      return (
+                        <div style={{ fontSize: '0.75rem', padding: '6px 10px', borderRadius: '8px', background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.25)', color: '#86efac' }}>
+                          🔌 Interne stekkerbediening: stekker "{plugName}" (niet via Companion; Pagina/Rij/Kolom niet in gebruik)
+                        </div>
+                      );
+                    })()}
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '10px' }}>
                       <div className="input-group">

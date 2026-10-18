@@ -14,19 +14,13 @@ import {
   Square
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { DEFAULT_PLUG_BY_BUTTON, plugIdForButton } from "@/lib/dashboardPlugs";
 
 interface ServiceStatus {
   name: string;
   status: 'UP' | 'DOWN' | 'READY';
   port: number;
 }
-
-// Dashboardknoppen die een pc starten/stoppen via zijn slimme stekker (knop-id -> stekker-id). Een eigen `plugId` bij de knop gaat voor.
-const DEFAULT_PLUG_BY_BUTTON: Record<string, string> = {
-  qww7gkpem: "plug_obs",     // "OBS PC"
-  qj3e7j7tu: "plug_beamer",  // "Beamer PC"
-  "722r2rj1r": "plug_offgridtec_mac_mini",   // "Ark Tracks" (Mac mini): afsluiten = apps stoppen, slaapstand, stekker uit; aan = stekker aan
-};
 
 interface BroadcastControlCenterProps {
   settings: any;
