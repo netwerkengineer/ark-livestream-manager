@@ -36,7 +36,13 @@ COPY config/qlcplus/common.css /usr/share/qlcplus/web/common.css
 # Create directories for fixtures and project
 RUN mkdir -p /root/.qlcplus/fixtures /QLC
 
-# Copy default fixtures into the image
+# Het qlcplus5 pakket (5.3.0+) levert geen fixturebibliotheek meer mee: haal die op uit de QLC+ repo (zelfde tag)
+RUN mkdir -p /usr/share/qlcplus/fixtures \
+    && curl -fsSL --retry 3 --retry-delay 5 --max-time 180 \
+      "https://github.com/mcallegari/qlcplus/archive/refs/tags/QLC%2B_5.3.0.tar.gz" \
+    | tar -xz -C /usr/share/qlcplus/fixtures --strip-components=3 --wildcards "*/resources/fixtures/"
+
+# Copy custom fixtures into the image (overschrijven/aanvullen op de bibliotheek)
 COPY config/fixtures/ /usr/share/qlcplus/fixtures/
 
 # Set Qt offscreen rendering for headless execution

@@ -8,7 +8,17 @@ rm -f "/root/.config/qlcplus/Q Light Controller Plus.conf"
 rm -f "/root/.qlcplus/Q Light Controller Plus.conf"
 
 # Start QLC+ v5 in headless web-modus op poort 9999
-qlcplus-qml --web --web-port 9999 &
+# QLC+ 5.2.x levert qlcplus-qml, vanaf 5.3.0 heet de binary qlcplus5
+if command -v qlcplus-qml >/dev/null 2>&1; then
+    QLC_BIN=qlcplus-qml
+elif command -v qlcplus5 >/dev/null 2>&1; then
+    QLC_BIN=qlcplus5
+else
+    echo "FOUT: geen qlcplus-qml of qlcplus5 gevonden" >&2
+    exit 1
+fi
+echo "Using $QLC_BIN"
+$QLC_BIN --web --web-port 9999 &
 QLC_PID=$!
 
 echo "Waiting for QLC+ v5 web server..."
