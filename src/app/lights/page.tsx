@@ -32,7 +32,7 @@ export default function LightsPage() {
   const [activeColors, setActiveColors] = useState<{[sceneId: number]: boolean}>({});
   // Kleuren die niet via een knop maar automatisch (Companion/FreeShow) draaien: QLC+ meldt die als 127 i.p.v. 255.
   const [autoColors, setAutoColors] = useState<{[sceneId: number]: boolean}>({});
-  const [autoLight, setAutoLight] = useState<{ available: boolean; auto: string; kleur: string; tijd: string } | null>(null);
+  const [autoLight, setAutoLight] = useState<{ available: boolean; auto: string; kleur: string; tijd: string; palet?: string[] } | null>(null);
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
@@ -742,7 +742,8 @@ export default function LightsPage() {
         const autoN = Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length;
         const manualN = Object.keys(activeColors).filter(k => activeColors[Number(k)] && !autoColors[Number(k)]).length;
         const anyScene = activeScene !== null || activeChase !== null || activeStrobe !== null;
-        const nothing = autoN === 0 && manualN === 0 && !anyScene;
+        const paletN = autoLight?.palet?.length || 0;
+        const nothing = autoN === 0 && manualN === 0 && !anyScene && paletN === 0;
         return (
           <section className="glass-card" style={{ padding: "16px 24px", marginBottom: "24px", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.9rem" }}>
@@ -752,6 +753,7 @@ export default function LightsPage() {
               ) : (
                 <span>
                   {autoN > 0 && <>Automatisch (FreeShow): <strong>{autoN}</strong> kleurkeuze(s) &nbsp;</>}
+                  {paletN > 0 && <>Kleurenschema (automatisch): <strong>{autoLight?.palet?.join(", ")}</strong> &nbsp;</>}
                   {manualN > 0 && <>Handmatig (knop): <strong>{manualN}</strong> kleurkeuze(s) &nbsp;</>}
                   {anyScene && <>Scène of lichtshow actief &nbsp;</>}
                   <span style={{ color: "var(--muted)" }}>De Scene Setter staat hier los van: de hoogste waarde wint.</span>

@@ -1,0 +1,7 @@
+[
+ {"slug": "reasons",     "naam": "10,000 Reasons",           "main": "ffb347", "accent": "ff6a3d", "wit": 0.12, "knop": 0},
+ {"slug": "buildmylife", "naam": "Build My Life",            "main": "3b5bdb", "accent": "7048e8", "wit": 0.20, "knop": 1},
+ {"slug": "livingwater", "naam": "Let the Living Water Flow","main": "14b8c8", "accent": "2f7de1", "wit": 0.25, "knop": 2},
+ {"slug": "worthy",      "naam": "Worthy",                   "main": "e11d48", "accent": "c026d3", "wit": 0.30, "knop": 3},
+ {"slug": "alphaomega",  "naam": "Alpha and Omega",          "main": "7c3aed", "accent": "f5b83d", "wit": 0.12, "knop": 4}
+]

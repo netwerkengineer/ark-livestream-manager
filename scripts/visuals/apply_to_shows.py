@@ -3,7 +3,8 @@
 
 Gebruik (draait op de machine waar de Shows-map staat):
   apply_to_shows.py <spec.json> --shows-dir <map> --backup-dir <map> --companion <http://host:8000>
-spec.json: {"<showbestand>.show": {"video": "<slug>", "kleur": "Blauw"}, ...}
+spec.json: {"<showbestand>.show": {"video": "<slug>", "palet": "<slug uit palettes.json>"}, ...}
+(of "kleur": "Blauw" voor een losse kleur; palettes.json staat naast dit script)
 
 - Werkt altijd vanaf de reservekopie (die wordt bij de eerste keer gemaakt), dus herhaalbaar.
 - Zet de achtergrond op de eerste dia van elke indeling en een dia-actie "Licht: <kleur>" op de eerste dia
@@ -11,6 +12,8 @@ spec.json: {"<showbestand>.show": {"video": "<slug>", "kleur": "Blauw"}, ...}
 - Schrijft via een tijdelijk bestand en hernoemen (NFS-rechten).
 """
 import json, os, sys, shutil, time, random, string
+
+HIER = os.path.dirname(os.path.abspath(__file__))
 
 KLEUREN = {"Rood": 0, "Groen": 1, "Blauw": 2, "Amber": 3, "Magenta": 4, "Cyaan": 5, "UV": 6, "Wit": 7}
 
@@ -28,7 +31,12 @@ def main():
         if not os.path.exists(p): print("ONTBREEKT", fn); continue
         if not os.path.exists(b): shutil.copy2(p, b)
         j = json.load(open(b)); c = j[1]
-        slug, kleur = cfg["video"], cfg["kleur"]
+        slug = cfg["video"]
+        if "palet" in cfg:
+            pal = {x["slug"]: x for x in json.load(open(os.path.join(HIER, "palettes.json")))}[cfg["palet"]]
+            naam, rij, kol = pal["naam"], 3, pal["knop"]
+        else:
+            naam, rij, kol = cfg["kleur"], 1, KLEUREN[cfg["kleur"]]
         c.setdefault("media", {})
         for k in [k for k, m in c["media"].items() if "Ark Visuals" in m.get("path", "")]: del c["media"][k]
         mid = "ark" + slug[:8] + rid(3)
@@ -46,15 +54,15 @@ def main():
         first = lay["slides"][0]
         acts = first.setdefault("actions", {}).setdefault("slideActions", [])
         acts[:] = [x for x in acts if not str(x.get("name", "")).startswith("Licht:")]
-        acts.append({"id": rid(), "name": "Licht: " + kleur, "triggers": ["send_rest_command"],
-                     "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/1/1/{KLEUREN[kleur]}/press",
+        acts.append({"id": rid(), "name": "Licht: " + naam, "triggers": ["send_rest_command"],
+                     "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/1/{rij}/{kol}/press",
                                                             "method": "POST", "contentType": "", "payload": ""}},
                      "customActivation": "", "midiEnabled": False})
         c["timestamps"]["modified"] = int(time.time() * 1000)
         tmp = os.path.join(shows, ".ark-tmp-" + slug)
         json.dump(j, open(tmp, "w"), indent=2, ensure_ascii=False)
         os.chmod(tmp, 0o666); os.replace(tmp, p)
-        print("ok", fn, "->", slug, kleur)
+        print("ok", fn, "->", slug, naam)
 
 if __name__ == "__main__":
     main()
