@@ -49,19 +49,23 @@ def stop_palets(except_id=None):
     return [(i, "0") for i in PALET_IDS if i != except_id]
 
 def pure_seq(name, k):
+    # eerst de nieuwe kleur starten, daarna de rest stoppen: zo vloeit het over i.p.v. eerst uit te gaan
     seq = []
     if name == "UV":                                 # alleen de ADJ-bars hebben UV; de rest blijft staan
-        seq += [(30 + j, "0") for j in range(8) if j != 6] + [(36, "1")]
+        seq += [(36, "1"), (67, "1")] + stop_palets()
+        seq += [(30 + j, "0") for j in range(8) if j != 6]
     else:
-        for g in GROEPEN:
-            seq += [(g + j, "0") for j in range(8) if j != k - 1] + [(g + k - 1, "1")]
-    seq += [(60 + j, "0") for j in range(7)] + [(67, "1")]    # KLS-200 altijd wit
-    return stop_palets() + seq
+        for g in GROEPEN: seq.append((g + k - 1, "1"))
+        seq.append((67, "1"))
+        seq += stop_palets()
+        for g in GROEPEN: seq += [(g + j, "0") for j in range(8) if j != k - 1]
+    seq += [(60 + j, "0") for j in range(7)]         # KLS-200 altijd wit
+    return seq
 
 def palet_seq(i):
-    seq = stop_palets(BASE_ID + i)
+    seq = [(BASE_ID + i, "1")] + stop_palets(BASE_ID + i)
     for g in GROEPEN + [60]: seq += [(g + j, "0") for j in range(8)]          # alle losse kleuren uit
-    return seq + [(BASE_ID + i, "1")]
+    return seq
 
 def button(label, bg, fg, seq_label, seq):
     j = copy.deepcopy(tmpl); j["feedbacks"] = []
