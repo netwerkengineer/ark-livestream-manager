@@ -30,6 +30,9 @@ export default function LightsPage() {
   const [fresnel4, setFresnel4] = useState(0);
   const [fresnelMaster, setFresnelMaster] = useState(0);
   const [activeColors, setActiveColors] = useState<{[sceneId: number]: boolean}>({});
+  // Kleuren die niet via een knop maar automatisch (Companion/FreeShow) draaien: QLC+ meldt die als 127 i.p.v. 255.
+  const [autoColors, setAutoColors] = useState<{[sceneId: number]: boolean}>({});
+  const [autoLight, setAutoLight] = useState<{ available: boolean; auto: string; kleur: string; tijd: string } | null>(null);
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
@@ -80,6 +83,7 @@ export default function LightsPage() {
 
     let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
     let isMounted = true;
 
     const WIDGET_IDS = [
@@ -123,6 +127,16 @@ export default function LightsPage() {
               }, index * 20); // 20ms delay per request (~1.8 seconds total for 91 widgets)
             });
           }
+          // QLC+ meldt kleuren die automatisch (als functie) zijn gestart niet uit zichzelf door: vraag ze regelmatig op.
+          clearInterval(refreshTimer);
+          refreshTimer = setInterval(() => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            WIDGET_IDS.filter(id => id >= 11 && id <= 138 && id % 10 >= 1 && id % 10 <= 8).forEach((id, index) => {
+              setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(`QLC+API|getWidgetStatus|${id}`);
+              }, index * 15);
+            });
+          }, 6000);
         };
 
         ws.onmessage = (event) => {
@@ -180,7 +194,9 @@ export default function LightsPage() {
                 const startId = widgetId - lastDigit;
                 if ([10, 30, 40, 50, 60, 100, 110, 120, 130].includes(startId)) {
                   const sceneId = widgetId - 1;
-                  setActiveColors(prev => ({ ...prev, [sceneId]: isActive }));
+                  // 255 = knop ingedrukt (handmatig), 127 = functie draait zonder knop (automatisch)
+                  setActiveColors(prev => ({ ...prev, [sceneId]: value >= 127 }));
+                  setAutoColors(prev => ({ ...prev, [sceneId]: value === 127 }));
                 }
               }
             }
@@ -198,6 +214,7 @@ export default function LightsPage() {
         };
 
         ws.onclose = () => {
+          clearInterval(refreshTimer);
           isWsConnected.current = false;
           wsRef.current = null;
           console.log("[QLC+ WebSocket] Connection closed, reconnecting in 5s...");
@@ -228,6 +245,7 @@ export default function LightsPage() {
 
     return () => {
       isMounted = false;
+      clearInterval(refreshTimer);
       if (ws) {
         ws.close();
       }
@@ -360,6 +378,34 @@ export default function LightsPage() {
     }
   };
 
+  useEffect(() => {
+    let stop = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/lights/auto", { cache: "no-store" });
+        if (res.ok && !stop) setAutoLight(await res.json());
+      } catch { /* Companion niet bereikbaar: blok blijft verborgen */ }
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => { stop = true; clearInterval(timer); };
+  }, []);
+
+  const handleAutoSwitch = async (next: "aan" | "uit") => {
+    setAutoLight(prev => prev ? { ...prev, auto: next } : prev);
+    try {
+      const res = await fetch("/api/lights/auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto: next }),
+      });
+      if (!res.ok) throw new Error("mislukt");
+      showStatus("success", next === "aan" ? "Automatisch licht staat aan (FreeShow mag het licht sturen)." : "Automatisch licht staat uit (FreeShow doet niets met het licht).");
+    } catch {
+      showStatus("error", "Kon de schakelaar voor automatisch licht niet instellen.");
+    }
+  };
+
   const handleResetAll = async () => {
     const now = Date.now();
     if (now - lastActionTime.current < 400) return;
@@ -400,6 +446,7 @@ export default function LightsPage() {
     setActiveScene(null);
     setActiveChase(null);
     setActiveColors({});
+    setAutoColors({});
     setActiveStrobe(null);
     setFresnel1(0);
     setFresnel2(0);
@@ -690,6 +737,46 @@ export default function LightsPage() {
         </div>
       </header>
 
+      {/* Wat stuurt QLC+ nu, en wie startte het? */}
+      {(() => {
+        const autoN = Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length;
+        const manualN = Object.keys(activeColors).filter(k => activeColors[Number(k)] && !autoColors[Number(k)]).length;
+        const anyScene = activeScene !== null || activeChase !== null || activeStrobe !== null;
+        const nothing = autoN === 0 && manualN === 0 && !anyScene;
+        return (
+          <section className="glass-card" style={{ padding: "16px 24px", marginBottom: "24px", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.9rem" }}>
+              <strong>Wat stuurt QLC+ nu?</strong>
+              {nothing ? (
+                <span style={{ color: "var(--muted)" }}>Niets. Brandt er toch licht, dan komt dat van de ADJ Scene Setter (QLC+ ziet de schuiven daarvan niet).</span>
+              ) : (
+                <span>
+                  {autoN > 0 && <>Automatisch (FreeShow): <strong>{autoN}</strong> kleurkeuze(s) &nbsp;</>}
+                  {manualN > 0 && <>Handmatig (knop): <strong>{manualN}</strong> kleurkeuze(s) &nbsp;</>}
+                  {anyScene && <>Scène of lichtshow actief &nbsp;</>}
+                  <span style={{ color: "var(--muted)" }}>De Scene Setter staat hier los van: de hoogste waarde wint.</span>
+                </span>
+              )}
+              {autoLight?.available && autoLight.kleur && (
+                <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Laatste automatische wissel: {autoLight.kleur} om {autoLight.tijd}. Gestippelde rand = automatisch gestart.</span>
+              )}
+            </div>
+            {autoLight?.available && (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "0.85rem" }}>Automatisch licht (FreeShow)</span>
+                <button
+                  onClick={() => handleAutoSwitch(autoLight.auto === "aan" ? "uit" : "aan")}
+                  className="btn-group-action off"
+                  style={{ padding: "6px 14px", fontSize: "0.8rem", borderColor: autoLight.auto === "aan" ? "rgba(74,222,128,0.5)" : "rgba(239,68,68,0.5)", color: autoLight.auto === "aan" ? "#86efac" : "#fca5a5" }}
+                >
+                  {autoLight.auto === "aan" ? "AAN" : "UIT"}
+                </button>
+              </div>
+            )}
+          </section>
+        );
+      })()}
+
       {/* Main Grid Content */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "32px", flexGrow: 1 }}>
         {/* Left Side: Color Pickers & Scenes */}
@@ -854,15 +941,16 @@ export default function LightsPage() {
                     ].map(c => {
                       const sceneId = group.startId + c.offset;
                       const isActive = !!activeColors[sceneId];
+                      const isAuto = isActive && !!autoColors[sceneId];
                       return (
                         <button 
                           key={c.offset}
                           onClick={() => handleColorClick(group.title, sceneId, `${group.title} - ${c.name}`)}
-                          title={`${group.title} - ${c.name}`}
+                          title={`${group.title} - ${c.name}${isAuto ? " (automatisch gestart)" : ""}`}
                           style={{ 
                             backgroundColor: c.color,
                             boxShadow: isActive ? `0 0 14px ${c.color}` : 'none',
-                            border: isActive ? '3px solid #fff' : '2px solid rgba(0,0,0,0.3)',
+                            border: isAuto ? '3px dashed #fff' : isActive ? '3px solid #fff' : '2px solid rgba(0,0,0,0.3)',
                             transform: isActive ? 'scale(1.15)' : 'scale(1)',
                             zIndex: isActive ? 2 : 1
                           }}

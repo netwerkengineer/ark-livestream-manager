@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Append custom CSS overrides for QLC+ v5 Web UI frame headers/titles
 RUN echo '\n/* Custom Overrides for Frame Titles */\n.frame-title {\n  display: block !important;\n  font-size: calc(var(--text-size-default) * 0.55) !important;\n  font-weight: 600 !important;\n  white-space: nowrap !important;\n  overflow: hidden !important;\n  text-overflow: ellipsis !important;\n  padding-left: 6px !important;\n  padding-right: 6px !important;\n  text-align: left !important;\n  margin-right: auto !important;\n  line-height: var(--list-item-height) !important;\n}' >> /usr/share/qlcplus/web/webaccess-v5.css
 
+# QLC+ 5.3.0 levert common.css niet meer mee, terwijl de oude pagina's (Configuration) die nog gebruiken: zonder stijl is de tekst donker op donker
+COPY config/qlcplus/common.css /usr/share/qlcplus/web/common.css
+
 # Create directories for fixtures and project
 RUN mkdir -p /root/.qlcplus/fixtures /QLC
 

@@ -39,13 +39,27 @@ export async function POST(req: NextRequest) {
             }, index * 2); // Small delay to avoid flooding QLC+ too fast
           });
 
+          // Kleuren die automatisch (via Companion/FreeShow) zijn gestart draaien als functie, zonder dat de
+          // knop is ingedrukt. Een "0" naar de knop stopt die niet, dus stop de functies ook rechtstreeks.
+          const FUNCTION_IDS = [
+            0, 1, 2, 3, 20, 24,
+            ...[10, 30, 40, 50, 60, 100, 110, 120, 130].flatMap(base => Array.from({ length: 8 }, (_, i) => base + i))
+          ];
+          FUNCTION_IDS.forEach((id, index) => {
+            setTimeout(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(`QLC+API|setFunctionStatus|${id}|0`);
+              }
+            }, WIDGET_IDS.length * 2 + index * 2);
+          });
+
           // Give it enough time to send all messages before closing
           setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.close();
             }
             resolve(NextResponse.json({ success: true }));
-          }, WIDGET_IDS.length * 2 + 100);
+          }, (WIDGET_IDS.length + 80) * 2 + 100);
         });
 
         ws.on('error', (err) => {

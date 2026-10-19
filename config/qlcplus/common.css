@@ -1,0 +1,16 @@
+/* Stijl voor de oude QLC+-pagina's (Configuration, Load fixture): sinds QLC+ 5.3.0 ontbreekt common.css,
+   waardoor zwarte tekst op een donkere achtergrond overbleef. */
+html, body { background: #222; color: #ddd; font-family: verdana, arial, sans-serif; }
+a { color: #8ab4ff; }
+.controlBar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #111; border-bottom: 1px solid #444; }
+.controlBar .swInfo { color: #aaa; font-size: 14px; }
+.button { display: inline-block; text-decoration: none; padding: 6px 16px; border-radius: 4px; color: #fff; background: #444; border: 1px solid #666; cursor: pointer; }
+.button-blue { background: #1e5fbf; border-color: #3a7be0; }
+.button:hover { filter: brightness(1.15); }
+table.hovertable { border-collapse: collapse; color: #ddd; font-size: 14px; }
+table.hovertable th { color: #fff; background: #333; padding: 8px 10px; border-bottom: 2px solid #555; }
+table.hovertable td { padding: 8px 10px; border-bottom: 1px solid #3a3a3a; color: #ddd; }
+table.hovertable tr:hover td { background: #2d2d2d; }
+select { background: #333; color: #eee; border: 1px solid #666; border-radius: 4px; padding: 4px 6px; }
+label { color: #ddd; cursor: pointer; }
+input[type=checkbox] { vertical-align: middle; margin-right: 6px; }
