@@ -35,7 +35,13 @@ def main():
         c["media"][mid] = {"name": slug + ".mp4", "path": "Z:\\FreeShow\\Media\\Motion backgrounds\\Ark Visuals\\" + slug + ".mp4",
                            "type": "video", "muted": True, "loop": True}
         for lid, l in c.get("layouts", {}).items():
-            if l.get("slides"): l["slides"][0]["background"] = mid
+            for i, sl in enumerate(l.get("slides", [])):
+                # eerste dia krijgt de nieuwe achtergrond; oude achtergronden op latere dia's en op
+                # kind-dia's (children) worden weggehaald, anders blijft daar de oude achtergrond staan
+                if i == 0: sl["background"] = mid
+                else: sl.pop("background", None)
+                for ov in (sl.get("children") or {}).values():
+                    if isinstance(ov, dict): ov.pop("background", None)
         lay = c["layouts"][c["settings"]["activeLayout"]]
         first = lay["slides"][0]
         acts = first.setdefault("actions", {}).setdefault("slideActions", [])
