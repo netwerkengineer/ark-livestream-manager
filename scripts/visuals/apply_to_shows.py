@@ -7,11 +7,11 @@ spec.json: {"<showbestand>.show": {"video": "<slug>", "palet": "<slug uit palett
 (of "kleur": "Blauw" voor een losse kleur; palettes.json staat naast dit script)
 
 - Werkt altijd vanaf de reservekopie (die wordt bij de eerste keer gemaakt), dus herhaalbaar.
-- Zet de achtergrond op de eerste dia van elke indeling en een dia-actie "Licht: <kleur>" op de eerste dia
-  van de actieve indeling (HTTP-verzoek naar Companion, knop op pagina 1, rij 1).
+- Maakt per indeling een lege startdia met de achtergrond en alle acties (stijl + "Licht: <naam>" als HTTP-verzoek
+  naar Companion); de indeling "Tracks" wordt niet verschoven.
 - Schrijft via een tijdelijk bestand en hernoemen (NFS-rechten).
 """
-import json, os, sys, shutil, time, random, string
+import copy, json, os, sys, shutil, time, random, string
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,22 +42,38 @@ def main():
         mid = "ark" + slug[:8] + rid(3)
         c["media"][mid] = {"name": slug + ".mp4", "path": "Z:\\FreeShow\\Media\\Motion backgrounds\\Ark Visuals\\" + slug + ".mp4",
                            "type": "video", "muted": True, "loop": True}
+        # Lege startdia (zelfde opzet als bij de Tracks-indelingen): daar komen achtergrond en alle acties op.
+        # De indeling "Tracks" wordt niet verschoven: de cuetabellen van Ark Tracks tellen de dia's daarvan.
+        start_id = None
+        action = {"id": rid(), "name": "Licht: " + naam, "triggers": ["send_rest_command"],
+                  "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/1/{rij}/{kol}/press",
+                                                         "method": "POST", "contentType": "", "payload": ""}},
+                  "customActivation": "", "midiEnabled": False}
         for lid, l in c.get("layouts", {}).items():
-            for i, sl in enumerate(l.get("slides", [])):
-                # eerste dia krijgt de nieuwe achtergrond; oude achtergronden op latere dia's en op
-                # kind-dia's (children) worden weggehaald, anders blijft daar de oude achtergrond staan
-                if i == 0: sl["background"] = mid
-                else: sl.pop("background", None)
+            sls = l.get("slides", [])
+            if not sls: continue
+            first_def = c["slides"].get(sls[0]["id"], {})
+            is_start = str(first_def.get("group", "")).startswith("Start")
+            if l.get("name") == "Tracks" and not is_start:
+                continue
+            if not is_start:
+                if start_id is None:
+                    start_id = rid()
+                    c["slides"][start_id] = {"group": "Start (tracks)", "color": "#334155", "settings": {},
+                                             "notes": "Lege startdia: hier hangen achtergrond, licht en stijl aan.",
+                                             "items": [], "globalGroup": None}
+                sls.insert(0, {"id": start_id})
+                moved = sls[1].get("actions")                       # acties van de eerste tekstdia verhuizen mee
+                if moved: sls[0]["actions"] = sls[1].pop("actions")
+            st = sls[0]
+            st["background"] = mid
+            for i, sl in enumerate(sls):
+                if i > 0: sl.pop("background", None)
                 for ov in (sl.get("children") or {}).values():
                     if isinstance(ov, dict): ov.pop("background", None)
-        lay = c["layouts"][c["settings"]["activeLayout"]]
-        first = lay["slides"][0]
-        acts = first.setdefault("actions", {}).setdefault("slideActions", [])
-        acts[:] = [x for x in acts if not str(x.get("name", "")).startswith("Licht:")]
-        acts.append({"id": rid(), "name": "Licht: " + naam, "triggers": ["send_rest_command"],
-                     "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/1/{rij}/{kol}/press",
-                                                            "method": "POST", "contentType": "", "payload": ""}},
-                     "customActivation": "", "midiEnabled": False})
+            acts = st.setdefault("actions", {}).setdefault("slideActions", [])
+            acts[:] = [x for x in acts if not str(x.get("name", "")).startswith("Licht:")]
+            acts.append(copy.deepcopy(action))
         c["timestamps"]["modified"] = int(time.time() * 1000)
         tmp = os.path.join(shows, ".ark-tmp-" + slug)
         json.dump(j, open(tmp, "w"), indent=2, ensure_ascii=False)
