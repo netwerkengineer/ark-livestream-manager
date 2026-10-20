@@ -37,6 +37,15 @@ def setvar(name, val):
     return {"type": "action", "id": nid(), "definitionId": "custom_variable_set_value", "connectionId": "internal",
             "options": {"name": O(name), "value": O(val)}, "upgradeIndex": None}
 
+def feedback(expr, overrides):
+    # Knopkleur laten meeveranderen met de schakelaar licht_auto: overrides = [(element, eigenschap, waarde), ...]
+    return {"id": nid(), "definitionId": "check_expression", "connectionId": "internal", "type": "feedback",
+            "options": {"expression": O(expr, True)}, "isInverted": O(False), "children": {},
+            "styleOverrides": [{"overrideId": nid(), "elementId": el, "elementProperty": prop, "override": {"isExpression": False, "value": val}}
+                               for el, prop, val in overrides]}
+
+UIT_UITERLIJK = [("box0", "color", 0x303030), ("text0", "color", 0x909090)]   # knop ziet er uitgeschakeld uit als automatisch licht uit staat
+
 def gated(label, actions):
     cond = {"type": "feedback", "id": nid(), "definitionId": "check_expression", "connectionId": "internal",
             "options": {"expression": O('$(custom:licht_auto) == "aan"', True)}, "isInverted": O(False),
@@ -73,6 +82,7 @@ def button(label, bg, fg, seq_label, seq):
         if l["id"] == "text0": l["text"]["value"] = label; l["color"]["value"] = fg
         if l["id"] == "box0": l["color"]["value"] = bg
     j["steps"] = {"0": {"action_sets": {"down": gated(seq_label, [fn(f, s) for f, s in seq]), "up": []}, "options": {"runWhileHeld": []}}}
+    j["feedbacks"] = [feedback('$(custom:licht_auto) == "uit"', UIT_UITERLIJK)]
     return j
 
 def put(page, row, col, ctl):
@@ -88,6 +98,10 @@ def switch_button(label, val, bg):
         if l["id"] == "text0": l["text"]["value"] = label; l["color"]["value"] = 0xFFFFFF
         if l["id"] == "box0": l["color"]["value"] = bg
     j["steps"] = {"0": {"action_sets": {"down": [setvar("licht_auto", val)], "up": []}, "options": {"runWhileHeld": []}}}
+    # de knop die de huidige stand aangeeft licht fel op; de andere is gedimd
+    actief = '$(custom:licht_auto) == "%s"' % val
+    fel = 0x00D000 if val == "aan" else 0xFF0000
+    j["feedbacks"] = [feedback(actief, [("box0", "color", fel)])]
     return j
 
 # Oude Auto/Licht-knoppen op pagina 1 weghalen (de lichtknoppen staan nu op een eigen pagina)
@@ -106,8 +120,8 @@ page["name"] = "Licht"
 for r, cols in list(page["controls"].items()):
     for cid in cols.values(): c.execute("delete from controls where id=?", (cid,))
 page["controls"] = {}
-put(page, 0, 0, switch_button("Auto licht AAN", "aan", 0x008800))
-put(page, 0, 1, switch_button("Auto licht UIT", "uit", 0xCC0000))
+put(page, 0, 0, switch_button("Auto licht AAN", "aan", 0x1F3D1F))
+put(page, 0, 1, switch_button("Auto licht UIT", "uit", 0x4A1F1F))
 for col, (name, k, bg, fg) in enumerate(KLEUREN):
     put(page, 1, col, button("Auto " + name, bg, fg, name, pure_seq(name, k)))
 for i, p in enumerate(PAL):

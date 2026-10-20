@@ -763,6 +763,11 @@ export default function LightsPage() {
                 <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Laatste automatische wissel: {autoLight.kleur} om {autoLight.tijd}. Gestippelde rand = automatisch gestart.</span>
               )}
             </div>
+            {autoLight?.available && autoLight.auto === "uit" && (
+              <div style={{ flexBasis: "100%", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.5)", color: "#fca5a5", borderRadius: "8px", padding: "8px 12px", fontSize: "0.85rem" }}>
+                ⚠️ <strong>Automatisch licht staat UIT.</strong> FreeShow en Companion sturen nu geen licht aan: de lichtacties bij de liederen doen niets. Zet de schakelaar rechts op AAN om ze weer te laten werken.
+              </div>
+            )}
             {autoLight?.available && (
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{ fontSize: "0.85rem" }}>Automatisch licht (FreeShow)</span>
