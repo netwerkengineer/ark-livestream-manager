@@ -34,7 +34,7 @@ def main():
         slug = cfg["video"]
         if "palet" in cfg:
             pal = {x["slug"]: x for x in json.load(open(os.path.join(HIER, "palettes.json")))}[cfg["palet"]]
-            naam, rij, kol = pal["naam"], 3, pal["knop"]
+            naam, rij, kol = pal["naam"], pal.get("rij", 3), pal["knop"]
         else:
             naam, rij, kol = cfg["kleur"], 1, KLEUREN[cfg["kleur"]]
         c.setdefault("media", {})

@@ -680,7 +680,7 @@
    <FixtureVal ID="20">0,0,1,255,2,0,12,255,13,255,14,255</FixtureVal>
   </Function>
   <Function ID="200" Type="Scene" Name="Strobe Blackout"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,0,1,0,2,0</FixtureVal><FixtureVal ID="14">0,0,1,0,2,0</FixtureVal><FixtureVal ID="15">0,0,1,0,2,0</FixtureVal><FixtureVal ID="16">0,20,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="17">0,20,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="18">0,20,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="19">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal><FixtureVal ID="20">0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0</FixtureVal></Function><Function ID="201" Type="Scene" Name="Strobe Scene: Red"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,255,1,0,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,255,1,0,2,0</FixtureVal><FixtureVal ID="14">0,255,1,0,2,0</FixtureVal><FixtureVal ID="15">0,255,1,0,2,0</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,0,6,255,7,0,8,0,9,255,10,0,11,0,12,255,13,0,14,0</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,0,6,255,7,0,8,0,9,255,10,0,11,0,12,255,13,0,14,0</FixtureVal></Function><Function ID="202" Type="Scene" Name="Strobe Scene: Green"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,255,2,0,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,0,1,255,2,0</FixtureVal><FixtureVal ID="14">0,0,1,255,2,0</FixtureVal><FixtureVal ID="15">0,0,1,255,2,0</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,255,8,0,9,0,10,255,11,0,12,0,13,255,14,0</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,0,6,0,7,255,8,0,9,0,10,255,11,0,12,0,13,255,14,0</FixtureVal></Function><Function ID="203" Type="Scene" Name="Strobe Scene: Blue"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,0,2,255,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,0,1,0,2,255</FixtureVal><FixtureVal ID="14">0,0,1,0,2,255</FixtureVal><FixtureVal ID="15">0,0,1,0,2,255</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,0,4,0,5,255,6,0,7,0,8,255,9,0,10,0,11,255,12,0,13,0,14,255</FixtureVal></Function><Function ID="204" Type="Scene" Name="Strobe Scene: Amber"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,0,2,0,3,255,4,0,5,0</FixtureVal><FixtureVal ID="13">0,255,1,160,2,0</FixtureVal><FixtureVal ID="14">0,255,1,160,2,0</FixtureVal><FixtureVal ID="15">0,255,1,160,2,0</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,255,4,160,5,0</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,160,5,0</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,160,5,0</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,255,4,100,5,0,6,255,7,100,8,0,9,255,10,100,11,0,12,255,13,100,14,0</FixtureVal></Function><Function ID="205" Type="Scene" Name="Strobe Scene: Magenta"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,255,1,0,2,255,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,255,1,0,2,255</FixtureVal><FixtureVal ID="14">0,255,1,0,2,255</FixtureVal><FixtureVal ID="15">0,255,1,0,2,255</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,0,5,255</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,255,4,0,5,255,6,255,7,0,8,255,9,255,10,0,11,255,12,255,13,0,14,255</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,255,4,0,5,255,6,255,7,0,8,255,9,255,10,0,11,255,12,255,13,0,14,255</FixtureVal></Function><Function ID="206" Type="Scene" Name="Strobe Scene: Cyan"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,255,2,255,3,0,4,0,5,0</FixtureVal><FixtureVal ID="13">0,0,1,255,2,255</FixtureVal><FixtureVal ID="14">0,0,1,255,2,255</FixtureVal><FixtureVal ID="15">0,0,1,255,2,255</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,0,4,255,5,255</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,255,8,255,9,0,10,255,11,255,12,0,13,255,14,255</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,0,4,255,5,255,6,0,7,255,8,255,9,0,10,255,11,255,12,0,13,255,14,255</FixtureVal></Function><Function ID="207" Type="Scene" Name="Strobe Scene: UV"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,0,5,255</FixtureVal><FixtureVal ID="13">0,80,1,0,2,255</FixtureVal><FixtureVal ID="14">0,80,1,0,2,255</FixtureVal><FixtureVal ID="15">0,80,1,0,2,255</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,80,4,0,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,80,4,0,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,80,4,0,5,255</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,100,4,0,5,255,6,100,7,0,8,255,9,100,10,0,11,255,12,100,13,0,14,255</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,100,4,0,5,255,6,100,7,0,8,255,9,100,10,0,11,255,12,100,13,0,14,255</FixtureVal></Function><Function ID="208" Type="Scene" Name="Strobe Scene: White"><Speed FadeIn="0" FadeOut="0" Duration="0" /><FixtureVal ID="4">0,0,1,0,2,0,3,0,4,255,5,0</FixtureVal><FixtureVal ID="13">0,255,1,255,2,255</FixtureVal><FixtureVal ID="14">0,255,1,255,2,255</FixtureVal><FixtureVal ID="15">0,255,1,255,2,255</FixtureVal><FixtureVal ID="16">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="17">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="18">0,20,1,255,2,0,3,255,4,255,5,255</FixtureVal><FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal><FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal></Function><Function ID="211" Type="Chaser" Name="Strobe Chaser: Red"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">201</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="212" Type="Chaser" Name="Strobe Chaser: Green"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">202</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="213" Type="Chaser" Name="Strobe Chaser: Blue"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">203</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="214" Type="Chaser" Name="Strobe Chaser: Amber"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">204</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="215" Type="Chaser" Name="Strobe Chaser: Magenta"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">205</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="216" Type="Chaser" Name="Strobe Chaser: Cyan"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">206</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="217" Type="Chaser" Name="Strobe Chaser: UV"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">207</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function><Function ID="218" Type="Chaser" Name="Strobe Chaser: White"><Speed FadeIn="0" FadeOut="0" Duration="100" /><Direction>Forward</Direction><RunOrder>Loop</RunOrder><SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common" /><Step Number="0" FadeIn="0" Hold="50" FadeOut="0">208</Step><Step Number="1" FadeIn="0" Hold="50" FadeOut="0">200</Step></Function>
-  <Function ID="300" Type="Scene" Name="Ark: 10,000 Reasons" Path="Ark paletten">
+  <Function ID="300" Type="Scene" Name="Ark: Zonsopgang" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
    <FixtureVal ID="4">0,255,1,179,2,71,3,28,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,255,1,188,2,93</FixtureVal>
@@ -692,7 +692,7 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
-  <Function ID="301" Type="Scene" Name="Ark: Build My Life" Path="Ark paletten">
+  <Function ID="301" Type="Scene" Name="Ark: Diepblauw" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
    <FixtureVal ID="4">0,59,1,91,2,219,3,46,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,98,1,124,2,226</FixtureVal>
@@ -704,7 +704,7 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
-  <Function ID="302" Type="Scene" Name="Ark: Let the Living Water Flow" Path="Ark paletten">
+  <Function ID="302" Type="Scene" Name="Ark: Water" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
    <FixtureVal ID="4">0,20,1,184,2,200,3,57,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,79,1,202,2,214</FixtureVal>
@@ -716,7 +716,7 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
-  <Function ID="303" Type="Scene" Name="Ark: Worthy" Path="Ark paletten">
+  <Function ID="303" Type="Scene" Name="Ark: Karmozijn" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
    <FixtureVal ID="4">0,225,1,29,2,72,3,69,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,234,1,97,2,127</FixtureVal>
@@ -728,7 +728,7 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
-  <Function ID="304" Type="Scene" Name="Ark: Alpha and Omega" Path="Ark paletten">
+  <Function ID="304" Type="Scene" Name="Ark: Koninklijk" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
    <FixtureVal ID="4">0,124,1,58,2,237,3,28,4,0,5,0</FixtureVal>
    <FixtureVal ID="13">0,140,1,82,2,239</FixtureVal>
@@ -737,6 +737,66 @@
    <FixtureVal ID="16">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
    <FixtureVal ID="17">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
    <FixtureVal ID="18">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="305" Type="Scene" Name="Ark: Vuur" Path="Ark paletten">
+   <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
+   <FixtureVal ID="4">0,255,1,77,2,28,3,23,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,255,1,95,2,51</FixtureVal>
+   <FixtureVal ID="14">0,255,1,95,2,51</FixtureVal>
+   <FixtureVal ID="15">0,255,1,95,2,51</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,184,5,26</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,255,4,184,5,26</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,255,4,184,5,26</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="306" Type="Scene" Name="Ark: Vreugde" Path="Ark paletten">
+   <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
+   <FixtureVal ID="4">0,255,1,94,2,168,3,34,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,255,1,118,2,181</FixtureVal>
+   <FixtureVal ID="14">0,255,1,118,2,181</FixtureVal>
+   <FixtureVal ID="15">0,255,1,118,2,181</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,203,5,82</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,255,4,203,5,82</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,255,4,203,5,82</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="307" Type="Scene" Name="Ark: Goud" Path="Ark paletten">
+   <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
+   <FixtureVal ID="4">0,242,1,193,2,78,3,57,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,245,1,208,2,122</FixtureVal>
+   <FixtureVal ID="14">0,245,1,208,2,122</FixtureVal>
+   <FixtureVal ID="15">0,245,1,208,2,122</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,248,4,237,5,199</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,248,4,237,5,199</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,248,4,237,5,199</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="308" Type="Scene" Name="Ark: Nacht" Path="Ark paletten">
+   <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
+   <FixtureVal ID="4">0,55,1,48,2,163,3,11,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,65,1,58,2,168</FixtureVal>
+   <FixtureVal ID="14">0,65,1,58,2,168</FixtureVal>
+   <FixtureVal ID="15">0,65,1,58,2,168</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,131,4,115,5,241</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,131,4,115,5,241</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,131,4,115,5,241</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
+  </Function>
+  <Function ID="309" Type="Scene" Name="Ark: Leven" Path="Ark paletten">
+   <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
+   <FixtureVal ID="4">0,47,1,182,2,124,3,34,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,78,1,193,2,144</FixtureVal>
+   <FixtureVal ID="14">0,78,1,193,2,144</FixtureVal>
+   <FixtureVal ID="15">0,78,1,193,2,144</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,242,4,208,5,106</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,242,4,208,5,106</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,242,4,208,5,106</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>

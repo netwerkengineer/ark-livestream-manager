@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zet de lichtknoppen in de Companion-database (pagina 1): 8 losse kleuren (rij 1) en de paletten (rij 3).
+"""Zet de lichtknoppen in de Companion-database (pagina 1): 8 losse kleuren (rij 1) en de paletten (rij 3, en rij 2 vanaf kolom 2).
 
 Draai dit in de Companion-datamap met Companion GESTOPT (docker stop companion), als de eigenaar van de
 bestanden (uid 1000). Gebruik: companion_palettes.py <db.sqlite> <palettes.json>
@@ -88,7 +88,7 @@ for col, (name, k, bg, fg) in enumerate(KLEUREN):
 for i, p in enumerate(PAL):
     h = int(p["main"], 16)
     lum = (0.299 * (h >> 16) + 0.587 * ((h >> 8) & 255) + 0.114 * (h & 255))
-    put(page, 3, p["knop"], button("Licht " + p["naam"], h, 0x000000 if lum > 150 else 0xFFFFFF, p["naam"], palet_seq(i)))
+    put(page, p.get("rij", 3), p["knop"], button("Licht " + p["naam"], h, 0x000000 if lum > 150 else 0xFFFFFF, p["naam"], palet_seq(i)))
 c.execute("update pages set value=? where id=1", (json.dumps(page),))
 c.commit(); c.close()
 print("knoppen bijgewerkt:", len(KLEUREN), "kleuren en", len(PAL), "paletten")

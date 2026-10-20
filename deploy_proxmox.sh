@@ -5,7 +5,7 @@ echo "Vastleggen git-commit voor versie-badge..."
 git rev-parse --short HEAD | xargs -I{} printf '{\n  "sha": "%s"\n}\n' {} > src/lib/gitSha.generated.json
 
 echo "Inpakken lokaal..."
-tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude ".git" --exclude "deploy.tar.gz" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" -czf deploy.tar.gz .
+tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude ".git" --exclude "deploy.tar.gz" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" --exclude "./freeshow" -czf deploy.tar.gz .
 
 echo "Terugzetten placeholder (repo blijft schoon)..."
 git checkout -- src/lib/gitSha.generated.json
