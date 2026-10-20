@@ -207,7 +207,14 @@ def deploy():
         f.write(f'{{\n  "sha": "{git_sha}"\n}}\n')
 
     print(f"\n>>> Lokaal: Project inpakken (exclusief node_modules en build data) ...")
-    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "--exclude", "track-computer/ark-engine/target", "--exclude", "track-computer/ark-desktop/build", "--exclude", "__pycache__", "--exclude", ".claude", "--exclude", "./freeshow", "-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
+    # Lokale build van FreeShow (/freeshow, 160 MB, staat in .gitignore) niet meepakken. Een patroon "./freeshow" zou ook
+    # src/components/freeshow en src/app/api/freeshow uitsluiten (tar zoekt patronen in elk pad), dus per onderdeel uitsluiten.
+    freeshow_dir = os.path.join(config['LOCAL_APP_PATH'], "freeshow")
+    freeshow_excludes = []
+    if os.path.isdir(freeshow_dir):
+        for item in os.listdir(freeshow_dir):
+            freeshow_excludes += ["--exclude", f"./freeshow/{item}"]
+    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "--exclude", "track-computer/ark-engine/target", "--exclude", "track-computer/ark-desktop/build", "--exclude", "__pycache__", "--exclude", ".claude"] + freeshow_excludes + ["-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
     env = os.environ.copy()
     env["COPYFILE_DISABLE"] = "1"
     subprocess.check_call(tar_cmd, env=env)

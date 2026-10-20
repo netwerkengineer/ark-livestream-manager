@@ -12,8 +12,15 @@ SSH="ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCou
 echo "Vastleggen git-commit voor versie-badge..."
 git rev-parse --short HEAD | xargs -I{} printf '{\n  "sha": "%s"\n}\n' {} > src/lib/gitSha.generated.json
 
+# Lokale build van FreeShow (/freeshow, 160 MB, staat in .gitignore) niet meepakken. Let op: een patroon "./freeshow" zou ook de
+# mappen src/components/freeshow en src/app/api/freeshow uitsluiten (tar zoekt patronen in elk pad), dus sluit de inhoud per onderdeel uit.
+FRESHOW_EXCLUDES=""
+if [ -d freeshow ]; then
+  while IFS= read -r item; do FRESHOW_EXCLUDES="$FRESHOW_EXCLUDES --exclude ./freeshow/$item"; done < <(ls -A freeshow)
+fi
+
 echo "Inpakken lokaal..."
-tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude ".git" --exclude "deploy.tar.gz" --exclude "deploy.manifest" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" --exclude "./freeshow" -czf deploy.tar.gz .
+tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude ".git" --exclude "deploy.tar.gz" --exclude "deploy.manifest" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" $FRESHOW_EXCLUDES -czf deploy.tar.gz .
 
 echo "Terugzetten placeholder (repo blijft schoon)..."
 git checkout -- src/lib/gitSha.generated.json
@@ -27,6 +34,17 @@ with tarfile.open("deploy.tar.gz") as t:
             print(f"{hashlib.md5(t.extractfile(m).read()).hexdigest()}  {m.name}")
 PY
 echo "  $(wc -l < deploy.manifest | tr -d ' ') bestanden in de lijst"
+
+# Staat elk bestand dat in git zit (src, config, scripts) ook echt in het archief? Zo niet, dan sloot een uitsluiting iets uit.
+cut -c35- deploy.manifest > deploy.paths
+MIST=$(git ls-files src config scripts | grep -v '^config/qlcplus/config/' | while IFS= read -r f; do [ -f "$f" ] && [ ! -L "$f" ] && ! grep -qxF "./$f" deploy.paths && echo "$f"; done || true)
+rm -f deploy.paths
+if [ -n "$MIST" ]; then
+  echo "FOUT: deze bestanden uit git zitten niet in het archief (een uitsluiting in de tar-opdracht?), deploy gestopt:"
+  echo "$MIST"
+  rm -f deploy.tar.gz deploy.manifest
+  exit 1
+fi
 
 echo "Kopiëren naar Proxmox..."
 scp -o StrictHostKeyChecking=no deploy.tar.gz deploy.manifest $HOST:/root/
