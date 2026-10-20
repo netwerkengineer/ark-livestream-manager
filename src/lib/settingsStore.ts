@@ -86,6 +86,8 @@ export interface AppSettings {
   freeshowMediaPath?: string;
   freeshowTrashPath?: string;
   freeshowClientPath?: string;
+  // Adres van Companion zoals de FreeShow-computer dat bereikt (voor de lichtacties in de shows), bv. http://192.168.2.250:8000
+  freeshowCompanionUrl?: string;
   freeshowAdditionalTargets?: FreeShowSyncTarget[];
   // Output ID (local to whichever machine actually runs FreeShow for this
   // environment - the Beamer PC in production, the Mac when this app runs

@@ -1,0 +1,12 @@
+[
+ {"slug": "reasons",     "naam": "Zonsopgang", "main": "ffb347", "accent": "ff6a3d", "wit": 0.12, "knop": 0},
+ {"slug": "buildmylife", "naam": "Diepblauw",  "main": "3b5bdb", "accent": "7048e8", "wit": 0.20, "knop": 1},
+ {"slug": "livingwater", "naam": "Water",      "main": "14b8c8", "accent": "2f7de1", "wit": 0.25, "knop": 2},
+ {"slug": "worthy",      "naam": "Karmozijn",  "main": "e11d48", "accent": "c026d3", "wit": 0.30, "knop": 3},
+ {"slug": "alphaomega",  "naam": "Koninklijk", "main": "7c3aed", "accent": "f5b83d", "wit": 0.12, "knop": 4},
+ {"slug": "vuur",        "naam": "Vuur",       "main": "ff4d1c", "accent": "ffb000", "wit": 0.10, "knop": 5},
+ {"slug": "vreugde",     "naam": "Vreugde",    "main": "ff5ea8", "accent": "ffc233", "wit": 0.15, "knop": 6},
+ {"slug": "goud",        "naam": "Goud",       "main": "f2c14e", "accent": "f6e7b4", "wit": 0.25, "knop": 7},
+ {"slug": "nacht",       "naam": "Nacht",      "main": "3730a3", "accent": "7c6cf0", "wit": 0.05, "knop": 2, "rij": 2},
+ {"slug": "leven",       "naam": "Leven",      "main": "2fb67c", "accent": "f0c850", "wit": 0.15, "knop": 3, "rij": 2}
+]

@@ -1696,6 +1696,20 @@ export default function SettingsPanel({
                 </p>
               </div>
 
+              <div className="input-group">
+                <label className="input-label">Companion-adres, zoals de FreeShow-computer het ziet (voor het licht per lied)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.freeshowCompanionUrl || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, freeshowCompanionUrl: e.target.value })}
+                  placeholder="http://192.168.2.250:8000"
+                />
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Als je in de setlist een sfeer kiest, zet de app op de startdia van het lied een actie die dit adres aanroept (de Companion-knop voor die lichtkleur). Leeg laten betekent: alleen de achtergrond, geen licht.
+                </p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="input-group">
                   <label className="input-label">Projecten Map</label>

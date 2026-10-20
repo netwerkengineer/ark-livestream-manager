@@ -2,7 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { getSettings } from '@/lib/settingsStore';
-import { checkLocalSongExists, getLocalSongText, getLocalShowData, fetchLyricsFromInternet } from '@/lib/songs';
+import { checkLocalSongExists, getLocalSongText, getLocalShowData, getLocalShowFilePath, fetchLyricsFromInternet } from '@/lib/songs';
+import { applySfeerToShowFile } from '@/lib/sfeer';
 import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
@@ -382,8 +383,26 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
 
   for (const song of draft.songs) {
     const { item, note } = await resolveSongItem(song, settings, livestreamOutputId, songStyleId);
-    showsList.push(item);
     if (note) notes.push(note);
+    // Gekozen sfeer (achtergrondvideo + licht) op de startdia van het lied zetten; blijft op het lied staan.
+    if (song.sfeer) {
+      try {
+        const showFile = await getLocalShowFilePath(song.title, song.artist || '');
+        if (showFile) {
+          const applied = await applySfeerToShowFile(showFile, song.sfeer);
+          if (applied.note) notes.push(`${song.title}: ${applied.note}`);
+          if (applied.ok) {
+            const fresh = await getLocalShowData(song.title, song.artist || '');
+            if (fresh) item.fullData = fresh;
+          }
+        } else {
+          notes.push(`${song.title}: sfeer niet gezet, het lied staat nog niet in de catalogus.`);
+        }
+      } catch (err: any) {
+        notes.push(`${song.title}: sfeer zetten mislukt (${err?.message || err}).`);
+      }
+    }
+    showsList.push(item);
   }
   for (const scripture of draft.scriptures) {
     const item = await resolveScriptureItem(scripture, livestreamOutputId, songStyleId);

@@ -14,6 +14,7 @@ interface DraftSong {
   chordsText?: string;
   chordsFileName?: string;
   chordsFilePath?: string;
+  sfeer?: string;
 }
 
 interface DraftScripture {
@@ -508,6 +509,27 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     setEditChordsFileName(song.chordsFileName || '');
     setEditChordsFilePath(song.chordsFilePath || '');
     setEditSection(song.section || '');
+  };
+
+  // Sfeer (achtergrondvideo + licht) per lied: wordt bij "Project aanmaken/bijwerken" op het lied gezet en blijft er staan
+  const [sferen, setSferen] = useState<{ slug: string; naam: string; kleur: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/sferen').then(r => r.ok ? r.json() : null).then(d => { if (d?.sferen) setSferen(d.sferen); }).catch(() => {});
+  }, []);
+
+  const changeSfeer = async (songId: string, sfeer: string) => {
+    if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, sfeer } : x) });
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sfeer })
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Kon sfeer niet opslaan');
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   const saveEditing = async (songId: string) => {
@@ -1244,6 +1266,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                         {(s.lyricsText || s.chordsText) && <span title="Tekst/akkoorden toegevoegd" style={{ flexShrink: 0 }}>📝</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                        {sferen.length > 0 && (
+                          <select
+                            value={s.sfeer || ''}
+                            onChange={e => changeSfeer(s.id, e.target.value)}
+                            title="Sfeer: achtergrond en licht bij dit lied (blijft op het lied staan)"
+                            style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.06)', color: 'inherit', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '4px', padding: '2px 4px', maxWidth: '8.5rem', borderLeft: `4px solid ${sferen.find(x => x.slug === s.sfeer)?.kleur || 'transparent'}` }}
+                          >
+                            <option value="">Sfeer: zoals in het lied</option>
+                            {sferen.map(x => <option key={x.slug} value={x.slug}>{x.naam}</option>)}
+                          </select>
+                        )}
                         <button onClick={() => moveSong(i, -1)} disabled={i === 0} title="Omhoog" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
                         <button onClick={() => moveSong(i, 1)} disabled={i === draft.songs.length - 1} title="Omlaag" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === draft.songs.length - 1 ? 0.3 : 1 }}>▼</button>
                         <button onClick={() => startEditing(s)} title="Tekst/akkoorden bewerken" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.3rem' }}>✏️</button>

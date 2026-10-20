@@ -69,6 +69,26 @@ export async function getLocalSongText(title: string, artist: string): Promise<s
   }
 }
 
+// Pad van het showbestand van een lied in de catalogus (zelfde zoekregel als getLocalShowData), of null.
+export async function getLocalShowFilePath(title: string, artist: string): Promise<string | null> {
+  let songDir = process.env.FREESHOW_SONGS_DIR || path.join(process.cwd(), 'database', 'songs');
+  try {
+    const settings = getSettings() as any;
+    if (settings.freeshowPath) songDir = path.join(settings.freeshowPath, 'Shows');
+  } catch (e) {}
+  try {
+    const files = await fs.readdir(songDir);
+    const match = files.find(file => {
+      const lowerFile = file.toLowerCase();
+      if (!lowerFile.endsWith('.show')) return false;
+      return lowerFile.includes(title.toLowerCase()) && lowerFile.includes(artist.toLowerCase());
+    });
+    return match ? path.join(songDir, match) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getLocalShowData(title: string, artist: string): Promise<{ id: string, data: any } | null> {
   let songDir = process.env.FREESHOW_SONGS_DIR || path.join(process.cwd(), 'database', 'songs');
   
