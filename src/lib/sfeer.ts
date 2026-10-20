@@ -15,8 +15,13 @@ export interface Sfeer {
   main: string;
   accent: string;
   wit: number;
-  knop: number; // kolom van de Companion-knop
-  rij?: number; // rij van de Companion-knop (standaard 3)
+  knop: number; // volgnummer van de Companion-knop op de pagina "Licht" (acht per rij, vanaf rij 2)
+}
+
+// Companion: eigen pagina "Licht" met de knoppen (rij 0: schakelaar automatisch licht, rij 1: losse kleuren, vanaf rij 2: sferen)
+export const COMPANION_PAGINA = 2;
+export function companionKnopPad(s: Sfeer): string {
+  return `${COMPANION_PAGINA}/${2 + Math.floor(s.knop / 8)}/${s.knop % 8}`;
 }
 
 export const SFEREN: Sfeer[] = sferenData as Sfeer[];
@@ -78,7 +83,7 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
   const companionUrl = String(settings.freeshowCompanionUrl || '').replace(/\/+$/, '');
   const lightAction = companionUrl ? {
     id: rid(), name: `Licht: ${sfeer.naam}`, triggers: ['send_rest_command'],
-    actionValues: { send_rest_command: { url: `${companionUrl}/api/location/1/${sfeer.rij ?? 3}/${sfeer.knop}/press`, method: 'POST', contentType: '', payload: '' } },
+    actionValues: { send_rest_command: { url: `${companionUrl}/api/location/${companionKnopPad(sfeer)}/press`, method: 'POST', contentType: '', payload: '' } },
     customActivation: '', midiEnabled: false
   } : null;
   if (!lightAction) notes.push('Geen Companion-adres voor FreeShow ingesteld (Instellingen); de lichtactie is niet gezet.');

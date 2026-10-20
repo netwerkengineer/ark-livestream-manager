@@ -14,6 +14,7 @@ spec.json: {"<showbestand>.show": {"video": "<slug>", "palet": "<slug uit palett
 import copy, json, os, sys, shutil, time, random, string
 
 HIER = os.path.dirname(os.path.abspath(__file__))
+PAGINA = 2   # Companion-pagina "Licht"
 
 KLEUREN = {"Rood": 0, "Groen": 1, "Blauw": 2, "Amber": 3, "Magenta": 4, "Cyaan": 5, "UV": 6, "Wit": 7}
 
@@ -34,7 +35,7 @@ def main():
         slug = cfg["video"]
         if "palet" in cfg:
             pal = {x["slug"]: x for x in json.load(open(os.path.join(HIER, "palettes.json")))}[cfg["palet"]]
-            naam, rij, kol = pal["naam"], pal.get("rij", 3), pal["knop"]
+            naam, rij, kol = pal["naam"], 2 + pal["knop"] // 8, pal["knop"] % 8
         else:
             naam, rij, kol = cfg["kleur"], 1, KLEUREN[cfg["kleur"]]
         c.setdefault("media", {})
@@ -46,7 +47,7 @@ def main():
         # De indeling "Tracks" wordt niet verschoven: de cuetabellen van Ark Tracks tellen de dia's daarvan.
         start_id = None
         action = {"id": rid(), "name": "Licht: " + naam, "triggers": ["send_rest_command"],
-                  "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/1/{rij}/{kol}/press",
+                  "actionValues": {"send_rest_command": {"url": f"{comp}/api/location/{PAGINA}/{rij}/{kol}/press",
                                                          "method": "POST", "contentType": "", "payload": ""}},
                   "customActivation": "", "midiEnabled": False}
         for lid, l in c.get("layouts", {}).items():

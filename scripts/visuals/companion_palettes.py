@@ -6,7 +6,7 @@ bestanden (uid 1000). Gebruik: companion_palettes.py <db.sqlite> <palettes.json>
 Elke knop doet niets als de variabele licht_auto op "uit" staat, en onthoudt kleur en tijd van de laatste wissel.
 Herhaalbaar: bestaande Auto-knoppen worden opnieuw opgebouwd.
 """
-import copy, json, random, shutil, sqlite3, string, sys
+import copy, json, random, re, shutil, sqlite3, string, sys
 
 db, palfile = sys.argv[1], sys.argv[2]
 PAL = json.load(open(palfile))
@@ -82,13 +82,39 @@ def put(page, row, col, ctl):
     c.execute("insert into controls(id,value) values(?,?)", (cid, json.dumps(ctl)))
     page["controls"][str(row)][str(col)] = cid
 
-page = json.loads(c.execute("select value from pages where id=1").fetchone()[0])
+def switch_button(label, val, bg):
+    j = copy.deepcopy(tmpl); j["feedbacks"] = []
+    for l in j["style"]["layers"]:
+        if l["id"] == "text0": l["text"]["value"] = label; l["color"]["value"] = 0xFFFFFF
+        if l["id"] == "box0": l["color"]["value"] = bg
+    j["steps"] = {"0": {"action_sets": {"down": [setvar("licht_auto", val)], "up": []}, "options": {"runWhileHeld": []}}}
+    return j
+
+# Oude Auto/Licht-knoppen op pagina 1 weghalen (de lichtknoppen staan nu op een eigen pagina)
+p1 = json.loads(c.execute("select value from pages where id=1").fetchone()[0])
+for r, cols in list(p1["controls"].items()):
+    for col, cid in list(cols.items()):
+        row = c.execute("select value from controls where id=?", (cid,)).fetchone()
+        if row and re.search(r'"value":\s*"(Auto |Licht )', row[0]):
+            c.execute("delete from controls where id=?", (cid,)); del cols[col]
+c.execute("update pages set value=? where id=1", (json.dumps(p1),))
+
+# Pagina 2 "Licht" opnieuw opbouwen
+old = c.execute("select value from pages where id=2").fetchone()
+page = json.loads(old[0]) if old else {"name": "Licht", "controls": {}, "id": nid()}
+page["name"] = "Licht"
+for r, cols in list(page["controls"].items()):
+    for cid in cols.values(): c.execute("delete from controls where id=?", (cid,))
+page["controls"] = {}
+put(page, 0, 0, switch_button("Auto licht AAN", "aan", 0x008800))
+put(page, 0, 1, switch_button("Auto licht UIT", "uit", 0xCC0000))
 for col, (name, k, bg, fg) in enumerate(KLEUREN):
     put(page, 1, col, button("Auto " + name, bg, fg, name, pure_seq(name, k)))
 for i, p in enumerate(PAL):
     h = int(p["main"], 16)
     lum = (0.299 * (h >> 16) + 0.587 * ((h >> 8) & 255) + 0.114 * (h & 255))
-    put(page, p.get("rij", 3), p["knop"], button("Licht " + p["naam"], h, 0x000000 if lum > 150 else 0xFFFFFF, p["naam"], palet_seq(i)))
-c.execute("update pages set value=? where id=1", (json.dumps(page),))
+    put(page, 2 + p["knop"] // 8, p["knop"] % 8, button("Licht " + p["naam"], h, 0x000000 if lum > 150 else 0xFFFFFF, p["naam"], palet_seq(i)))
+c.execute("delete from pages where id=2")
+c.execute("insert into pages(id,value) values(2,?)", (json.dumps(page),))
 c.commit(); c.close()
-print("knoppen bijgewerkt:", len(KLEUREN), "kleuren en", len(PAL), "paletten")
+print("pagina Licht bijgewerkt:", len(KLEUREN), "kleuren en", len(PAL), "sferen")
