@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import LightAutoBanner from "./LightAutoBanner";
+import SferenKaart from "./SferenKaart";
 
 interface LightsControlProps {
   settings: any;
@@ -647,6 +648,9 @@ export default function LightsControl({ settings }: LightsControlProps) {
         sceneActive={activeScene !== null || activeChase !== null || activeStrobe !== null}
         onStatus={showStatus}
       />
+
+      {/* Kleurvoorbeeld per sfeer */}
+      <SferenKaart onStatus={showStatus} />
 
       {/* Main Grid Content */}
       <div className="lights-main-grid">

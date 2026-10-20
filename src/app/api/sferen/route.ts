@@ -7,5 +7,5 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const session = await isAuthorized(req, undefined, 'freeshow');
   if (!session) return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 });
-  return NextResponse.json({ sferen: SFEREN.map(s => ({ slug: s.slug, naam: s.naam, kleur: `#${s.main}`, accent: `#${s.accent}` })) });
+  return NextResponse.json({ sferen: SFEREN.map(s => ({ slug: s.slug, naam: s.naam, kleur: `#${s.main}`, accent: `#${s.accent}`, wit: s.wit })) });
 }
