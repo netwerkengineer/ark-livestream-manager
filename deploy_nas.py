@@ -166,6 +166,17 @@ def run_with_pty(cmd, description, nas_pass, socket_path):
 
     return proc.returncode == 0
 
+def build_manifest(archive_path):
+    """Checksum (md5) per bestand in het archief, in het formaat van `md5sum -c`. Zo controleert de NAS na het uitpakken of elk bestand
+    goed is aangekomen (een bestand dat bij het uitpakken is overgeslagen leverde eerder een app zonder die wijziging op)."""
+    import hashlib, tarfile
+    lines = []
+    with tarfile.open(archive_path) as t:
+        for m in t:
+            if m.isfile():
+                lines.append(f"{hashlib.md5(t.extractfile(m).read()).hexdigest()}  {m.name}")
+    return "\n".join(lines) + "\n"
+
 def deploy():
     print("==================================================")
     print("    ARK CHURCH LIVESTREAM MANAGER DEPLOYMENT v1.0")
@@ -203,6 +214,11 @@ def deploy():
 
     subprocess.check_call(["git", "-C", config['LOCAL_APP_PATH'], "checkout", "--", "src/lib/gitSha.generated.json"])
 
+    manifest_local = config['LOCAL_TEMP_ARCHIVE'] + ".manifest"
+    with open(manifest_local, "w") as fh:
+        fh.write(build_manifest(config['LOCAL_TEMP_ARCHIVE']))
+    print(f"✓ Controlelijst gemaakt ({sum(1 for _ in open(manifest_local))} bestanden).")
+
     # 3. NAS MAP VOORBEREIDEN
     # Geen wachtwoord in opdrachtregels en geen chmod 777: de app-map is van de NAS-gebruiker (leesbaar voor anderen, niet beschrijfbaar),
     # data/ is van de gebruiker in de container (uid 1001) en niet leesbaar voor anderen; sleutels zijn 600. companion-data blijft zoals het is.
@@ -236,6 +252,7 @@ def deploy():
         with open(local, "rb") as fh:
             subprocess.check_call(ssh_plain + [target, f"cat > {shlex.quote(remote_path)}"], stdin=fh)
     send_file(config['LOCAL_TEMP_ARCHIVE'], config['REMOTE_TEMP_ARCHIVE'])
+    send_file(manifest_local, f"{config['REMOTE_APP_PATH']}/.deploy-manifest")
     print("✓ Project succesvol overgebracht naar de NAS.")
 
     # 4.1 FALLBACK TEMPLATE OVERZETTEN NAAR NAS (data/ is van de container; we zetten het bestand eerst in de app-map en verplaatsen het met sudo)
@@ -282,6 +299,9 @@ def deploy():
         f"echo \"[DEBUG NAS] Start deployment script in $(pwd)\" && "
         f"tar -v -xzf {shlex.quote(config['REMOTE_TEMP_ARCHIVE'])} -C {app} && "
         f"echo \"[DEBUG NAS] Tar gelukt\" && "
+        # Controle: is elk bestand goed uitgepakt? Zo niet, dan stopt de deploy hier (voordat er iets wordt gebouwd).
+        f"{{ if command -v md5sum >/dev/null 2>&1; then md5sum -c --quiet .deploy-manifest && echo \"[DEBUG NAS] Alle bestanden komen overeen\"; "
+        f"else echo \"[DEBUG NAS] md5sum ontbreekt, bestandscontrole overgeslagen\"; fi; }} && "
         f"rm -f {shlex.quote(config['REMOTE_TEMP_ARCHIVE'])} && "
         f"sed -i \"s|/mnt/data/Projects/Beamer/FreeShow|/volume1/Beamer/FreeShow|g\" docker-compose.yml && "
         f"echo \"[DEBUG NAS] Sed gelukt\" && "
@@ -300,15 +320,16 @@ def deploy():
     final_cmd = remote(ssh_t, target, sudo(inner))
     print("\n>>> Deploy-opdracht naar de NAS (zonder wachtwoord in de opdrachtregel).")
     if not run_with_pty(final_cmd, "Project uitpakken en Docker bouwen/herstarten", config['NAS_PASS'], global_ssh_mux_socket):
-        print("\n❌ Fout tijdens deployment op de NAS.")
+        print("\n❌ Fout tijdens deployment op de NAS. Staat er hierboven 'FAILED' bij een bestand, dan is dat bestand niet goed uitgepakt: draai de deploy opnieuw.")
     else:
         print("\n✅ ARK CHURCH LIVESTREAM MANAGER IS LIVE OP JE NAS!")
         print(f"Bezoek: http://{config['NAS_IP']}:3005")
         save_config(config)
 
     cleanup_ssh_mux()
-    try: os.remove(config['LOCAL_TEMP_ARCHIVE'])
-    except: pass
+    for leftover in (config['LOCAL_TEMP_ARCHIVE'], config['LOCAL_TEMP_ARCHIVE'] + ".manifest"):
+        try: os.remove(leftover)
+        except: pass
 
 if __name__ == "__main__":
     deploy()
