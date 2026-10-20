@@ -68,7 +68,7 @@ export default function LightAutoBanner({ autoCount, manualCount, sceneActive, o
           </span>
         )}
         {autoLight?.available && autoLight.kleur && (
-          <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Laatste automatische wissel: {autoLight.kleur} om {autoLight.tijd}. Gestippelde rand = automatisch gestart.</span>
+          <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Laatste automatische wissel: {autoLight.kleur} om {autoLight.tijd}. Een los kleurbolletje met een gestippelde rand is automatisch gestart; een sfeer heeft geen bolletje, die zie je hierboven en in de kaart Sferen.</span>
         )}
       </div>
       {autoLight?.available && (
