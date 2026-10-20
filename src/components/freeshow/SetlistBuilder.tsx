@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
+import SfeerKiezer, { SfeerOptie } from '../SfeerKiezer';
 import SongInput from './SongInput';
 import { BIBLE_BOOKS } from '@/lib/freeshowUtils';
 
@@ -512,7 +513,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   };
 
   // Sfeer (achtergrondvideo + licht) per lied: wordt bij "Project aanmaken/bijwerken" op het lied gezet en blijft er staan
-  const [sferen, setSferen] = useState<{ slug: string; naam: string; kleur: string }[]>([]);
+  const [sferen, setSferen] = useState<SfeerOptie[]>([]);
   useEffect(() => {
     fetch('/api/sferen').then(r => r.ok ? r.json() : null).then(d => { if (d?.sferen) setSferen(d.sferen); }).catch(() => {});
   }, []);
@@ -1267,15 +1268,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
                         {sferen.length > 0 && (
-                          <select
-                            value={s.sfeer || ''}
-                            onChange={e => changeSfeer(s.id, e.target.value)}
-                            title="Sfeer: achtergrond en licht bij dit lied (blijft op het lied staan)"
-                            style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.06)', color: 'inherit', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '4px', padding: '2px 4px', maxWidth: '8.5rem', borderLeft: `4px solid ${sferen.find(x => x.slug === s.sfeer)?.kleur || 'transparent'}` }}
-                          >
-                            <option value="">Sfeer: zoals in het lied</option>
-                            {sferen.map(x => <option key={x.slug} value={x.slug}>{x.naam}</option>)}
-                          </select>
+                          <SfeerKiezer value={s.sfeer || ''} opties={sferen} onChange={slug => changeSfeer(s.id, slug)} />
                         )}
                         <button onClick={() => moveSong(i, -1)} disabled={i === 0} title="Omhoog" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
                         <button onClick={() => moveSong(i, 1)} disabled={i === draft.songs.length - 1} title="Omlaag" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === draft.songs.length - 1 ? 0.3 : 1 }}>▼</button>
