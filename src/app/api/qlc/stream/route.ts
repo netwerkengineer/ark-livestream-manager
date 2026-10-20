@@ -47,6 +47,18 @@ export async function GET(req: NextRequest) {
     });
   });
 
+  // QLC+ meldt kleuren die automatisch (als functie, zonder knop) zijn gestart niet uit zichzelf door: vraag ze regelmatig op
+  const refreshInterval = setInterval(() => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    [10, 30, 40, 50, 60, 100, 110, 120, 130].forEach((startId, g) => {
+      for (let i = 1; i <= 8; i++) {
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(`QLC+API|getWidgetStatus|${startId + i}`);
+        }, (g * 8 + i) * 15);
+      }
+    });
+  }, 6000);
+
   ws.on('message', (data) => {
     const message = data.toString();
     writer.write(encoder.encode(`data: ${message}\n\n`)).catch(() => {});
@@ -55,18 +67,21 @@ export async function GET(req: NextRequest) {
   ws.on('close', () => {
     console.log(`[QLC+ SSE] WebSocket closed`);
     clearInterval(keepAliveInterval);
+    clearInterval(refreshInterval);
     writer.close().catch(() => {});
   });
 
   ws.on('error', (err) => {
     console.error(`[QLC+ SSE] WebSocket error:`, err);
     clearInterval(keepAliveInterval);
+    clearInterval(refreshInterval);
     writer.close().catch(() => {});
   });
 
   req.signal.addEventListener("abort", () => {
     console.log(`[QLC+ SSE] Client disconnected`);
     clearInterval(keepAliveInterval);
+    clearInterval(refreshInterval);
     ws.close();
     writer.close().catch(() => {});
   });

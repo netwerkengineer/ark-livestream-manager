@@ -12,6 +12,7 @@ import {
   Activity
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import LightAutoBanner from "./LightAutoBanner";
 
 interface LightsControlProps {
   settings: any;
@@ -48,6 +49,8 @@ export default function LightsControl({ settings }: LightsControlProps) {
   const [fresnel4, setFresnel4] = useState(0);
   const [fresnelMaster, setFresnelMaster] = useState(0);
   const [activeColors, setActiveColors] = useState<{[sceneId: number]: boolean}>({});
+  // Kleuren die niet via een knop maar automatisch (Companion/FreeShow) draaien: QLC+ meldt die als 127 i.p.v. 255.
+  const [autoColors, setAutoColors] = useState<{[sceneId: number]: boolean}>({});
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
@@ -152,7 +155,9 @@ export default function LightsControl({ settings }: LightsControlProps) {
                 const startId = widgetId - lastDigit;
                 if ([10, 30, 40, 50, 60, 100, 110, 120, 130].includes(startId)) {
                   const sceneId = widgetId - 1;
-                  setActiveColors(prev => ({ ...prev, [sceneId]: isActive }));
+                  // 255 = knop ingedrukt (handmatig), 127 = functie draait zonder knop (automatisch)
+                  setActiveColors(prev => ({ ...prev, [sceneId]: value >= 127 }));
+                  setAutoColors(prev => ({ ...prev, [sceneId]: value === 127 }));
                 }
               }
             }
@@ -385,6 +390,7 @@ export default function LightsControl({ settings }: LightsControlProps) {
     setActiveScene(null);
     setActiveChase(null);
     setActiveColors({});
+    setAutoColors({});
     setActiveStrobe(null);
     setFresnel1(0);
     setFresnel2(0);
@@ -634,6 +640,14 @@ export default function LightsControl({ settings }: LightsControlProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      {/* Wat stuurt QLC+ nu, en wie startte het? */}
+      <LightAutoBanner
+        autoCount={Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length}
+        manualCount={Object.keys(activeColors).filter(k => activeColors[Number(k)] && !autoColors[Number(k)]).length}
+        sceneActive={activeScene !== null || activeChase !== null || activeStrobe !== null}
+        onStatus={showStatus}
+      />
+
       {/* Main Grid Content */}
       <div className="lights-main-grid">
         {/* Left Side: Color Pickers & Scenes */}
@@ -785,15 +799,16 @@ export default function LightsControl({ settings }: LightsControlProps) {
                     ].map(c => {
                       const sceneId = group.startId + c.offset;
                       const isActive = !!activeColors[sceneId];
+                      const isAuto = isActive && !!autoColors[sceneId];
                       return (
                         <button 
                           key={c.offset}
                           onClick={() => handleColorClick(group.title, sceneId, `${group.title} - ${c.name}`)}
-                          title={`${group.title} - ${c.name}`}
+                          title={`${group.title} - ${c.name}${isAuto ? " (automatisch gestart)" : ""}`}
                           style={{ 
                             backgroundColor: c.color,
                             boxShadow: isActive ? `0 0 14px ${c.color}` : 'none',
-                            border: isActive ? '3px solid #fff' : '2px solid rgba(0,0,0,0.3)',
+                            border: isAuto ? '3px dashed #fff' : isActive ? '3px solid #fff' : '2px solid rgba(0,0,0,0.3)',
                             transform: isActive ? 'scale(1.15)' : 'scale(1)',
                             zIndex: isActive ? 2 : 1
                           }}

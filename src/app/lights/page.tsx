@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import LightAutoBanner from "@/components/LightAutoBanner";
 import { useSession, signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -32,7 +33,6 @@ export default function LightsPage() {
   const [activeColors, setActiveColors] = useState<{[sceneId: number]: boolean}>({});
   // Kleuren die niet via een knop maar automatisch (Companion/FreeShow) draaien: QLC+ meldt die als 127 i.p.v. 255.
   const [autoColors, setAutoColors] = useState<{[sceneId: number]: boolean}>({});
-  const [autoLight, setAutoLight] = useState<{ available: boolean; auto: string; kleur: string; tijd: string; palet?: string[] } | null>(null);
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [activeChase, setActiveChase] = useState<number | null>(null);
   const [activeFade, setActiveFade] = useState<number>(0);
@@ -378,34 +378,6 @@ export default function LightsPage() {
     }
   };
 
-  useEffect(() => {
-    let stop = false;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/lights/auto", { cache: "no-store" });
-        if (res.ok && !stop) setAutoLight(await res.json());
-      } catch { /* Companion niet bereikbaar: blok blijft verborgen */ }
-    };
-    load();
-    const timer = setInterval(load, 5000);
-    return () => { stop = true; clearInterval(timer); };
-  }, []);
-
-  const handleAutoSwitch = async (next: "aan" | "uit") => {
-    setAutoLight(prev => prev ? { ...prev, auto: next } : prev);
-    try {
-      const res = await fetch("/api/lights/auto", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto: next }),
-      });
-      if (!res.ok) throw new Error("mislukt");
-      showStatus("success", next === "aan" ? "Automatisch licht staat aan (FreeShow mag het licht sturen)." : "Automatisch licht staat uit (FreeShow doet niets met het licht).");
-    } catch {
-      showStatus("error", "Kon de schakelaar voor automatisch licht niet instellen.");
-    }
-  };
-
   const handleResetAll = async () => {
     const now = Date.now();
     if (now - lastActionTime.current < 400) return;
@@ -738,51 +710,12 @@ export default function LightsPage() {
       </header>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
-      {(() => {
-        const autoN = Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length;
-        const manualN = Object.keys(activeColors).filter(k => activeColors[Number(k)] && !autoColors[Number(k)]).length;
-        const anyScene = activeScene !== null || activeChase !== null || activeStrobe !== null;
-        const paletN = autoLight?.palet?.length || 0;
-        const nothing = autoN === 0 && manualN === 0 && !anyScene && paletN === 0;
-        return (
-          <section className="glass-card" style={{ padding: "16px 24px", marginBottom: "24px", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.9rem" }}>
-              <strong>Wat stuurt QLC+ nu?</strong>
-              {nothing ? (
-                <span style={{ color: "var(--muted)" }}>Niets. Brandt er toch licht, dan komt dat van de ADJ Scene Setter (QLC+ ziet de schuiven daarvan niet).</span>
-              ) : (
-                <span>
-                  {autoN > 0 && <>Automatisch (FreeShow): <strong>{autoN}</strong> kleurkeuze(s) &nbsp;</>}
-                  {paletN > 0 && <>Kleurenschema (automatisch): <strong>{autoLight?.palet?.join(", ")}</strong> &nbsp;</>}
-                  {manualN > 0 && <>Handmatig (knop): <strong>{manualN}</strong> kleurkeuze(s) &nbsp;</>}
-                  {anyScene && <>Scène of lichtshow actief &nbsp;</>}
-                  <span style={{ color: "var(--muted)" }}>De Scene Setter staat hier los van: de hoogste waarde wint.</span>
-                </span>
-              )}
-              {autoLight?.available && autoLight.kleur && (
-                <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>Laatste automatische wissel: {autoLight.kleur} om {autoLight.tijd}. Gestippelde rand = automatisch gestart.</span>
-              )}
-            </div>
-            {autoLight?.available && autoLight.auto === "uit" && (
-              <div style={{ flexBasis: "100%", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.5)", color: "#fca5a5", borderRadius: "8px", padding: "8px 12px", fontSize: "0.85rem" }}>
-                ⚠️ <strong>Automatisch licht staat UIT.</strong> FreeShow en Companion sturen nu geen licht aan: de lichtacties bij de liederen doen niets. Zet de schakelaar rechts op AAN om ze weer te laten werken.
-              </div>
-            )}
-            {autoLight?.available && (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "0.85rem" }}>Automatisch licht (FreeShow)</span>
-                <button
-                  onClick={() => handleAutoSwitch(autoLight.auto === "aan" ? "uit" : "aan")}
-                  className="btn-group-action off"
-                  style={{ padding: "6px 14px", fontSize: "0.8rem", borderColor: autoLight.auto === "aan" ? "rgba(74,222,128,0.5)" : "rgba(239,68,68,0.5)", color: autoLight.auto === "aan" ? "#86efac" : "#fca5a5" }}
-                >
-                  {autoLight.auto === "aan" ? "AAN" : "UIT"}
-                </button>
-              </div>
-            )}
-          </section>
-        );
-      })()}
+      <LightAutoBanner
+        autoCount={Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length}
+        manualCount={Object.keys(activeColors).filter(k => activeColors[Number(k)] && !autoColors[Number(k)]).length}
+        sceneActive={activeScene !== null || activeChase !== null || activeStrobe !== null}
+        onStatus={showStatus}
+      />
 
       {/* Main Grid Content */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "32px", flexGrow: 1 }}>
