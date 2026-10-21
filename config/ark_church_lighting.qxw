@@ -730,13 +730,13 @@
   </Function>
   <Function ID="304" Type="Scene" Name="Ark: Koninklijk" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
-   <FixtureVal ID="4">0,124,1,58,2,237,3,28,4,0,5,0</FixtureVal>
-   <FixtureVal ID="13">0,140,1,82,2,239</FixtureVal>
-   <FixtureVal ID="14">0,140,1,82,2,239</FixtureVal>
-   <FixtureVal ID="15">0,140,1,82,2,239</FixtureVal>
-   <FixtureVal ID="16">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
-   <FixtureVal ID="17">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
-   <FixtureVal ID="18">0,20,1,255,2,0,3,246,4,193,5,84</FixtureVal>
+   <FixtureVal ID="4">0,115,1,0,2,120,3,0,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,120,1,0,2,130</FixtureVal>
+   <FixtureVal ID="14">0,120,1,0,2,130</FixtureVal>
+   <FixtureVal ID="15">0,120,1,0,2,130</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,255,4,140,5,20</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,255,4,140,5,20</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,255,4,140,5,20</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>

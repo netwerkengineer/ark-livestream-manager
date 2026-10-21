@@ -88,10 +88,28 @@
  {
   "slug": "alphaomega",
   "naam": "Koninklijk",
-  "main": "7c3aed",
-  "accent": "f5b83d",
-  "wit": 0.12,
-  "knop": 4
+  "main": "780082",
+  "accent": "ff8c14",
+  "wit": 0.0,
+  "knop": 4,
+  "lampen": {
+   "slimpar": [
+    120,
+    0,
+    130
+   ],
+   "adj": [
+    115,
+    0,
+    120,
+    0
+   ],
+   "lightmaxx": [
+    255,
+    140,
+    20
+   ]
+  }
  },
  {
   "slug": "vuur",
