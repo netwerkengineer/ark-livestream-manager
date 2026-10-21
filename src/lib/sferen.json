@@ -58,10 +58,28 @@
  {
   "slug": "goud",
   "naam": "Goud",
-  "main": "f2c14e",
-  "accent": "f6e7b4",
-  "wit": 0.25,
-  "knop": 7
+  "main": "ffbe46",
+  "accent": "ff7d0f",
+  "wit": 0.0,
+  "knop": 7,
+  "lampen": {
+   "slimpar": [
+    255,
+    190,
+    70
+   ],
+   "adj": [
+    255,
+    190,
+    60,
+    40
+   ],
+   "lightmaxx": [
+    255,
+    125,
+    15
+   ]
+  }
  },
  {
   "slug": "nacht",
