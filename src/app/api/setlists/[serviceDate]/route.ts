@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
 import { createOrGetDraftService } from '@/lib/draftServicesStore';
+import { fillCurrentSfeer } from '@/lib/draftSfeer';
 
 // Fetches (creating on first load, so the builder UI always has a record to
 // render/edit) the draft service for one date - the same DraftService the
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ serv
 
   const { serviceDate } = await params;
   try {
-    const draft = createOrGetDraftService(serviceDate);
+    const draft = await fillCurrentSfeer(createOrGetDraftService(serviceDate));
     return NextResponse.json({ success: true, draft });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

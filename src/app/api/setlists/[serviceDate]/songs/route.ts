@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
 import { addSongToDraft } from '@/lib/draftServicesStore';
+import { fillCurrentSfeer } from '@/lib/draftSfeer';
 
 // Adds one song to a setlist being built directly in the app (as opposed to
 // one parsed from a liturgie mail) - the worship-leader-facing counterpart
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
     if (!section || typeof section !== 'string' || !section.trim()) {
       return NextResponse.json({ success: false, error: 'Sectie is verplicht' }, { status: 400 });
     }
-    const draft = addSongToDraft(serviceDate, { title: title.trim(), artist, category, section, lyricsText, chordsText, chordsFileName, chordsFilePath });
+    const draft = await fillCurrentSfeer(addSongToDraft(serviceDate, { title: title.trim(), artist, category, section, lyricsText, chordsText, chordsFileName, chordsFilePath }));
     return NextResponse.json({ success: true, draft });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
