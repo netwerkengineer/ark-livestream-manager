@@ -26,10 +26,28 @@
  {
   "slug": "worthy",
   "naam": "Karmozijn",
-  "main": "e11d48",
-  "accent": "c026d3",
-  "wit": 0.3,
-  "knop": 3
+  "main": "f00816",
+  "accent": "f01437",
+  "wit": 0.0,
+  "knop": 3,
+  "lampen": {
+   "slimpar": [
+    240,
+    8,
+    22
+   ],
+   "adj": [
+    235,
+    6,
+    20,
+    20
+   ],
+   "lightmaxx": [
+    240,
+    20,
+    55
+   ]
+  }
  },
  {
   "slug": "alphaomega",
