@@ -210,10 +210,28 @@
  {
   "slug": "nacht",
   "naam": "Nacht",
-  "main": "3730a3",
-  "accent": "7c6cf0",
-  "wit": 0.05,
-  "knop": 8
+  "main": "190064",
+  "accent": "7846dc",
+  "wit": 0.0,
+  "knop": 8,
+  "lampen": {
+   "slimpar": [
+    25,
+    0,
+    100
+   ],
+   "adj": [
+    22,
+    0,
+    90,
+    0
+   ],
+   "lightmaxx": [
+    120,
+    70,
+    220
+   ]
+  }
  },
  {
   "slug": "leven",
