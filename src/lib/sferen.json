@@ -18,10 +18,28 @@
  {
   "slug": "livingwater",
   "naam": "Water",
-  "main": "14b8c8",
-  "accent": "2f7de1",
-  "wit": 0.25,
-  "knop": 2
+  "main": "00c864",
+  "accent": "0064dc",
+  "wit": 0.0,
+  "knop": 2,
+  "lampen": {
+   "slimpar": [
+    0,
+    200,
+    100
+   ],
+   "adj": [
+    0,
+    185,
+    90,
+    20
+   ],
+   "lightmaxx": [
+    0,
+    100,
+    220
+   ]
+  }
  },
  {
   "slug": "worthy",
