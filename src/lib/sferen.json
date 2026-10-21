@@ -132,10 +132,28 @@
  {
   "slug": "vuur",
   "naam": "Vuur",
-  "main": "ff4d1c",
-  "accent": "ffb000",
-  "wit": 0.1,
-  "knop": 5
+  "main": "ff3c00",
+  "accent": "ff960a",
+  "wit": 0.0,
+  "knop": 5,
+  "lampen": {
+   "slimpar": [
+    255,
+    60,
+    0
+   ],
+   "adj": [
+    255,
+    55,
+    0,
+    0
+   ],
+   "lightmaxx": [
+    255,
+    150,
+    10
+   ]
+  }
  },
  {
   "slug": "vreugde",
