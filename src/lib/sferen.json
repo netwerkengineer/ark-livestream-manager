@@ -2,10 +2,28 @@
  {
   "slug": "reasons",
   "naam": "Zonsopgang",
-  "main": "ffb347",
-  "accent": "ff6a3d",
-  "wit": 0.12,
-  "knop": 0
+  "main": "ffa01e",
+  "accent": "ff550a",
+  "wit": 0.0,
+  "knop": 0,
+  "lampen": {
+   "slimpar": [
+    255,
+    160,
+    30
+   ],
+   "adj": [
+    255,
+    155,
+    25,
+    20
+   ],
+   "lightmaxx": [
+    255,
+    85,
+    10
+   ]
+  }
  },
  {
   "slug": "buildmylife",
