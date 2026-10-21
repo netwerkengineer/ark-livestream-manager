@@ -236,9 +236,27 @@
  {
   "slug": "leven",
   "naam": "Leven",
-  "main": "2fb67c",
-  "accent": "f0c850",
-  "wit": 0.15,
-  "knop": 9
+  "main": "00d719",
+  "accent": "ffa50a",
+  "wit": 0.0,
+  "knop": 9,
+  "lampen": {
+   "slimpar": [
+    0,
+    215,
+    25
+   ],
+   "adj": [
+    0,
+    205,
+    20,
+    20
+   ],
+   "lightmaxx": [
+    255,
+    165,
+    10
+   ]
+  }
  }
 ]
