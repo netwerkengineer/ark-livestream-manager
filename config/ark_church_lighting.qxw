@@ -694,13 +694,13 @@
   </Function>
   <Function ID="301" Type="Scene" Name="Ark: Diepblauw" Path="Ark paletten">
    <Speed FadeIn="1500" FadeOut="1500" Duration="0" />
-   <FixtureVal ID="4">0,59,1,91,2,219,3,46,4,0,5,0</FixtureVal>
-   <FixtureVal ID="13">0,98,1,124,2,226</FixtureVal>
-   <FixtureVal ID="14">0,98,1,124,2,226</FixtureVal>
-   <FixtureVal ID="15">0,98,1,124,2,226</FixtureVal>
-   <FixtureVal ID="16">0,20,1,255,2,0,3,141,4,109,5,237</FixtureVal>
-   <FixtureVal ID="17">0,20,1,255,2,0,3,141,4,109,5,237</FixtureVal>
-   <FixtureVal ID="18">0,20,1,255,2,0,3,141,4,109,5,237</FixtureVal>
+   <FixtureVal ID="4">0,5,1,28,2,110,3,0,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,5,1,30,2,120</FixtureVal>
+   <FixtureVal ID="14">0,5,1,30,2,120</FixtureVal>
+   <FixtureVal ID="15">0,5,1,30,2,120</FixtureVal>
+   <FixtureVal ID="16">0,20,1,255,2,0,3,35,4,10,5,130</FixtureVal>
+   <FixtureVal ID="17">0,20,1,255,2,0,3,35,4,10,5,130</FixtureVal>
+   <FixtureVal ID="18">0,20,1,255,2,0,3,35,4,10,5,130</FixtureVal>
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>

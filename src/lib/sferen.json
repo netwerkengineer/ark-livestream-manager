@@ -10,10 +10,28 @@
  {
   "slug": "buildmylife",
   "naam": "Diepblauw",
-  "main": "3b5bdb",
-  "accent": "7048e8",
-  "wit": 0.2,
-  "knop": 1
+  "main": "051e78",
+  "accent": "230a82",
+  "wit": 0.0,
+  "knop": 1,
+  "lampen": {
+   "slimpar": [
+    5,
+    30,
+    120
+   ],
+   "adj": [
+    5,
+    28,
+    110,
+    0
+   ],
+   "lightmaxx": [
+    35,
+    10,
+    130
+   ]
+  }
  },
  {
   "slug": "livingwater",
