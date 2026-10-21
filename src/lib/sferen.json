@@ -158,10 +158,28 @@
  {
   "slug": "vreugde",
   "naam": "Vreugde",
-  "main": "ff5ea8",
-  "accent": "ffc233",
-  "wit": 0.15,
-  "knop": 6
+  "main": "ff1e3c",
+  "accent": "ffa500",
+  "wit": 0.0,
+  "knop": 6,
+  "lampen": {
+   "slimpar": [
+    255,
+    30,
+    60
+   ],
+   "adj": [
+    255,
+    25,
+    55,
+    30
+   ],
+   "lightmaxx": [
+    255,
+    165,
+    0
+   ]
+  }
  },
  {
   "slug": "goud",
