@@ -25,9 +25,22 @@ QLC = upg = None
 for iid, v in c.execute("select id,value from instances"):
     j = json.loads(v)
     if j.get("moduleId") == "massimo-callegari-qlcplus": QLC, upg = iid, j.get("lastUpgradeIndex")
+def layered(j):
+    return {l.get("id") for l in (j.get("style") or {}).get("layers", [])} >= {"text0", "box0"}
+
 tmpl = None
 for cid, v in c.execute("select id,value from controls"):
     if "Smart Stekker 1" in v: tmpl = json.loads(v); break
+if tmpl is None:    # geen Smart Stekker-knop (bv. op productie): neem een bestaande Licht-/Auto-knop als uitgangspunt voor de opmaak
+    for cid, v in c.execute("select id,value from controls"):
+        j = json.loads(v)
+        if layered(j) and re.search(r'"value":\s*"(Licht |Auto )', v): tmpl = j; break
+if tmpl is None:    # anders een willekeurige knop met de lagen text0 en box0
+    for cid, v in c.execute("select id,value from controls"):
+        j = json.loads(v)
+        if layered(j): tmpl = j; break
+if tmpl is None:
+    sys.exit("Geen knop gevonden die als sjabloon kan dienen - de database is niet aangepast.")
 
 def fn(f, status):
     return {"id": nid(), "definitionId": "setFunctionStatus", "connectionId": QLC,
