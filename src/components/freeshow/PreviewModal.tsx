@@ -365,6 +365,7 @@ export default function PreviewModal({
                     {/* Slide items */}
                     <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
                       {slide.items && slide.items.map((item: any, itemIdx: number) => {
+                        if (item.hidden) return null;
                         const itemType = getItemType(item);
                         if (itemType === 'media') {
                           return (

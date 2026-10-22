@@ -251,42 +251,43 @@ export function getAlignmentStyle(alignValue: any): React.CSSProperties {
   };
 }
 
-export function applyTemplateToSlideItem(slideItem: any, templateItem: any): any {
+// Past een FreeShow-sjabloon toe op een dia, zoals FreeShow dat zelf doet (mergeWithTemplate): de tekstvakken van de dia krijgen
+// één voor één de stijl van de tekstvakken van het sjabloon, en elke regel/tekstdeel de stijl van de bijbehorende regel in het
+// sjabloon (bij meer regels dan het sjabloon heeft geldt de laatste). Stijlen zijn CSS-teksten, geen objecten: de oude versie
+// voegde ze samen als objecten, waardoor de opmaak van het sjabloon verloren ging en de tekst linksboven bleef staan.
+function itemText(item: any): string {
+  return (item?.lines || []).map((l: any) => (l?.text || []).map((t: any) => t?.value || '').join('')).join('');
+}
+
+// Voorwaarde "alleen tonen als er tekst is" (element text, isNot, leeg) - de enige die onze sjablonen gebruiken.
+function hidesWhenNoText(templateItem: any): boolean {
+  const c = templateItem?.conditions?.showItem?.[0]?.[0]?.[0]?.[0];
+  return !!c && (c.element || 'text') === 'text' && c.operator === 'isNot' && (c.value ?? '') === '';
+}
+
+export function applyTemplateToSlideItem(slideItem: any, templateItem: any, slideHasText = true): any {
   const merged = { ...slideItem };
 
-  if (templateItem.style) {
-    merged.style = {
-      ...(slideItem.style || {}),
-      ...templateItem.style
-    };
-  }
+  if (typeof templateItem.style === 'string') merged.style = templateItem.style;
+  if (templateItem.align !== undefined) merged.align = templateItem.align;
+  if (!slideHasText && hidesWhenNoText(templateItem)) merged.hidden = true;
 
-  if (templateItem.align) {
-    merged.align = templateItem.align;
-  }
-
-  if (templateItem.lines && slideItem.lines) {
+  if (Array.isArray(templateItem.lines) && templateItem.lines.length && Array.isArray(slideItem.lines)) {
+    const tLines = templateItem.lines;
     merged.lines = slideItem.lines.map((line: any, lineIdx: number) => {
-      const templateLine = templateItem.lines?.[lineIdx];
+      const templateLine = tLines[Math.min(lineIdx, tLines.length - 1)];
       if (!templateLine) return line;
 
       const mergedLine = { ...line };
       if (templateLine.align) mergedLine.align = templateLine.align;
-      if (templateLine.text && Array.isArray(templateLine.text) && Array.isArray(line.text)) {
+      if (Array.isArray(templateLine.text) && templateLine.text.length && Array.isArray(line.text)) {
         mergedLine.text = line.text.map((seg: any, segIdx: number) => {
-          const templateSeg = templateLine.text?.[segIdx];
-          if (!templateSeg) return seg;
-
-          return {
-            ...seg,
-            style: {
-              ...(seg.style || {}),
-              ...(templateSeg.style || {})
-            }
-          };
+          if (seg?.customType === 'disableTemplate') return seg;
+          const templateSeg = templateLine.text[Math.min(segIdx, templateLine.text.length - 1)];
+          if (!templateSeg || typeof templateSeg.style !== 'string') return seg;
+          return { ...seg, style: templateSeg.style };
         });
       }
-
       return mergedLine;
     });
   }
@@ -315,11 +316,17 @@ export function applyTemplateToSlide(slide: any, template: any): any {
       ? slide.items
       : Object.values(slide.items);
 
-    merged.items = slideItemsArray.map((item: any, idx: number) => {
-      const templateItem = templateItemsArray[idx];
-      if (!templateItem) return item;
+    const slideHasText = slideItemsArray.some((it: any) => (it?.type || 'text') === 'text' && itemText(it).trim().length > 0);
 
-      return applyTemplateToSlideItem(item, templateItem);
+    // Tekstvakken van de dia koppelen aan de tekstvakken van het sjabloon, in volgorde
+    const templateTexts = templateItemsArray.filter((t: any) => (t?.type || 'text') === 'text');
+    let nextTemplateText = 0;
+
+    merged.items = slideItemsArray.map((item: any) => {
+      if ((item?.type || 'text') !== 'text') return item;
+      const templateItem = templateTexts[nextTemplateText++];
+      if (!templateItem) return item;
+      return applyTemplateToSlideItem(item, templateItem, slideHasText);
     });
   }
 
@@ -328,7 +335,14 @@ export function applyTemplateToSlide(slide: any, template: any): any {
 
 export function getContainerStyle(item: any): React.CSSProperties {
   const styleObj = item.style ? parseStyleString(item.style) : {};
-  const alignObj = getAlignmentStyle(item.align);
+  let alignObj: any = getAlignmentStyle(item.align);
+
+  // In FreeShow betekent "align-items" bij een tekstvak de verticale plaatsing van de tekst in het vak (boven/midden/onder);
+  // de horizontale uitlijning staat per regel in "text-align". Hier is het vak een kolom, dus verticaal = justify-content.
+  if (typeof item.align === 'string' && /align-items\s*:/i.test(item.align)) {
+    const v = alignObj.alignItems;
+    alignObj = { justifyContent: v === 'center' ? 'center' : (v === 'flex-end' || v === 'end') ? 'flex-end' : 'flex-start' };
+  }
 
   return {
     position: 'absolute',
@@ -341,7 +355,12 @@ export function getContainerStyle(item: any): React.CSSProperties {
 
 export function getLineStyle(line: any, itemAlign: any): React.CSSProperties {
   const align = line.align || itemAlign;
-  return getAlignmentStyle(align);
+  const style: any = getAlignmentStyle(align);
+  // De regel is een rij: de horizontale plaatsing volgt uit text-align (zoals in FreeShow), niet alleen uit text-align zelf.
+  if (style.textAlign) {
+    style.justifyContent = style.textAlign === 'right' ? 'flex-end' : (style.textAlign === 'left' || style.textAlign === 'justify') ? 'flex-start' : 'center';
+  }
+  return style;
 }
 
 // FreeShow shows created without ever touching per-line styling (e.g. some
