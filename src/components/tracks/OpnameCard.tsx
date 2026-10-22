@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Mic, Square, CloudUpload } from "lucide-react";
-import type { ReaperState } from "@/lib/reaperControl";
+import { Mic, Square, CloudUpload, Headphones } from "lucide-react";
+import type { ReaperState, OpnameItem } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
 
 interface OpnameCardProps {
@@ -84,7 +84,18 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
     );
   }
 
+  const afspelen = bridge.opnameAfspelen;
+  const lijst: OpnameItem[] = bridge.opnames ?? [];
+  const kiesOpname = async (o: OpnameItem) => {
+    if (!confirm(`De opname "${o.name}" klaarzetten om af te spelen?\n\nElk spoor gaat naar de USB-uitgang met hetzelfde nummer als het kanaal waarvan het is opgenomen.`)) return;
+    await act({ action: "opnamePlay", value: o.file }, "Opname staat klaar om af te spelen");
+  };
+  const sluitOpname = async () => {
+    await act({ action: "opnameClose" }, "Opname gesloten");
+  };
+
   return (
+    <>
     <section className="glass-card trk-timing">
       <div className="trk-setlist-head" style={{ marginBottom: 0, gap: 8, flexWrap: "wrap" }}>
         <h3 className="trk-title"><Mic size={18} style={{ color: "#ef4444" }} /> Opname</h3>
@@ -132,5 +143,55 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
         </p>
       )}
     </section>
+    {(afspelen || lijst.length > 0) && (
+      <section className="glass-card trk-timing">
+        <div className="trk-setlist-head" style={{ marginBottom: 0 }}>
+          <h3 className="trk-title"><Headphones size={18} style={{ color: "#60a5fa" }} /> Opnames afspelen (virtuele soundcheck)</h3>
+          {afspelen && (
+            <button className="trk-load" onClick={sluitOpname} disabled={busy || afspelen.playing}
+              title={afspelen.playing ? "Stop eerst het afspelen" : "Opname-tab sluiten"}>
+              Opname sluiten
+            </button>
+          )}
+        </div>
+        {afspelen && (
+          <>
+            <p className="trk-arr-hint" style={{ margin: "8px 0 0", color: afspelen.outputs === 0 || afspelen.linked < afspelen.tracks ? "#f59e0b" : "#4ade80" }}>
+              Klaar: <b>{afspelen.name}</b> · {afspelen.linked} van {afspelen.tracks} sporen naar USB-uitgang 1 t/m 32 (spoor van kanaal N naar uitgang N). Speel af met de gewone knoppen hierboven.
+            </p>
+            {afspelen.outputs === 0 && (
+              <p className="trk-empty" style={{ color: "#f87171", marginTop: 6 }}>
+                REAPER ziet geen audio-uitgangen (is de X32 aan en de X-UF kaart verbonden?). Zonder uitgangen hoor je niets.
+              </p>
+            )}
+            <p className="trk-arr-hint" style={{ margin: "6px 0 0" }}>
+              Let op: de X32 stuurt de computer pas naar de kanalen als Routing op PLAY staat. Dat doe je op de tafel (REC/PLAY). Zet hem na afloop weer op REC.
+            </p>
+          </>
+        )}
+        {lijst.length > 0 && (
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            {lijst.map(o => (
+              <div key={o.file} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ flex: "1 1 220px" }}>
+                  {o.name}
+                  {o.seconds ? <span style={{ opacity: 0.7 }}> · {hms(o.seconds)}</span> : <span style={{ opacity: 0.7 }}> · geen audio</span>}
+                  <span style={{ opacity: 0.7 }}>
+                    {o.copy?.status === "klaar" ? " · op de NAS" : o.copy?.status === "bezig" ? " · kopiëren..." : o.copy?.status === "fout" ? " · NAS-kopie mislukt" : " · alleen lokaal"}
+                  </span>
+                </span>
+                <button className="trk-load" style={{ padding: "2px 10px" }}
+                  disabled={busy || playing || afspelen?.file === o.file || !o.seconds}
+                  title={playing ? "Stop eerst het afspelen" : !o.seconds ? "Deze opname bevat geen audio" : "Klaarzetten om af te spelen"}
+                  onClick={() => kiesOpname(o)}>
+                  {afspelen?.file === o.file ? "Staat klaar" : "Klaarzetten"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    )}
+    </>
   );
 }

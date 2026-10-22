@@ -69,6 +69,8 @@ export interface BridgeState {
   // Audio-opname (band en sprekers) in een eigen REAPER-project; zie ark_tracks_bridge.lua "opname (audio)"
   opname?: AudioRecording;           // loopt nu
   lastOpname?: { name: string; folder: string; file: string; seconds: number; copy?: OpnameCopy };
+  opnames?: OpnameItem[];            // eerdere opnames op de track-computer (nieuwste eerst)
+  opnameAfspelen?: OpnamePlayback;   // de actieve tab is een opname (virtuele soundcheck)
   diskFreeGB?: number;               // vrije schijfruimte op de track-computer
   opnameSjabloon?: boolean;          // staat het opnamesjabloon op de track-computer?
 }
@@ -80,6 +82,24 @@ export interface OpnameCopy {
   bytes?: number;
   files?: number;
   time?: number;
+}
+
+export interface OpnameItem {
+  name: string;
+  folder: string;
+  file: string;
+  seconds?: number | null;
+  copy?: OpnameCopy | null;
+}
+
+// Een opname staat klaar om af te spelen: spoor van ingang N gaat naar USB-uitgang N
+export interface OpnamePlayback {
+  name: string;
+  file: string;
+  tracks: number;
+  linked: number;      // sporen met een uitgang naar de USB-kaart
+  outputs: number;     // audio-uitgangen die REAPER nu ziet (0 = geen X-UF)
+  playing: boolean;
 }
 
 export interface AudioRecording {

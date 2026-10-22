@@ -103,6 +103,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen. De opname is geannuleerd." }, { status: 502 });
     } else if (action === "opnameStop") {
       await sendBridgeCommand("recstop", [], 20000);
+    } else if (action === "opnamePlay") {
+      // value: pad naar het .RPP-bestand van een opname (de bridge controleert dat het in de opnamemap staat)
+      if (typeof value !== "string" || /[\t\r\n]/.test(value) || !value.endsWith(".RPP")) {
+        return NextResponse.json({ error: "Ongeldige opname" }, { status: 400 });
+      }
+      await sendBridgeCommand("playopname", [value], 60000);
+    } else if (action === "opnameClose") {
+      await sendBridgeCommand("closeopname", [], 20000);
     } else if (action === "opnameCopy") {
       await sendBridgeCommand("copyopname", [], 10000);
     } else if (action === "recordStart" || action === "recordCancel") {

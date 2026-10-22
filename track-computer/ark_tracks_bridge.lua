@@ -23,6 +23,8 @@
 --   recstart \t naam          audio-opname starten (nieuw project uit het opnamesjabloon, eigen tab)
 --   recstop \t [annuleer]     audio-opname stoppen en het project bewaren (en kopiëren naar de NAS starten)
 --   copyopname                 de laatste opname (opnieuw) naar de NAS kopiëren
+--   playopname \t pad          een opname openen om af te spelen (virtuele soundcheck): spoor N -> USB-uitgang N
+--   closeopname                de opname-tab sluiten
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
 local SECTION = "ArkTracks"
@@ -821,6 +823,62 @@ local function refreshCopy()
   if lo then lo.copy = readCopyStatus(lo.folder) end
 end
 
+---------------------------------------------------------------- opnames afspelen (virtuele soundcheck)
+-- Een eerdere opname weer afspelen op dezelfde kanalen waarvan hij is opgenomen: elk spoor krijgt een hardware-uitgang
+-- naar dezelfde USB-uitgang als het ingangsnummer (spoor van ingang N -> uitgang N). De X32 moet de kaart dan als
+-- bron voor die kanalen gebruiken (Routing -> REC/PLAY). Het project wordt na het klaarzetten bewaard (anders vraagt
+-- REAPER bij het sluiten om op te slaan, en dat blokkeert op de track-computer).
+local opnames, opnamesChecked = {}, 0
+local rppCache = {}   -- bestand -> { size, seconds }
+
+local function insideRecDir(p)
+  return type(p) == "string" and p:sub(1, #REC_DIR + 1) == REC_DIR .. "/" and not p:find("/..", 1, true) and p:lower():sub(-4) == ".rpp"
+end
+
+local function activeOpnameProject()
+  local proj, fn = reaper.EnumProjects(-1)
+  if fn and insideRecDir(fn) then return proj, fn end
+end
+
+-- duur van een opname = het einde van het laatste blok in het projectbestand (alleen opnieuw inlezen als het bestand veranderde)
+local function rppSeconds(file)
+  local f = io.open(file, "r")
+  if not f then return nil end
+  local size = f:seek("end")
+  local c = rppCache[file]
+  if c and c.size == size then f:close() return c.seconds end
+  f:seek("set", 0)
+  local txt = f:read("*a") or ""
+  f:close()
+  local last = 0
+  for pos, len in txt:gmatch("POSITION%s+(%S+)%s+SNAPOFFS%s+%S+%s+LENGTH%s+(%S+)") do
+    local e = (tonumber(pos) or 0) + (tonumber(len) or 0)
+    if e > last then last = e end
+  end
+  rppCache[file] = { size = size, seconds = last }
+  return last
+end
+
+local function refreshOpnames()
+  local now = reaper.time_precise()
+  if now - opnamesChecked < 5 then return end
+  opnamesChecked = now
+  local list, i = {}, 0
+  while true do
+    local d = reaper.EnumerateSubdirectories(REC_DIR, i)
+    if not d then break end
+    i = i + 1
+    local folder = REC_DIR .. "/" .. d
+    local file = folder .. "/" .. d .. ".RPP"
+    if fileExists(file) and not (opname and opname.file == file) then
+      list[#list + 1] = { name = d, folder = folder, file = file, seconds = rppSeconds(file), copy = readCopyStatus(folder) }
+    end
+  end
+  table.sort(list, function(a, b) return a.name > b.name end)
+  while #list > 30 do table.remove(list) end
+  opnames = list
+end
+
 local function noRecording()
   if opname then error("Er loopt een opname - stop die eerst") end
 end
@@ -891,6 +949,43 @@ function handlers.copyopname()
   if cur and cur.status == "bezig" and os.time() - (cur.time or 0) < 6 * 3600 then error("Er wordt al gekopieerd") end
   startCopy(lo.folder)
   copyChecked = 0
+end
+
+-- Een opname openen en klaarzetten om af te spelen (virtuele soundcheck)
+function handlers.playopname(file)
+  noRecording()
+  if isPlaying() then error("Stop eerst het afspelen") end
+  if not insideRecDir(file) or not fileExists(file) then error("Opname niet gevonden") end
+  restoreGuide()
+  st.pendingSong = nil
+  local proj = findOrOpen(file)
+  reaper.SelectProjectInstance(proj)
+  for i = 0, reaper.CountTracks(proj) - 1 do
+    local tr = reaper.GetTrack(proj, i)
+    reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 0)       -- geen opname per ongeluk
+    reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", 0)
+    for sIdx = reaper.GetTrackNumSends(tr, 1) - 1, 0, -1 do reaper.RemoveTrackSend(tr, 1, sIdx) end
+    local inp = math.floor(reaper.GetMediaTrackInfo_Value(tr, "I_RECINPUT"))
+    if inp >= 0 and inp < 512 then                           -- mono ingang N (0-gebaseerd) -> mono uitgang N
+      local sIdx = reaper.CreateTrackSend(tr, nil)
+      if sIdx >= 0 then
+        reaper.SetTrackSendInfo_Value(tr, 1, sIdx, "I_SRCCHAN", 1024)       -- mono, kanaal 1 van het spoor
+        reaper.SetTrackSendInfo_Value(tr, 1, sIdx, "I_DSTCHAN", 1024 + inp)
+      end
+    end
+  end
+  reaper.SetEditCurPos2(proj, 0, true, false)
+  reaper.Main_SaveProject(proj, false)
+end
+
+-- De tab van de opname sluiten (opslaan eerst: een vraag van REAPER zou de bridge blokkeren)
+function handlers.closeopname()
+  local proj = activeOpnameProject()
+  if not proj then error("De actieve tab is geen opname") end
+  if isPlaying() then error("Stop eerst het afspelen") end
+  reaper.OnStopButtonEx(proj)
+  reaper.Main_SaveProject(proj, false)
+  reaper.Main_OnCommand(40860, 0)      -- File: Close project tab
 end
 
 -- Timing opnemen: start | save | cancel. "save" zet de tikken per sectienaam in
@@ -1267,6 +1362,7 @@ end
 local function writeState()
   refreshDisk()
   refreshCopy()
+  refreshOpnames()
   local tabs = {}
   local active = reaper.EnumProjects(-1)
   for _, p in ipairs(openProjects()) do
@@ -1306,6 +1402,17 @@ local function writeState()
     opname = opname and { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0,
                           recording = (reaper.GetPlayState() & 4) ~= 0 } or nil,
     lastOpname = st.lastOpname,
+    opnames = opnames,
+    opnameAfspelen = (function()
+      local proj, fn = activeOpnameProject()
+      if not proj then return nil end
+      local linked = 0
+      for i = 0, reaper.CountTracks(proj) - 1 do
+        if reaper.GetTrackNumSends(reaper.GetTrack(proj, i), 1) > 0 then linked = linked + 1 end
+      end
+      return { name = fn:match("([^/]+)/[^/]+$") or fn, file = fn, tracks = reaper.CountTracks(proj), linked = linked,
+               outputs = reaper.GetNumAudioOutputs(), playing = isPlaying() }
+    end)(),
     diskFreeGB = diskFreeGB,
     opnameSjabloon = fileExists(REC_TEMPLATE),
   }
