@@ -113,13 +113,17 @@ export async function POST(req: NextRequest) {
       }
       await sendBridgeCommand("playopname", [value], 60000);
     } else if (action === "opnameDelete") {
-      // Een opname van de track-computer verwijderen (de NAS-kopie blijft staan): alleen voor beheerders
+      // Een opname verwijderen van de track-computer, de NAS of beide: alleen voor beheerders.
+      // value: { name, local: boolean, nas: boolean }
       if (authSession.role !== "admin") return NextResponse.json({ error: "Alleen een beheerder mag opnames verwijderen" }, { status: 403 });
-      if (typeof value !== "string" || !value || /[\t\r\n/\\]/.test(value) || value.startsWith(".")) {
+      const name = value?.name;
+      if (typeof name !== "string" || !name || /[\t\r\n/\\]/.test(name) || name.startsWith(".")) {
         return NextResponse.json({ error: "Ongeldige opname" }, { status: 400 });
       }
-      await sendBridgeCommand("deleteopname", [value], 60000);
-      console.log(`[Opname] Verwijderd van de track-computer: ${value} (${authSession.username})`);
+      const scope = value.local && value.nas ? "beide" : value.nas ? "nas" : value.local ? "lokaal" : null;
+      if (!scope) return NextResponse.json({ error: "Kies waarvan de opname verwijderd moet worden" }, { status: 400 });
+      await sendBridgeCommand("deleteopname", [name, scope], 60000);
+      console.log(`[Opname] Verwijderd (${scope}): ${name} (${authSession.username})`);
     } else if (action === "opnameClose") {
       await sendBridgeCommand("closeopname", [], 20000);
     } else if (action === "opnameCopy") {

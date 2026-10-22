@@ -71,6 +71,7 @@ export interface BridgeState {
   lastOpname?: { name: string; folder: string; file: string; seconds: number; copy?: OpnameCopy };
   opnames?: OpnameItem[];            // eerdere opnames op de track-computer (nieuwste eerst)
   opnameAfspelen?: OpnamePlayback;   // de actieve tab is een opname (virtuele soundcheck)
+  nasWissen?: { status: string; message?: string; name?: string; time?: number };   // laatste verwijdering van een opname van de NAS
   audio?: { running: boolean; inputs: number; outputs: number };   // audio-apparaat van REAPER
   diskFreeGB?: number;               // vrije schijfruimte op de track-computer
   opnameSjabloon?: boolean;          // staat het opnamesjabloon op de track-computer?
@@ -202,6 +203,7 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       opnameSjabloon: typeof s.opnameSjabloon === 'boolean' ? s.opnameSjabloon : undefined,
       diskFreeGB: typeof s.diskFreeGB === 'number' ? s.diskFreeGB : undefined,
       audio: s.audio ?? undefined,
+      nasWissen: s.nasWissen ?? undefined,
     };
   } catch {
     return null;

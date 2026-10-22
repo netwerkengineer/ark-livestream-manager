@@ -27,6 +27,7 @@ function hms(sec: number): string {
 export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wis, setWis] = useState<{ o: OpnameItem; lokaal: boolean; nas: boolean } | null>(null);
   const [fout, setFout] = useState<string | null>(null);   // blijft staan tot de volgende actie (de melding bovenin verdwijnt snel)
 
   const bridge = state?.bridge;
@@ -95,13 +96,12 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
     if (!confirm(`De opname "${o.name}" klaarzetten om af te spelen?\n\nElk spoor gaat naar de USB-uitgang met hetzelfde nummer als het kanaal waarvan het is opgenomen.`)) return;
     await act({ action: "opnamePlay", value: o.file }, "Opname staat klaar om af te spelen");
   };
-  const verwijder = async (o: OpnameItem) => {
-    const opNas = o.copy?.status === "klaar";
-    const tekst = opNas
-      ? `De opname "${o.name}" van de track-computer verwijderen?\n\nDe kopie op de NAS blijft staan.`
-      : `LET OP: de opname "${o.name}" staat NIET op de NAS (${o.copy?.status === "bezig" ? "kopiëren is nog bezig" : o.copy?.status === "fout" ? "de kopie is mislukt" : "alleen lokaal"}).\n\nVerwijderen is definitief: de opname is daarna weg. Toch verwijderen?`;
-    if (!confirm(tekst)) return;
-    await act({ action: "opnameDelete", value: o.name }, "Opname verwijderd van de track-computer");
+  const bevestigWis = async () => {
+    if (!wis) return;
+    const { o, lokaal, nas } = wis;
+    setWis(null);
+    await act({ action: "opnameDelete", value: { name: o.name, local: lokaal, nas } },
+      lokaal && nas ? "Opname verwijderd van de track-computer; verwijderen van de NAS gestart" : nas ? "Verwijderen van de NAS gestart" : "Opname verwijderd van de track-computer");
   };
   const sluitOpname = async () => {
     // Eerst de X32 terug naar REC (als hij op PLAY staat), anders blijft de zaal zonder microfoons
@@ -196,6 +196,11 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
           </>
         )}
         <X32RoutingBar klaar={!!afspelen} playing={(state?.playState ?? 0) !== 0} onError={onError} onStatus={onStatus} />
+        {bridge.nasWissen && bridge.nasWissen.time && Date.now() / 1000 - bridge.nasWissen.time < 600 && (
+          <p className="trk-arr-hint" style={{ margin: "8px 0 0", color: bridge.nasWissen.status === "fout" ? "#f87171" : bridge.nasWissen.status === "klaar" ? "#4ade80" : undefined }}>
+            NAS: {bridge.nasWissen.name ? `"${bridge.nasWissen.name}" - ` : ""}{bridge.nasWissen.message ?? bridge.nasWissen.status}
+          </p>
+        )}
         {lijst.length > 0 && (
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             {lijst.map(o => (
@@ -214,8 +219,8 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
                   {afspelen?.file === o.file && afspelen.linked > 0 ? "Staat klaar" : "Klaarzetten"}
                 </button>
                 <button className="trk-load" style={{ padding: "2px 8px" }} disabled={busy || playing || o.copy?.status === "bezig"}
-                  title={o.copy?.status === "bezig" ? "Wacht tot de kopie naar de NAS klaar is" : "Verwijderen van de track-computer (de NAS-kopie blijft staan)"}
-                  onClick={() => verwijder(o)}>
+                  title={o.copy?.status === "bezig" ? "Wacht tot de kopie naar de NAS klaar is" : "Verwijderen (track-computer en/of NAS)"}
+                  onClick={() => setWis({ o, lokaal: true, nas: false })}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -223,6 +228,36 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
           </div>
         )}
       </section>
+    )}
+    {wis && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        onClick={() => setWis(null)}>
+        <div className="glass-card" style={{ maxWidth: 460, width: "100%" }} onClick={e => e.stopPropagation()}>
+          <h3 className="trk-title" style={{ marginBottom: 8 }}><Trash2 size={18} style={{ color: "#f87171" }} /> Opname verwijderen</h3>
+          <p style={{ margin: "0 0 10px" }}><b>{wis.o.name}</b></p>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <input type="checkbox" checked={wis.lokaal} onChange={e => setWis({ ...wis, lokaal: e.target.checked })} />
+            Van de track-computer
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <input type="checkbox" checked={wis.nas} onChange={e => setWis({ ...wis, nas: e.target.checked })} />
+            Van de NAS {wis.o.copy?.status === "klaar" ? "" : "(daar staat deze opname mogelijk niet)"}
+          </label>
+          {wis.lokaal && wis.o.copy?.status !== "klaar" && !wis.nas && (
+            <p style={{ color: "#f87171", margin: "0 0 10px" }}>Let op: deze opname staat <b>niet</b> op de NAS. Verwijderen is definitief.</p>
+          )}
+          {wis.lokaal && wis.nas && (
+            <p style={{ color: "#f87171", margin: "0 0 10px" }}><b>Definitief:</b> de opname bestaat daarna nergens meer.</p>
+          )}
+          {!wis.lokaal && wis.nas && (
+            <p style={{ opacity: 0.85, margin: "0 0 10px" }}>De opname blijft op de track-computer staan en is daarna niet meer als &ldquo;op de NAS&rdquo; gemarkeerd.</p>
+          )}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button className="trk-load" onClick={() => setWis(null)}>Annuleren</button>
+            <button className="trk-load" style={{ background: "rgba(239,68,68,0.9)" }} disabled={!wis.lokaal && !wis.nas} onClick={bevestigWis}>Verwijderen</button>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

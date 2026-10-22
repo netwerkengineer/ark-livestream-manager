@@ -25,7 +25,7 @@
 --   copyopname                 de laatste opname (opnieuw) naar de NAS kopiëren
 --   playopname \t pad          een opname openen om af te spelen (virtuele soundcheck): spoor N -> USB-uitgang N
 --   closeopname                de opname-tab sluiten
---   deleteopname \t naam       een opname (map in ~/Tracks/Opnames) van de track-computer verwijderen; de NAS blijft onaangeroerd
+--   deleteopname \t naam \t [lokaal|nas|beide]   een opname verwijderen van de track-computer, de NAS of beide
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
 local SECTION = "ArkTracks"
@@ -804,8 +804,8 @@ local function startCopy(folder)
   os.execute("nohup /bin/bash " .. shq(REC_COPY) .. " " .. shq(folder) .. " >/dev/null 2>&1 &")
 end
 
-local function readCopyStatus(folder)
-  local f = io.open(folder .. "/.naar-nas.status", "r")
+local function readStatusFile(path)
+  local f = io.open(path, "r")
   if not f then return nil end
   local c = {}
   for line in f:lines() do
@@ -814,8 +814,18 @@ local function readCopyStatus(folder)
   end
   f:close()
   if not c.status then return nil end
-  return { status = c.status, message = c.message, bytes = tonumber(c.bytes), files = tonumber(c.files), time = tonumber(c.time) }
+  return { status = c.status, message = c.message, bytes = tonumber(c.bytes), files = tonumber(c.files), time = tonumber(c.time), name = c.name }
 end
+
+local function readCopyStatus(folder)
+  return readStatusFile(folder .. "/.naar-nas.status")
+end
+
+-- Verwijderen van een opname van de NAS (script opname-van-nas-wissen.sh, op de achtergrond)
+local TOOLS_DIR = (os.getenv("HOME") or "") .. "/Tracks/_tools"
+local NAS_WIPE = TOOLS_DIR .. "/opname-van-nas-wissen.sh"
+local NAS_WIPE_STATUS = TOOLS_DIR .. "/.nas-wissen.status"
+local nasWissen = nil
 
 local function refreshCopy()
   local now = reaper.time_precise()
@@ -823,6 +833,7 @@ local function refreshCopy()
   copyChecked = now
   local lo = st.lastOpname
   if lo then lo.copy = readCopyStatus(lo.folder) end
+  nasWissen = readStatusFile(NAS_WIPE_STATUS)
 end
 
 ---------------------------------------------------------------- opnames afspelen (virtuele soundcheck)
@@ -1005,28 +1016,42 @@ function handlers.closeopname()
   reaper.Main_OnCommand(40860, 0)      -- File: Close project tab
 end
 
--- Een opname van de track-computer verwijderen (alleen die map, nooit iets op de NAS). Weigert tijdens een opname, tijdens
--- afspelen en terwijl de kopie naar de NAS nog bezig is.
-function handlers.deleteopname(name)
+-- Een opname verwijderen: scope "lokaal" (map op de track-computer), "nas" (alleen de kopie op de NAS) of "beide".
+-- Weigert tijdens een opname, tijdens afspelen en terwijl de kopie naar de NAS nog bezig is.
+function handlers.deleteopname(name, scope)
   noRecording()
   if isPlaying() then error("Stop eerst het afspelen") end
+  scope = (scope == "nas" or scope == "beide") and scope or "lokaal"
   if type(name) ~= "string" or name == "" or name:find("/", 1, true) or name:sub(1, 1) == "." then
     error("Ongeldige opname")
   end
   local folder = REC_DIR .. "/" .. name
   local file = folder .. "/" .. name .. ".RPP"
-  if not fileExists(file) then error("Opname niet gevonden") end
   local cur = readCopyStatus(folder)
   if cur and cur.status == "bezig" and os.time() - (cur.time or 0) < 6 * 3600 then error("De opname wordt nog naar de NAS gekopieerd") end
-  local proj = findOpen(file)
-  if proj then                               -- eerst de tab sluiten (opslaan: een vraag van REAPER zou de bridge blokkeren)
-    reaper.SelectProjectInstance(proj)
-    reaper.Main_SaveProject(proj, false)
-    reaper.Main_OnCommand(40860, 0)          -- File: Close project tab
+  if scope ~= "nas" then
+    if not fileExists(file) then error("Opname niet gevonden") end
   end
-  os.execute("/bin/rm -rf -- " .. shq(folder))
-  if fileExists(file) then error("Verwijderen mislukt: " .. folder) end
-  if st.lastOpname and st.lastOpname.folder == folder then st.lastOpname = nil end
+  if scope ~= "lokaal" then
+    if not fileExists(NAS_WIPE) then error("Script ontbreekt op de track-computer: " .. NAS_WIPE) end
+    local w = readStatusFile(NAS_WIPE_STATUS)
+    if w and w.status == "bezig" and os.time() - (w.time or 0) < 3600 then error("Er wordt al iets van de NAS verwijderd") end
+  end
+  if scope ~= "nas" then
+    local proj = findOpen(file)
+    if proj then                             -- eerst de tab sluiten (opslaan: een vraag van REAPER zou de bridge blokkeren)
+      reaper.SelectProjectInstance(proj)
+      reaper.Main_SaveProject(proj, false)
+      reaper.Main_OnCommand(40860, 0)        -- File: Close project tab
+    end
+    os.execute("/bin/rm -rf -- " .. shq(folder))
+    if fileExists(file) then error("Verwijderen mislukt: " .. folder) end
+    if st.lastOpname and st.lastOpname.folder == folder then st.lastOpname = nil end
+  end
+  if scope ~= "lokaal" then
+    os.execute("nohup /bin/bash " .. shq(NAS_WIPE) .. " " .. shq(name) .. " >/dev/null 2>&1 &")
+    copyChecked = 0
+  end
   opnamesChecked = 0
 end
 
@@ -1445,6 +1470,7 @@ local function writeState()
                           recording = (reaper.GetPlayState() & 4) ~= 0 } or nil,
     lastOpname = st.lastOpname,
     opnames = opnames,
+    nasWissen = nasWissen,
     opnameAfspelen = (function()
       local proj, fn = activeOpnameProject()
       if not proj then return nil end
