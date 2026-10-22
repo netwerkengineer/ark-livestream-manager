@@ -98,7 +98,9 @@ export async function POST(req: NextRequest) {
         const b = await getBridgeState();
         if (b?.opname?.recording) return NextResponse.json({ success: true });
       }
-      return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen." }, { status: 502 });
+      // Er wordt niet echt opgenomen: de opname meteen annuleren, anders blijft de bridge "er loopt al een opname" melden
+      await sendBridgeCommand("recstop", ["annuleer"], 20000).catch(() => undefined);
+      return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen. De opname is geannuleerd." }, { status: 502 });
     } else if (action === "opnameStop") {
       await sendBridgeCommand("recstop", [], 20000);
     } else if (action === "opnameCopy") {

@@ -21,7 +21,7 @@
 --   master \t volume \t mute  master volume (lineair 0-2) en master mute (0/1)
 --   freeshow \t host \t poort  FreeShow REST-API voor de cues (leeg = MIDI)
 --   recstart \t naam          audio-opname starten (nieuw project uit het opnamesjabloon, eigen tab)
---   recstop                    audio-opname stoppen en het project bewaren (en kopiëren naar de NAS starten)
+--   recstop \t [annuleer]     audio-opname stoppen en het project bewaren (en kopiëren naar de NAS starten)
 --   copyopname                 de laatste opname (opnieuw) naar de NAS kopiëren
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
@@ -865,15 +865,18 @@ function handlers.recstart(name)
   reaper.Main_OnCommand(1013, 0)                          -- Transport: Record
 end
 
--- Audio-opname stoppen en het project bewaren
-function handlers.recstop()
+-- Audio-opname stoppen en het project bewaren. Met "annuleer" (opname die nooit echt begon, bv. geen
+-- audio-apparaat) wordt alleen gestopt: geen "laatste opname" en geen kopie naar de NAS.
+function handlers.recstop(mode)
   if not opname then error("Er loopt geen opname") end
   local proj = findOpen(opname.file) or reaper.EnumProjects(-1)
   reaper.OnStopButtonEx(proj)
   reaper.Main_SaveProject(proj, false)
-  st.lastOpname = { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0 }
-  startCopy(opname.folder)
-  copyChecked = 0
+  if mode ~= "annuleer" then
+    st.lastOpname = { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0 }
+    startCopy(opname.folder)
+    copyChecked = 0
+  end
   opname = nil
   saveOpnameState()
 end
