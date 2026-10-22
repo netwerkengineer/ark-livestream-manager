@@ -11,6 +11,13 @@ export async function GET(req: NextRequest) {
   }
   const settings = getSettings() as any;
   const all = await listTemplates(settings.freeshowPath);
-  const names = Array.from(new Set(all.filter(t => t.category !== 'scripture').map(t => t.name))).sort((a, b) => a.localeCompare(b));
+  // Alleen sjablonen voor liedteksten: de categorie "song" van FreeShow. Eigen categorieen (met een willekeurig id) tellen mee als
+  // de naam op een liedsjabloon wijst ("lyrics", "song", "lied"); bijbel- en presentatiesjablonen vallen af.
+  const isLied = (t: { name: string; category: string; mode: string }) => {
+    if (t.mode === 'scripture' || t.category === 'scripture' || t.category === 'presentation') return false;
+    if (t.category === 'song') return true;
+    return /lyric|song|lied/i.test(t.name) && !/scrip|bijbel/i.test(t.name);
+  };
+  const names = Array.from(new Set(all.filter(isLied).map(t => t.name))).sort((a, b) => a.localeCompare(b));
   return NextResponse.json({ templates: names });
 }

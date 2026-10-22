@@ -26,14 +26,14 @@ export const LIVESTREAM_SONG_STYLE_NAME = 'Livestream Liederen';
 
 // Sjablonen staan in Config/templates.json (id -> { name, category, ... }). Net als bij stijlen zoeken we op naam, zodat het id
 // van de computer waarop het sjabloon is geimporteerd er niet toe doet.
-export async function listTemplates(freeshowPath: string | undefined): Promise<{ id: string; name: string; category: string }[]> {
+export async function listTemplates(freeshowPath: string | undefined): Promise<{ id: string; name: string; category: string; mode: string }[]> {
   if (!freeshowPath) return [];
   try {
     const raw = await fs.readFile(path.join(freeshowPath, 'Config', 'templates.json'), 'utf-8');
     const all = JSON.parse(raw) || {};
     return Object.entries<any>(all)
       .filter(([, t]) => t && typeof t.name === 'string')
-      .map(([id, t]) => ({ id, name: String(t.name).trim(), category: String(t.category || '') }));
+      .map(([id, t]) => ({ id, name: String(t.name).trim(), category: String(t.category || ''), mode: String(t.settings?.mode || '') }));
   } catch (err) {
     console.error('[FreeShow] Kon sjablonen niet lezen:', err);
     return [];
