@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Mic, Square, CloudUpload, Headphones } from "lucide-react";
 import type { ReaperState, OpnameItem } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
+import X32RoutingBar from "./X32RoutingBar";
 
 interface OpnameCardProps {
   state: ReaperState | null;
@@ -91,6 +92,8 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
     await act({ action: "opnamePlay", value: o.file }, "Opname staat klaar om af te spelen");
   };
   const sluitOpname = async () => {
+    // Eerst de X32 terug naar REC (als hij op PLAY staat), anders blijft de zaal zonder microfoons
+    try { await reaperAction({ mode: "REC" }, "/api/x32/routing"); } catch { /* X32 niet bereikbaar: de balk toont dat */ }
     await act({ action: "opnameClose" }, "Opname gesloten");
   };
 
@@ -164,11 +167,9 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
                 REAPER ziet geen audio-uitgangen (is de X32 aan en de X-UF kaart verbonden?). Zonder uitgangen hoor je niets.
               </p>
             )}
-            <p className="trk-arr-hint" style={{ margin: "6px 0 0" }}>
-              Let op: de X32 stuurt de computer pas naar de kanalen als Routing op PLAY staat. Dat doe je op de tafel (REC/PLAY). Zet hem na afloop weer op REC.
-            </p>
           </>
         )}
+        <X32RoutingBar klaar={!!afspelen} playing={(state?.playState ?? 0) !== 0} onError={onError} onStatus={onStatus} />
         {lijst.length > 0 && (
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             {lijst.map(o => (
