@@ -1,10 +1,10 @@
 # Instellingen voor opname-naar-nas.sh. Kopieer naar ~/Tracks/_tools/opname-nas.conf en pas aan.
-# De SMB-share "Opnames" op de NAS en een gebruiker met alleen schrijfrechten daarop (zie de handleiding, hoofdstuk 6a).
+# De SMB-share "Tracks" op de NAS en een eigen gebruiker met alleen rechten op die share (zie de handleiding, hoofdstuk 6a).
 # Het wachtwoord van die gebruiker staat NIET hier maar in ~/.nsmbrc (chmod 600):
 #   [<NAS_HOST>:<NAS_USER>]
 #   password=<wachtwoord>
 NAS_HOST=192.168.2.250
-NAS_USER=opnames
-NAS_SHARE=Opnames
-#NAS_SUBDIR=            # optioneel: submap in de share
+NAS_USER=arktracks
+NAS_SHARE=Tracks
+NAS_SUBDIR=Opnames          # submap in de share (wordt aangemaakt)
 #DEST_DIR=              # alleen om te testen: kopieer naar deze lokale map in plaats van naar de NAS
