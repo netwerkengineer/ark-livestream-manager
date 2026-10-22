@@ -328,6 +328,28 @@ export function generateStreamBackup(
             console.error(`[Backup] Projects symlink failed: ${projectsDir}`, e);
           }
 
+          // FreeShow-instellingen (Config: templates.json, settings_synced.json met stijlen en categorieen, overlays, thema's) en
+          // de sjablonen die als losse .fstemplate-bestanden in de FreeShow-map staan. Samen een paar honderd KB.
+          const configDir = path.join(freeshowPath, 'Config');
+          try {
+            await fs.access(configDir);
+            await fs.symlink(configDir, path.join(zipFsDir, 'Config'));
+          } catch (e) {
+            console.error(`[Backup] Config symlink failed: ${configDir}`, e);
+          }
+          try {
+            const templateFiles = (await fs.readdir(freeshowPath)).filter(f => f.toLowerCase().endsWith('.fstemplate') && !f.startsWith('._'));
+            if (templateFiles.length > 0) {
+              const zipTemplatesDir = path.join(zipFsDir, 'Templates');
+              await fs.mkdir(zipTemplatesDir, { recursive: true });
+              for (const f of templateFiles) {
+                await fs.symlink(path.join(freeshowPath, f), path.join(zipTemplatesDir, f));
+              }
+            }
+          } catch (e) {
+            console.error(`[Backup] Templates symlink failed in: ${freeshowPath}`, e);
+          }
+
           if (includeMedia) {
             console.log(`[Backup] includeMedia=true, freeshowMediaPath="${freeshowMediaPath}", freeshowPath="${freeshowPath}"`);
             let mediaDir = freeshowMediaPath || path.join(freeshowPath, 'media');

@@ -711,7 +711,7 @@ Deze extra doelen krijgen **geen** stroom-/opstart-automatisering en ook geen "P
 
 **Opslagdoel**: geen (alleen lokaal), FTP, of WebDAV — met bijbehorende verbindingsgegevens en een bestandsnaam-voorvoegsel (handig als je meerdere omgevingen, zoals test en productie, naar dezelfde opslag back-uppen).
 
-**Nieuwe back-up maken**: kies wat wordt meegenomen (app-configuratie, QLC+, Companion, FreeShow-database — optioneel inclusief mediabestanden, wat groot kan worden) en klik **"Lokaal Downloaden"** of **"Verzenden naar Externe Opslag"**.
+**Nieuwe back-up maken**: kies wat wordt meegenomen (app-configuratie, QLC+, Companion, FreeShow-database — shows, bijbels, projecten, de sjablonen (`.fstemplate`) en de FreeShow-instellingen uit de map `Config` met onder meer de stijlen van de livestream-output; optioneel inclusief mediabestanden, zoals de achtergrondvideo's, wat groot kan worden) en klik **"Lokaal Downloaden"** of **"Verzenden naar Externe Opslag"**.
 
 **Herstellen**: upload een eerder gemaakte back-up-zip, kies welke onderdelen teruggezet moeten worden, en klik **"Herstel Geselecteerde Onderdelen"**. Er wordt automatisch eerst een veiligheidskopie van de huidige staat gemaakt voordat er iets wordt overschreven.
 

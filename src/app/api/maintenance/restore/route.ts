@@ -85,6 +85,13 @@ export async function POST(req: NextRequest) {
         count += await extractFolder('FreeShow/Media/', settings.freeshowMediaPath || path.join(freeshowPath, 'Media'));
         
         if (count > 0) restoredItems.push('FreeShow Database');
+
+        // Sjablonen (.fstemplate in de FreeShow-map) en FreeShow-instellingen (Config). Hebben back-ups van voor deze uitbreiding
+        // niet: dan blijft het bij 0 en wordt niets overschreven.
+        let extra = 0;
+        extra += await extractFolder('FreeShow/Templates/', freeshowPath);
+        extra += await extractFolder('FreeShow/Config/', path.join(freeshowPath, 'Config'));
+        if (extra > 0) restoredItems.push('FreeShow sjablonen en instellingen');
       }
     }
 

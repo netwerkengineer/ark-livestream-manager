@@ -254,7 +254,7 @@ export default function BackupRestoreSettings({ settings, setSettings }: Props) 
             <div style={{ paddingLeft: '12px', borderLeft: '2px solid rgba(255,255,255,0.1)' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
                 <input type="checkbox" checked={backupTargets.freeshow} onChange={e => setBackupTargets({...backupTargets, freeshow: e.target.checked})} />
-                <span>FreeShow Database (Shows, Bibles)</span>
+                <span>FreeShow Database (Shows, Bibles, projecten, sjablonen en instellingen)</span>
               </label>
               {backupTargets.freeshow && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginLeft: '24px', fontSize: '0.85rem', color: 'var(--muted)' }}>
