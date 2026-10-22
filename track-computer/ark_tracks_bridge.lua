@@ -21,7 +21,8 @@
 --   master \t volume \t mute  master volume (lineair 0-2) en master mute (0/1)
 --   freeshow \t host \t poort  FreeShow REST-API voor de cues (leeg = MIDI)
 --   recstart \t naam          audio-opname starten (nieuw project uit het opnamesjabloon, eigen tab)
---   recstop                    audio-opname stoppen en het project bewaren
+--   recstop                    audio-opname stoppen en het project bewaren (en kopiëren naar de NAS starten)
+--   copyopname                 de laatste opname (opnieuw) naar de NAS kopiëren
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
 local SECTION = "ArkTracks"
@@ -745,7 +746,9 @@ end
 -- Commando's: recstart \t naam (naam mag leeg zijn) | recstop
 local REC_DIR = (os.getenv("HOME") or "") .. "/Tracks/Opnames"
 local REC_TEMPLATE = (os.getenv("HOME") or "") .. "/Tracks/_tools/Ark_opname_band.RPP"
+local REC_COPY = (os.getenv("HOME") or "") .. "/Tracks/_tools/opname-naar-nas.sh"
 local opname = nil          -- { name, folder, file, t0 } zolang er een opname loopt
+local copyChecked = 0
 local diskFreeGB, diskChecked = nil, 0
 
 local function fileExists(p)
@@ -787,6 +790,35 @@ local function refreshDisk()
   p:close()
   local avail = line:match("^%S+%s+%d+%s+%d+%s+(%d+)")
   if avail then diskFreeGB = math.floor(tonumber(avail) / 1048576 * 10 + 0.5) / 10 end
+end
+
+-- Kopie van een opname naar de NAS (script opname-naar-nas.sh, draait op de achtergrond; verwijdert nooit iets).
+-- De voortgang staat in <opname-map>/.naar-nas.status en gaat mee in de status (lastOpname.copy).
+local function startCopy(folder)
+  if not fileExists(REC_COPY) then return end
+  local function q(x) return "'" .. x:gsub("'", "'\\''") .. "'" end   -- veilig voor de shell, ook met $ of ` in de naam
+  os.execute("nohup /bin/bash " .. q(REC_COPY) .. " " .. q(folder) .. " >/dev/null 2>&1 &")
+end
+
+local function readCopyStatus(folder)
+  local f = io.open(folder .. "/.naar-nas.status", "r")
+  if not f then return nil end
+  local c = {}
+  for line in f:lines() do
+    local k, v = line:match("^(%w+)=(.*)$")
+    if k then c[k] = v end
+  end
+  f:close()
+  if not c.status then return nil end
+  return { status = c.status, message = c.message, bytes = tonumber(c.bytes), files = tonumber(c.files), time = tonumber(c.time) }
+end
+
+local function refreshCopy()
+  local now = reaper.time_precise()
+  if now - copyChecked < 2 then return end
+  copyChecked = now
+  local lo = st.lastOpname
+  if lo then lo.copy = readCopyStatus(lo.folder) end
 end
 
 local function noRecording()
@@ -840,8 +872,22 @@ function handlers.recstop()
   reaper.OnStopButtonEx(proj)
   reaper.Main_SaveProject(proj, false)
   st.lastOpname = { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0 }
+  startCopy(opname.folder)
+  copyChecked = 0
   opname = nil
   saveOpnameState()
+end
+
+-- De laatste opname (opnieuw) naar de NAS kopiëren, bv. na een fout of als de NAS uit stond
+function handlers.copyopname()
+  local lo = st.lastOpname
+  if not lo then error("Er is geen opname om te kopiëren") end
+  if opname then error("Er loopt een opname - stop die eerst") end
+  if not fileExists(REC_COPY) then error("Kopieerscript ontbreekt op de track-computer: " .. REC_COPY) end
+  local cur = readCopyStatus(lo.folder)
+  if cur and cur.status == "bezig" and os.time() - (cur.time or 0) < 6 * 3600 then error("Er wordt al gekopieerd") end
+  startCopy(lo.folder)
+  copyChecked = 0
 end
 
 -- Timing opnemen: start | save | cancel. "save" zet de tikken per sectienaam in
@@ -1217,6 +1263,7 @@ end
 
 local function writeState()
   refreshDisk()
+  refreshCopy()
   local tabs = {}
   local active = reaper.EnumProjects(-1)
   for _, p in ipairs(openProjects()) do

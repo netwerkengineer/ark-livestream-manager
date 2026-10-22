@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, CloudUpload } from "lucide-react";
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
 
@@ -59,6 +59,9 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
     await act({ action: "opnameStop" }, "Opname gestopt en bewaard");
   };
 
+  const copy = bridge.lastOpname?.copy;
+  const gb = (b?: number) => (b ? (b / 1e9).toFixed(1) + " GB" : "");
+
   if (run) {
     return (
       <section className="glass-card trk-timing recording">
@@ -109,6 +112,23 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
         <p className="trk-arr-hint" style={{ marginTop: 8, marginBottom: 0 }}>
           Laatste opname: {bridge.lastOpname.name || "(zonder naam)"} · {hms(bridge.lastOpname.seconds)} · <code>{bridge.lastOpname.folder.replace(/^.*\/Tracks\//, "~/Tracks/")}</code>
           {vrij !== undefined && <> · vrij: {vrij} GB (± {Math.max(0, uren ?? 0).toFixed(1)} uur)</>}
+        </p>
+      )}
+      {bridge.lastOpname && (
+        <p className="trk-arr-hint" style={{ marginTop: 4, marginBottom: 0, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+          color: copy?.status === "fout" ? "#f87171" : copy?.status === "klaar" ? "#4ade80" : undefined }}>
+          <CloudUpload size={14} />
+          {!copy && "NAS-kopie: nog niet gestart"}
+          {copy?.status === "bezig" && "Kopiëren naar de NAS... (mag even duren, de opname zelf staat veilig op de track-computer)"}
+          {copy?.status === "klaar" && `Gekopieerd naar de NAS en gecontroleerd (${copy.files} bestanden, ${gb(copy.bytes)}). De opname blijft ook op de track-computer staan.`}
+          {copy?.status === "fout" && `Kopie naar de NAS mislukt: ${copy.message ?? "onbekende fout"}`}
+          {copy?.status === "niet-ingesteld" && `NAS-kopie niet ingesteld (${copy.message ?? "zie de handleiding"})`}
+          {copy?.status !== "bezig" && (
+            <button className="trk-load" style={{ padding: "2px 10px" }} disabled={busy}
+              onClick={() => act({ action: "opnameCopy" }, "Kopiëren naar de NAS gestart")}>
+              {copy?.status === "klaar" ? "Opnieuw kopiëren" : "Kopieer naar de NAS"}
+            </button>
+          )}
         </p>
       )}
     </section>

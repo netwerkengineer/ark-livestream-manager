@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen." }, { status: 502 });
     } else if (action === "opnameStop") {
       await sendBridgeCommand("recstop", [], 20000);
+    } else if (action === "opnameCopy") {
+      await sendBridgeCommand("copyopname", [], 10000);
     } else if (action === "recordStart" || action === "recordCancel") {
       await sendBridgeCommand("record", [action === "recordStart" ? "start" : "cancel"]);
     } else if (action === "tap") {

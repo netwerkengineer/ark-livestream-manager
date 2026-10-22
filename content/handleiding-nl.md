@@ -531,6 +531,7 @@ Klopt de automatische timing van de dia's niet, gebruik dan **Timing opnemen**: 
 - Starten kan niet terwijl er een nummer afspeelt. Tijdens een opname kun je geen ander nummer kiezen.
 - Een opname van 21 sporen op 24 bit/48 kHz neemt ongeveer 11 GB per uur in beslag; de kaart toont de vrije ruimte.
 - De sporen luisteren niet mee (geen monitoring) en sturen niets terug naar de X32.
+- **Kopie naar de NAS:** na "Stop opname" kopieert de track-computer de hele opnamemap automatisch naar de share `Opnames` op de NAS en controleert daarna of alle bestanden er met dezelfde grootte staan. De kaart toont "Kopiëren...", "Gekopieerd en gecontroleerd" of de foutmelding, met een knop om opnieuw te kopiëren (bijvoorbeeld als de NAS uit stond). De opname blijft altijd ook op de track-computer staan: er wordt niets automatisch verwijderd. Opgenomen wordt dus lokaal (veilig tegen netwerkstoringen) en pas daarna gekopieerd. Eenmalig instellen: op de NAS de share `Opnames` met een eigen gebruiker met alleen schrijfrechten daarop, op de track-computer `opname-naar-nas.sh` en `opname-nas.conf` (zie `track-computer/README.md`) in `~/Tracks/_tools/` en het wachtwoord in `~/.nsmbrc`. Zonder die instelling meldt de kaart "NAS-kopie niet ingesteld" en blijft de opname gewoon lokaal staan.
 
 ### 6a.2 Bibliotheek
 
