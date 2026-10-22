@@ -120,6 +120,11 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
           <span className="trk-rec-dot" /> Opname starten
         </button>
       </div>
+      {bridge.audio && bridge.audio.inputs === 0 && (
+        <p className="trk-empty" style={{ marginTop: 8, color: "#f59e0b" }}>
+          REAPER ziet geen audio-ingangen. Staat de X32 aan en is de X-UF verbonden? Zonder ingangen neemt REAPER niets op.
+        </p>
+      )}
       {fout && (
         <p className="trk-empty" style={{ marginTop: 8, color: "#f87171" }}>{fout}</p>
       )}

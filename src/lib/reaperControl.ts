@@ -71,6 +71,7 @@ export interface BridgeState {
   lastOpname?: { name: string; folder: string; file: string; seconds: number; copy?: OpnameCopy };
   opnames?: OpnameItem[];            // eerdere opnames op de track-computer (nieuwste eerst)
   opnameAfspelen?: OpnamePlayback;   // de actieve tab is een opname (virtuele soundcheck)
+  audio?: { running: boolean; inputs: number; outputs: number };   // audio-apparaat van REAPER
   diskFreeGB?: number;               // vrije schijfruimte op de track-computer
   opnameSjabloon?: boolean;          // staat het opnamesjabloon op de track-computer?
 }
@@ -194,6 +195,13 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       recSlide: s.recSlide ?? undefined,
       recSlides: s.recSlides ?? undefined,
       output: s.output ?? undefined,
+      opname: s.opname ?? undefined,
+      lastOpname: s.lastOpname ?? undefined,
+      opnames: Array.isArray(s.opnames) ? s.opnames : undefined,
+      opnameAfspelen: s.opnameAfspelen ?? undefined,
+      opnameSjabloon: typeof s.opnameSjabloon === 'boolean' ? s.opnameSjabloon : undefined,
+      diskFreeGB: typeof s.diskFreeGB === 'number' ? s.diskFreeGB : undefined,
+      audio: s.audio ?? undefined,
     };
   } catch {
     return null;
