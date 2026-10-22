@@ -9,13 +9,30 @@ import { logActivity } from "@/lib/activityLog";
 import { MAX_LINES_PER_SLIDE, MAX_CHARS_PER_LINE, slideLines, resplitGroup, maxRowsInGroup } from "@/lib/slideSplit";
 import { rebuildArrangementsForShow } from "@/lib/trackArrangement";
 
-// Splits slides of songs (category "song") that take more than
+// Splits slides of songs (category "song" plus the song books listed in EXTRA_SONG_CATEGORIES) that take more than
 // MAX_LINES_PER_SLIDE rows on screen - the livestream lower third only fits
 // two, and a line longer than MAX_CHARS_PER_LINE wraps into two rows.
 // Only those groups are touched; songs with 1 or 2 lines per slide stay as
 // they are. GET = preview, POST = convert (originals copied to
 // data/backups/split-lines-<time>/ first). The regular FreeShow sync then
 // takes the changed shows to the FreeShow computers.
+
+// Liedboek-categorieen die naast de ingebouwde categorie "song" ook worden aangepast. Op naam gezocht in
+// Config/settings_synced.json (de ids zijn per FreeShow-installatie verschillend). De overige liedboeken (Baptisten,
+// Joh. de Heer, Kinderen, Timotheus) blijven bewust zoals ze zijn.
+const EXTRA_SONG_CATEGORIES = ["opwekkings liederen", "tieners liederen"];
+
+async function songCategoryIds(freeshowPath: string): Promise<Set<string>> {
+  const ids = new Set<string>(["song"]);
+  try {
+    const cfg = JSON.parse(await fs.readFile(path.join(freeshowPath, "Config", "settings_synced.json"), "utf-8"));
+    for (const [id, cat] of Object.entries<any>(cfg.categories || {})) {
+      const name = String(cat?.name || "").trim().toLowerCase();
+      if (EXTRA_SONG_CATEGORIES.some(prefix => name.startsWith(prefix))) ids.add(id);
+    }
+  } catch { /* geen of onleesbare Config: alleen de categorie "song" */ }
+  return ids;
+}
 
 interface Change {
   file: string;
@@ -54,6 +71,7 @@ async function scan(apply: boolean) {
   const showsDir = path.join(settings.freeshowPath, "Shows");
   const backupDir = path.join(process.cwd(), "data", "backups", `split-lines-${new Date().toISOString().replace(/[:.]/g, "-")}`);
   const changes: Change[] = [];
+  const songCategories = await songCategoryIds(settings.freeshowPath);
 
   for (const file of await fs.readdir(showsDir)) {
     if (!file.endsWith(".show") || file.startsWith("._")) continue;
@@ -67,7 +85,7 @@ async function scan(apply: boolean) {
       continue;
     }
     const show = Array.isArray(parsed) ? parsed[1] : parsed;
-    if (show?.category !== "song") continue;
+    if (!songCategories.has(show?.category)) continue;
     const result = convertShow(show);
     if (!result.changed) continue;
     changes.push({ file, name: show.name || file.replace(/\.show$/, ""), groups: result.groups, maxLines: result.maxLines });
