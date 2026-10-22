@@ -477,7 +477,20 @@ def _scan_local_tree(base_dir, matches):
     forward-slash-separated relative paths so keys line up with the remote
     listing regardless of host OS."""
     found = {}
-    for root, _dirs, files in os.walk(base_dir):
+    # followlinks: een submap die op de NAS een snelkoppeling (symlink) naar een andere map is, hoort wel gewoon bij de media. Zonder
+    # followlinks zag de sync die bestanden niet op de NAS, dacht dat ze "nieuw op de Beamer-PC" waren en kopieerde ze bij elke sync
+    # opnieuw. De bezochte echte paden worden bijgehouden zodat een lus (symlink naar een bovenliggende map) niet kan.
+    seen_real = {os.path.realpath(base_dir)}
+    for root, _dirs, files in os.walk(base_dir, followlinks=True):
+        keep = []
+        for d in _dirs:
+            real = os.path.realpath(os.path.join(root, d))
+            if os.path.islink(os.path.join(root, d)) and (real in seen_real or real == os.path.realpath(base_dir) or os.path.realpath(base_dir).startswith(real + os.sep)):
+                continue  # lus of dubbele route naar een al bezochte map
+            if os.path.islink(os.path.join(root, d)):
+                seen_real.add(real)
+            keep.append(d)
+        _dirs[:] = keep
         # @eaDir is Synology's own hidden thumbnail/index cache, regenerated
         # by the NAS itself independently of any real content change - left
         # unpruned, its mtimes keep looking "newer" forever and every sync
