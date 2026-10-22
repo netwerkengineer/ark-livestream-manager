@@ -132,8 +132,10 @@ export default function DatabaseView(props: DatabaseViewProps) {
   const [isImportingProject, setIsImportingProject] = useState(false);
   const [isSplittingLines, setIsSplittingLines] = useState(false);
 
-  // Songs with more than 2 lines on a slide don't fit the livestream lower
-  // third: preview which ones, then split them (originals backed up first).
+  // Songs with more than 2 rows on screen on a slide don't fit the livestream lower third: preview which ones in a scrollable
+  // list (a browser confirm() cuts long lists off), then split them (originals backed up first).
+  const [splitPreview, setSplitPreview] = useState<{ changes: { name: string; category?: string; maxLines: number }[]; maxLines: number } | null>(null);
+
   const splitSongLines = async () => {
     setIsSplittingLines(true);
     try {
@@ -144,8 +146,18 @@ export default function DatabaseView(props: DatabaseViewProps) {
         alert(`Alle liederen hebben al max. ${data.maxLines} regels per dia op het scherm.`);
         return;
       }
-      const list = data.changes.map((c: any) => `• ${c.name} (nu tot ${c.maxLines} regels op het scherm)`).join('\n');
-      if (!confirm(`Deze ${data.changes.length} lied(eren) worden opgesplitst naar max. ${data.maxLines} regels per dia op het scherm; een regel langer dan ${data.maxChars} tekens loopt door en telt als 2 (de tekst blijft gelijk, er wordt eerst een backup gemaakt):\n\n${list}\n\nDoorgaan? Sluit FreeShow eerst af op de computers en draai daarna een sync.`)) return;
+      setSplitPreview({ changes: data.changes, maxLines: data.maxLines });
+    } catch (e: any) {
+      alert('Opsplitsen mislukt: ' + (e?.message || e));
+    } finally {
+      setIsSplittingLines(false);
+    }
+  };
+
+  const runSplitSongLines = async () => {
+    setSplitPreview(null);
+    setIsSplittingLines(true);
+    try {
       const run = await fetch('/api/maintenance/split-lines', { method: 'POST' });
       const result = await run.json();
       if (!result.success) throw new Error(result.error);
@@ -217,6 +229,38 @@ export default function DatabaseView(props: DatabaseViewProps) {
 
   return (
     <div className="database-dashboard-view" style={{ marginTop: '3rem' }}>
+      {splitPreview && (() => {
+        const perCategory: Record<string, number> = {};
+        for (const c of splitPreview.changes) perCategory[c.category || 'Songs'] = (perCategory[c.category || 'Songs'] || 0) + 1;
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setSplitPreview(null)}>
+            <div className="glass-card" style={{ width: 'min(760px, 100%)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', background: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '14px' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 0.5rem' }}>Opsplitsen naar max. {splitPreview.maxLines} regels per dia</h3>
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', opacity: 0.8 }}>
+                Deze <strong>{splitPreview.changes.length}</strong> lied(eren) worden aangepast: dia's die op het scherm meer dan {splitPreview.maxLines} regels beslaan worden verdeeld over meer dia's. Een regel die te breed is voor de lower third loopt door en telt als 2. De tekst blijft gelijk; er wordt eerst een back-up van de originelen gemaakt.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                {Object.entries(perCategory).sort((a, b) => b[1] - a[1]).map(([cat, n]) => (
+                  <span key={cat} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '999px', background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.35)' }}>{cat}: {n}</span>
+                ))}
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', background: 'rgba(0,0,0,0.25)' }}>
+                {splitPreview.changes.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span>{c.name}</span>
+                    <span style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>{c.category ? c.category.replace(/ Ops Pro$/i, '') + ' · ' : ''}nu {c.maxLines} regels</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: '0.75rem 0 0', fontSize: '0.8rem', opacity: 0.7 }}>Sluit FreeShow eerst af op de computers en draai na het opsplitsen een sync.</p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1rem' }}>
+                <button className="button" onClick={() => setSplitPreview(null)}>Annuleren</button>
+                <button className="button" style={{ background: 'rgba(14,165,233,0.85)', borderColor: 'rgba(14,165,233,1)', fontWeight: 600 }} onClick={runSplitSongLines}>Opsplitsen ({splitPreview.changes.length})</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
           {databaseSubTab === 'catalog' && (
             <div className="glass-card" style={{ padding: '2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>

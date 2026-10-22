@@ -22,13 +22,13 @@ import { rebuildArrangementsForShow } from "@/lib/trackArrangement";
 // Joh. de Heer, Kinderen, Timotheus) blijven bewust zoals ze zijn.
 const EXTRA_SONG_CATEGORIES = ["opwekkings liederen", "tieners liederen"];
 
-async function songCategoryIds(freeshowPath: string): Promise<Set<string>> {
-  const ids = new Set<string>(["song"]);
+async function songCategoryIds(freeshowPath: string): Promise<Map<string, string>> {
+  const ids = new Map<string, string>([["song", "Songs"]]);
   try {
     const cfg = JSON.parse(await fs.readFile(path.join(freeshowPath, "Config", "settings_synced.json"), "utf-8"));
     for (const [id, cat] of Object.entries<any>(cfg.categories || {})) {
       const name = String(cat?.name || "").trim().toLowerCase();
-      if (EXTRA_SONG_CATEGORIES.some(prefix => name.startsWith(prefix))) ids.add(id);
+      if (EXTRA_SONG_CATEGORIES.some(prefix => name.startsWith(prefix))) ids.set(id, String(cat?.name || id).trim());
     }
   } catch { /* geen of onleesbare Config: alleen de categorie "song" */ }
   return ids;
@@ -37,6 +37,7 @@ async function songCategoryIds(freeshowPath: string): Promise<Set<string>> {
 interface Change {
   file: string;
   name: string;
+  category: string;
   groups: number;
   maxLines: number;
 }
@@ -88,7 +89,7 @@ async function scan(apply: boolean) {
     if (!songCategories.has(show?.category)) continue;
     const result = convertShow(show);
     if (!result.changed) continue;
-    changes.push({ file, name: show.name || file.replace(/\.show$/, ""), groups: result.groups, maxLines: result.maxLines });
+    changes.push({ file, name: show.name || file.replace(/\.show$/, ""), category: songCategories.get(show.category) || "Songs", groups: result.groups, maxLines: result.maxLines });
     if (apply) {
       await fs.mkdir(backupDir, { recursive: true });
       await fs.writeFile(path.join(backupDir, file), raw);
