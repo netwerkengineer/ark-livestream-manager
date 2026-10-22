@@ -43,6 +43,7 @@ tokens.json
 /data/
 /public/thumbnails/
 deploy.tar.gz
+deploy.tar.gz.manifest
 
 # vercel
 .vercel
