@@ -21,7 +21,11 @@ function Vlak({ s, breed }: { s: SfeerOptie; breed: number }) {
   );
 }
 
-export default function SfeerKiezer({ value, opties, onChange }: { value: string; opties: SfeerOptie[]; onChange: (slug: string) => void }) {
+export default function SfeerKiezer({ value, opties, onChange, titel = "Sfeer: achtergrond en licht bij dit lied (blijft op het lied staan)", leegLabel = "Sfeer: zoals nu", leegKeuze = "Zoals in het lied laten" }: {
+  value: string; opties: SfeerOptie[]; onChange: (slug: string) => void;
+  /** tooltip en teksten; met leegKeuze={null} ontbreekt de keuze "niets kiezen" */
+  titel?: string; leegLabel?: string; leegKeuze?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -34,22 +38,24 @@ export default function SfeerKiezer({ value, opties, onChange }: { value: string
   const gekozen = opties.find(o => o.slug === value);
   const knop: React.CSSProperties = { display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", cursor: "pointer", color: "inherit", background: "transparent", border: "none", padding: "5px 8px", fontSize: "0.78rem" };
   return (
-    <div ref={ref} style={{ position: "relative" }} title="Sfeer: achtergrond en licht bij dit lied (blijft op het lied staan)">
+    <div ref={ref} style={{ position: "relative" }} title={titel}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         style={{ ...knop, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, minWidth: "9.5rem" }}
       >
         {gekozen ? <Vlak s={gekozen} breed={34} /> : <span style={{ width: 34, height: 19, borderRadius: 5, border: "1px dashed rgba(255,255,255,0.35)", flexShrink: 0 }} />}
-        <span style={{ flex: 1, whiteSpace: "nowrap" }}>{gekozen ? gekozen.naam : "Sfeer: zoals nu"}</span>
+        <span style={{ flex: 1, whiteSpace: "nowrap" }}>{gekozen ? gekozen.naam : leegLabel}</span>
         <span style={{ opacity: 0.6, fontSize: "0.65rem" }}>▾</span>
       </button>
       {open && (
         <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 50, minWidth: "13rem", background: "#0f172a", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: 4, maxHeight: "22rem", overflowY: "auto" }}>
-          <button type="button" style={knop} onClick={() => { onChange(""); setOpen(false); }}>
-            <span style={{ width: 44, height: 24, borderRadius: 5, border: "1px dashed rgba(255,255,255,0.35)", flexShrink: 0 }} />
-            <span style={{ opacity: 0.8 }}>Zoals in het lied laten</span>
-          </button>
+          {leegKeuze !== null && (
+            <button type="button" style={knop} onClick={() => { onChange(""); setOpen(false); }}>
+              <span style={{ width: 44, height: 24, borderRadius: 5, border: "1px dashed rgba(255,255,255,0.35)", flexShrink: 0 }} />
+              <span style={{ opacity: 0.8 }}>{leegKeuze}</span>
+            </button>
+          )}
           {opties.map(o => (
             <button key={o.slug} type="button" style={{ ...knop, background: o.slug === value ? "rgba(255,255,255,0.1)" : "transparent" }} onClick={() => { onChange(o.slug); setOpen(false); }}>
               <Vlak s={o} breed={44} />

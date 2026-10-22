@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
 import SfeerKiezer, { SfeerOptie } from '../SfeerKiezer';
+import { BIJBELSTIJLEN, STANDAARD_BIJBELSTIJL } from '@/lib/bijbelstijlen';
 import SongInput from './SongInput';
 import { BIBLE_BOOKS } from '@/lib/freeshowUtils';
 
@@ -50,6 +51,7 @@ interface DraftService {
   songs: DraftSong[];
   scriptures: DraftScripture[];
   media: DraftMedia[];
+  bijbelStijl?: string;
   sourceEmails: SourceEmailRecord[];
   lastGeneratedAt?: string;
   lastGenerationNotes?: string[];
@@ -517,6 +519,22 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   useEffect(() => {
     fetch('/api/sferen').then(r => r.ok ? r.json() : null).then(d => { if (d?.sferen) setSferen(d.sferen); }).catch(() => {});
   }, []);
+
+  const changeBijbelStijl = async (stijl: string) => {
+    if (!draft || !stijl) return;
+    setDraft({ ...draft, bijbelStijl: stijl });
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/bijbelstijl`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stijl })
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Kon de bijbelstijl niet opslaan');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
 
   const changeSfeer = async (songId: string, sfeer: string) => {
     if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, sfeer } : x) });
@@ -1374,7 +1392,17 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
               <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 {draft.scriptures.length > 0 && (
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem' }}>📖 Bijbelteksten ({draft.scriptures.length})</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>📖 Bijbelteksten ({draft.scriptures.length})</div>
+                      <SfeerKiezer
+                        value={draft.bijbelStijl || STANDAARD_BIJBELSTIJL}
+                        opties={BIJBELSTIJLEN.map(b => ({ slug: b.slug, naam: b.naam, kleur: b.kleur, accent: b.accent }))}
+                        onChange={changeBijbelStijl}
+                        titel="Opmaak en achtergrond van de bijbelteksten in deze dienst (geldt voor alle bijbelteksten hieronder)"
+                        leegLabel="Bijbelstijl"
+                        leegKeuze={null}
+                      />
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                       {draft.scriptures.map(s => (
                         <div key={s.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>

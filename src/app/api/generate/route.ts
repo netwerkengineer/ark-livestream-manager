@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath } from '@/lib/freeshowUtils';
-import { buildBibleRefData } from '@/lib/draftProjectGenerator';
+import { buildBibleRefData, groupVersesForSlides } from '@/lib/draftProjectGenerator';
+import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { syncAfterProjectSave } from '@/lib/syncTrigger';
 import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { isAuthorized } from '@/lib/authHelper';
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Niet geautoriseerd" }, { status: 401 });
     }
 
-    const { date, projectName, items, useTemplate, saveToNas, projectPath } = await req.json();
+    const { date, projectName, items, useTemplate, saveToNas, projectPath, bijbelStijl } = await req.json();
     const showsList: any[] = [];
     const settings = getSettings() as any;
 
@@ -29,11 +30,23 @@ export async function POST(req: NextRequest) {
 
     // Bijbelteksten zonder verzen-indeling (bv. uit de lokale catalogus): opnieuw opbouwen, zodat de opmaak gelijk is aan de
     // dienstvoorbereiding (een dia per vers/blok, vlak, versnummer, verwijzing) in plaats van de gewone liedtekst-opmaak.
+    // De verzen worden ook opnieuw over de dia's verdeeld volgens de gekozen bijbelstijl (src/lib/bijbelstijlen.ts), omdat die
+    // per stijl een ander tekstvak en een andere lettergrootte heeft; en de achtergrondvideo van die stijl wordt erbij gezocht.
     const rebuiltBibles = new Map<string, { refData: any; text: string }>();
+    const bijbelStijlPerItem = new Map<string, { slug: string; video: string | null }>();
     for (const item of items) {
-      if (item.type === 'bible' && !(item.bibleData?.chunks?.length)) {
-        const rebuilt = await buildBibleRefData(item.ref, item.translation, item.text);
+      if (item.type !== 'bible') continue;
+      const slug = resolveBijbelStijlSlug(item.bijbelStijl || bijbelStijl);
+      bijbelStijlPerItem.set(String(item.id), { slug, video: await bijbelAchtergrondPad(slug) });
+      if (!(item.bibleData?.chunks?.length)) {
+        const rebuilt = await buildBibleRefData(item.ref, item.translation, item.text, slug);
         if (rebuilt) rebuiltBibles.set(String(item.id), rebuilt);
+      } else {
+        const chunks = groupVersesForSlides(item.bibleData.chunks.flat(), slug);
+        rebuiltBibles.set(String(item.id), {
+          refData: { ...item.bibleData, chunks },
+          text: chunks.map((chunk: any[]) => chunk.map(v => `${v.verse}. ${v.text}`).join('\n')).join('\n\n')
+        });
       }
     }
 
@@ -108,8 +121,10 @@ export async function POST(req: NextRequest) {
         showsList.push({
           ...baseShow,
           refData: rebuiltBibles.get(String(item.id))?.refData ?? item.bibleData,
-          backgroundMedia: toClientPath(item.backgroundMedia),
-          backgroundType: item.backgroundType,
+          bijbelStijl: bijbelStijlPerItem.get(String(item.id))?.slug,
+          // Een zelf gekozen achtergrond bij dit item gaat voor; anders de video van de bijbelstijl
+          backgroundMedia: toClientPath(item.backgroundMedia || bijbelStijlPerItem.get(String(item.id))?.video),
+          backgroundType: item.backgroundMedia ? item.backgroundType : (bijbelStijlPerItem.get(String(item.id))?.video ? 'video' : item.backgroundType),
           ...(livestreamOutputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: livestreamOutputId } : {}),
           data: {
             name: sanitizeName(`${item.ref} - ${item.translation}`),

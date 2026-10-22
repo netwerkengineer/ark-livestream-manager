@@ -62,6 +62,8 @@ export interface DraftService {
   scriptures: DraftScripture[];
   media: DraftMedia[];
   sourceEmails: SourceEmailRecord[];
+  /** gekozen opmaak/achtergrond voor de bijbelteksten (slug uit bijbelstijlen.ts); leeg = standaard */
+  bijbelStijl?: string;
   lastUpdatedAt: string;
   lastGeneratedHash?: string;
   lastGeneratedAt?: string;
@@ -325,6 +327,16 @@ export function updateSongInDraft(
   if (!song) return null;
 
   Object.assign(song, patch);
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
+export function setBijbelStijlInDraft(serviceDate: string, slug: string): DraftService | null {
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  if (!draft) return null;
+  draft.bijbelStijl = slug;
   draft.lastUpdatedAt = new Date().toISOString();
   writeStore(store);
   return draft;

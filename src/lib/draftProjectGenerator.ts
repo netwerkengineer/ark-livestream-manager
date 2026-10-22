@@ -8,6 +8,8 @@ import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
 import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
+import { getBijbelStijl, bijbelCapaciteit } from '@/lib/bijbelstijlen';
+import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
 
 export interface GenerateResult {
@@ -139,17 +141,11 @@ async function resolveSongItem(song: DraftSong, settings: any, outputId: string,
 
 // Rough approximation of FreeShow's own smart-fit slide splitting (which
 // measures actual rendered text against the template's text box in pixels).
-// This just word-wraps against the box createShowObject hardcodes for
-// scripture slides (see the "1860px"/"865px"/"font-size: 80px" style below),
+// This just word-wraps against the text box of the chosen Bible style
+// (src/lib/bijbelstijlen.ts: box size, font size, character width),
 // and packs as many verses as estimated to fit before starting a new slide,
 // instead of always putting exactly one verse per slide.
-const SCRIPTURE_BOX_WIDTH = 1860 - 50; // minus 25px padding each side
-const SCRIPTURE_BOX_HEIGHT = 865 - 50;
-const SCRIPTURE_FONT_SIZE = 80;
-const SCRIPTURE_CHARS_PER_LINE = Math.floor(SCRIPTURE_BOX_WIDTH / (SCRIPTURE_FONT_SIZE * 0.5));
-const SCRIPTURE_LINES_PER_SLIDE = Math.floor(SCRIPTURE_BOX_HEIGHT / (SCRIPTURE_FONT_SIZE * 1.35));
-
-function estimateLines(verses: { verse: string; text: string }[]): number {
+function estimateLines(verses: { verse: string; text: string }[], tekensPerRegel: number): number {
   let lines = 0;
   let currentLineLength = 0;
   for (const v of verses) {
@@ -159,7 +155,7 @@ function estimateLines(verses: { verse: string; text: string }[]): number {
       if (currentLineLength === 0) {
         currentLineLength = word.length;
         lines++;
-      } else if (currentLineLength + 1 + word.length <= SCRIPTURE_CHARS_PER_LINE) {
+      } else if (currentLineLength + 1 + word.length <= tekensPerRegel) {
         currentLineLength += 1 + word.length;
       } else {
         lines++;
@@ -170,12 +166,13 @@ function estimateLines(verses: { verse: string; text: string }[]): number {
   return lines;
 }
 
-export function groupVersesForSlides(verses: { verse: string; text: string }[]): { verse: string; text: string }[][] {
+export function groupVersesForSlides(verses: { verse: string; text: string }[], stijlSlug?: string | null): { verse: string; text: string }[][] {
+  const { tekensPerRegel, regelsPerDia } = bijbelCapaciteit(getBijbelStijl(stijlSlug));
   const groups: { verse: string; text: string }[][] = [];
   let current: { verse: string; text: string }[] = [];
   for (const v of verses) {
     const proposed = [...current, v];
-    if (current.length > 0 && estimateLines(proposed) > SCRIPTURE_LINES_PER_SLIDE) {
+    if (current.length > 0 && estimateLines(proposed, tekensPerRegel) > regelsPerDia) {
       groups.push(current);
       current = [v];
     } else {
@@ -192,7 +189,7 @@ export function groupVersesForSlides(verses: { verse: string; text: string }[]):
  * Zonder chunks viel de generator terug op de gewone liedtekst-route: aparte dia's voor versnummer, tekst en verwijzing, 100 px, geen vlak.
  * Volgorde: verwijzing opzoeken in de Bijbel van FreeShow; lukt dat niet, dan de verzen uit de platte tekst ("1\ntekst\n2\ntekst") halen.
  */
-export async function buildBibleRefData(ref: string, translationHint: string | undefined, plainText: string | undefined): Promise<{ refData: any; text: string } | null> {
+export async function buildBibleRefData(ref: string, translationHint: string | undefined, plainText: string | undefined, stijlSlug?: string | null): Promise<{ refData: any; text: string } | null> {
   const m = /^\s*(.+?)\s+(\d+):(\d+)(?:\s*-\s*(\d+))?(?:\s*-\s*(\S+))?\s*$/.exec(ref || '');
   const book = m?.[1];
   const chapter = m ? parseInt(m[2], 10) : NaN;
@@ -231,27 +228,33 @@ export async function buildBibleRefData(ref: string, translationHint: string | u
   }
   if (verses.length === 0 || !book) return null;
 
-  const chunks = groupVersesForSlides(verses);
+  const chunks = groupVersesForSlides(verses, stijlSlug);
   const text = chunks.map(chunk => chunk.map(v => `${v.verse}. ${v.text}`).join('\n')).join('\n\n');
   return { refData: { book, chapter, verses, chunks, ...extra }, text };
 }
 
 // Mirrors /api/preview's bible resolution exactly (same chunking/text shape)
 // so the generated slides look identical to what the manual Builder makes.
-async function resolveScriptureItem(scripture: DraftScripture, outputId: string, songStyleId: string | null): Promise<any | null> {
+async function resolveScriptureItem(scripture: DraftScripture, outputId: string, songStyleId: string | null, stijlSlug: string): Promise<any | null> {
   try {
     const verseEnd = scripture.verseEnd ?? scripture.verseStart;
     const bibleRes = await getBibleVerses(scripture.translation, scripture.book, scripture.chapter, scripture.verseStart, verseEnd);
     if (!bibleRes.verses || bibleRes.verses.length === 0) return null;
 
-    const chunks: any[] = groupVersesForSlides(bibleRes.verses);
+    const chunks: any[] = groupVersesForSlides(bibleRes.verses, stijlSlug);
     const textMap = chunks.map(chunk => chunk.map((v: any) => `${v.verse}. ${v.text}`).join('\n')).join('\n\n');
     const ref = `${scripture.book} ${scripture.chapter}:${scripture.verseStart}${scripture.verseEnd ? '-' + scripture.verseEnd : ''}`;
+
+    // Achtergrondvideo van de gekozen stijl (alleen als die in de mediamap staat; anders blijft de dia zonder achtergrond)
+    const settings = getSettings() as any;
+    const videoPad = await bijbelAchtergrondPad(stijlSlug);
 
     return {
       id: scripture.id,
       type: 'bible',
       targetSection: scripture.section,
+      bijbelStijl: stijlSlug,
+      ...(videoPad ? { backgroundMedia: toFreeShowClientPath(videoPad, settings.freeshowPath, settings.freeshowClientPath), backgroundType: 'video' } : {}),
       refData: {
         collectionId: bibleRes.collectionId,
         metadata: bibleRes.metadata,
@@ -404,8 +407,12 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
     showsList.push(item);
   }
+  const bijbelStijlSlug = resolveBijbelStijlSlug((draft as any).bijbelStijl);
+  if (draft.scriptures.length > 0 && !(await bijbelAchtergrondPad(bijbelStijlSlug))) {
+    notes.push(`Bijbeltekst-achtergrond "${getBijbelStijl(bijbelStijlSlug).video}.mp4" ontbreekt in de mediamap (Motion backgrounds/Ark Visuals); de bijbelteksten hebben nu geen achtergrond.`);
+  }
   for (const scripture of draft.scriptures) {
-    const item = await resolveScriptureItem(scripture, livestreamOutputId, songStyleId);
+    const item = await resolveScriptureItem(scripture, livestreamOutputId, songStyleId, bijbelStijlSlug);
     if (item) {
       showsList.push(item);
     } else {

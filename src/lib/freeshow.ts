@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import fs from 'fs/promises';
 import path from 'path';
 import { chunkForScreen } from './slideSplit';
+import { getBijbelStijl } from './bijbelstijlen';
 
 function generateId() {
   return Math.random().toString(36).padEnd(15, '0').substring(2, 13);
@@ -43,6 +44,8 @@ const GROUP_KEYWORDS: Record<string, string> = {
 // angels sang") is never mistaken for a label.
 const GROUP_LABEL_RE = /^(pre[\s-]?chorus|pre[\s-]?refrein|pre[\s-]?refrain|verse|vers|couplet|chorus|refrein|refrain|bridge|brug|intro|outro|slot|tag|break|pauze)\s*[\divxIVX]*\s*:?\s*$/i;
 
+const SANS_NUMMER = "Arial, Helvetica, sans-serif";
+
 export function createShowObject(show: any) {
   const now = Date.now();
   const slides: any = {};
@@ -54,7 +57,7 @@ export function createShowObject(show: any) {
   if (show.backgroundMedia) {
     bgMediaId = generateId();
     showMedia[bgMediaId] = {
-      name: show.backgroundMedia.split('/').pop(),
+      name: show.backgroundMedia.split(/[\\/]/).pop(),
       path: show.backgroundMedia,
       type: show.backgroundType || "video",
       muted: true,
@@ -127,23 +130,39 @@ export function createShowObject(show: any) {
       const verseRange = firstVerse === lastVerse ? firstVerse : `${firstVerse}-${lastVerse}`;
       const slideRef = `${show.refData.book} ${show.refData.chapter}:${verseRange}`;
 
-      const itemIdMain = generateId();
-      const itemIdDecor = generateId();
-
-      const lines: any[] = [{ align: "text-align: left;", text: [] }];
+      // Opmaak per bijbelstijl (src/lib/bijbelstijlen.ts): vak, lettertype, kleuren en een apart vak voor de verwijzing en de vertaling.
+      const stijl = getBijbelStijl(show.bijbelStijl);
+      const t = stijl.tekst;
+      const textStyle = `font-family:${t.lettertype};font-size:${t.grootte}px;color:${t.kleur};font-weight:${t.gewicht};text-shadow:${t.schaduw};line-height:${t.regelhoogte};`;
+      const lines: any[] = [{ align: `text-align: ${t.uitlijning};`, text: [] }];
 
       chunk.forEach((v: any, vIdx: number) => {
         lines[0].text.push({
           value: v.verse,
-          style: "font-size: 80px;;font-size: 40px;color: rgb(255 255 255 / 0.6);font-size: 60px;margin-right: 0.3em;",
+          style: `font-family:${SANS_NUMMER};font-size:${stijl.nummer.grootte}px;font-weight:bold;color:${stijl.nummer.kleur};vertical-align:super;margin-right:0.3em;text-shadow:none;`,
           customType: "disableTemplate"
         });
         lines[0].text.push({
           value: v.text + (vIdx < chunk.length - 1 ? " " : ""),
           sourceDynamicKey: `scripture_text:${vIdx}`,
-          style: "font-size: 80px;;font-size: 80px;"
+          style: textStyle
         });
       });
+
+      const kleinVak = (vak: string, uitlijning: string, tekstStijl: string, waarde: string) => ({
+        id: generateId(),
+        type: "text",
+        lines: [{ align: `text-align: ${uitlijning};`, text: [{ value: waarde, style: tekstStijl }] }],
+        style: vak,
+        align: "",
+        auto: false,
+        decoration: true
+      });
+      const verwijzingVak = kleinVak(stijl.verwijzing.vak, stijl.verwijzing.uitlijning,
+        `font-family:${stijl.verwijzing.lettertype};font-size:${stijl.verwijzing.grootte}px;color:${stijl.verwijzing.kleur};${stijl.verwijzing.stijl}`, slideRef);
+      const vertalingVak = kleinVak(stijl.vertaling.vak, stijl.vertaling.uitlijning,
+        `font-family:${stijl.vertaling.lettertype};font-size:${stijl.vertaling.grootte}px;color:${stijl.vertaling.kleur};`, show.refData.translationName || "Bijbel");
+      const decorVakken = stijl.decor.map(d => ({ id: generateId(), type: "text", lines: [{ align: "", text: [{ value: "", style: "" }] }], style: d, align: "", auto: false, decoration: true }));
 
       slides[slideId] = {
         group: slideRef,
@@ -151,25 +170,17 @@ export function createShowObject(show: any) {
         settings: {},
         notes: "",
         items: [
+          ...decorVakken,
           {
-            id: itemIdMain,
+            id: generateId(),
             type: "text",
             lines: lines,
-            style: "top: 30px;left: 30px;width: 1860px;height: 865px;background-color: rgb(0 0 0 / 0.4);border-radius: 20px;padding: 25px;",
-            align: "",
+            style: t.vak,
+            align: "align-items:center;",
             auto: false
           },
-          {
-            id: itemIdDecor,
-            type: "text",
-            lines: [
-              { align: "", text: [{ value: slideRef, style: "font-size: 55px;color: rgb(255 255 255 / 0.8);" }] },
-              { align: "", text: [{ value: show.refData.translationName || "Bijbel", style: "font-size: 40px;color: rgb(255 255 255 / 0.7);" }] }
-            ],
-            style: "top: 900px;left: 30px;width: 1860px;height: 150px;",
-            align: "",
-            decoration: true
-          }
+          verwijzingVak,
+          vertalingVak
         ],
         customDynamicValues: {
           // Real bible templates often use the numbered {scripture1_...}
@@ -264,7 +275,8 @@ export function createShowObject(show: any) {
     category: show.data.category,
     settings: {
       activeLayout: defaultLayoutId,
-      template: show.data.category === 'scripture' ? 'scripture' : 'default'
+      // Bijbelteksten krijgen hun eigen opmaak mee (bijbelstijlen.ts); FreeShow's ingebouwde sjabloon "scripture" zou die overschrijven.
+      template: show.data.category === 'scripture' ? '' : 'default'
     },
     timestamps: { created: now, modified: null, used: null },
     meta: isBibleShow ? {
