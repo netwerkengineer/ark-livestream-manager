@@ -827,6 +827,50 @@ def resolve_remote_freeshow_dirs(user, host, remote_os):
 
     return remote_app_data_dir, remote_root_dir, remote_shows_dir, remote_media_dir, remote_bibles_dir, remote_templates_dir
 
+# Config-bestanden die de app van de FreeShow-computer nodig heeft: sjablonen (voor "Sjabloon voor liedteksten") en
+# settings_synced.json (categorieen van liederen en de ids van de livestream-stijlen). De app leest deze alleen; FreeShow
+# zelf schrijft ze op de afspeelcomputer. Daarom alleen van het hoofd-doel naar de NAS halen, nooit terugschrijven.
+CONFIG_PULL_FILES = ["templates.json", "settings_synced.json"]
+
+def pull_config_files(label, nas_freeshow_path, remote_root_dir, user, host):
+    nas_config_dir = os.path.join(nas_freeshow_path, "Config")
+    try:
+        os.makedirs(nas_config_dir, exist_ok=True)
+    except Exception as e:
+        print(f"[{label}] Config-map '{nas_config_dir}' niet aan te maken ({e}) - Config-bestanden overgeslagen.")
+        return
+    for name in CONFIG_PULL_FILES:
+        tmp_dl = f"/tmp/config_pull_{host.replace('.', '_')}_{name}"
+        try:
+            if not sftp_transfer(user, host, tmp_dl, f"{remote_root_dir}/Config/{name}", "get"):
+                print(f"[{label}] Config/{name}: niet opgehaald (bestaat niet of niet bereikbaar).")
+                continue
+            with open(tmp_dl, "rb") as f:
+                data = f.read()
+            parsed = json.loads(data.decode("utf-8"))
+            if not isinstance(parsed, dict) or not parsed:
+                print(f"[{label}] Config/{name}: leeg of ongeldig - overgeslagen.")
+                continue
+            dest = os.path.join(nas_config_dir, name)
+            if os.path.exists(dest):
+                with open(dest, "rb") as f:
+                    if f.read() == data:
+                        print(f"[{label}] Config/{name}: ongewijzigd.")
+                        continue
+                shutil.copy2(dest, dest + ".bak-sync")  # een reservekopie van de vorige versie
+            new_tmp = dest + ".tmp-sync"
+            with open(new_tmp, "wb") as f:
+                f.write(data)
+            os.replace(new_tmp, dest)  # nieuw bestand + hernoemen (werkt ook op NFS met root_squash)
+            _safe_chmod(dest)
+            print(f"[{label}] Config/{name}: bijgewerkt vanaf {label}.")
+            log_activity("sync", f"Config/{name} bijgewerkt vanaf {label}")
+        except Exception as e:
+            print(f"[{label}] Config/{name}: mislukt ({e}) - de bestaande versie op de NAS blijft staan.")
+        finally:
+            if os.path.exists(tmp_dl):
+                os.remove(tmp_dl)
+
 def delete_remote_show_file(user, host, remote_os, remote_shows_dir, show_file):
     remote_file_path = f"{remote_shows_dir}/{show_file}"
     if remote_os == "windows":
@@ -1439,6 +1483,8 @@ def main():
                 f"{label} - Templates", nas_freeshow_path, remote_templates_dir, target["user"], target["host"], remote_os,
                 t_state["templates"], extensions={".fstemplate"}, one_way=one_way
             )
+            if target["is_primary"]:
+                pull_config_files(label, nas_freeshow_path, remote_root_dir, target["user"], target["host"])
             if skip_media:
                 print(f"\n--- SYNC: {label} - Media --- OVERGESLAGEN (--skip-media)")
             else:
