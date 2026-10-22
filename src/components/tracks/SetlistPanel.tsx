@@ -72,8 +72,30 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     load(null);
   }, [load]);
 
-  const chooseSource = (v: "service" | "own") => { setSetlistSource(v); setSource(v); load(null); };
+  const chooseSource = async (v: "service" | "own") => {
+    if (desktop) { setSetlistSource(v); setSource(v); load(null); return; }
+    // REAPER: the choice is kept on the server so every screen shows the same list
+    try {
+      await reaperAction({ action: "ownSource", own: v === "own" }, "/api/reaper/setlist");
+      await load(null);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Wisselen mislukt");
+    }
+  };
   const ownEdit = async (fn: () => void) => { fn(); await load(date); };
+  // Adding, removing and moving in the own list: on this computer (desktop app) or on the server (REAPER)
+  const ownDo = async (op: "add" | "remove" | "move", songPath: string, index: number, dir?: -1 | 1) => {
+    if (desktop) {
+      await ownEdit(() => { if (op === "add") ownAdd(songPath); else if (op === "remove") ownRemove(index); else ownMove(index, dir || 1); });
+      return;
+    }
+    try {
+      await reaperAction({ action: op === "add" ? "ownAdd" : op === "remove" ? "ownRemove" : "ownMove", path: songPath, dir }, "/api/reaper/setlist");
+      await load(null);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Setlist aanpassen mislukt");
+    }
+  };
 
   const activePath = state?.bridge?.tabs.find(t => t.active)?.path;
   const openPaths = new Set(state?.bridge?.tabs.map(t => t.path) || []);
@@ -109,14 +131,14 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
   };
 
   const loadIntoReaper = async () => {
-    if (!date) return;
+    if (!date && !data?.own) return;
     if (playing) {
       onError("Stop eerst het afspelen voordat je de setlist klaarzet.");
       return;
     }
     setBusy(true);
     try {
-      await reaperAction({ action: "load", date }, "/api/reaper/setlist");
+      await reaperAction({ action: "load", date, own: !!data?.own }, "/api/reaper/setlist");
       onStatus("Setlist staat klaar in REAPER.");
       await load(date);
     } catch (err) {
@@ -141,13 +163,13 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
     <section className={`glass-card trk-setlist${stage ? " stage" : ""}`}>
       <div className="trk-setlist-head">
         <h3 className="trk-title"><ListOrdered size={18} style={{ color: "var(--primary)" }} /> Setlist</h3>
-        {desktop && (!isOffline() || hasServiceCache()) && (
+        {((desktop && (!isOffline() || hasServiceCache())) || (!desktop && data)) && (
           <span className="trk-src">
-            <button className={`trk-icon-btn${source === "service" ? " pinned" : ""}`} onClick={() => chooseSource("service")}>Dienst</button>
-            <button className={`trk-icon-btn${source === "own" ? " pinned" : ""}`} onClick={() => chooseSource("own")}>Eigen setlist</button>
+            <button className={`trk-icon-btn${(desktop ? source === "service" : !data?.own) ? " pinned" : ""}`} onClick={() => chooseSource("service")}>Dienst</button>
+            <button className={`trk-icon-btn${(desktop ? source === "own" : !!data?.own) ? " pinned" : ""}`} onClick={() => chooseSource("own")}>Eigen setlist</button>
           </span>
         )}
-        {data && data.dates.length > 0 && (
+        {data && !data.own && data.dates.length > 0 && (
           <select className="input-field trk-date" value={date || ""} onChange={(e) => load(e.target.value)}>
             {data.dates.map(d => (
               <option key={d} value={d}>{formatDate(d)}{d === data.today ? " (vandaag)" : ""}</option>
@@ -162,17 +184,17 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
         )}
       </div>
 
-      {data?.own && (
+      {data?.own && !stage && (
         <div className="trk-own-add">
-          <select className="input-field" value="" onChange={e => { if (e.target.value) ownEdit(() => ownAdd(e.target.value)); }}>
+          <select className="input-field" value="" onChange={e => { if (e.target.value) ownDo("add", e.target.value, 0); }}>
             <option value="">+ Nummer toevoegen aan je eigen setlist…</option>
-            {data.songs.filter(x => !ownPaths().includes(x.path)).map(x => (
+            {data.songs.filter(x => !(desktop ? ownPaths() : data.setlist.map(s => s.path)).includes(x.path)).map(x => (
               <option key={x.path} value={x.path}>{parseSongName(x.name).title}</option>
             ))}
           </select>
         </div>
       )}
-      {data?.own && data.setlist.length === 0 && <p className="trk-empty">Je eigen setlist is leeg. Voeg hierboven nummers toe uit de map met nummers op deze computer.</p>}
+      {data?.own && data.setlist.length === 0 && <p className="trk-empty">Je eigen setlist is leeg. Voeg hierboven nummers toe uit de map met nummers op {desktop ? "deze computer" : "de track-computer"}.</p>}
       {data?.bridgeError && <p className="trk-warn"><AlertTriangle size={14} /> {data.bridgeError}</p>}
       {data && !data.date && !data.own && <p className="trk-empty">Er is nog geen dienst met een setlist in de Planner.</p>}
       {data?.date && !data.own && data.setlist.length === 0 && <p className="trk-empty">Deze dienst heeft nog geen liederen.</p>}
@@ -213,9 +235,9 @@ export default function SetlistPanel({ state, onError, onStatus, stage }: Setlis
                 </>)}
                 {data.own ? (
                   <>
-                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownMove(i, -1))} disabled={i === 0} aria-label="Omhoog"><ChevronUp size={14} /></button>
-                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownMove(i, 1))} disabled={i === data.setlist.length - 1} aria-label="Omlaag"><ChevronDown size={14} /></button>
-                    <button className="trk-icon-btn" onClick={() => ownEdit(() => ownRemove(i))} aria-label="Verwijder uit de setlist"><X size={14} /></button>
+                    <button className="trk-icon-btn" onClick={() => ownDo("move", s.path || "", i, -1)} disabled={i === 0} aria-label="Omhoog"><ChevronUp size={14} /></button>
+                    <button className="trk-icon-btn" onClick={() => ownDo("move", s.path || "", i, 1)} disabled={i === data.setlist.length - 1} aria-label="Omlaag"><ChevronDown size={14} /></button>
+                    <button className="trk-icon-btn" onClick={() => ownDo("remove", s.path || "", i)} aria-label="Verwijder uit de setlist"><X size={14} /></button>
                   </>
                 ) : (
                 <select

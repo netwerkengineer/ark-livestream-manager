@@ -507,6 +507,8 @@ Bovenaan kies je tussen **Live**, **Bibliotheek** en de link **Podiumweergave (t
 - **geen track gevonden** — er staat geen bijpassende track in de bibliotheek; upload hem bij Bibliotheek (6a.2)
 - **audio wordt opgehaald…** — het nummer is bekend, maar de audio staat nog niet op de track-computer. Die wordt vanzelf opgehaald.
 
+**Eigen setlist** — naast **Dienst** staat de knop **Eigen setlist**. Daarmee maak je een lijst die los staat van de Planner: kies met "+ Nummer toevoegen aan je eigen setlist…" nummers uit de projecten op de track-computer, verander de volgorde met de pijltjes en haal een nummer weg met het kruisje. De lijst staat op de server, dus je ziet hem op elk apparaat (ook op het podium) en hij blijft bewaard. **Klaarzetten in REAPER** opent de nummers als tabs, precies zoals bij een dienst. Met **Dienst** ga je terug naar de setlist van een dienst; de gekozen lijst geldt voor alle schermen.
+
 Met het vernieuw-icoon laad je de lijst opnieuw. Een tweede knop opent alle gevonden songs als projecttabs in REAPER.
 
 **Arrangement** — een knop per sectie van het nummer (Intro, Couplet, Refrein, enzovoort; elke soort heeft een eigen kleur). Tik op een sectie om ernaartoe te springen. Met **Sprongmoment** kies je *wanneer* de sprong gebeurt:

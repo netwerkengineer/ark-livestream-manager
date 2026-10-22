@@ -10,6 +10,8 @@ import { isDesktopBackend, playerState, sendCommand, checkCommand, deviceLabel }
 import { getStoredArrangement, rebuildIfShowChanged } from "@/lib/trackArrangement";
 import { listTracks } from "@/lib/trackLibrary";
 import { hasDesktopAccess, DESKTOP_COOKIE } from "@/lib/desktopAccess";
+import { getOwnSetlist, saveOwnSetlist } from "@/lib/trackOwnSetlist";
+import { parseSongName } from "@/components/tracks/songName";
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -34,6 +36,24 @@ function setlistFor(serviceDate: string, songs: BridgeSong[]) {
       local,
     };
   });
+}
+
+// The own setlist: the stored project paths that still exist on the track computer, in order
+function ownSetlistFor(songs: BridgeSong[]) {
+  const library = listTracks();
+  const stored = getOwnSetlist().paths;
+  return stored
+    .map(p => songs.find(s => s.path === p))
+    .filter((s): s is BridgeSong => !!s)
+    .map(s => ({
+      id: s.path,
+      title: parseSongName(s.name).title,
+      artist: "",
+      section: "",
+      path: s.path,
+      manual: true,
+      local: library.find(i => i.report?.rpp === s.path)?.local ?? null,
+    }));
 }
 
 function resolveDate(requested: string | null) {
@@ -90,6 +110,11 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     bridgeError = `REAPER niet bereikbaar: ${errorMessage(err)}`;
+  }
+
+  // The own setlist replaces the service until the operator switches back (shared between all screens)
+  if (getOwnSetlist().active && !req.nextUrl.searchParams.get("date")) {
+    return NextResponse.json({ today, dates, date: null, own: true, setlist: ownSetlistFor(songs), songs, loaded, bridgeError });
   }
 
   return NextResponse.json({
@@ -154,6 +179,43 @@ export async function POST(req: NextRequest) {
       }
       saveSongLink(title, path);
       return NextResponse.json({ success: true });
+    }
+
+    // Own setlist (REAPER): which list is shown, and adding, removing and moving projects
+    if (action === "ownSource") {
+      const cur = getOwnSetlist();
+      saveOwnSetlist({ ...cur, active: !!body.own });
+      return NextResponse.json({ success: true });
+    }
+    if (action === "ownAdd" || action === "ownRemove" || action === "ownMove") {
+      const cur = getOwnSetlist();
+      const pathArg = typeof body.path === "string" ? body.path : "";
+      let paths = cur.paths.filter(p => bridge.songs.some(s => s.path === p));
+      if (action === "ownAdd") {
+        if (!bridge.songs.some(s => s.path === pathArg)) return NextResponse.json({ error: "Onbekende song" }, { status: 400 });
+        if (!paths.includes(pathArg)) paths = [...paths, pathArg];
+      } else if (action === "ownRemove") {
+        paths = paths.filter(p => p !== pathArg);
+      } else {
+        const i = paths.indexOf(pathArg);
+        const j = i + (body.dir === -1 ? -1 : 1);
+        if (i < 0 || j < 0 || j >= paths.length) return NextResponse.json({ success: true });
+        [paths[i], paths[j]] = [paths[j], paths[i]];
+      }
+      saveOwnSetlist({ active: true, paths });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "load" && body.own) {
+      const paths = ownSetlistFor(bridge.songs).map(s => s.path);
+      if (paths.length === 0) return NextResponse.json({ error: "De eigen setlist is leeg" }, { status: 400 });
+      await sendBridgeCommand("setlist", paths, 60000);
+      for (const p of paths) {
+        const rebuilt = await rebuildIfShowChanged(p).catch(() => false);
+        const stored = await getStoredArrangement(p);
+        if (stored && !rebuilt) await sendBridgeCommand("cues", [p, stored.cues]).catch(() => undefined);
+      }
+      return NextResponse.json({ success: true, loaded: paths.length });
     }
 
     if (action === "load") {
