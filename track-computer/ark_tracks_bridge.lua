@@ -913,11 +913,21 @@ function handlers.recstart(name)
   reaper.RecursiveCreateDirectory(folder, 0)
   local file = folder .. "/" .. folderName .. ".RPP"
   restoreGuide()
+  -- Het sjabloon als projectbestand in de opnamemap zetten en dat openen: zo heeft het project meteen zijn eigen naam
+  -- (een sjabloon-project is naamloos, en opslaan vraagt dan om een bestandsnaam en blokkeert de bridge)
+  local src = io.open(REC_TEMPLATE, "rb")
+  local dst = src and io.open(file, "wb")
+  if not (src and dst) then
+    if src then src:close() end
+    error("Het opname-project kon niet worden aangemaakt in " .. folder)
+  end
+  dst:write(src:read("*a"))
+  src:close()
+  dst:close()
   reaper.Main_OnCommand(CMD_NEW_TAB, 0)                 -- eigen tab, de song-tabs blijven ongemoeid
-  reaper.Main_openProject("template:" .. REC_TEMPLATE)
-  local proj = reaper.EnumProjects(-1)
-  reaper.Main_SaveProjectEx(proj, file, 0)               -- eerst opslaan: dan staat het project ook als REAPER crasht
-  if not fileExists(file) then error("Het opname-project kon niet worden opgeslagen in " .. folder) end
+  reaper.Main_openProject("noprompt:" .. file)
+  local proj = findOpen(file)
+  if not proj then error("Het opname-project kon niet worden geopend") end
   opname = { name = label, folder = folder, file = file, t0 = os.time() }
   saveOpnameState()
   reaper.Main_OnCommand(1013, 0)                          -- Transport: Record
@@ -927,9 +937,14 @@ end
 -- audio-apparaat) wordt alleen gestopt: geen "laatste opname" en geen kopie naar de NAS.
 function handlers.recstop(mode)
   if not opname then error("Er loopt geen opname") end
-  local proj = findOpen(opname.file) or reaper.EnumProjects(-1)
-  reaper.OnStopButtonEx(proj)
-  reaper.Main_SaveProject(proj, false)
+  local proj = findOpen(opname.file)
+  if proj then reaper.SelectProjectInstance(proj) end
+  -- "Stop (save all recorded media)": het gewone Stop vraagt, als die voorkeur van REAPER aanstaat, in een venster of de
+  -- opgenomen bestanden bewaard moeten worden. Dat venster blokkeert de bridge tot iemand op de track-computer klikt.
+  reaper.Main_OnCommand(40667, 0)
+  if proj then
+    reaper.Main_SaveProjectEx(proj, opname.file, 0)
+  end
   if mode ~= "annuleer" then
     st.lastOpname = { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0 }
     startCopy(opname.folder)
@@ -1413,6 +1428,7 @@ local function writeState()
       return { name = fn:match("([^/]+)/[^/]+$") or fn, file = fn, tracks = reaper.CountTracks(proj), linked = linked,
                outputs = reaper.GetNumAudioOutputs(), playing = isPlaying() }
     end)(),
+    audio = { running = reaper.Audio_IsRunning() == 1, inputs = reaper.GetNumAudioInputs(), outputs = reaper.GetNumAudioOutputs() },
     diskFreeGB = diskFreeGB,
     opnameSjabloon = fileExists(REC_TEMPLATE),
   }
