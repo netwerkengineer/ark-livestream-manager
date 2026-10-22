@@ -19,6 +19,7 @@ import SetlistPanel from "@/components/tracks/SetlistPanel";
 import SectionsPanel from "@/components/tracks/SectionsPanel";
 import TrackLibraryPanel from "@/components/tracks/TrackLibraryPanel";
 import TimingRecorder from "@/components/tracks/TimingRecorder";
+import OpnameCard from "@/components/tracks/OpnameCard";
 import PadsPanel from "@/components/tracks/PadsPanel";
 import LocalSongsPanel from "@/components/tracks/LocalSongsPanel";
 import { hasDesktopEngine, isOffline } from "@/lib/desktopEngine";
@@ -266,6 +267,8 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
       </div>
 
       <PadsPanel state={state} onError={showError} />
+
+      {!offline && <OpnameCard state={state} onError={showError} onStatus={showSuccess} />}
 
       {!offline && <TimingRecorder state={state} onError={showError} onStatus={showSuccess} />}
 

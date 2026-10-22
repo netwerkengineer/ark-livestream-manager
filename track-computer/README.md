@@ -11,6 +11,7 @@ bedient hem via REAPER's webinterface (Tracks-tab en de podiumweergave `/tracks`
 | `convert-all.command` | `~/Tracks/_tools/` | Dubbelklikbaar: alles in `~/Tracks/Songs` omzetten. |
 | `ark_tracks_agent.py` | `~/Tracks/_tools/` | Haalt geüploade tracks van de server op, zet ze om, en houdt alleen de audio van songs die nodig zijn (setlists, recent, "altijd houden"). |
 | `ark_tracks_bridge.lua` | `~/Library/Application Support/REAPER/Scripts/` | Draait in REAPER: songs/setlist als projecttabs, muzikaal springen (regions), loop, dynamische guide, uitgangsmodus, FreeShow-cues. |
+| `Ark_opname_band.RPP` | `~/Tracks/_tools/` | Sjabloon voor de audio-opname (knop "Opname" in de Tracks-tab): 21 mono-sporen (drums, bas, gitaar, toetsen, sax, zang, spreker-mic, oude click en tracks), geen monitoring, geen uitgang. Ingang N = X32-kanaal N via de USB-kaart (Routing → Card: A1-8, A9-16, AN17-24, AN25-32). Opnames komen in `~/Tracks/Opnames/<datum tijd naam>/`. |
 | `__startup.lua` | idem | Start de bridge automatisch met REAPER. |
 | `ArkPads.swift` | `~/Tracks/_tools/` | Padspeler los van REAPER (crossfade per toonsoort). Pads in `~/Tracks/Pads/<set>/<laag>/<toon>.wav`. |
 

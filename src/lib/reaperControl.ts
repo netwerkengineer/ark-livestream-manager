@@ -66,6 +66,19 @@ export interface BridgeState {
   recSlide?: number;   // while recording: slide (within the section) on screen now
   recSlides?: number;  // ... of this many
   output?: string;     // what's applied now (auto resolves to multi/stereo)
+  // Audio-opname (band en sprekers) in een eigen REAPER-project; zie ark_tracks_bridge.lua "opname (audio)"
+  opname?: AudioRecording;           // loopt nu
+  lastOpname?: { name: string; folder: string; file: string; seconds: number };
+  diskFreeGB?: number;               // vrije schijfruimte op de track-computer
+  opnameSjabloon?: boolean;          // staat het opnamesjabloon op de track-computer?
+}
+
+export interface AudioRecording {
+  name: string;
+  folder: string;
+  file: string;
+  seconds: number;     // sinds de start
+  recording: boolean;  // REAPER neemt ook echt op (anders: gestart maar geen opname, bv. geen audio-ingang)
 }
 
 export type JumpMode = 'end' | 'bar' | 'now';

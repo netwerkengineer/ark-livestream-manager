@@ -88,6 +88,19 @@ export async function POST(req: NextRequest) {
         const v = value === undefined ? -1 : (value ? 1 : 0);
         await reaperRequest([`SET/TRACK/${index}/${action === "mute" ? "MUTE" : "SOLO"}/${v}`]);
       }
+    } else if (action === "opnameStart") {
+      // Naam is optioneel; de bridge maakt er een veilige mapnaam van
+      const naam = typeof body.name === "string" ? body.name.replace(/[\t\r\n]/g, " ").trim().slice(0, 60) : "";
+      await sendBridgeCommand("recstart", [naam], 20000);
+      // Zeker weten dat REAPER opneemt: nog even op de status wachten
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        const b = await getBridgeState();
+        if (b?.opname?.recording) return NextResponse.json({ success: true });
+      }
+      return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen." }, { status: 502 });
+    } else if (action === "opnameStop") {
+      await sendBridgeCommand("recstop", [], 20000);
     } else if (action === "recordStart" || action === "recordCancel") {
       await sendBridgeCommand("record", [action === "recordStart" ? "start" : "cancel"]);
     } else if (action === "tap") {

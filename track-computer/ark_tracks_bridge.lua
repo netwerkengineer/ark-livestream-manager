@@ -20,6 +20,8 @@
 --   lead \t tellen             FreeShow-dia's zoveel tellen eerder tonen (0-4)
 --   master \t volume \t mute  master volume (lineair 0-2) en master mute (0/1)
 --   freeshow \t host \t poort  FreeShow REST-API voor de cues (leeg = MIDI)
+--   recstart \t naam          audio-opname starten (nieuw project uit het opnamesjabloon, eigen tab)
+--   recstop                    audio-opname stoppen en het project bewaren
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
 local SECTION = "ArkTracks"
@@ -736,6 +738,61 @@ local function readSections(path)
   return list
 end
 
+---------------------------------------------------------------- opname (audio)
+-- Een opname van de band en de sprekers: nieuw project uit het opnamesjabloon (in een eigen tab),
+-- opgeslagen als ~/Tracks/Opnames/<datum tijd [naam]>/<zelfde naam>.RPP, dan opnemen. De audio komt
+-- in de map "Media" naast het project. Het sjabloon (Ark_opname_band.RPP) staat in ~/Tracks/_tools/.
+-- Commando's: recstart \t naam (naam mag leeg zijn) | recstop
+local REC_DIR = (os.getenv("HOME") or "") .. "/Tracks/Opnames"
+local REC_TEMPLATE = (os.getenv("HOME") or "") .. "/Tracks/_tools/Ark_opname_band.RPP"
+local opname = nil          -- { name, folder, file, t0 } zolang er een opname loopt
+local diskFreeGB, diskChecked = nil, 0
+
+local function fileExists(p)
+  local f = io.open(p, "r")
+  if f then f:close() return true end
+  return false
+end
+
+local function cleanName(n)
+  local x = (n or ""):gsub("[%c/\\:*?\"<>|]", " ")
+  x = x:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  return x:sub(1, 60)
+end
+
+-- Opname die nog loopt na het opnieuw laden van dit script terugvinden
+do
+  local saved = reaper.GetExtState(SECTION, "opname")
+  if saved ~= "" then
+    local a = split(saved, "\t")
+    if a[3] and a[3] ~= "" then opname = { name = a[1], folder = a[2], file = a[3], t0 = tonumber(a[4]) or os.time() } end
+  end
+end
+
+local function saveOpnameState()
+  if opname then
+    reaper.SetExtState(SECTION, "opname", table.concat({ opname.name, opname.folder, opname.file, tostring(opname.t0) }, "\t"), false)
+  else
+    reaper.DeleteExtState(SECTION, "opname", false)
+  end
+end
+
+local function refreshDisk()
+  local now = reaper.time_precise()
+  if now - diskChecked < 30 then return end
+  diskChecked = now
+  local ok, p = pcall(io.popen, 'df -k "$HOME" 2>/dev/null | tail -1')
+  if not ok or not p then return end
+  local line = p:read("*a") or ""
+  p:close()
+  local avail = line:match("^%S+%s+%d+%s+%d+%s+(%d+)")
+  if avail then diskFreeGB = math.floor(tonumber(avail) / 1048576 * 10 + 0.5) / 10 end
+end
+
+local function noRecording()
+  if opname then error("Er loopt een opname - stop die eerst") end
+end
+
 ---------------------------------------------------------------- commands
 local handlers = {}
 
@@ -753,6 +810,38 @@ function handlers.output(mode)
   outputMode = mode
   reaper.SetExtState(SECTION, "outputMode", mode, true)
   routing.force = true
+end
+
+-- Audio-opname starten (zie "opname (audio)" hierboven)
+function handlers.recstart(name)
+  if opname then error("Er loopt al een opname") end
+  if reaper.GetPlayState() ~= 0 then error("Stop eerst het afspelen") end
+  if not fileExists(REC_TEMPLATE) then error("Opnamesjabloon ontbreekt op de track-computer: " .. REC_TEMPLATE) end
+  local label = cleanName(name)
+  local folderName = os.date("%Y-%m-%d %H.%M") .. (label ~= "" and (" " .. label) or "")
+  local folder = REC_DIR .. "/" .. folderName
+  reaper.RecursiveCreateDirectory(folder, 0)
+  local file = folder .. "/" .. folderName .. ".RPP"
+  restoreGuide()
+  reaper.Main_OnCommand(CMD_NEW_TAB, 0)                 -- eigen tab, de song-tabs blijven ongemoeid
+  reaper.Main_openProject("template:" .. REC_TEMPLATE)
+  local proj = reaper.EnumProjects(-1)
+  reaper.Main_SaveProjectEx(proj, file, 0)               -- eerst opslaan: dan staat het project ook als REAPER crasht
+  if not fileExists(file) then error("Het opname-project kon niet worden opgeslagen in " .. folder) end
+  opname = { name = label, folder = folder, file = file, t0 = os.time() }
+  saveOpnameState()
+  reaper.Main_OnCommand(1013, 0)                          -- Transport: Record
+end
+
+-- Audio-opname stoppen en het project bewaren
+function handlers.recstop()
+  if not opname then error("Er loopt geen opname") end
+  local proj = findOpen(opname.file) or reaper.EnumProjects(-1)
+  reaper.OnStopButtonEx(proj)
+  reaper.Main_SaveProject(proj, false)
+  st.lastOpname = { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0 }
+  opname = nil
+  saveOpnameState()
 end
 
 -- Timing opnemen: start | save | cancel. "save" zet de tikken per sectienaam in
@@ -890,6 +979,7 @@ function handlers.mode(m)
 end
 
 function handlers.setlist(...)
+  noRecording()
   if isPlaying() then error("Setlist laden kan niet tijdens afspelen") end
   restoreGuide()
   local active = reaper.EnumProjects(-1)
@@ -910,6 +1000,7 @@ end
 
 -- Een opnieuw gemaakt project opnieuw inladen (in zijn eigen tab), zonder vragen
 function handlers.reopen(path)
+  noRecording()
   local proj = findOpen(path)
   if not proj then return end
   restoreGuide()
@@ -924,6 +1015,7 @@ end
 -- niet sample-nauwkeurig tussen projecten wisselen) en het nieuwe start vanaf zijn
 -- Count Off. Zonder modus of als er niets speelt: stoppen en klaarzetten.
 function handlers.song(path, mode)
+  noRecording()
   local _, current = reaper.EnumProjects(-1)
   if isPlaying() and mode and mode ~= "" and path ~= current then
     if not findOpen(path) then error("Dit nummer staat nog niet klaar in REAPER (setlist klaarzetten)") end
@@ -1124,6 +1216,7 @@ local function midiOutputs()
 end
 
 local function writeState()
+  refreshDisk()
   local tabs = {}
   local active = reaper.EnumProjects(-1)
   for _, p in ipairs(openProjects()) do
@@ -1160,6 +1253,11 @@ local function writeState()
     error = st.error,
     nextSong = nextInSetlist(),
     pendingSong = st.pendingSong and st.pendingSong.path or nil,
+    opname = opname and { name = opname.name, folder = opname.folder, file = opname.file, seconds = os.time() - opname.t0,
+                          recording = (reaper.GetPlayState() & 4) ~= 0 } or nil,
+    lastOpname = st.lastOpname,
+    diskFreeGB = diskFreeGB,
+    opnameSjabloon = fileExists(REC_TEMPLATE),
   }
   reaper.SetExtState(SECTION, "state", json(out), false)
 end

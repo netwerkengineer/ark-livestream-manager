@@ -525,6 +525,13 @@ Met het vernieuw-icoon laad je de lijst opnieuw. Een tweede knop opent alle gevo
 
 Klopt de automatische timing van de dia's niet, gebruik dan **Timing opnemen**: speel het nummer af en tik op het moment dat de **Volgende dia** moet komen. Met **Opslaan** wordt dat per sectie onthouden en gebruikt de app voortaan jouw timing. Hoeveel tellen de dia's eerder dan de muziek worden getoond (standaard 2) stel je in bij 8.2.
 
+**Opname van de band en sprekers** — onderaan de Live-weergave staat de kaart **"Opname"**. Vul eventueel een naam in en klik **"Opname starten"**: REAPER op de track-computer maakt een nieuw project uit het opnamesjabloon (21 sporen: de drums, bas, gitaar, toetsen, saxofoon en zang, de spreker-microfoon, en de oude click en tracks), slaat dat op in de map `~/Tracks/Opnames/<datum tijd naam>` en begint op te nemen. Tijdens de opname zie je een rode stip en de duur. **"Stop opname"** (met een bevestiging) stopt en bewaart het project; de audio staat in de map `Media` naast het project en is een gewoon REAPER-project dat je later kunt mixen of uitknippen. Aandachtspunten:
+- Het sjabloon `Ark_opname_band.RPP` (staat in de map `track-computer` van de app) moet in `~/Tracks/_tools/` op de track-computer staan, en de bijgewerkte bridge (`ark_tracks_bridge.lua`) moet in REAPER draaien. Ontbreekt het sjabloon, dan meldt de kaart dat.
+- REAPER moet als audio-apparaat de X-USB gebruiken, voor ingang én uitgang. De X32 stuurt via Routing → Card de ingangen naar de USB-kaart.
+- Starten kan niet terwijl er een nummer afspeelt. Tijdens een opname kun je geen ander nummer kiezen.
+- Een opname van 21 sporen op 24 bit/48 kHz neemt ongeveer 11 GB per uur in beslag; de kaart toont de vrije ruimte.
+- De sporen luisteren niet mee (geen monitoring) en sturen niets terug naar de X32.
+
 ### 6a.2 Bibliotheek
 
 **Track-bibliotheek** — alle nummers waarvoor tracks beschikbaar zijn. Nieuwe tracks voeg je toe door een **MultiTracks-zip** naar het vak te slepen of erop te klikken. De zip wordt in stukken geüpload (en hervat vanzelf na een haperende verbinding). Daarna haalt de track-computer hem automatisch op, zet hem om naar een REAPER-project en maakt de server er een oefenversie van voor de oefenspeler (6b). Per nummer zie je de status en de secties. Het label **op Mac mini** betekent dat de audio op de track-computer staat. Bij een fout kun je het **Opnieuw proberen**, en met **Verwijderen** haal je een nummer weg.
