@@ -75,6 +75,43 @@ export function slideRows(slideObj: any): number {
   return slideLines(slideObj).reduce((sum: number, l: any) => sum + screenRows(l), 0);
 }
 
+// Een regel die op het scherm meer dan MAX_LINES_PER_SLIDE rijen beslaat (bv. een hele zin van 70 tekens in één regel) kan niet
+// door dia's te verdelen op twee rijen komen: de regel zelf is te lang. Die breken we op woordgrenzen in meerdere regels, elk
+// hooguit één rij breed, zodat ze netjes over de dia's verdeeld worden. De tekst blijft hetzelfde. Voorkeur voor een breuk na
+// leestekens en gelijkmatige stukken (geen losse laatste woorden).
+function breakIntoRows(text: string): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const total = lineWidthEm(words.join(' '));
+  const parts = Math.max(2, Math.ceil(total / MAX_LINE_EM));
+  const target = total / parts;
+  const pieces: string[] = [];
+  let cur = '';
+  for (const word of words) {
+    if (!cur) { cur = word; continue; }
+    const withWord = `${cur} ${word}`;
+    const w = lineWidthEm(withWord);
+    const curW = lineWidthEm(cur);
+    const punct = /[,.;:!?)]$/.test(cur);
+    const mustBreak = w > MAX_LINE_EM;
+    const likelyBreak = w > target * 1.12 || (punct && curW >= target * 0.7);
+    if (mustBreak || (likelyBreak && pieces.length < parts - 1)) { pieces.push(cur); cur = word; } else { cur = withWord; }
+  }
+  if (cur) pieces.push(cur);
+  return pieces;
+}
+
+export function splitOverlongLines<T extends { text?: any[] }>(lines: T[]): T[] {
+  const out: T[] = [];
+  for (const line of lines) {
+    if (screenRows(line) <= MAX_LINES_PER_SLIDE) { out.push(line); continue; }
+    const first = (line.text || [])[0] || {};
+    for (const piece of breakIntoRows(lineText(line))) {
+      out.push({ ...line, text: [{ ...first, value: piece }] });
+    }
+  }
+  return out;
+}
+
 // Lines in order, at most MAX_LINES_PER_SLIDE rows on screen per slide. A
 // line that wraps by itself gets a slide of its own.
 export function chunkForScreen<T>(lines: T[], rowsOf: (line: T) => number = screenRows): T[][] {
@@ -120,7 +157,7 @@ export function childSlideFrom(parent: any, lines: any[]): any {
 // rows on screen per slide), a number = at most that many lines per slide.
 // Existing child ids are reused where possible.
 export function resplitGroup(parent: any, children: EditorChild[], lines: any[], size: number | 'screen'): { parent: any; children: EditorChild[] } {
-  const chunks = size === 'screen' ? chunkForScreen(lines) : chunkLines(lines, size);
+  const chunks = size === 'screen' ? chunkForScreen(splitOverlongLines(lines)) : chunkLines(lines, size);
   const item = textItem(parent);
   const newParent = { ...parent, items: parent.items.map((it: any) => (it === item ? { ...it, lines: chunks[0] } : it)) };
   const newChildren = chunks.slice(1).map((chunk, i) => ({

@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import fs from 'fs/promises';
 import path from 'path';
-import { chunkForScreen } from './slideSplit';
+import { chunkForScreen, splitOverlongLines } from './slideSplit';
 import { getBijbelStijl } from './bijbelstijlen';
 
 function generateId() {
@@ -233,7 +233,7 @@ export function createShowObject(show: any) {
       // FreeShow itself uses when it splits a group, so the layout still
       // references only the group slide and FreeShow shows the children
       // right after it. Presentations keep all their lines on one slide.
-      const chunks: any[][] = show.data.category === 'presentation' ? [lines] : chunkForScreen(lines);
+      const chunks: any[][] = show.data.category === 'presentation' ? [lines] : chunkForScreen(splitOverlongLines(lines));
 
       const childIds = chunks.slice(1).map(chunk => {
         const childId = generateId();
