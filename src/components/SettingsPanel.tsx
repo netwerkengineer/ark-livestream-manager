@@ -2410,7 +2410,7 @@ export default function SettingsPanel({
                   className="input-field"
                   value={settings.opsAlertEmail || ""}
                   onChange={(e) => onSettingsChange({ ...settings, opsAlertEmail: e.target.value })}
-                  placeholder="jeffrey.go@arkchurch.nl"
+                  placeholder="naam@voorbeeld.nl"
                 />
               </div>
 

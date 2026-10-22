@@ -372,7 +372,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   smtpSecure: true,
   smtpFromName: "Ark Church Livestream Manager",
   smtpFromEmail: "",
-  opsAlertEmail: "jeffrey.go@arkchurch.nl",
+  opsAlertEmail: "",
   thumbnailSyncEnabled: true,
   ledPanelEnabled: false,
   ledPanelMac: "",
