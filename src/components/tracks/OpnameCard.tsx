@@ -27,6 +27,7 @@ function hms(sec: number): string {
 export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);   // blijft staan tot de volgende actie (de melding bovenin verdwijnt snel)
 
   const bridge = state?.bridge;
   if (!bridge) return null;
@@ -38,12 +39,15 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
 
   const act = async (body: object, okText?: string) => {
     setBusy(true);
+    setFout(null);
     try {
       await reaperAction(body);
       if (okText) onStatus(okText);
       return true;
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Actie mislukt");
+      const melding = err instanceof Error ? err.message : "Actie mislukt";
+      setFout(melding);
+      onError(melding);
       return false;
     } finally {
       setBusy(false);
@@ -116,6 +120,9 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
           <span className="trk-rec-dot" /> Opname starten
         </button>
       </div>
+      {fout && (
+        <p className="trk-empty" style={{ marginTop: 8, color: "#f87171" }}>{fout}</p>
+      )}
       {geenSjabloon && (
         <p className="trk-empty" style={{ marginTop: 8 }}>
           Het opnamesjabloon ontbreekt op de track-computer: zet <code>Ark_opname_band.RPP</code> in <code>~/Tracks/_tools/</code>.

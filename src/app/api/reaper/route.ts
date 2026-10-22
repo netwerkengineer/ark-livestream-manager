@@ -93,11 +93,14 @@ export async function POST(req: NextRequest) {
       const naam = typeof body.name === "string" ? body.name.replace(/[\t\r\n]/g, " ").trim().slice(0, 60) : "";
       await sendBridgeCommand("recstart", [naam], 20000);
       // Zeker weten dat REAPER opneemt: nog even op de status wachten
+      let last: unknown = null;
       for (let i = 0; i < 6; i++) {
         await new Promise(r => setTimeout(r, 500));
-        const b = await getBridgeState();
+        const b = await getBridgeState().catch(err => { last = `fout: ${errorMessage(err)}`; return null; });
+        if (b) last = { opname: b.opname ?? null, error: b.error ?? null, lastCmd: b.lastCmd };
         if (b?.opname?.recording) return NextResponse.json({ success: true });
       }
+      console.warn("[Opname] REAPER meldt niet dat hij opneemt:", JSON.stringify(last));
       // Er wordt niet echt opgenomen: de opname meteen annuleren, anders blijft de bridge "er loopt al een opname" melden
       await sendBridgeCommand("recstop", ["annuleer"], 20000).catch(() => undefined);
       return NextResponse.json({ error: "De opname is gestart in REAPER, maar REAPER neemt niet op. Controleer het audio-apparaat (X-USB, in én uit) en de ingangen. De opname is geannuleerd." }, { status: 502 });
