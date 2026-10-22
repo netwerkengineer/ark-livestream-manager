@@ -112,6 +112,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Ongeldige opname" }, { status: 400 });
       }
       await sendBridgeCommand("playopname", [value], 60000);
+    } else if (action === "opnameDelete") {
+      // Een opname van de track-computer verwijderen (de NAS-kopie blijft staan): alleen voor beheerders
+      if (authSession.role !== "admin") return NextResponse.json({ error: "Alleen een beheerder mag opnames verwijderen" }, { status: 403 });
+      if (typeof value !== "string" || !value || /[\t\r\n/\\]/.test(value) || value.startsWith(".")) {
+        return NextResponse.json({ error: "Ongeldige opname" }, { status: 400 });
+      }
+      await sendBridgeCommand("deleteopname", [value], 60000);
+      console.log(`[Opname] Verwijderd van de track-computer: ${value} (${authSession.username})`);
     } else if (action === "opnameClose") {
       await sendBridgeCommand("closeopname", [], 20000);
     } else if (action === "opnameCopy") {

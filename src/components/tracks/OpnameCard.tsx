@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Mic, Square, CloudUpload, Headphones } from "lucide-react";
+import { Mic, Square, CloudUpload, Headphones, Trash2 } from "lucide-react";
 import type { ReaperState, OpnameItem } from "@/lib/reaperControl";
 import { reaperAction } from "./useReaper";
 import X32RoutingBar from "./X32RoutingBar";
@@ -94,6 +94,14 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
   const kiesOpname = async (o: OpnameItem) => {
     if (!confirm(`De opname "${o.name}" klaarzetten om af te spelen?\n\nElk spoor gaat naar de USB-uitgang met hetzelfde nummer als het kanaal waarvan het is opgenomen.`)) return;
     await act({ action: "opnamePlay", value: o.file }, "Opname staat klaar om af te spelen");
+  };
+  const verwijder = async (o: OpnameItem) => {
+    const opNas = o.copy?.status === "klaar";
+    const tekst = opNas
+      ? `De opname "${o.name}" van de track-computer verwijderen?\n\nDe kopie op de NAS blijft staan.`
+      : `LET OP: de opname "${o.name}" staat NIET op de NAS (${o.copy?.status === "bezig" ? "kopiëren is nog bezig" : o.copy?.status === "fout" ? "de kopie is mislukt" : "alleen lokaal"}).\n\nVerwijderen is definitief: de opname is daarna weg. Toch verwijderen?`;
+    if (!confirm(tekst)) return;
+    await act({ action: "opnameDelete", value: o.name }, "Opname verwijderd van de track-computer");
   };
   const sluitOpname = async () => {
     // Eerst de X32 terug naar REC (als hij op PLAY staat), anders blijft de zaal zonder microfoons
@@ -204,6 +212,11 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
                   title={playing ? "Stop eerst het afspelen" : !o.seconds ? "Deze opname bevat geen audio" : "Klaarzetten om af te spelen"}
                   onClick={() => kiesOpname(o)}>
                   {afspelen?.file === o.file && afspelen.linked > 0 ? "Staat klaar" : "Klaarzetten"}
+                </button>
+                <button className="trk-load" style={{ padding: "2px 8px" }} disabled={busy || playing || o.copy?.status === "bezig"}
+                  title={o.copy?.status === "bezig" ? "Wacht tot de kopie naar de NAS klaar is" : "Verwijderen van de track-computer (de NAS-kopie blijft staan)"}
+                  onClick={() => verwijder(o)}>
+                  <Trash2 size={13} />
                 </button>
               </div>
             ))}

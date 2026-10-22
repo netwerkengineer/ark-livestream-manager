@@ -25,6 +25,7 @@
 --   copyopname                 de laatste opname (opnieuw) naar de NAS kopiëren
 --   playopname \t pad          een opname openen om af te spelen (virtuele soundcheck): spoor N -> USB-uitgang N
 --   closeopname                de opname-tab sluiten
+--   deleteopname \t naam       een opname (map in ~/Tracks/Opnames) van de track-computer verwijderen; de NAS blijft onaangeroerd
 -- Lange opdrachten mogen in delen komen, zie handlePart.
 
 local SECTION = "ArkTracks"
@@ -796,10 +797,11 @@ end
 
 -- Kopie van een opname naar de NAS (script opname-naar-nas.sh, draait op de achtergrond; verwijdert nooit iets).
 -- De voortgang staat in <opname-map>/.naar-nas.status en gaat mee in de status (lastOpname.copy).
+local function shq(x) return "'" .. x:gsub("'", "'\\''") .. "'" end   -- veilig voor de shell, ook met $ of ` in de naam
+
 local function startCopy(folder)
   if not fileExists(REC_COPY) then return end
-  local function q(x) return "'" .. x:gsub("'", "'\\''") .. "'" end   -- veilig voor de shell, ook met $ of ` in de naam
-  os.execute("nohup /bin/bash " .. q(REC_COPY) .. " " .. q(folder) .. " >/dev/null 2>&1 &")
+  os.execute("nohup /bin/bash " .. shq(REC_COPY) .. " " .. shq(folder) .. " >/dev/null 2>&1 &")
 end
 
 local function readCopyStatus(folder)
@@ -1001,6 +1003,31 @@ function handlers.closeopname()
   reaper.OnStopButtonEx(proj)
   reaper.Main_SaveProject(proj, false)
   reaper.Main_OnCommand(40860, 0)      -- File: Close project tab
+end
+
+-- Een opname van de track-computer verwijderen (alleen die map, nooit iets op de NAS). Weigert tijdens een opname, tijdens
+-- afspelen en terwijl de kopie naar de NAS nog bezig is.
+function handlers.deleteopname(name)
+  noRecording()
+  if isPlaying() then error("Stop eerst het afspelen") end
+  if type(name) ~= "string" or name == "" or name:find("/", 1, true) or name:sub(1, 1) == "." then
+    error("Ongeldige opname")
+  end
+  local folder = REC_DIR .. "/" .. name
+  local file = folder .. "/" .. name .. ".RPP"
+  if not fileExists(file) then error("Opname niet gevonden") end
+  local cur = readCopyStatus(folder)
+  if cur and cur.status == "bezig" and os.time() - (cur.time or 0) < 6 * 3600 then error("De opname wordt nog naar de NAS gekopieerd") end
+  local proj = findOpen(file)
+  if proj then                               -- eerst de tab sluiten (opslaan: een vraag van REAPER zou de bridge blokkeren)
+    reaper.SelectProjectInstance(proj)
+    reaper.Main_SaveProject(proj, false)
+    reaper.Main_OnCommand(40860, 0)          -- File: Close project tab
+  end
+  os.execute("/bin/rm -rf -- " .. shq(folder))
+  if fileExists(file) then error("Verwijderen mislukt: " .. folder) end
+  if st.lastOpname and st.lastOpname.folder == folder then st.lastOpname = nil end
+  opnamesChecked = 0
 end
 
 -- Timing opnemen: start | save | cancel. "save" zet de tikken per sectienaam in
