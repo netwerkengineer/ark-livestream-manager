@@ -30,9 +30,14 @@ else
   [ -n "${NAS_HOST:-}" ] && [ -n "${NAS_USER:-}" ] && [ -n "${NAS_SHARE:-}" ] || { schrijf niet-ingesteld "opname-nas.conf is onvolledig (NAS_HOST, NAS_USER, NAS_SHARE)"; exit 3; }
   mkdir -p "$MNT"
   if ! mount | grep -q " on $MNT "; then
-    # het wachtwoord staat in ~/.nsmbrc ([host:gebruiker] password=...), niet op de opdrachtregel
-    if ! mount_smbfs "//${NAS_USER}@${NAS_HOST}/${NAS_SHARE}" "$MNT" 2>"$STATUS.err"; then
-      schrijf fout "Koppelen aan de NAS mislukt: $(tr '\n' ' ' < "$STATUS.err" | cut -c1-200)"; rm -f "$STATUS.err"; exit 4
+    # Het wachtwoord staat in ~/.nsmbrc ([host:gebruiker] password=...). mount_smbfs leest dat bestand zelf niet goed als er
+    # een @ of ander speciaal teken in het wachtwoord staat, dus lees het hier en geef het URL-gecodeerd mee.
+    PW="$(awk -v sec="[${NAS_HOST}:${NAS_USER}]" '$0==sec{f=1;next} /^\[/{f=0} f&&/^password=/{sub(/^password=/,"");print;exit}' "$HOME/.nsmbrc" 2>/dev/null)"
+    [ -n "$PW" ] || { schrijf niet-ingesteld "Wachtwoord ontbreekt in ~/.nsmbrc voor [${NAS_HOST}:${NAS_USER}]"; exit 3; }
+    PWENC="$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$PW")"
+    if ! mount_smbfs "//${NAS_USER}:${PWENC}@${NAS_HOST}/${NAS_SHARE}" "$MNT" 2>"$STATUS.err"; then
+      MELDING="$(tr '\n' ' ' < "$STATUS.err" | cut -c1-200)"
+      schrijf fout "Koppelen aan de NAS mislukt: ${MELDING//$PWENC/***}"; rm -f "$STATUS.err"; exit 4
     fi
     MOUNTED_BY_US=1
   fi
