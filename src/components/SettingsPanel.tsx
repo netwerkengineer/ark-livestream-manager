@@ -93,6 +93,15 @@ export default function SettingsPanel({
   const [detectingOutputs, setDetectingOutputs] = useState(false);
   const [detectedOutputs, setDetectedOutputs] = useState<{ id: string; name: string }[] | null>(null);
   const [detectError, setDetectError] = useState('');
+  const [songTemplates, setSongTemplates] = useState<string[] | null>(null);
+  const loadSongTemplates = async () => {
+    if (songTemplates) return;
+    try {
+      const res = await fetch('/api/freeshow/templates');
+      const data = await res.json();
+      setSongTemplates(Array.isArray(data.templates) ? data.templates : []);
+    } catch { setSongTemplates([]); }
+  };
 
   const detectLivestreamOutputs = async () => {
     setDetectingOutputs(true);
@@ -1707,6 +1716,25 @@ export default function SettingsPanel({
                 />
                 <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
                   Als je in de setlist een sfeer kiest, zet de app op de startdia van het lied een actie die dit adres aanroept (de Companion-knop voor die lichtkleur). Leeg laten betekent: alleen de achtergrond, geen licht.
+                </p>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Sjabloon voor liedteksten (naam in FreeShow)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  list="song-template-names"
+                  value={settings.songTemplateName || ""}
+                  onFocus={loadSongTemplates}
+                  onChange={(e) => onSettingsChange({ ...settings, songTemplateName: e.target.value })}
+                  placeholder="Leeg = standaardsjabloon van FreeShow"
+                />
+                <datalist id="song-template-names">
+                  {(songTemplates || []).map(n => <option key={n} value={n} />)}
+                </datalist>
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Nieuwe projecten (en projecten die je bijwerkt) zetten dit sjabloon op alle liederen, ook op liederen die al in de catalogus staan. Het sjabloon moet in FreeShow zijn geïmporteerd (Templates), bijvoorbeeld "Songs Modern Gecentreerd". De naam wordt opgezocht in Config/templates.json van de FreeShow-map.
                 </p>
               </div>
 

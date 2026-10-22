@@ -671,6 +671,8 @@ Zie hoofdstuk 7.
 | Automatisch opslaan op NAS | Of gegenereerde projecten automatisch worden weggeschreven |
 | Output-ID voor livestream-video-stijl | De (per machine lokale) FreeShow-output-ID die automatisch omgeschakeld wordt tussen de stijlen "Livestream Video fullscreen" (bij voorgrond-media) en "Livestream Liederen" (bij een lied/Bijbeltekst) — zie de uitleg in 5.2.1. Klik **"Automatisch opzoeken"** om deze op te halen via SSH van de machine die momenteel als FreeShow-host is ingesteld; kies daarna de juiste output uit de lijst. Omdat dit ID lokaal is aan die ene machine, moet dit opnieuw opgezocht worden als de FreeShow-host ooit verandert. |
 
+**Sjabloon voor liedteksten:** hier kies je (op naam) welk FreeShow-sjabloon de liedteksten op het scherm krijgen, bijvoorbeeld "Songs Modern Gecentreerd". Bij "Project aanmaken / bijwerken" zet de app dit sjabloon op alle liederen in het project, ook op liederen die al in de catalogus staan. Het sjabloon moet eerst in FreeShow zijn geïmporteerd (tabblad Templates). Leeg laten betekent: het standaardsjabloon van FreeShow. Staat de naam er wel, maar vindt de app het sjabloon niet, dan krijg je een melding bij het project.
+
 **E-mailkoppeling — ontvangen (liturgie-mails inlezen):**
 
 | Veld | Uitleg |

@@ -7,7 +7,7 @@ import { applySfeerToShowFile } from '@/lib/sfeer';
 import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
-import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
+import { resolveStyleIdByName, resolveTemplateIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { getBijbelStijl, bijbelCapaciteit } from '@/lib/bijbelstijlen';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
@@ -389,6 +389,11 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
   const livestreamOutputId = (settings.livestreamStyleOutputId || '').trim();
   const videoStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_VIDEO_STYLE_NAME) : null;
   const songStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_SONG_STYLE_NAME) : null;
+  // Sjabloon voor liedteksten (Instellingen -> FreeShow); leeg of niet gevonden = het standaardsjabloon van FreeShow
+  const songTemplateId = await resolveTemplateIdByName(settings.freeshowPath, settings.songTemplateName);
+  if ((settings.songTemplateName || '').trim() && !songTemplateId) {
+    notes.push(`Sjabloon voor liedteksten "${settings.songTemplateName}" niet gevonden in FreeShow (Config/templates.json); de liederen gebruiken het standaardsjabloon.`);
+  }
 
   for (const song of draft.songs) {
     const { item, note } = await resolveSongItem(song, settings, livestreamOutputId, songStyleId);
@@ -411,6 +416,7 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
         notes.push(`${song.title}: sfeer zetten mislukt (${err?.message || err}).`);
       }
     }
+    if (songTemplateId) item.templateId = songTemplateId;
     showsList.push(item);
   }
   const bijbelStijlSlug = resolveBijbelStijlSlug((draft as any).bijbelStijl);

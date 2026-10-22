@@ -276,7 +276,7 @@ export function createShowObject(show: any) {
     settings: {
       activeLayout: defaultLayoutId,
       // Bijbelteksten krijgen hun eigen opmaak mee (bijbelstijlen.ts); FreeShow's ingebouwde sjabloon "scripture" zou die overschrijven.
-      template: show.data.category === 'scripture' ? '' : 'default'
+      template: show.data.category === 'scripture' ? '' : (show.templateId || 'default')
     },
     timestamps: { created: now, modified: null, used: null },
     meta: isBibleShow ? {
@@ -698,6 +698,11 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
       const realId = item.fullData?.id || showId;
       showsToPush.push({ id: realId });
       let showData = item.fullData?.data || createShowObject(item);
+      // Gekozen sjabloon voor liedteksten (Instellingen -> FreeShow): ook op een bestaand lied uit de catalogus. Het project bevat
+      // de hele show, dus FreeShow neemt dit bij het importeren over.
+      if (item.type === 'song' && item.templateId) {
+        showData = { ...showData, settings: { ...(showData.settings || {}), template: item.templateId } };
+      }
       if ((item.type === 'song' || item.type === 'bible') && item.revertStyleId && item.revertOutputId) {
         showData = withRevertStyleAction(showData, item.revertOutputId, item.revertStyleId);
       }

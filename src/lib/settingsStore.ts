@@ -135,6 +135,8 @@ export interface AppSettings {
   // whose own token has expired - without this it logs/emails "koppeling
   // verlopen" every cycle. Only an explicit false disables it, so every
   // existing settings.json (no key) keeps syncing.
+  /** Naam van het FreeShow-sjabloon voor liedteksten in nieuwe projecten (leeg = het standaardsjabloon van FreeShow) */
+  songTemplateName?: string;
   thumbnailSyncEnabled?: boolean;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
@@ -373,6 +375,7 @@ Voor giften en donaties https://www.arkchurch.nl/gift/
   smtpFromName: "Ark Church Livestream Manager",
   smtpFromEmail: "",
   opsAlertEmail: "",
+  songTemplateName: "",
   thumbnailSyncEnabled: true,
   ledPanelEnabled: false,
   ledPanelMac: "",

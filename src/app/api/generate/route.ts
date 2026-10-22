@@ -4,7 +4,7 @@ import { toFreeShowClientPath } from '@/lib/freeshowUtils';
 import { buildBibleRefData, groupVersesForSlides, bijbelShowNaam } from '@/lib/draftProjectGenerator';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { syncAfterProjectSave } from '@/lib/syncTrigger';
-import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
+import { resolveStyleIdByName, resolveTemplateIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { isAuthorized } from '@/lib/authHelper';
 import { getSettings } from '@/lib/settingsStore';
 import fs from 'fs/promises';
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     // output to the fullscreen video style, and a song switches it back.
     const livestreamOutputId = (settings.livestreamStyleOutputId || '').trim();
     const videoStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_VIDEO_STYLE_NAME) : null;
+    const songTemplateId = await resolveTemplateIdByName(settings.freeshowPath, settings.songTemplateName);
     const songStyleId = livestreamOutputId ? await resolveStyleIdByName(settings.freeshowPath, LIVESTREAM_SONG_STYLE_NAME) : null;
 
     // Bijbelteksten zonder verzen-indeling (bv. uit de lokale catalogus): opnieuw opbouwen, zodat de opmaak gelijk is aan de
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
         showsList.push({
           ...baseShow,
           fullData: item.fullData,
+          ...(songTemplateId ? { templateId: songTemplateId } : {}),
           backgroundMedia: toClientPath(item.backgroundMedia),
           backgroundType: item.backgroundType,
           data: {
