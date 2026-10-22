@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath } from '@/lib/freeshowUtils';
-import { buildBibleRefData, groupVersesForSlides } from '@/lib/draftProjectGenerator';
+import { buildBibleRefData, groupVersesForSlides, bijbelShowNaam } from '@/lib/draftProjectGenerator';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { syncAfterProjectSave } from '@/lib/syncTrigger';
 import { resolveStyleIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
           backgroundType: item.backgroundMedia ? item.backgroundType : (bijbelStijlPerItem.get(String(item.id))?.video ? 'video' : item.backgroundType),
           ...(livestreamOutputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: livestreamOutputId } : {}),
           data: {
-            name: sanitizeName(`${item.ref} - ${item.translation}`),
+            name: bijbelShowNaam(item.ref, item.translation),
             category: "scripture",
             text: rebuiltBibles.get(String(item.id))?.text ?? item.text
           }

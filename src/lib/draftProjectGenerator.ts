@@ -53,6 +53,12 @@ function resolveSongCategoryId(rawCategory: string | undefined, categories: Reco
 
 const sanitizeShowName = (name: string) => name.replace(/[\\/:*?"<>|]/g, ' ').trim();
 
+// Naam van een bijbeltekst-show, bv. "Genesis 1,1-10 - BB". Bewust zonder dubbele punt: FreeShow maakt er zelf een komma van
+// ("Genesis 1,1-10") en schrijft het bestand onder die naam, terwijl de synchronisatie en het bestandssysteem er iets anders
+// van kunnen maken. Wijkt de bestandsnaam af van de naam in FreeShow, dan geeft FreeShow de show bij het inlezen een nieuw id
+// en verwijst het project niet meer naar de show ("Unnamed" in het project).
+export const bijbelShowNaam = (ref: string, vertaling: string) => `${ref} - ${vertaling}`.replace(/:/g, ',').replace(/[\\/*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+
 // Mirrors /api/preview's song resolution: reuse the existing catalog show
 // verbatim if there's a match (preserving its styling). If there's no match,
 // this now auto-creates a real catalog entry (mirroring /api/save-show)
@@ -266,7 +272,7 @@ async function resolveScriptureItem(scripture: DraftScripture, outputId: string,
         verses: bibleRes.verses,
         chunks
       },
-      data: { name: `${ref} - ${scripture.translation}`, category: 'scripture', text: textMap },
+      data: { name: bijbelShowNaam(ref, scripture.translation), category: 'scripture', text: textMap },
       // Same reasoning as resolveSongItem: a bijbeltekst following foreground
       // media also needs to switch the livestream output back.
       ...(outputId && songStyleId ? { revertStyleId: songStyleId, revertOutputId: outputId } : {})
