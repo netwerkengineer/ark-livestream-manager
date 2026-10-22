@@ -171,9 +171,15 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
         </div>
         {afspelen && (
           <>
-            <p className="trk-arr-hint" style={{ margin: "8px 0 0", color: afspelen.outputs === 0 || afspelen.linked < afspelen.tracks ? "#f59e0b" : "#4ade80" }}>
-              Klaar: <b>{afspelen.name}</b> · {afspelen.linked} van {afspelen.tracks} sporen naar USB-uitgang 1 t/m 32 (spoor van kanaal N naar uitgang N). Speel af met de gewone knoppen hierboven.
-            </p>
+            {afspelen.linked === 0 ? (
+              <p className="trk-arr-hint" style={{ margin: "8px 0 0", color: "#f59e0b" }}>
+                <b>{afspelen.name}</b> staat open in REAPER maar is nog <b>niet klaargezet</b>: de sporen hebben nog geen uitgang, dus je hoort niets. Klik hieronder bij de opname op <b>Klaarzetten</b>.
+              </p>
+            ) : (
+              <p className="trk-arr-hint" style={{ margin: "8px 0 0", color: afspelen.outputs === 0 || afspelen.linked < afspelen.tracks ? "#f59e0b" : "#4ade80" }}>
+                Klaar: <b>{afspelen.name}</b> · {afspelen.linked} van {afspelen.tracks} sporen naar USB-uitgang 1 t/m 32 (spoor van kanaal N naar uitgang N). Speel af met de gewone knoppen hierboven.
+              </p>
+            )}
             {afspelen.outputs === 0 && (
               <p className="trk-empty" style={{ color: "#f87171", marginTop: 6 }}>
                 REAPER ziet geen audio-uitgangen (is de X32 aan en de X-UF kaart verbonden?). Zonder uitgangen hoor je niets.
@@ -194,10 +200,10 @@ export default function OpnameCard({ state, onError, onStatus }: OpnameCardProps
                   </span>
                 </span>
                 <button className="trk-load" style={{ padding: "2px 10px" }}
-                  disabled={busy || playing || afspelen?.file === o.file || !o.seconds}
+                  disabled={busy || playing || (afspelen?.file === o.file && afspelen.linked > 0) || !o.seconds}
                   title={playing ? "Stop eerst het afspelen" : !o.seconds ? "Deze opname bevat geen audio" : "Klaarzetten om af te spelen"}
                   onClick={() => kiesOpname(o)}>
-                  {afspelen?.file === o.file ? "Staat klaar" : "Klaarzetten"}
+                  {afspelen?.file === o.file && afspelen.linked > 0 ? "Staat klaar" : "Klaarzetten"}
                 </button>
               </div>
             ))}
