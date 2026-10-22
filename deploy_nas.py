@@ -83,7 +83,7 @@ def setup_environment():
     config['DEPLOY_QLC'] = get_input("3. QLC+ (Lighting)? (ja/nee)", default_qlc).lower() in ["ja", "yes", "j", "y", "true"]
     
     default_tuya = "ja" if last_config.get('DEPLOY_TUYA', True) else "nee"
-    config['DEPLOY_TUYA'] = get_input("4. Tuya Control? (ja/nee)", default_tuya).lower() in ["ja", "yes", "j", "y", "true"]
+    config['DEPLOY_TUYA'] = get_input("4. Tuya Control (dit is ook de container die de FreeShow-sync draait: kies ja als sync_and_cleanup_freeshow.py of tuya-code is gewijzigd)? (ja/nee)", default_tuya).lower() in ["ja", "yes", "j", "y", "true"]
     
     default_emulators = "ja" if last_config.get('DEPLOY_EMULATORS', False) else "nee"
     config['DEPLOY_EMULATORS'] = get_input("5. X32 & ATEM Emulators? (ja/nee)", default_emulators).lower() in ["ja", "yes", "j", "y", "true"]
