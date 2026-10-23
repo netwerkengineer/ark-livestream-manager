@@ -121,6 +121,8 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
     if (firstText) {
       const textActs = ((firstText.actions = firstText.actions || {}).slideActions = (firstText.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
       if (lightAction) textActs.push({ ...lightAction, id: rid() });
+      // Zelfde met de achtergrond; een eigen, handmatig gekozen achtergrond op die dia blijft staan (oude Ark-achtergronden zijn hierboven al weg)
+      if (mid && !firstText.background) firstText.background = mid;
     }
   }
 
