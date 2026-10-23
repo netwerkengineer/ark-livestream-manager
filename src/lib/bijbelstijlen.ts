@@ -72,6 +72,22 @@ export const BIJBELSTIJLEN: BijbelStijl[] = [
     decor: ['top:150px;left:170px;width:8px;height:660px;background-color:rgb(143 176 242);border-radius:4px;']
   },
   {
+    slug: 'ark',
+    naam: 'Ark',
+    omschrijving: 'Ark-huisstijl: diep blauw-groen, tekst links in een schreefloos lettertype met turquoise balk',
+    kleur: '062a30', accent: '8ce8dc',
+    video: 'bijbel-ark',
+    tekst: {
+      vak: 'top:130px;left:230px;width:1460px;height:700px;', vakB: 1460, vakH: 700,
+      uitlijning: 'left', lettertype: SANS, grootte: 72, regelhoogte: 1.3, tekenbreedte: 0.52,
+      kleur: 'rgb(255 255 255)', gewicht: 'bold', schaduw: '0px 2px 16px rgb(0 0 0 / 0.5)'
+    },
+    nummer: { kleur: 'rgb(140 232 220)', grootte: 34 },
+    verwijzing: { vak: 'top:870px;left:230px;width:1300px;height:70px;', uitlijning: 'left', lettertype: SANS, grootte: 44, kleur: 'rgb(140 232 220)', stijl: 'letter-spacing:0.18em;text-transform:uppercase;font-weight:bold;' },
+    vertaling: { vak: 'top:945px;left:230px;width:1300px;height:50px;', uitlijning: 'left', lettertype: SANS, grootte: 32, kleur: 'rgb(255 255 255 / 0.55)' },
+    decor: ['top:150px;left:170px;width:8px;height:660px;background-color:rgb(77 182 172);border-radius:4px;']
+  },
+  {
     slug: 'kader',
     naam: 'Kader',
     omschrijving: 'Donkere leisteen met een zacht, doorschijnend kader en gouden rand',

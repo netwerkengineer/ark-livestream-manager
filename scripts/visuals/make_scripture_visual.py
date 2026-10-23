@@ -2,7 +2,7 @@
 """Maakt een rustige, naadloos lopende achtergrond voor bijbelteksten (mp4 + optioneel still).
 
 Gebruik: make_scripture_visual.py <stijl> <uitvoer.mp4> [--still still.jpg] [--secs 24]
-Stijlen: goud (warm perkament/kaarslicht), nacht (diep blauw, koel licht), ochtend (leisteen met gouden lichtbundel),
+Stijlen: goud (warm perkament/kaarslicht), nacht (diep blauw, koel licht), ark (diep blauw-groen, turquoise licht), ochtend (leisteen met gouden lichtbundel),
 licht (lichte crème/perkament met zonnebundel, voor donkere tekst)
 
 Bewust anders van de sfeer-visuals bij de liederen (make_visual.py): geen kleurvlekken maar een
@@ -21,6 +21,8 @@ STIJLEN = {
     "nacht":   dict(top="060c1e", bot="14264f", licht="a9c8ff", stof="d6e4ff", hoek=0.10, sterkte=0.62, breedte=0.46, bron=(0.30, -0.30)),
     # lichte variant: crème/perkament met een zachte zonnebundel; donkere tekst (zie src/lib/bijbelstijlen.ts)
     "licht":   dict(top="f7efe0", bot="e3cba2", licht="fffaf0", stof="ffffff", hoek=-0.30, sterkte=0.55, breedte=0.42, bron=(0.85, -0.25), vign=0.9),
+    # Ark-huisstijl: diep blauw-groen (teal) met een koele, turquoise lichtbundel; bij "Bijbel Ark" (kopie van Modern, andere kleur)
+    "ark":     dict(top="03141a", bot="0b3a44", licht="6fe3d4", stof="c4f7ef", hoek=0.10, sterkte=0.60, breedte=0.46, bron=(0.30, -0.30)),
     "ochtend": dict(top="12161b", bot="25303a", licht="ffe2a8", stof="fff0cf", hoek=-0.40, sterkte=0.66, breedte=0.34, bron=(0.92, -0.20)),
 }
 
