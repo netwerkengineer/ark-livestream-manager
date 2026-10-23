@@ -4,7 +4,7 @@
 Gebruik: make_social_afbeelding.py <ark-still.jpg> <logo-wit.png> <uitvoermap> [--naam @arkchurch] [--youtube X] [--facebook X] [--instagram X] [--tiktok X]
 Zonder opties staat overal --naam (een gezamenlijke naam). Per platform kan een eigen naam worden opgegeven.
 """
-import argparse, math, os
+import argparse, math, os, subprocess
 from PIL import Image, ImageDraw
 from make_obs_afbeeldingen import W, H, TEAL, TEAL_LICHT, f, rgb, tekst, rrect, passend, achtergrond
 
@@ -87,12 +87,38 @@ def schermvullend(still, logo, namen, uit):
     img.convert("RGB").save(uit, quality=94, subsampling=0)
 
 
+def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6):
+    """Lower third als video met transparantie: schuift van onder in, blijft staan, schuift weer weg. Schrijft MOV (ProRes 4444) en WebM (VP9)."""
+    import numpy as np
+    stil = Image.open(png).convert("RGBA"); y0, y1 = 780, 1050; balk = stil.crop((0, y0, W, y1)); schuif = 330
+
+    def frame(k, alpha):
+        """k = 0 (weg, onder beeld) .. 1 (op zijn plek)"""
+        c = Image.new("RGBA", (W, H), (0, 0, 0, 0)); b = balk.copy()
+        if alpha < 1: b.putalpha(b.getchannel("A").point(lambda v: int(v * alpha)))
+        c.alpha_composite(b, (0, int(y0 + (1 - k) * schuif))); return np.asarray(c).tobytes()
+    ease = lambda t: 1 - (1 - t) ** 3
+    n_in, n_uit, n_houd = round(in_s * fps), round(uit_s * fps), round(houd_s * fps)
+    frames = [frame(ease((i + 1) / n_in), min(1, (i + 1) / n_in * 1.6)) for i in range(n_in)]
+    hou = frame(1, 1); uit = [frame(1 - ease((i + 1) / n_uit), 1 - (i + 1) / n_uit * .6) for i in range(n_uit)]
+    for naam, opties in (("Volg ons - lower third animatie.mov", ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]),
+                         ("Volg ons - lower third animatie.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0"])):
+        pr = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-"] + opties + [os.path.join(uitmap, naam)],
+                              stdin=subprocess.PIPE)
+        for fr in frames: pr.stdin.write(fr)
+        for _ in range(n_houd): pr.stdin.write(hou)
+        for fr in uit: pr.stdin.write(fr)
+        pr.stdin.close(); pr.wait()
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("still"); ap.add_argument("logo"); ap.add_argument("uit")
-    ap.add_argument("--naam", default="@arkchurchnl")
+    ap.add_argument("--naam", default="@arkchurchnl"); ap.add_argument("--animatie", action="store_true", help="ook de lower third als video (MOV en WebM met transparantie)")
     for _, _, _, s in PLATFORMS: ap.add_argument("--" + s)
     a = ap.parse_args(); namen = {s: getattr(a, s) or a.naam for _, _, _, s in PLATFORMS}
     os.makedirs(a.uit, exist_ok=True)
     lower_third(namen, os.path.join(a.uit, "Volg ons - lower third.png"))
     schermvullend(a.still, a.logo, namen, os.path.join(a.uit, "Volg ons - schermvullend.jpg"))
+    if a.animatie: animatie(os.path.join(a.uit, "Volg ons - lower third.png"), a.uit)
     print("klaar")
+
