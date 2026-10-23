@@ -109,7 +109,16 @@ LOGO = "Media/arkchurch-logo-wit.png"
 FINAL_IDS = {"Welkom": "f1592509bbe", "Bedankt": "21266b09d9c"}
 
 
-def make_show(soort, var, client, final=False):
+VIDEO_STIJL_ID = "95740a329b1"  # 'Livestream Video fullscreen' (staat in Config/settings_synced.json, gelijk op alle machines)
+
+
+def stijl_actie(output_id, stijl_id):
+    return {"slideActions": [{"id": rid(), "name": "Set style to livestream video", "triggers": ["change_output_style"],
+            "actionValues": {"change_output_style": {"styleOutputs": {"type": "specific", "outputs": {output_id: stijl_id}}}},
+            "customActivation": "", "midiEnabled": False}]}
+
+
+def make_show(soort, var, client, final=False, output_id=None, stijl_id=VIDEO_STIJL_ID):
     random.seed(f"{soort}-{var['nr']}")
     woord, r1, r2, kicker = TEKSTEN[soort][var["naam"]]
     logo_src = f"{client}/{LOGO}"
@@ -123,7 +132,10 @@ def make_show(soort, var, client, final=False):
     for i, items in enumerate(dias):
         sid = rid()
         slides[sid] = {"group": groepen[i], "color": None, "settings": {}, "notes": "", "items": items}
-        layout_slides.append({"id": sid, "nextTimer": 8, "background": vid_id})
+        ls = {"id": sid, "nextTimer": 8, "background": vid_id}
+        if output_id:  # tekstdia's: de livestream-uitvoer op de volledigscherm-stijl zetten (anders komt de tekst als onderste balk)
+            ls["actions"] = stijl_actie(output_id, stijl_id)
+        layout_slides.append(ls)
     if soort == "Welkom":
         # Thema-dia: altijd als laatste van Welkom, met hetzelfde plaatje (thema.jpg) als de bestaande Welkom-show
         tid = rid()
@@ -182,6 +194,7 @@ def main():
     ap.add_argument("--client-path", default="/Users/jeffreygo/Documents/FreeShow")
     ap.add_argument("--preview")
     ap.add_argument("--still-dir")
+    ap.add_argument("--livestream-output-id", help="id van de livestream-uitvoer van deze machine (settings: livestreamStyleOutputId); zet op de tekstdia's de stijl Livestream Video fullscreen")
     ap.add_argument("--final", action="store_true", help="maak de echte Welkom.show en Bedankt.show (variant strak) onder de bestaande show-id's")
     a = ap.parse_args()
     os.makedirs(a.outdir, exist_ok=True)
@@ -189,7 +202,7 @@ def main():
     shows = {"Welkom": [], "Bedankt": []}
     for soort in ("Welkom", "Bedankt"):
         for var in (VARIANTEN[:1] if a.final else VARIANTEN):
-            sid, content, dias, video = make_show(soort, var, a.client_path.rstrip("/"), final=a.final)
+            sid, content, dias, video = make_show(soort, var, a.client_path.rstrip("/"), final=a.final, output_id=a.livestream_output_id)
             fn = os.path.join(a.outdir, content["name"] + ".show")
             with open(fn, "w", encoding="utf-8") as f:
                 json.dump([sid, content], f, ensure_ascii=False)

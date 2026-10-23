@@ -35,6 +35,7 @@ def main():
     ap.add_argument('--fs', required=True); ap.add_argument('--template', required=True); ap.add_argument('--shows', required=True)
     ap.add_argument('--uitvoeren', action='store_true')
     ap.add_argument('--alleen-sjabloon', action='store_true', help='laat de showbestanden met rust en werk alleen de kopie in template.project bij')
+    ap.add_argument('--alleen-shows', action='store_true', help='werk alleen de showbestanden bij (met verse wijzigingstijd) en laat het sjabloon met rust')
     a = ap.parse_args()
     nieuw = {}
     for n in NAMEN:
@@ -57,13 +58,18 @@ def main():
     os.makedirs(bk)
     if not a.alleen_sjabloon:
         for n in NAMEN: shutil.copy2(os.path.join(a.fs, 'Shows', f'{n}.show'), os.path.join(bk, f'{n}.show'))
-    shutil.copy2(a.template, os.path.join(bk, 'template.project'))
+    if not a.alleen_shows: shutil.copy2(a.template, os.path.join(bk, 'template.project'))
     print('reservekopie:', bk)
     for sid, (n, c) in nieuw.items():
         data['shows'][sid] = c
         if a.alleen_sjabloon: continue
         doel = os.path.join(a.fs, 'Shows', f'{n}.show'); tmp = os.path.join(a.fs, 'Shows', f'.ark-tmp-{n}')
         json.dump([sid, c], open(tmp, 'w', encoding='utf-8'), ensure_ascii=False); os.chmod(tmp, 0o666); os.replace(tmp, doel)
+    if a.alleen_shows:
+        for n in NAMEN:
+            s = json.load(open(os.path.join(a.fs, 'Shows', f'{n}.show'), encoding='utf-8'))[1]
+            print(f'klaar: {n}.show heeft nu {len(s["slides"])} dia\'s (sjabloon ongemoeid)')
+        return
     st = os.stat(a.template); tmpz = a.template + '.tmp'
     with zipfile.ZipFile(tmpz, 'w', zipfile.ZIP_DEFLATED) as zo:
         for it in zin.infolist():
