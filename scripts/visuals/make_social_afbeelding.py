@@ -64,12 +64,12 @@ def lower_third(namen, uit):
         for i, (titel, kl, gl, sl) in enumerate(PLATFORMS): img.alpha_composite(tegel(110, kl, gl), (x + i * 135, 860))
         tekst(img, naam, passend(naam, "zwaar", 74, 1780 - (x + 4 * 135 + 20))[0], 0, x + 4 * 135 + 20, 875, TEAL_LICHT, schaduw=0)
         img.save(uit); return
-    x = 760; kol = (1780 - x) / 4
+    x = 700; kol = 540  # 2x2-raster: elke naam krijgt genoeg ruimte om leesbaar te blijven
     for i, (titel, kl, gl, sl) in enumerate(PLATFORMS):
-        cx = x + i * kol
-        img.alpha_composite(tegel(92, kl, gl), (int(cx), 850))
-        tekst(img, namen[sl], passend(namen[sl], "zwaar", 30, kol - 112)[0], 0, cx + 108, 862, "#ffffff", schaduw=0)
-        tekst(img, titel, f("licht", 26), 0, cx + 108, 906, "#ffffff", alpha=200, schaduw=0)
+        cx, cy = x + (i % 2) * kol, 822 + (i // 2) * 100
+        img.alpha_composite(tegel(84, kl, gl), (cx, cy))
+        tekst(img, namen[sl], passend(namen[sl], "zwaar", 40, kol - 120)[0], 0, cx + 100, cy + 2, "#ffffff", schaduw=0)
+        tekst(img, titel, f("licht", 28), 0, cx + 100, cy + 48, TEAL_LICHT, schaduw=0)
     img.save(uit)
 
 
@@ -89,7 +89,7 @@ def schermvullend(still, logo, namen, uit):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("still"); ap.add_argument("logo"); ap.add_argument("uit")
-    ap.add_argument("--naam", default="@arkchurch")
+    ap.add_argument("--naam", default="@arkchurchnl")
     for _, _, _, s in PLATFORMS: ap.add_argument("--" + s)
     a = ap.parse_args(); namen = {s: getattr(a, s) or a.naam for _, _, _, s in PLATFORMS}
     os.makedirs(a.uit, exist_ok=True)
