@@ -115,6 +115,13 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
     });
     const acts = ((start.actions = start.actions || {}).slideActions = (start.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
     if (lightAction) acts.push({ ...lightAction, id: rid() });
+    // Ook op de eerste tekstdia (net na de lege startdia): slaat de operator de startdia over, dan moet het licht toch wisselen.
+    // De Companion-knop zet de scène aan (geen wisselknop), dus twee keer indrukken geeft hetzelfde resultaat.
+    const firstText = sls[1];
+    if (firstText) {
+      const textActs = ((firstText.actions = firstText.actions || {}).slideActions = (firstText.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
+      if (lightAction) textActs.push({ ...lightAction, id: rid() });
+    }
   }
 
   c.timestamps = { ...(c.timestamps || {}), modified: Date.now() };

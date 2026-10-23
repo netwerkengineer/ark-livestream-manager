@@ -667,28 +667,37 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
 function withRevertStyleAction(showData: any, outputId: string, styleId: string) {
   const layoutId = showData?.settings?.activeLayout;
   const layout = layoutId ? showData?.layouts?.[layoutId] : Object.values(showData?.layouts || {})[0];
-  const firstSlideRef = (layout as any)?.slides?.[0];
-  const existing: any[] = firstSlideRef?.actions?.slideActions || [];
-  if (!firstSlideRef || existing.some(a => (a?.triggers || []).includes('change_output_style'))) return showData;
+  const slideRefs: any[] = (layout as any)?.slides || [];
+  if (!slideRefs.length) return showData;
+
+  // Dia 0 en, als dat een lege startdia is (zonder tekst, bijv. "Start (tracks)"), ook de eerste tekstdia erna: slaat de
+  // operator de startdia over, dan moet de uitvoer toch op de liederenstijl staan. Dezelfde stijl twee keer zetten kan geen kwaad.
+  const targets = [0];
+  const def0 = showData?.slides?.[slideRefs[0].id];
+  if (slideRefs.length > 1 && def0 && (def0.items || []).length === 0) targets.push(1);
+  const needs = targets.filter(i => !(slideRefs[i].actions?.slideActions || []).some((a: any) => (a?.triggers || []).includes('change_output_style')));
+  if (!needs.length) return showData;
 
   const cloned = JSON.parse(JSON.stringify(showData));
-  const clonedLayout = layoutId ? cloned.layouts[layoutId] : Object.values(cloned.layouts)[0];
-  const clonedSlide = (clonedLayout as any).slides[0];
-  clonedSlide.actions = {
-    ...(clonedSlide.actions || {}),
-    slideActions: [{
-      id: generateId(),
-      name: 'Set style to livestream liederen',
-      triggers: ['change_output_style'],
-      actionValues: {
-        change_output_style: {
-          styleOutputs: { type: 'specific', outputs: { [outputId]: styleId } }
-        }
-      },
-      customActivation: '',
-      midiEnabled: false
-    }, ...(clonedSlide.actions?.slideActions || [])]
-  };
+  const clonedLayout: any = layoutId ? cloned.layouts[layoutId] : Object.values(cloned.layouts)[0];
+  for (const i of needs) {
+    const clonedSlide = clonedLayout.slides[i];
+    clonedSlide.actions = {
+      ...(clonedSlide.actions || {}),
+      slideActions: [{
+        id: generateId(),
+        name: 'Set style to livestream liederen',
+        triggers: ['change_output_style'],
+        actionValues: {
+          change_output_style: {
+            styleOutputs: { type: 'specific', outputs: { [outputId]: styleId } }
+          }
+        },
+        customActivation: '',
+        midiEnabled: false
+      }, ...(clonedSlide.actions?.slideActions || [])]
+    };
+  }
   return cloned;
 }
 
