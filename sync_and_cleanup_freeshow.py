@@ -1011,18 +1011,22 @@ def freeshow_process_names(user, host, remote_os):
 def _taskkill_in_user_session(label, user, host, name):
     """Windows: een afsluitverzoek vanuit een SSH-sessie bereikt de vensters van FreeShow niet (die draaien in de sessie van de
     ingelogde gebruiker). Daarom `taskkill /IM <naam>` (zonder /F: netjes) via een eenmalige geplande taak laten uitvoeren die
-    interactief in de sessie van die gebruiker draait (/IT), en de taak daarna weer verwijderen. Geeft True als de taak is gestart."""
+    interactief in de sessie van die gebruiker draait (/IT), en de taak daarna weer verwijderen. Geeft True als de taak is gestart.
+    Alle antwoorden van Windows komen in de log, want dit is van buitenaf moeilijk te controleren."""
     tn = "ArkCloseFreeShow"
+    korte = lambda r: ((getattr(r, "stdout", "") or "") + (getattr(r, "stderr", "") or "")).strip().replace("\r", "").replace("\n", " | ")[:220]
     create = run_ssh_cmd(user, host, f'schtasks /Create /TN {tn} /TR "taskkill /IM {name}" /SC ONCE /ST 00:00 /RU {user} /IT /F')
+    print(f"[{label}] [sluittaak] aanmaken: rc={getattr(create, 'returncode', '?')} {korte(create)}")
     if getattr(create, "returncode", 1) != 0:
-        print(f"[{label}] Taak om FreeShow in de gebruikerssessie te sluiten kon niet worden gemaakt: "
-              f"{((create.stdout or '') + (create.stderr or '')).strip()[:200]}")
         return False
     run = run_ssh_cmd(user, host, f"schtasks /Run /TN {tn}")
+    print(f"[{label}] [sluittaak] starten: rc={getattr(run, 'returncode', '?')} {korte(run)}")
     ok = getattr(run, "returncode", 1) == 0
-    if not ok:
-        print(f"[{label}] Taak starten mislukt: {((run.stdout or '') + (run.stderr or '')).strip()[:200]}")
-    time.sleep(2)
+    time.sleep(4)
+    q = run_ssh_cmd(user, host, f"schtasks /Query /TN {tn} /V /FO LIST")
+    regels = [l.strip() for l in (q.stdout or "").splitlines()
+              if any(k in l.lower() for k in ("status", "last result", "laatste resultaat", "run as user", "uitvoeren als", "logon mode", "aanmeldmodus"))]
+    print(f"[{label}] [sluittaak] toestand: {' | '.join(regels)[:300]}")
     run_ssh_cmd(user, host, f"schtasks /Delete /TN {tn} /F")
     return ok
 
