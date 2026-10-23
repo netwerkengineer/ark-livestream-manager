@@ -35,8 +35,11 @@ def main():
     ap.add_argument('--fs', required=True); ap.add_argument('--template', required=True); ap.add_argument('--shows', required=True)
     ap.add_argument('--uitvoeren', action='store_true')
     ap.add_argument('--alleen-sjabloon', action='store_true', help='laat de showbestanden met rust en werk alleen de kopie in template.project bij')
+    ap.add_argument('--namen', default='Welkom,Bedankt', help='kommagescheiden shownamen die worden vervangen (standaard Welkom,Bedankt)')
     ap.add_argument('--alleen-shows', action='store_true', help='werk alleen de showbestanden bij (met verse wijzigingstijd) en laat het sjabloon met rust')
     a = ap.parse_args()
+    global NAMEN
+    NAMEN = tuple(n.strip() for n in a.namen.split(',') if n.strip())
     nieuw = {}
     for n in NAMEN:
         sid, c, dias = lees_show(os.path.join(a.shows, f'{n}.show'))
