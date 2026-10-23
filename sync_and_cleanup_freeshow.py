@@ -1008,6 +1008,25 @@ def freeshow_process_names(user, host, remote_os):
     return ["freeshow"] if (res.stdout or "").strip() else []
 
 
+def _taskkill_in_user_session(label, user, host, name):
+    """Windows: een afsluitverzoek vanuit een SSH-sessie bereikt de vensters van FreeShow niet (die draaien in de sessie van de
+    ingelogde gebruiker). Daarom `taskkill /IM <naam>` (zonder /F: netjes) via een eenmalige geplande taak laten uitvoeren die
+    interactief in de sessie van die gebruiker draait (/IT), en de taak daarna weer verwijderen. Geeft True als de taak is gestart."""
+    tn = "ArkCloseFreeShow"
+    create = run_ssh_cmd(user, host, f'schtasks /Create /TN {tn} /TR "taskkill /IM {name}" /SC ONCE /ST 00:00 /RU {user} /IT /F')
+    if getattr(create, "returncode", 1) != 0:
+        print(f"[{label}] Taak om FreeShow in de gebruikerssessie te sluiten kon niet worden gemaakt: "
+              f"{((create.stdout or '') + (create.stderr or '')).strip()[:200]}")
+        return False
+    run = run_ssh_cmd(user, host, f"schtasks /Run /TN {tn}")
+    ok = getattr(run, "returncode", 1) == 0
+    if not ok:
+        print(f"[{label}] Taak starten mislukt: {((run.stdout or '') + (run.stderr or '')).strip()[:200]}")
+    time.sleep(2)
+    run_ssh_cmd(user, host, f"schtasks /Delete /TN {tn} /F")
+    return ok
+
+
 def close_freeshow_on_target(label, user, host, remote_os, force):
     """Sluit FreeShow op het doel netjes af (zonder /F: het programma krijgt het verzoek om te sluiten en kan zelf opslaan),
     zodat het tijdens de sync geen oudere show terugschrijft. Blijft FreeShow na ~20 s open, dan wordt er alleen geforceerd als
@@ -1020,7 +1039,9 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
         print(f"[{label}] FreeShow draait ({', '.join(names)}); netjes afsluiten voor de sync...")
         for n in names:
             if remote_os == "windows":
-                run_ssh_cmd(user, host, f'taskkill /IM "{n}"')
+                # eerst in de sessie van de gebruiker (daar bereikt het de vensters); lukt dat niet, dan het gewone verzoek
+                if not _taskkill_in_user_session(label, user, host, n):
+                    run_ssh_cmd(user, host, f'taskkill /IM "{n}"')
             elif remote_os == "linux":
                 run_ssh_cmd(user, host, "pkill -TERM -ix freeshow")
             else:
