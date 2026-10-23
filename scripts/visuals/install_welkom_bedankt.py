@@ -34,6 +34,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--fs', required=True); ap.add_argument('--template', required=True); ap.add_argument('--shows', required=True)
     ap.add_argument('--uitvoeren', action='store_true')
+    ap.add_argument('--alleen-sjabloon', action='store_true', help='laat de showbestanden met rust en werk alleen de kopie in template.project bij')
     a = ap.parse_args()
     nieuw = {}
     for n in NAMEN:
@@ -54,19 +55,23 @@ def main():
     basis = os.path.join(a.fs, '_backup-welkom-bedankt-' + time.strftime('%Y%m%d')); bk = basis; i = 1
     while os.path.exists(bk): i += 1; bk = f'{basis}-{i}'
     os.makedirs(bk)
-    for n in NAMEN: shutil.copy2(os.path.join(a.fs, 'Shows', f'{n}.show'), os.path.join(bk, f'{n}.show'))
+    if not a.alleen_sjabloon:
+        for n in NAMEN: shutil.copy2(os.path.join(a.fs, 'Shows', f'{n}.show'), os.path.join(bk, f'{n}.show'))
     shutil.copy2(a.template, os.path.join(bk, 'template.project'))
     print('reservekopie:', bk)
     for sid, (n, c) in nieuw.items():
+        data['shows'][sid] = c
+        if a.alleen_sjabloon: continue
         doel = os.path.join(a.fs, 'Shows', f'{n}.show'); tmp = os.path.join(a.fs, 'Shows', f'.ark-tmp-{n}')
         json.dump([sid, c], open(tmp, 'w', encoding='utf-8'), ensure_ascii=False); os.chmod(tmp, 0o666); os.replace(tmp, doel)
-        data['shows'][sid] = c
-    tmpz = a.template + '.tmp'
+    st = os.stat(a.template); tmpz = a.template + '.tmp'
     with zipfile.ZipFile(tmpz, 'w', zipfile.ZIP_DEFLATED) as zo:
         for it in zin.infolist():
             zo.writestr(it, json.dumps(data, ensure_ascii=False) if it.filename == 'data.json' else zin.read(it.filename))
     zin.close(); os.replace(tmpz, a.template)
-    for n in NAMEN:
+    os.chmod(a.template, st.st_mode & 0o777)
+    if os.geteuid() == 0: os.chown(a.template, st.st_uid, st.st_gid)
+    for n in ([] if a.alleen_sjabloon else NAMEN):
         s = json.load(open(os.path.join(a.fs, 'Shows', f'{n}.show'), encoding='utf-8'))[1]
         print(f'klaar: {n}.show heeft nu {len(s["slides"])} dia\'s')
     print('klaar: sjabloon bijgewerkt')
