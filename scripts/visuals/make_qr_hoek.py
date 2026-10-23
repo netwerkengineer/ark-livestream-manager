@@ -5,7 +5,7 @@ Schermvullende transparante PNG, 1920x1080: in OBS gewoon over het hele beeld pl
 Gebruik: make_qr_hoek.py <oud-New-Givt.png> <uitvoermap>
 Schrijft twee varianten: boven de lower third (rechts uitgelijnd met de tekstbalk) en rechtsonder (zonder lower third).
 """
-import os, sys
+import os, subprocess, sys
 from PIL import Image, ImageChops
 from make_obs_afbeeldingen import W, H, DONKER, TEAL, f, rgb, tekst, rrect, qr_afbeelding, givt_kolom
 
@@ -38,8 +38,32 @@ def zet(oud, uit, rechts, onder):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); k = kaart(oud); img.alpha_composite(k, (rechts - k.width, onder - k.height)); img.save(uit)
 
 
+def animatie(oud, uit, naam, rechts, onder, fps=30, in_s=0.7, houd_s=12.0, uit_s=0.6, cyclus_s=45.0):
+    """Kaart schuift van rechts het beeld in, blijft staan, schuift weer weg en komt na de pauze terug. Eén cyclus (standaard 45 s)
+    als WebM (VP9 met transparantie); laat hem in OBS herhalen ("Loop") dan komt de QR tijdens het hele nummer steeds terug."""
+    import numpy as np
+    k = kaart(oud); y = onder - k.height; x_rust = rechts - k.width; afstand = W - x_rust
+    def frame(p):
+        c = Image.new("RGBA", (W, H), (0, 0, 0, 0)); c.alpha_composite(k, (int(x_rust + (1 - p) * afstand), y)); return np.asarray(c).tobytes()
+    ease = lambda t: 1 - (1 - t) ** 3
+    n_in, n_uit, n_houd = round(in_s * fps), round(uit_s * fps), round(houd_s * fps); n_pauze = round(cyclus_s * fps) - n_in - n_uit - n_houd
+    pr = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-",
+                           "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0", "-cpu-used", "4", "-row-mt", "1",
+                           os.path.join(uit, naam)], stdin=subprocess.PIPE)
+    for i in range(n_in): pr.stdin.write(frame(ease((i + 1) / n_in)))
+    rust = frame(1)
+    for _ in range(n_houd): pr.stdin.write(rust)
+    for i in range(n_uit): pr.stdin.write(frame(1 - ease((i + 1) / n_uit)))
+    leeg = frame(0)
+    for _ in range(n_pauze): pr.stdin.write(leeg)
+    pr.stdin.close(); pr.wait()
+
+
 if __name__ == "__main__":
     oud = Image.open(sys.argv[1]).convert("RGBA"); uit = sys.argv[2]; os.makedirs(uit, exist_ok=True)
     zet(oud, os.path.join(uit, "QR Givt - boven lower third.png"), 1755, 822)
     zet(oud, os.path.join(uit, "QR Givt - rechtsonder.png"), 1860, 1030)
+    if len(sys.argv) > 3 and sys.argv[3] == "--animatie":
+        animatie(oud, uit, "QR Givt - boven lower third animatie.webm", 1755, 822)
+        animatie(oud, uit, "QR Givt - rechtsonder animatie.webm", 1860, 1030)
     print("klaar")
