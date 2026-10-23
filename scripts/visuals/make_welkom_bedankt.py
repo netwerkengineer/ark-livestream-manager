@@ -29,6 +29,8 @@ def item(left, top, width, height, lines, align="center", valign="center", extra
         "style": f"left:{left}px;top:{top}px;width:{width}px;height:{height}px;padding:0px;{extra}",
         "type": "text",
         "align": f"align-items:{valign};",
+        "auto": True,
+        "textFit": "shrinkToFit",  # past de tekst niet in het vak (breder lettertype in FreeShow), dan wordt hij kleiner
         "lines": [{"align": f"text-align:{a};", "text": [r]} for r, a in lines],
         "bindings": [],
     }
