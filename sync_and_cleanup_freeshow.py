@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import csv
 import json
 import os
 import subprocess
@@ -953,6 +954,99 @@ def _upload_show(user, host, local_path, remote_path, path_rewrite):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+def _show_modified_ms(path):
+    """timestamps.modified (milliseconden) uit een showbestand, of None als het niet te lezen is. FreeShow zet dit alleen als de
+    INHOUD van de show verandert; opnieuw opslaan na gebruik ("used") verandert het niet."""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, list) and len(data) > 1 and isinstance(data[1], dict):
+            val = (data[1].get("timestamps") or {}).get("modified")
+            if isinstance(val, (int, float)) and val > 0:
+                return int(val)
+    except Exception:
+        pass
+    return None
+
+
+def decide_show_direction(label, name, n_info, user, host, remote_shows_dir):
+    """Welke kant heeft de nieuwste INHOUD van een show die op beide kanten bestaat? Vergelijkt timestamps.modified in de show
+    zelf, niet de bestandstijd: een pc-versie die alleen opnieuw is opgeslagen (nieuwe bestandstijd, zelfde inhoud) wint dan niet
+    meer van een echt nieuwere versie op de NAS. Geeft "remote", "nas", "same" of None (niet te bepalen: oude regel gebruiken)."""
+    nas_mod = _show_modified_ms(n_info["path"])
+    if nas_mod is None:
+        return None
+    tmp = f"/tmp/temp_cmp_{host.replace('.', '_')}_{name}"
+    rem_mod = None
+    try:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        if sftp_transfer(user, host, tmp, f"{remote_shows_dir}/{name}", "get"):
+            rem_mod = _show_modified_ms(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    if rem_mod is None:
+        return None
+    if rem_mod > nas_mod:
+        return "remote"
+    if nas_mod > rem_mod:
+        return "nas"
+    return "same"
+
+
+def freeshow_process_names(user, host, remote_os):
+    """Namen van draaiende FreeShow-processen op het doel (leeg = draait niet, of niet te bepalen)."""
+    if remote_os == "windows":
+        res = run_ssh_cmd(user, host, "tasklist /FO CSV /NH")
+        names = []
+        for row in csv.reader((res.stdout or "").splitlines()):
+            if row and "freeshow" in row[0].lower() and row[0] not in names:
+                names.append(row[0])
+        return names
+    res = run_ssh_cmd(user, host, "pgrep -ix freeshow")
+    return ["freeshow"] if (res.stdout or "").strip() else []
+
+
+def close_freeshow_on_target(label, user, host, remote_os, force):
+    """Sluit FreeShow op het doel netjes af (zonder /F: het programma krijgt het verzoek om te sluiten en kan zelf opslaan),
+    zodat het tijdens de sync geen oudere show terugschrijft. Blijft FreeShow na ~20 s open, dan wordt er alleen geforceerd als
+    `force` (onbemande run; de pc gaat daarna toch uit). Geeft True als FreeShow niet (meer) draait."""
+    try:
+        names = freeshow_process_names(user, host, remote_os)
+        if not names:
+            print(f"[{label}] FreeShow draait niet op het doel; niets af te sluiten.")
+            return True
+        print(f"[{label}] FreeShow draait ({', '.join(names)}); netjes afsluiten voor de sync...")
+        for n in names:
+            if remote_os == "windows":
+                run_ssh_cmd(user, host, f'taskkill /IM "{n}"')
+            elif remote_os == "linux":
+                run_ssh_cmd(user, host, "pkill -TERM -ix freeshow")
+            else:
+                run_ssh_cmd(user, host, "osascript -e 'tell application \"FreeShow\" to quit'")
+        for _ in range(10):
+            time.sleep(2)
+            if not freeshow_process_names(user, host, remote_os):
+                print(f"[{label}] FreeShow is afgesloten.")
+                return True
+        if force:
+            print(f"[{label}] FreeShow sloot niet binnen 20 s; onbemande run, dus geforceerd afsluiten.")
+            for n in names:
+                if remote_os == "windows":
+                    run_ssh_cmd(user, host, f'taskkill /F /IM "{n}"')
+                else:
+                    run_ssh_cmd(user, host, "pkill -KILL -ix freeshow")
+            time.sleep(3)
+            return not freeshow_process_names(user, host, remote_os)
+        print(f"[{label}] WAARSCHUWING: FreeShow sloot niet binnen 20 s en blijft open (iemand zit eraan). De sync gaat door; "
+              "de vergelijking op timestamps.modified beschermt nieuwe versies op de NAS, maar sluit FreeShow zelf af en sync opnieuw als er iets niet klopt.")
+        return False
+    except Exception as e:
+        print(f"[{label}] FreeShow afsluiten mislukt ({e}); de sync gaat door.")
+        return False
+
+
 def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote_os,
                        remote_app_data_dir, shows_state, now_ts, one_week_secs,
                        delete_all_scriptures, expired_show_files, one_way=False,
@@ -1049,6 +1143,30 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
             print(f"[{label}] Verwijderen van doel: {name}...")
             delete_remote_show_file(user, host, remote_os, remote_shows_dir, name)
 
+    # Voor shows die op beide kanten staan en waarvan de bestandstijden verschillen: bepaal welke kant de nieuwste INHOUD heeft
+    # (timestamps.modified in de show), niet welke kant het laatst is opgeslagen. Is de inhoud gelijk, dan wordt er niets gekopieerd
+    # als de pc-versie alleen opnieuw is opgeslagen; staat de NAS-versie er nieuwer op, dan gaat die naar het doel (zoals voorheen).
+    decisions = {}
+    for name, n_info in nas_files.items():
+        r_info = remote_files.get(name)
+        if r_info is None:
+            continue
+        gap = r_info["mtime"] - n_info["mtime"]
+        if abs(gap) <= 2.0:
+            continue
+        direction = decide_show_direction(label, name, n_info, user, host, remote_shows_dir)
+        if direction is None:  # geen leesbare timestamps.modified: oude regel (nieuwste bestandstijd wint)
+            direction = "remote" if gap > 0 else "nas"
+        elif direction == "same":
+            if gap > 0:
+                print(f"[{label}] '{name}': pc-versie is alleen opnieuw opgeslagen (zelfde inhoud); niets gekopieerd.")
+                _safe_utime(n_info["path"], r_info["mtime"])
+                n_info["mtime"] = r_info["mtime"]
+                direction = None
+            else:
+                direction = "nas"
+        decisions[name] = direction
+
     # Doel -> NAS (nieuw of nieuwer op doel) - never for a one-way target
     copied_to_nas = 0
     if not one_way:
@@ -1087,7 +1205,7 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
                         copied_to_nas += 1
             else:
                 n_info = nas_files[name]
-                if r_info["mtime"] - n_info["mtime"] > 2.0:
+                if decisions.get(name) == "remote":
                     print(f"[{label}] Nieuwere versie gedetecteerd op doel: '{name}'. Analyseren...")
                     temp_dest = f"/tmp/temp_sync_{host.replace('.', '_')}_{name}"
                     if os.path.exists(temp_dest):
@@ -1134,7 +1252,7 @@ def sync_shows_folder(label, nas_shows_dir, remote_shows_dir, user, host, remote
                 copied_to_remote += 1
         else:
             r_info = remote_files[name]
-            if n_info["mtime"] - r_info["mtime"] > 2.0:
+            if decisions.get(name) == "nas":
                 print(f"[{label}] Nieuwere versie gedetecteerd op NAS: '{name}'. Updaten op doel...")
                 if _upload_show(user, host, n_info["path"], remote_path, path_rewrite):
                     _touch_remote(user, host, remote_os, remote_path, n_info["mtime"])
@@ -1461,6 +1579,12 @@ def main():
         try:
             remote_os = detect_remote_os(target["user"], target["host"])
             print(f"[{label}] Remote OS: {remote_os}")
+
+            # FreeShow netjes afsluiten voordat er bestanden worden vervangen (opt-out: --niet-afsluiten). Bij een handmatige sync
+            # (--keep-on, iemand zit eraan) nooit geforceerd; bij een onbemande run wel als het niet netjes lukt. Daarna wordt
+            # FreeShow niet opnieuw gestart: start het zelf weer.
+            if "--niet-afsluiten" not in sys.argv:
+                close_freeshow_on_target(label, target["user"], target["host"], remote_os, force=not keep_on)
 
             (remote_app_data_dir, remote_root_dir, remote_shows_dir,
              remote_media_dir, remote_bibles_dir, remote_templates_dir) = resolve_remote_freeshow_dirs(
