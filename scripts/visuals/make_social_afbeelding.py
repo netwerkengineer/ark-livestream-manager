@@ -54,9 +54,9 @@ PLATFORMS = [("YouTube", ((255, 0, 0), (200, 0, 0)), g_youtube, "youtube"), ("Fa
              ("Instagram", ((253, 160, 60), (190, 40, 150)), g_instagram, "instagram"), ("TikTok", (10, 10, 12), g_tiktok, "tiktok")]
 
 
-def lower_third(namen, uit):
+def lower_third(namen, uit, dekkend=False):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    rrect(img, (60, 800, 1860, 1030), 30, (4, 24, 29, 232)); rrect(img, (60, 800, 72, 1030), 6, rgb(TEAL) + (255,))
+    rrect(img, (60, 800, 1860, 1030), 30, (4, 24, 29, 255 if dekkend else 232)); rrect(img, (60, 800, 72, 1030), 6, rgb(TEAL) + (255,))
     tekst(img, "VOLG ONS", f("zwaar", 30), 9, 120, 830, TEAL_LICHT)
     tekst(img, "Mis geen dienst", f("zwaar", 62), -1, 120, 870, "#ffffff")
     if len(set(namen.values())) == 1:  # overal dezelfde naam: vier pictogrammen en de naam één keer groot
@@ -87,7 +87,7 @@ def schermvullend(still, logo, namen, uit):
     img.convert("RGB").save(uit, quality=94, subsampling=0)
 
 
-def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6):
+def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6, suffix=""):
     """Lower third als video met transparantie: schuift van onder in, blijft staan, schuift weer weg. Schrijft MOV (ProRes 4444) en WebM (VP9)."""
     import numpy as np
     stil = Image.open(png).convert("RGBA"); y0, y1 = 780, 1050; balk = stil.crop((0, y0, W, y1)); schuif = 330
@@ -101,8 +101,8 @@ def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6):
     n_in, n_uit, n_houd = round(in_s * fps), round(uit_s * fps), round(houd_s * fps)
     frames = [frame(ease((i + 1) / n_in), min(1, (i + 1) / n_in * 1.6)) for i in range(n_in)]
     hou = frame(1, 1); uit = [frame(1 - ease((i + 1) / n_uit), 1 - (i + 1) / n_uit * .6) for i in range(n_uit)]
-    for naam, opties in (("Volg ons - lower third animatie.mov", ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]),
-                         ("Volg ons - lower third animatie.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0"])):
+    for naam, opties in ((f"Volg ons - lower third animatie{suffix}.mov", ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]),
+                         (f"Volg ons - lower third animatie{suffix}.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0"])):
         pr = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-"] + opties + [os.path.join(uitmap, naam)],
                               stdin=subprocess.PIPE)
         for fr in frames: pr.stdin.write(fr)
@@ -113,12 +113,15 @@ def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("still"); ap.add_argument("logo"); ap.add_argument("uit")
-    ap.add_argument("--naam", default="@arkchurchnl"); ap.add_argument("--animatie", action="store_true", help="ook de lower third als video (MOV en WebM met transparantie)")
+    ap.add_argument("--naam", default="@arkchurchnl"); ap.add_argument("--animatie", action="store_true", help="ook de lower third als video (MOV en WebM met transparantie)"); ap.add_argument("--dekkend", action="store_true", help="ook een variant met een niet-doorzichtige balk (png, MOV en WebM met 'dekkend' in de naam)")
     for _, _, _, s in PLATFORMS: ap.add_argument("--" + s)
     a = ap.parse_args(); namen = {s: getattr(a, s) or a.naam for _, _, _, s in PLATFORMS}
     os.makedirs(a.uit, exist_ok=True)
     lower_third(namen, os.path.join(a.uit, "Volg ons - lower third.png"))
     schermvullend(a.still, a.logo, namen, os.path.join(a.uit, "Volg ons - schermvullend.jpg"))
     if a.animatie: animatie(os.path.join(a.uit, "Volg ons - lower third.png"), a.uit)
+    if a.dekkend:
+        lower_third(namen, os.path.join(a.uit, "Volg ons - lower third dekkend.png"), dekkend=True)
+        if a.animatie: animatie(os.path.join(a.uit, "Volg ons - lower third dekkend.png"), a.uit, suffix=" dekkend")
     print("klaar")
 
