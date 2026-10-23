@@ -1039,7 +1039,7 @@ def _taskkill_in_user_session(label, user, host, name):
 
 def close_freeshow_on_target(label, user, host, remote_os, force):
     """Sluit FreeShow op het doel netjes af (zonder /F: het programma krijgt het verzoek om te sluiten en kan zelf opslaan),
-    zodat het tijdens de sync geen oudere show terugschrijft. Blijft FreeShow na ~20 s open, dan wordt er alleen geforceerd als
+    zodat het tijdens de sync geen oudere show terugschrijft. Blijft FreeShow na 3 sluitverzoeken (~30-40 s) open, dan wordt er alleen geforceerd als
     `force` (onbemande run; de pc gaat daarna toch uit). Geeft True als FreeShow niet (meer) draait."""
     try:
         names = None
@@ -1055,23 +1055,32 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
             print(f"[{label}] FreeShow draait niet op het doel; niets af te sluiten.")
             return True
         print(f"[{label}] FreeShow draait ({', '.join(names)}); netjes afsluiten voor de sync...")
-        for n in names:
-            if remote_os == "windows":
-                # eerst in de sessie van de gebruiker (daar bereikt het de vensters); lukt dat niet, dan het gewone verzoek
-                if not _taskkill_in_user_session(label, user, host, n):
-                    run_ssh_cmd(user, host, f'taskkill /IM "{n}"')
-            elif remote_os == "linux":
-                run_ssh_cmd(user, host, "pkill -TERM -ix freeshow")
-            else:
-                run_ssh_cmd(user, host, "osascript -e 'tell application \"FreeShow\" to quit'")
-        for _ in range(10):
-            time.sleep(2)
-            nu = freeshow_process_names(user, host, remote_os)
-            if nu is not None and not nu:  # alleen "afgesloten" als de lijst echt is opgevraagd en FreeShow er niet meer in staat
-                print(f"[{label}] FreeShow is afgesloten.")
-                return True
+
+        def stuur_sluitverzoek():
+            for n in names:
+                if remote_os == "windows":
+                    # eerst in de sessie van de gebruiker (daar bereikt het de vensters); lukt dat niet, dan het gewone verzoek
+                    if not _taskkill_in_user_session(label, user, host, n):
+                        run_ssh_cmd(user, host, f'taskkill /IM "{n}"')
+                elif remote_os == "linux":
+                    run_ssh_cmd(user, host, "pkill -TERM -ix freeshow")
+                else:
+                    run_ssh_cmd(user, host, "osascript -e 'tell application \"FreeShow\" to quit'")
+
+        # Het eerste sluitverzoek doet bij een pas gestart FreeShow soms niets zichtbaars (een tweede sync sloot hem wel): het verzoek
+        # daarom tot 3 keer herhalen, met ~10 s wachten na elk verzoek.
+        for poging in range(1, 4):
+            stuur_sluitverzoek()
+            for _ in range(5):
+                time.sleep(2)
+                nu = freeshow_process_names(user, host, remote_os)
+                if nu is not None and not nu:  # alleen "afgesloten" als de lijst echt is opgevraagd en FreeShow er niet meer in staat
+                    print(f"[{label}] FreeShow is afgesloten (sluitverzoek {poging}).")
+                    return True
+            if poging < 3:
+                print(f"[{label}] FreeShow sloot nog niet; sluitverzoek opnieuw ({poging + 1}/3)...")
         if force:
-            print(f"[{label}] FreeShow sloot niet binnen 20 s; onbemande run, dus geforceerd afsluiten.")
+            print(f"[{label}] FreeShow sloot niet na 3 sluitverzoeken; onbemande run, dus geforceerd afsluiten.")
             for n in names:
                 if remote_os == "windows":
                     run_ssh_cmd(user, host, f'taskkill /F /IM "{n}"')
@@ -1080,7 +1089,7 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
             time.sleep(3)
             nu = freeshow_process_names(user, host, remote_os)
             return nu is not None and not nu
-        print(f"[{label}] WAARSCHUWING: FreeShow sloot niet binnen 20 s en blijft open (iemand zit eraan). De sync gaat door; "
+        print(f"[{label}] WAARSCHUWING: FreeShow sloot niet na 3 sluitverzoeken en blijft open (iemand zit eraan). De sync gaat door; "
               "de vergelijking op timestamps.modified beschermt nieuwe versies op de NAS, maar sluit FreeShow zelf af en sync opnieuw als er iets niet klopt.")
         return False
     except Exception as e:
