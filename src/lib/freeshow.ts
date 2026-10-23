@@ -659,17 +659,23 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
 // Clones rather than mutating in place: for a reused catalog song, showData
 // is the actual object read from that song's real .show file, and this
 // change must only ever affect the generated project's own embedded copy.
-// Skips a slide that already has a hand-set action, so a song someone has
-// specifically configured in FreeShow isn't silently overridden.
+// Skips a slide that already has a hand-set style change, so a song someone has
+// specifically configured in FreeShow isn't silently overridden. Other actions on
+// that slide (bijvoorbeeld de lichtactie van de sfeer) blijven staan: de stijlwissel
+// komt er dan bij. Eerder werd elke bestaande actie als "met de hand ingesteld"
+// gezien, waardoor het eerste lied met een sfeer na Welkom de uitvoer niet terugzette.
 function withRevertStyleAction(showData: any, outputId: string, styleId: string) {
   const layoutId = showData?.settings?.activeLayout;
   const layout = layoutId ? showData?.layouts?.[layoutId] : Object.values(showData?.layouts || {})[0];
   const firstSlideRef = (layout as any)?.slides?.[0];
-  if (!firstSlideRef || firstSlideRef.actions?.slideActions?.length) return showData;
+  const existing: any[] = firstSlideRef?.actions?.slideActions || [];
+  if (!firstSlideRef || existing.some(a => (a?.triggers || []).includes('change_output_style'))) return showData;
 
   const cloned = JSON.parse(JSON.stringify(showData));
   const clonedLayout = layoutId ? cloned.layouts[layoutId] : Object.values(cloned.layouts)[0];
-  (clonedLayout as any).slides[0].actions = {
+  const clonedSlide = (clonedLayout as any).slides[0];
+  clonedSlide.actions = {
+    ...(clonedSlide.actions || {}),
     slideActions: [{
       id: generateId(),
       name: 'Set style to livestream liederen',
@@ -681,7 +687,7 @@ function withRevertStyleAction(showData: any, outputId: string, styleId: string)
       },
       customActivation: '',
       midiEnabled: false
-    }]
+    }, ...(clonedSlide.actions?.slideActions || [])]
   };
   return cloned;
 }
