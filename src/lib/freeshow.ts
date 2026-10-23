@@ -667,7 +667,7 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
 // that slide (bijvoorbeeld de lichtactie van de sfeer) blijven staan: de stijlwissel
 // komt er dan bij. Eerder werd elke bestaande actie als "met de hand ingesteld"
 // gezien, waardoor het eerste lied met een sfeer na Welkom de uitvoer niet terugzette.
-function withRevertStyleAction(showData: any, outputId: string, styleId: string) {
+export function withRevertStyleAction(showData: any, outputId: string, styleId: string) {
   const layoutId = showData?.settings?.activeLayout;
   const layout = layoutId ? showData?.layouts?.[layoutId] : Object.values(showData?.layouts || {})[0];
   const slideRefs: any[] = (layout as any)?.slides || [];
@@ -675,10 +675,15 @@ function withRevertStyleAction(showData: any, outputId: string, styleId: string)
 
   // Dia 0 en, als dat een lege startdia is (zonder tekst, bijv. "Start (tracks)"), ook de eerste tekstdia erna: slaat de
   // operator de startdia over, dan moet de uitvoer toch op de liederenstijl staan. Dezelfde stijl twee keer zetten kan geen kwaad.
+  // "Leeg" = geen media en geen tekst: FreeShow bewaart zo'n startdia met een lege tekstvak, dus items.length === 0 is niet genoeg.
   const targets = [0];
   const def0 = showData?.slides?.[slideRefs[0].id];
-  if (slideRefs.length > 1 && def0 && (def0.items || []).length === 0) targets.push(1);
-  const needs = targets.filter(i => !(slideRefs[i].actions?.slideActions || []).some((a: any) => (a?.triggers || []).includes('change_output_style')));
+  const heeftInhoud = (def: any) => (def?.items || []).some((i: any) => i?.type !== 'text' || (i.lines || []).some((l: any) => (l?.text || []).some((r: any) => String(r?.value || '').trim() !== '')));
+  if (slideRefs.length > 1 && def0 && (String(def0.group || '').startsWith('Start') || !heeftInhoud(def0))) targets.push(1);
+  const stijlActies = (i: number): any[] => (slideRefs[i].actions?.slideActions || []).filter((a: any) => (a?.triggers || []).includes('change_output_style'));
+  // Een met de hand gezette stijlwissel (andere naam dan de onze) op een van die dia's: het hele lied met rust laten
+  if (targets.some(i => stijlActies(i).some((a: any) => a?.name !== 'Set style to livestream liederen'))) return showData;
+  const needs = targets.filter(i => stijlActies(i).length === 0);
   if (!needs.length) return showData;
 
   const cloned = JSON.parse(JSON.stringify(showData));

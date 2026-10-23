@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { getSettings } from '@/lib/settingsStore';
 import { checkLocalSongExists, getLocalSongText, getLocalShowData, getLocalShowFilePath, fetchLyricsFromInternet } from '@/lib/songs';
 import { applySfeerToShowFile } from '@/lib/sfeer';
+import { ensureRevertStyleInShowFile } from '@/lib/showRevertStyle';
 import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
@@ -414,6 +415,19 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
         }
       } catch (err: any) {
         notes.push(`${song.title}: sfeer zetten mislukt (${err?.message || err}).`);
+      }
+    }
+    // De stijlwissel naar de liederenstijl ook in het showbestand zelf zetten (FreeShow speelt een lied uit de bibliotheek af zoals
+    // het daar staat, niet zoals het in het project is meegegeven)
+    if (livestreamOutputId && songStyleId) {
+      try {
+        const showFile = await getLocalShowFilePath(song.title, song.artist || '');
+        if (showFile && await ensureRevertStyleInShowFile(showFile, livestreamOutputId, songStyleId)) {
+          const fresh = await getLocalShowData(song.title, song.artist || '');
+          if (fresh) item.fullData = fresh;
+        }
+      } catch (err: any) {
+        notes.push(`${song.title}: stijlwissel naar liederen in het lied zetten mislukt (${err?.message || err}).`);
       }
     }
     if (songTemplateId) item.templateId = songTemplateId;
