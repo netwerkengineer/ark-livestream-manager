@@ -44,13 +44,13 @@ def logo_item(left, top, width, height, src):
     return {"style": f"left:{left}px;top:{top}px;width:{width}px;height:{height}px;", "type": "media", "src": src, "fit": "contain"}
 
 
-def strak(woord, regel1, regel2, kicker, logo=None):
+def strak(woord, regel1, regel2, kicker, logo=None, toon_kicker=False):
     teal = "#4db6ac"
     if logo:  # Welkom met het Ark Church-logo: logo boven het woord, klein logo onderaan op de volgende dia
         return [
             [logo_item(810, 100, 300, 304, logo),
              item(0, 430, 1920, 320, [(run(woord, 250, "bold", extra="letter-spacing:-3px;"), "center")]),
-             bar(900, 790, 120, teal)],
+             bar(900, 790, 120, teal)] + ([item(0, 830, 1920, 100, [(run(kicker, 54, "300", extra="letter-spacing:10px;text-transform:uppercase;opacity:0.9;"), "center")])] if toon_kicker else []),
             [item(160, 300, 1600, 240, [(run(regel1, 150, "bold"), "center")]),
              bar(900, 570, 120, teal),
              item(160, 610, 1600, 120, [(run(regel2, 56, "300", extra="opacity:0.92;"), "center")]),
@@ -66,7 +66,7 @@ def strak(woord, regel1, regel2, kicker, logo=None):
     ]
 
 
-def warm(woord, regel1, regel2, kicker, logo=None):
+def warm(woord, regel1, regel2, kicker, logo=None, toon_kicker=False):
     goud = "#ffbe46"
     return [
         [item(150, 300, 1620, 90, [(run(kicker, 44, "bold", goud, "letter-spacing:9px;text-transform:uppercase;"), "left")], valign="flex-end"),
@@ -76,7 +76,7 @@ def warm(woord, regel1, regel2, kicker, logo=None):
     ]
 
 
-def typografisch(woord, regel1, regel2, kicker, logo=None):
+def typografisch(woord, regel1, regel2, kicker, logo=None, toon_kicker=False):
     paars = "#b28cff"
     return [
         [item(0, 250, 1920, 480, [(run(woord.upper(), 340, "800", extra="letter-spacing:14px;"), "center")]),
@@ -112,8 +112,8 @@ FINAL_IDS = {"Welkom": "f1592509bbe", "Bedankt": "21266b09d9c"}
 def make_show(soort, var, client, final=False):
     random.seed(f"{soort}-{var['nr']}")
     woord, r1, r2, kicker = TEKSTEN[soort][var["naam"]]
-    logo_src = f"{client}/{LOGO}" if soort == "Welkom" else None
-    dias = var["build"](woord, r1, r2, kicker, logo=logo_src)
+    logo_src = f"{client}/{LOGO}"
+    dias = var["build"](woord, r1, r2, kicker, logo=logo_src, toon_kicker=(soort == "Bedankt"))
     slides, layout_slides, media = {}, [], {}
     vid_id = "ark" + var["video"][:6] + rid(3)
     if logo_src:
