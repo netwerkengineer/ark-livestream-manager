@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { chunkForScreen, splitOverlongLines } from './slideSplit';
 import { getBijbelStijl } from './bijbelstijlen';
+import { getSettings } from './settingsStore';
 
 function generateId() {
   return Math.random().toString(36).padEnd(15, '0').substring(2, 13);
@@ -489,7 +490,38 @@ export function createMediaShowObject(item: any) {
   };
 }
 
-export async function createFreeShowProject(dateStr: string, showsList: any[], projectName?: string, templatePath?: string, useTemplate: boolean = true) {
+// De shows uit het sjabloon (Welkom, Bedankt, Thema, ...) komen uit de showmap als daar een show met dezelfde naam staat:
+// zo is de showmap de enige bron en is een aanpassing aan bijvoorbeeld Welkom meteen in het volgende project te zien. Staat
+// er geen show met die naam (bijvoorbeeld hernoemd), dan blijft de kopie uit het sjabloon staan en komt er een melding.
+// Het show-id uit het sjabloon blijft behouden, want de projectindeling verwijst daarnaar.
+async function refreshTemplateShowsFromLibrary(dataFile: any, notes?: string[]): Promise<void> {
+  let showsDir = '';
+  try {
+    const s = getSettings() as any;
+    if (s.freeshowPath) showsDir = path.join(s.freeshowPath, 'Shows');
+  } catch { /* geen instellingen: sjabloonkopie gebruiken */ }
+  if (!showsDir) return;
+
+  for (const [id, show] of Object.entries<any>(dataFile.shows || {})) {
+    const name = String(show?.name || '').trim();
+    if (!name || /[\\/]/.test(name)) continue;
+    let raw: any;
+    try {
+      raw = JSON.parse(await fs.readFile(path.join(showsDir, `${name}.show`), 'utf-8'));
+    } catch {
+      notes?.push(`Sjabloonshow "${name}" staat niet in de showmap; de kopie uit het sjabloon is gebruikt.`);
+      continue;
+    }
+    const content = Array.isArray(raw) ? raw[1] : raw;
+    if (!content || typeof content !== 'object' || !content.slides || !content.layouts) {
+      notes?.push(`Sjabloonshow "${name}" in de showmap is onleesbaar; de kopie uit het sjabloon is gebruikt.`);
+      continue;
+    }
+    dataFile.shows[id] = { ...content, media: content.media || {} };
+  }
+}
+
+export async function createFreeShowProject(dateStr: string, showsList: any[], projectName?: string, templatePath?: string, useTemplate: boolean = true, notes?: string[]) {
   const safeDateName = dateStr.replace(/\//g, '-');
   const finalProjectName = projectName ? projectName : safeDateName;
   const now = Date.now();
@@ -523,6 +555,8 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
   }
 
   if (useTemplate) {
+    // Eerst verversen, daarna de per project gekozen aanpassingen (andere media, extra dia's) erop zetten
+    await refreshTemplateShowsFromLibrary(dataFile, notes);
     const removedIds = showsList.filter(s => s.source === 'template' && s.isRemoved).map(s => s.id);
     dataFile.project.shows = dataFile.project.shows.filter((s: any) => !removedIds.includes(s.id));
 

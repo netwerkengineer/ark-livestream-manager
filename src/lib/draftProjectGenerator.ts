@@ -440,7 +440,7 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
 
-  const dataJson = await createFreeShowProject(draft.serviceDate, showsList, projectName, templatePath, true);
+  const dataJson = await createFreeShowProject(draft.serviceDate, showsList, projectName, templatePath, true, notes);
   const serialized = await serializeProject(dataJson, { draftServiceDate: draft.serviceDate });
 
   await fs.mkdir(projectDir, { recursive: true });
