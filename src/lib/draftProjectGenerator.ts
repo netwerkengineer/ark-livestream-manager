@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settingsStore';
 import { checkLocalSongExists, getLocalSongText, getLocalShowData, getLocalShowFilePath, fetchLyricsFromInternet } from '@/lib/songs';
 import { applySfeerToShowFile } from '@/lib/sfeer';
 import { ensureRevertStyleInShowFile } from '@/lib/showRevertStyle';
+import { writeScriptureShowsToLibrary } from '@/lib/scriptureLibrary';
 import { getBibleVerses } from '@/lib/bible';
 import { createShowObject, createFreeShowProject, serializeProject } from '@/lib/freeshow';
 import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
@@ -455,6 +456,14 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
   }
 
   const dataJson = await createFreeShowProject(draft.serviceDate, showsList, projectName, templatePath, true, notes);
+  // Bijbelshows ook in de showmap zetten, zodat een andere stijl (bijv. Ark) de eerder geopende versie in FreeShow vervangt
+  if (settings.freeshowPath && draft.scriptures.length > 0) {
+    try {
+      await writeScriptureShowsToLibrary(dataJson, path.join(settings.freeshowPath, 'Shows'));
+    } catch (err: any) {
+      notes.push(`Bijbelteksten in de showmap zetten mislukt (${err?.message || err}); FreeShow kan de oude stijl blijven tonen.`);
+    }
+  }
   const serialized = await serializeProject(dataJson, { draftServiceDate: draft.serviceDate });
 
   await fs.mkdir(projectDir, { recursive: true });
