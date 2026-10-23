@@ -9,7 +9,8 @@ import os, sys
 from PIL import Image, ImageChops
 from make_obs_afbeeldingen import W, H, DONKER, TEAL, f, rgb, tekst, rrect, qr_afbeelding, givt_kolom
 
-KAART_B, KAART_H = 320, 392
+KAART_B, KAART_H = 320, 372
+SCHAAL = 0.75  # compact: de kaart blijft een hoekje van het beeld, de QR is dan ~213 px (scant nog prima)
 
 
 def wordmark(oud):
@@ -28,18 +29,17 @@ def kaart(oud):
     wm = wordmark(oud); h = 40; wm = wm.resize((int(wm.width * h / wm.height), h), Image.LANCZOS)
     c.alpha_composite(wm, (24 + int(f("zwaar", 30).getlength("Geef via")) + 16, 17))
     qr = qr_afbeelding(6)  # 6 px per punt, rand 4 -> verkleind naar de kaartbreedte
-    qr = qr.resize((284, 284), Image.NEAREST if False else Image.LANCZOS)
+    qr = qr.resize((284, 284), Image.LANCZOS)
     c.alpha_composite(qr, ((KAART_B - 284) // 2, 66))
-    tekst(c, "Scan met de Givt-app", f("licht", 24), 0, KAART_B / 2, 352, "#36505a", "midden", 0, 255)
-    return c
+    return c.resize((int(KAART_B * SCHAAL), int(KAART_H * SCHAAL)), Image.LANCZOS)
 
 
 def zet(oud, uit, rechts, onder):
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); img.alpha_composite(kaart(oud), (rechts - KAART_B, onder - KAART_H)); img.save(uit)
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); k = kaart(oud); img.alpha_composite(k, (rechts - k.width, onder - k.height)); img.save(uit)
 
 
 if __name__ == "__main__":
     oud = Image.open(sys.argv[1]).convert("RGBA"); uit = sys.argv[2]; os.makedirs(uit, exist_ok=True)
-    zet(oud, os.path.join(uit, "QR Givt - boven lower third.png"), 1754, 790)
+    zet(oud, os.path.join(uit, "QR Givt - boven lower third.png"), 1860, 822)
     zet(oud, os.path.join(uit, "QR Givt - rechtsonder.png"), 1860, 1030)
     print("klaar")
