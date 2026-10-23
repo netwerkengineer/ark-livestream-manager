@@ -40,8 +40,22 @@ def bar(left, top, width, color, height=8):
 
 
 # ---- ontwerpen -----------------------------------------------------------------------------------------------------
-def strak(woord, regel1, regel2, kicker):
+def logo_item(left, top, width, height, src):
+    return {"style": f"left:{left}px;top:{top}px;width:{width}px;height:{height}px;", "type": "media", "src": src, "fit": "contain"}
+
+
+def strak(woord, regel1, regel2, kicker, logo=None):
     teal = "#4db6ac"
+    if logo:  # Welkom met het Ark Church-logo: logo boven het woord, klein logo onderaan op de volgende dia
+        return [
+            [logo_item(810, 100, 300, 304, logo),
+             item(0, 430, 1920, 320, [(run(woord, 250, "bold", extra="letter-spacing:-3px;"), "center")]),
+             bar(900, 790, 120, teal)],
+            [item(160, 300, 1600, 240, [(run(regel1, 150, "bold"), "center")]),
+             bar(900, 570, 120, teal),
+             item(160, 610, 1600, 120, [(run(regel2, 56, "300", extra="opacity:0.92;"), "center")]),
+             logo_item(910, 870, 100, 101, logo)],
+        ]
     return [
         [item(0, 300, 1920, 330, [(run(woord, 250, "bold", extra="letter-spacing:-3px;"), "center")]),
          bar(900, 660, 120, teal),
@@ -52,7 +66,7 @@ def strak(woord, regel1, regel2, kicker):
     ]
 
 
-def warm(woord, regel1, regel2, kicker):
+def warm(woord, regel1, regel2, kicker, logo=None):
     goud = "#ffbe46"
     return [
         [item(150, 300, 1620, 90, [(run(kicker, 44, "bold", goud, "letter-spacing:9px;text-transform:uppercase;"), "left")], valign="flex-end"),
@@ -62,7 +76,7 @@ def warm(woord, regel1, regel2, kicker):
     ]
 
 
-def typografisch(woord, regel1, regel2, kicker):
+def typografisch(woord, regel1, regel2, kicker, logo=None):
     paars = "#b28cff"
     return [
         [item(0, 250, 1920, 480, [(run(woord.upper(), 340, "800", extra="letter-spacing:14px;"), "center")]),
@@ -84,19 +98,26 @@ TEKSTEN = {
         "typografisch": ("Welkom", "Fijn dat je er bent", "een goede dienst gewenst", "Ark Church"),
     },
     "Bedankt": {
-        "strak": ("Bedankt", "Tot de volgende keer", "Een fijne week gewenst", "voor het komen"),
+        "strak": ("Bedankt", "Tot de volgende keer", "Een gezegende week gewenst", "voor het komen"),
         "warm": ("Een fijne week", "Bedankt", "voor het komen.", "Tot de volgende keer"),
         "typografisch": ("Bedankt", "Tot de volgende keer", "een fijne week gewenst", "Ark Church"),
     },
 }
 
 
-def make_show(soort, var, client):
+LOGO = "Media/arkchurch-logo-wit.png"
+FINAL_IDS = {"Welkom": "f1592509bbe", "Bedankt": "21266b09d9c"}
+
+
+def make_show(soort, var, client, final=False):
     random.seed(f"{soort}-{var['nr']}")
     woord, r1, r2, kicker = TEKSTEN[soort][var["naam"]]
-    dias = var["build"](woord, r1, r2, kicker)
+    logo_src = f"{client}/{LOGO}" if soort == "Welkom" else None
+    dias = var["build"](woord, r1, r2, kicker, logo=logo_src)
     slides, layout_slides, media = {}, [], {}
     vid_id = "ark" + var["video"][:6] + rid(3)
+    if logo_src:
+        media[rid()] = {"name": os.path.basename(LOGO), "path": logo_src, "type": "image"}
     media[vid_id] = {"name": f"{var['video']}.mp4", "path": f"{client}/{VIDEO_DIR}/{var['video']}.mp4", "type": "video", "muted": True, "loop": True}
     groepen = {"Welkom": ["Welkom", "Fijn dat je er bent"], "Bedankt": ["Bedankt", "Tot de volgende keer"]}[soort]
     for i, items in enumerate(dias):
@@ -116,11 +137,13 @@ def make_show(soort, var, client):
     sid_show = rid()
     now = int(time.time() * 1000)
     content = {
-        "name": f"{soort} voorstel {var['nr']} ({var['naam']})", "private": False, "category": "presentation",
+        "name": soort if final else f"{soort} voorstel {var['nr']} ({var['naam']})", "private": False, "category": "presentation",
         "settings": {"activeLayout": layout_id, "template": None},
         "timestamps": {"created": now, "modified": now, "used": now}, "quickAccess": {}, "meta": {},
         "slides": slides, "layouts": {layout_id: {"name": "Default", "notes": "", "slides": layout_slides}}, "media": media,
     }
+    if final:
+        sid_show = FINAL_IDS[soort]
     return sid_show, content, dias, var["video"]
 
 
@@ -140,6 +163,10 @@ h2{font-weight:600;margin:28px 0 8px}h3{font-weight:500;font-size:14px;color:#9a
             for n, items in enumerate(dias, 1):
                 out.append(f"<div class=card><div class=box><div class=slide style=\"background-image:{bg}\">")
                 for it in items:
+                    if it["type"] == "media":  # logo: lokaal bestand uit de still-map (of dezelfde naam)
+                        local = os.path.join(stills_dir or ".", os.path.basename(it["src"]))
+                        out.append(f"<div class=it style=\"{it['style']}\"><img src=\"{local}\" style=\"width:100%;height:100%;object-fit:contain\"></div>")
+                        continue
                     lines = ''.join(f"<div class=ln style=\"{l['align']}\">" + ''.join(f"<span style=\"{t['style']}\">{html.escape(t['value'])}</span>" for t in l['text']) + "</div>" for l in it["lines"])
                     out.append(f"<div class=it style=\"{it['style']}{it['align']}\"><div style='width:100%'>{lines}</div></div>")
                 out.append(f"</div></div><div class=cap>dia {n}</div></div>")
@@ -155,13 +182,14 @@ def main():
     ap.add_argument("--client-path", default="/Users/jeffreygo/Documents/FreeShow")
     ap.add_argument("--preview")
     ap.add_argument("--still-dir")
+    ap.add_argument("--final", action="store_true", help="maak de echte Welkom.show en Bedankt.show (variant strak) onder de bestaande show-id's")
     a = ap.parse_args()
     os.makedirs(a.outdir, exist_ok=True)
     random.seed()
     shows = {"Welkom": [], "Bedankt": []}
     for soort in ("Welkom", "Bedankt"):
-        for var in VARIANTEN:
-            sid, content, dias, video = make_show(soort, var, a.client_path.rstrip("/"))
+        for var in (VARIANTEN[:1] if a.final else VARIANTEN):
+            sid, content, dias, video = make_show(soort, var, a.client_path.rstrip("/"), final=a.final)
             fn = os.path.join(a.outdir, content["name"] + ".show")
             with open(fn, "w", encoding="utf-8") as f:
                 json.dump([sid, content], f, ensure_ascii=False)
