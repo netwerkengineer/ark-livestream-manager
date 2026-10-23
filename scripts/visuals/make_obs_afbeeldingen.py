@@ -14,7 +14,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 W, H = 1920, 1080
-NAAM = "Evangelische Gemeente De Ark"
+NAAM = "Ark Church"
 IBAN = "NL05INGB0000298205"
 IBAN_WEERGAVE = " ".join(IBAN[i:i + 4] for i in range(0, len(IBAN), 4))
 QR_DATA = "https://www.givtapp.net/download?code=NjFmN2VkMDE0ZTRjMDYxN2MwMDAuYzAwMDAwMDAwMDAx"
