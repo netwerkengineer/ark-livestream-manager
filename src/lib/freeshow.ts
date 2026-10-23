@@ -178,7 +178,8 @@ export function createShowObject(show: any) {
             lines: lines,
             style: t.vak,
             align: "align-items:center;",
-            auto: false
+            auto: true,
+            textFit: "shrinkToFit"
           },
           verwijzingVak,
           vertalingVak
@@ -224,7 +225,8 @@ export function createShowObject(show: any) {
         lines: chunk,
         style: "top:88px;left:50px;height:904px;width:1820px;",
         align: "",
-        auto: false
+        auto: true,
+        textFit: "shrinkToFit"
       }];
 
       // At most two rows on screen per slide (a long line wraps and counts
@@ -365,7 +367,8 @@ export function createComplexShowObject(item: any) {
         lines: lines,
         style: "top:100px;left:100px;height:880px;width:1720px;",
         align: "",
-        auto: false
+        auto: true,
+        textFit: "shrinkToFit"
       });
     }
 
