@@ -996,15 +996,21 @@ def decide_show_direction(label, name, n_info, user, host, remote_shows_dir):
 
 
 def freeshow_process_names(user, host, remote_os):
-    """Namen van draaiende FreeShow-processen op het doel (leeg = draait niet, of niet te bepalen)."""
+    """Namen van draaiende FreeShow-processen op het doel. Geeft een lege lijst als FreeShow niet draait en None als de lijst met
+    processen niet op te vragen was (verbinding haperde): "niet te bepalen" is niet hetzelfde als "draait niet"."""
     if remote_os == "windows":
         res = run_ssh_cmd(user, host, "tasklist /FO CSV /NH")
+        rows = [r for r in csv.reader((res.stdout or "").splitlines()) if r]
+        if getattr(res, "returncode", 1) != 0 or len(rows) < 5:  # een echte processenlijst heeft er tientallen
+            return None
         names = []
-        for row in csv.reader((res.stdout or "").splitlines()):
-            if row and "freeshow" in row[0].lower() and row[0] not in names:
+        for row in rows:
+            if "freeshow" in row[0].lower() and row[0] not in names:
                 names.append(row[0])
         return names
     res = run_ssh_cmd(user, host, "pgrep -ix freeshow")
+    if getattr(res, "returncode", 1) not in (0, 1):  # 1 = geen treffers (draait niet); anders niet te bepalen
+        return None
     return ["freeshow"] if (res.stdout or "").strip() else []
 
 
@@ -1036,7 +1042,15 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
     zodat het tijdens de sync geen oudere show terugschrijft. Blijft FreeShow na ~20 s open, dan wordt er alleen geforceerd als
     `force` (onbemande run; de pc gaat daarna toch uit). Geeft True als FreeShow niet (meer) draait."""
     try:
-        names = freeshow_process_names(user, host, remote_os)
+        names = None
+        for _ in range(3):  # een haperende verbinding even opnieuw proberen
+            names = freeshow_process_names(user, host, remote_os)
+            if names is not None:
+                break
+            time.sleep(2)
+        if names is None:
+            print(f"[{label}] WAARSCHUWING: de lijst met draaiende programma's was niet op te vragen; niet te bepalen of FreeShow draait. De sync gaat door.")
+            return False
         if not names:
             print(f"[{label}] FreeShow draait niet op het doel; niets af te sluiten.")
             return True
@@ -1052,7 +1066,8 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
                 run_ssh_cmd(user, host, "osascript -e 'tell application \"FreeShow\" to quit'")
         for _ in range(10):
             time.sleep(2)
-            if not freeshow_process_names(user, host, remote_os):
+            nu = freeshow_process_names(user, host, remote_os)
+            if nu is not None and not nu:  # alleen "afgesloten" als de lijst echt is opgevraagd en FreeShow er niet meer in staat
                 print(f"[{label}] FreeShow is afgesloten.")
                 return True
         if force:
@@ -1063,7 +1078,8 @@ def close_freeshow_on_target(label, user, host, remote_os, force):
                 else:
                     run_ssh_cmd(user, host, "pkill -KILL -ix freeshow")
             time.sleep(3)
-            return not freeshow_process_names(user, host, remote_os)
+            nu = freeshow_process_names(user, host, remote_os)
+            return nu is not None and not nu
         print(f"[{label}] WAARSCHUWING: FreeShow sloot niet binnen 20 s en blijft open (iemand zit eraan). De sync gaat door; "
               "de vergelijking op timestamps.modified beschermt nieuwe versies op de NAS, maar sluit FreeShow zelf af en sync opnieuw als er iets niet klopt.")
         return False
