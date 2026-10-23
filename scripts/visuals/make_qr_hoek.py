@@ -40,6 +40,6 @@ def zet(oud, uit, rechts, onder):
 
 if __name__ == "__main__":
     oud = Image.open(sys.argv[1]).convert("RGBA"); uit = sys.argv[2]; os.makedirs(uit, exist_ok=True)
-    zet(oud, os.path.join(uit, "QR Givt - boven lower third.png"), 1860, 822)
+    zet(oud, os.path.join(uit, "QR Givt - boven lower third.png"), 1755, 822)
     zet(oud, os.path.join(uit, "QR Givt - rechtsonder.png"), 1860, 1030)
     print("klaar")
