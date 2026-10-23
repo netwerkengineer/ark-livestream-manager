@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Maakt voorstellen voor de FreeShow-shows "Welkom" en "Bedankt": een bewegende Ark-achtergrond met stevige tekst,
-meerdere dia's, en de Thema-dia (thema.jpg, het YouTube-plaatje van de week) er altijd in.
+meerdere dia's; bij Welkom zit de Thema-dia (thema.jpg, het YouTube-plaatje van de week) er altijd in als laatste.
 
 Gebruik: make_welkom_bedankt.py <uitvoermap-voor-.show-bestanden> [--client-path /Users/jeffreygo/Documents/FreeShow]
                                 [--preview voorbeeld.html] [--still-dir map-met-ark.jpg,goud.jpg,nacht.jpg]
@@ -92,6 +92,7 @@ TEKSTEN = {
 
 
 def make_show(soort, var, client):
+    random.seed(f"{soort}-{var['nr']}")
     woord, r1, r2, kicker = TEKSTEN[soort][var["naam"]]
     dias = var["build"](woord, r1, r2, kicker)
     slides, layout_slides, media = {}, [], {}
@@ -102,12 +103,15 @@ def make_show(soort, var, client):
         sid = rid()
         slides[sid] = {"group": groepen[i], "color": None, "settings": {}, "notes": "", "items": items}
         layout_slides.append({"id": sid, "nextTimer": 8, "background": vid_id})
-    # Thema-dia: altijd als laatste, met hetzelfde plaatje (thema.jpg) als de bestaande Welkom-show
-    tid = rid()
-    slides[tid] = {"group": "Thema", "color": None, "settings": {}, "notes": "",
-                   "items": [{"style": "top:0px;left:0px;height:1080px;width:1920px;", "type": "media", "src": f"{client}/{THEMA}"}]}
-    layout_slides.append({"id": tid, "nextTimer": 10, "bindings": [], "end": True})
-    media[rid()] = {"name": THEMA, "path": f"{client}/{THEMA}", "type": "image"}
+    if soort == "Welkom":
+        # Thema-dia: altijd als laatste van Welkom, met hetzelfde plaatje (thema.jpg) als de bestaande Welkom-show
+        tid = rid()
+        slides[tid] = {"group": "Thema", "color": None, "settings": {}, "notes": "",
+                       "items": [{"style": "top:0px;left:0px;height:1080px;width:1920px;", "type": "media", "src": f"{client}/{THEMA}"}]}
+        layout_slides.append({"id": tid, "nextTimer": 10, "bindings": [], "end": True})
+        media[rid()] = {"name": THEMA, "path": f"{client}/{THEMA}", "type": "image"}
+    else:
+        layout_slides[-1].pop("nextTimer", None)  # Bedankt: de laatste dia blijft staan
     layout_id = rid()
     sid_show = rid()
     now = int(time.time() * 1000)
@@ -139,7 +143,9 @@ h2{font-weight:600;margin:28px 0 8px}h3{font-weight:500;font-size:14px;color:#9a
                     lines = ''.join(f"<div class=ln style=\"{l['align']}\">" + ''.join(f"<span style=\"{t['style']}\">{html.escape(t['value'])}</span>" for t in l['text']) + "</div>" for l in it["lines"])
                     out.append(f"<div class=it style=\"{it['style']}{it['align']}\"><div style='width:100%'>{lines}</div></div>")
                 out.append(f"</div></div><div class=cap>dia {n}</div></div>")
-            out.append("<div class=card><div class=box><div class=slide style=\"background:#0d1b2a;display:flex;align-items:center;justify-content:center;font:bold 120px Helvetica;color:#fff\">Thema</div></div><div class=cap>laatste dia: Thema (thema.jpg van de week)</div></div></div>")
+            if soort == "Welkom":
+                out.append("<div class=card><div class=box><div class=slide style=\"background:#0d1b2a;display:flex;align-items:center;justify-content:center;font:bold 120px Helvetica;color:#fff\">Thema</div></div><div class=cap>laatste dia: Thema (thema.jpg van de week)</div></div>")
+            out.append("</div>")
     return ''.join(out)
 
 
