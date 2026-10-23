@@ -10,7 +10,7 @@ from PIL import Image, ImageChops
 from make_obs_afbeeldingen import W, H, DONKER, TEAL, f, rgb, tekst, rrect, qr_afbeelding, givt_kolom
 
 KAART_B, KAART_H = 320, 372
-SCHAAL = 0.75  # compact: de kaart blijft een hoekje van het beeld, de QR is dan ~213 px (scant nog prima)
+SCHAAL = 0.55  # compact: de kaart blijft een hoekje van het beeld (QR ~156 px op 1080p)
 
 
 def wordmark(oud):
