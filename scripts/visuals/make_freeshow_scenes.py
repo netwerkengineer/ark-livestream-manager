@@ -37,12 +37,19 @@ def camera(a):
     return {"id": a.camera_id, "name": a.camera_name, "group": a.camera_group, "type": "camera"}
 
 
-def scenes(a, nu):
+def scenes(a, nu, bestaand=None):
+    """bestaand = de scenes die al in FreeShow staan: een camera die de gebruiker zelf in de scene heeft gekozen blijft staan
+    (camera-id's verschillen per computer en per installatie, die kan ik niet raden)."""
+    bestaand = bestaand or {}
+
+    def media(sid):
+        m = (bestaand.get(sid, {}).get("content") or {}).get("media")
+        return m if m else camera(a)
     b = [a.stream_output_id]
     return {"ark_scene_lt": {"name": "Stream: camera + liederen", "modified": nu, "bindings": b, "action": "",
-                             "content": {"media": camera(a), "style": a.lyrics_style_id, "overlays": ["ark_logo"]}},
+                             "content": {"media": media("ark_scene_lt"), "style": a.lyrics_style_id, "overlays": ["ark_logo"]}},
             "ark_scene_cam": {"name": "Stream: camera volledig", "modified": nu, "bindings": b, "action": "",
-                              "content": {"media": camera(a), "style": a.video_style_id, "overlays": ["ark_logo"]}},
+                              "content": {"media": media("ark_scene_cam"), "style": a.video_style_id, "overlays": ["ark_logo"]}},
             "ark_scene_dia": {"name": "Stream: dia's volledig", "modified": nu, "bindings": b, "action": "",
                               "content": {"media": None, "style": a.video_style_id, "overlays": []}}}
 
@@ -57,7 +64,7 @@ def main():
     # controles: bestaan de stijlen en de uitvoer?
     for sid, label in ((a.lyrics_style_id, "liedjes-stijl"), (a.video_style_id, "video-stijl")):
         assert sid in st.get("styles", {}), f"{label} {sid} staat niet in settings_synced.json"
-    nieuw_ov = {"ark_logo": overlay_logo(a, nu)}; nieuw_sc = scenes(a, nu)
+    nieuw_ov = {"ark_logo": overlay_logo(a, nu)}; nieuw_sc = scenes(a, nu, st.get('scenes', {}))
     print("Overlays:"); [print("  ", "bijwerken" if k in ov else "nieuw    ", k, v["name"]) for k, v in nieuw_ov.items()]
     print("Scenes:");   [print("  ", "bijwerken" if k in st.get("scenes", {}) else "nieuw    ", k, v["name"], "| stijl", st["styles"][v["content"]["style"]]["name"], "| overlays", v["content"]["overlays"]) for k, v in nieuw_sc.items()]
     print("Categorie 'Stream':", "bestaat" if CATEGORIE in st.get("overlayCategories", {}) else "nieuw")
