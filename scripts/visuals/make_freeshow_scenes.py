@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Maakt in FreeShow overlays en scenes om OBS te vervangen voor de livestream (RTMP-uitvoer):
 
-  Overlays (categorie "Stream"):
-    "Camera"      camera-item schermvullend, ONDER de dia (placeUnderSlide) zodat liedtekst/lower thirds erboven staan
+  Overlay (categorie "Stream"):
     "Logo Ark"    het Ark Church-logo rechtsboven
+  De camera is het MEDIA van de scene (zoals FreeShow dat zelf doet bij "Kies media-ingang"): FreeShow tekent dat onderaan, onder de dia
+  en de overlays, ongeacht de lagen van de stijl. (Een camera-item in een overlay deed het niet.)
   Scenes (gebonden aan de stream-uitvoer):
     "Stream: camera + liederen"   camera + logo, stijl "Livestream Liederen" (de transparante LT voor liederen en teksten)
     "Stream: camera volledig"     camera + logo, stijl "Livestream Video fullscreen" (dia's vullen het beeld)
@@ -32,12 +33,16 @@ def overlay_logo(a, nu):
             "items": [{"style": "left:1690px;top:36px;width:190px;height:192px;", "type": "media", "src": a.logo_path, "fit": "contain", "bindings": [a.stream_output_id]}]}
 
 
+def camera(a):
+    return {"id": a.camera_id, "name": a.camera_name, "group": a.camera_group, "type": "camera"}
+
+
 def scenes(a, nu):
     b = [a.stream_output_id]
     return {"ark_scene_lt": {"name": "Stream: camera + liederen", "modified": nu, "bindings": b, "action": "",
-                             "content": {"media": None, "style": a.lyrics_style_id, "overlays": ["ark_cam", "ark_logo"]}},
+                             "content": {"media": camera(a), "style": a.lyrics_style_id, "overlays": ["ark_logo"]}},
             "ark_scene_cam": {"name": "Stream: camera volledig", "modified": nu, "bindings": b, "action": "",
-                              "content": {"media": None, "style": a.video_style_id, "overlays": ["ark_cam", "ark_logo"]}},
+                              "content": {"media": camera(a), "style": a.video_style_id, "overlays": ["ark_logo"]}},
             "ark_scene_dia": {"name": "Stream: dia's volledig", "modified": nu, "bindings": b, "action": "",
                               "content": {"media": None, "style": a.video_style_id, "overlays": []}}}
 
@@ -52,7 +57,7 @@ def main():
     # controles: bestaan de stijlen en de uitvoer?
     for sid, label in ((a.lyrics_style_id, "liedjes-stijl"), (a.video_style_id, "video-stijl")):
         assert sid in st.get("styles", {}), f"{label} {sid} staat niet in settings_synced.json"
-    nieuw_ov = {"ark_cam": overlay_camera(a, nu), "ark_logo": overlay_logo(a, nu)}; nieuw_sc = scenes(a, nu)
+    nieuw_ov = {"ark_logo": overlay_logo(a, nu)}; nieuw_sc = scenes(a, nu)
     print("Overlays:"); [print("  ", "bijwerken" if k in ov else "nieuw    ", k, v["name"]) for k, v in nieuw_ov.items()]
     print("Scenes:");   [print("  ", "bijwerken" if k in st.get("scenes", {}) else "nieuw    ", k, v["name"], "| stijl", st["styles"][v["content"]["style"]]["name"], "| overlays", v["content"]["overlays"]) for k, v in nieuw_sc.items()]
     print("Categorie 'Stream':", "bestaat" if CATEGORIE in st.get("overlayCategories", {}) else "nieuw")
