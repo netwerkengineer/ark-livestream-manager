@@ -26,15 +26,16 @@ def tekstvak(schaduw):
             "conditions": {"showItem": [[[[{"element": "text", "operator": "isNot", "data": "value", "value": ""}]]]]}}
 
 
-def verloop():
-    """Leeg tekstvak over de onderste ~40% van het beeld met een verloop van transparant naar licht donker."""
-    return {"style": "left:0px;top:640px;width:1920px;height:440px;background-image:linear-gradient(to bottom, rgb(0 0 0 / 0.0) 0%, rgb(0 0 0 / 0.06) 25%, rgb(0 0 0 / 0.22) 55%, rgb(0 0 0 / 0.5) 100%);",
+def verloop(sterkte=0.5, hoogte=440):
+    """Leeg tekstvak over de onderkant van het beeld met een verloop van transparant naar donker (sterkte = dekking onderaan)."""
+    return {"style": f"left:0px;top:{1080 - hoogte}px;width:1920px;height:{hoogte}px;background-image:linear-gradient(to bottom, rgb(0 0 0 / 0.0) 0%, rgb(0 0 0 / {sterkte * 0.12:.2f}) 25%, rgb(0 0 0 / {sterkte * 0.44:.2f}) 55%, rgb(0 0 0 / {sterkte}) 100%);",
             "type": "text", "align": "align-items:center;",
             "lines": [{"align": "text-align:center;", "text": [{"value": "", "style": ""}]}], "bindings": []}
 
 
 TEMPLATES = {
     "LT Songs Transparant Zacht": {"name": "LT Songs Transparant Zacht", "color": "#4DB6AC", "category": "song", "items": [verloop(), tekstvak(SCHADUW_ZACHT)]},
+    "LT Songs Transparant TEST Sterk Verloop": {"name": "LT Songs Transparant TEST Sterk Verloop", "color": "#E53935", "category": "song", "items": [verloop(0.9, 600), tekstvak(SCHADUW_ZACHT)]},
     "LT Songs Transparant Puur": {"name": "LT Songs Transparant Puur", "color": "#4DB6AC", "category": "song", "items": [tekstvak(SCHADUW_PUUR)]},
 }
 
