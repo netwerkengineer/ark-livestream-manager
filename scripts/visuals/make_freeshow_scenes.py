@@ -9,6 +9,8 @@
     "Stream: camera + liederen"   camera + logo, stijl "Livestream Liederen" (de transparante LT voor liederen en teksten)
     "Stream: camera volledig"     camera + logo, stijl "Livestream Video fullscreen" (dia's vullen het beeld)
     "Stream: dia's volledig"      alleen de dia's, geen camera (Welkom, Collecte Givt, Bedankt)
+    "Stream: camera + lower third" camera + logo, met de stijl "Stream Presentatie" (kopie van de liederenstijl ZONDER sjabloon, zodat de tekst van een
+                                  dia niet als lyrics-regel wordt getoond): voor Collecte Givt en Volg ons, waar items alleen voor de stream een lower third zijn
 
 Gebruik: make_freeshow_scenes.py <FreeShow Config-map> --stream-output-id ID --camera-id ID --camera-group ID --camera-name "naam" --logo-path PAD
          --lyrics-style-id ID --video-style-id ID [--uitvoeren]
@@ -19,6 +21,7 @@ import argparse, json, os, shutil, time
 
 CATEGORIE = "ark_stream"
 OVERLAYS = {"ark_cam": "Camera", "ark_logo": "Logo Ark"}
+STIJL_PRES = "ark_style_pres"
 SCENES = {"ark_scene_lt": "Stream: camera + liederen", "ark_scene_cam": "Stream: camera volledig", "ark_scene_dia": "Stream: dia's volledig"}
 
 
@@ -50,6 +53,8 @@ def scenes(a, nu, bestaand=None):
                              "content": {"media": media("ark_scene_lt"), "style": a.lyrics_style_id, "overlays": ["ark_logo"]}},
             "ark_scene_cam": {"name": "Stream: camera volledig", "modified": nu, "bindings": b, "action": "",
                               "content": {"media": media("ark_scene_cam"), "style": a.video_style_id, "overlays": ["ark_logo"]}},
+            "ark_scene_pres": {"name": "Stream: camera + lower third", "modified": nu, "bindings": b, "action": "",
+                               "content": {"media": media("ark_scene_lt"), "style": STIJL_PRES, "overlays": ["ark_logo"]}},
             "ark_scene_dia": {"name": "Stream: dia's volledig", "modified": nu, "bindings": b, "action": "",
                               "content": {"media": None, "style": a.video_style_id, "overlays": []}}}
 
@@ -64,15 +69,18 @@ def main():
     # controles: bestaan de stijlen en de uitvoer?
     for sid, label in ((a.lyrics_style_id, "liedjes-stijl"), (a.video_style_id, "video-stijl")):
         assert sid in st.get("styles", {}), f"{label} {sid} staat niet in settings_synced.json"
+    import copy
+    pres = copy.deepcopy(st["styles"][a.lyrics_style_id]); pres.update({"name": "Stream Presentatie", "template": "", "templateScripture": ""})
     nieuw_ov = {"ark_logo": overlay_logo(a, nu)}; nieuw_sc = scenes(a, nu, st.get('scenes', {}))
     print("Overlays:"); [print("  ", "bijwerken" if k in ov else "nieuw    ", k, v["name"]) for k, v in nieuw_ov.items()]
-    print("Scenes:");   [print("  ", "bijwerken" if k in st.get("scenes", {}) else "nieuw    ", k, v["name"], "| stijl", st["styles"][v["content"]["style"]]["name"], "| overlays", v["content"]["overlays"]) for k, v in nieuw_sc.items()]
+    print("Scenes:");   [print("  ", "bijwerken" if k in st.get("scenes", {}) else "nieuw    ", k, v["name"], "| stijl", ({**{k2: v2["name"] for k2, v2 in st["styles"].items()}, STIJL_PRES: "Stream Presentatie"})[v["content"]["style"]], "| overlays", v["content"]["overlays"]) for k, v in nieuw_sc.items()]
+    print("Stijl:", "bijwerken" if STIJL_PRES in st["styles"] else "nieuw    ", STIJL_PRES, "Stream Presentatie (liederenstijl zonder sjabloon)")
     print("Categorie 'Stream':", "bestaat" if CATEGORIE in st.get("overlayCategories", {}) else "nieuw")
     if not a.uitvoeren:
         print("\nDROOG: er is niets gewijzigd."); return
     tijd = time.strftime("%Y%m%d-%H%M%S")
     for p in (op, sp): shutil.copy2(p, f"{p}.bak-scenes-{tijd}")
-    ov.update(nieuw_ov); st.setdefault("scenes", {}).update(nieuw_sc)
+    ov.update(nieuw_ov); st.setdefault("scenes", {}).update(nieuw_sc); st["styles"][STIJL_PRES] = pres
     st.setdefault("overlayCategories", {}).setdefault(CATEGORIE, {"name": "Stream", "icon": "camera"})
     for p, d in ((op, ov), (sp, st)):
         tmp = p + ".tmp-scenes"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, p)

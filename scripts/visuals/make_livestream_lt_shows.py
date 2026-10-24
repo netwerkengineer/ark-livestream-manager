@@ -4,7 +4,7 @@ RTMP-uitvoer "Youtube" komt de camera met een lower third eroverheen. Dat gaat m
 en met de scene "Stream: camera + liederen" (camera als media; de stijl daarvan toont de dia-achtergrond niet).
 
   Collecte Givt : alle bestaande items krijgen als binding de zaal-uitvoeren; dia 1 krijgt de Givt-lower third (PNG), dia 2 de QR-hoekkaart (PNG),
-                  beide alleen voor Youtube; de override-actie wordt "Ark scene: camera + liederen".
+                  beide alleen voor Youtube; de override-actie wordt "Ark scene: camera + lower third" (stijl zonder sjabloon).
   Volg ons      : nieuwe show met de schermvullende dia voor de zaal en de Volg ons-lower third voor Youtube.
 
 De PNG's komen uit de map met OBS-afbeeldingen en worden gekopieerd naar <FreeShow>/Media/Ark Livestream/.
@@ -22,7 +22,7 @@ BESTANDEN = {  # doelnaam in Media/Ark Livestream  <-  bestand in de OBS-map
     "volg-ons-schermvullend.jpg": "Volg ons - schermvullend.jpg",
 }
 VOLG_ONS_ID, VOLG_ONS_LAYOUT = "a7c3e91b4d2", "ba7c3e91b4d"
-SCENE_ID, SCENE_NAAM = "ark_scene_lt", "Ark scene: camera + liederen"
+SCENE_ID, SCENE_NAAM = "ark_scene_pres", "Ark scene: camera + lower third"
 
 
 def rid(n=11):

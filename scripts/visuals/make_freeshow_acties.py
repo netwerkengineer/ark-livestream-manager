@@ -40,7 +40,7 @@ def acties(companion_url, output_id, extra=()):
         uit.append({"name": naam, "triggers": ["change_output_style"],
                     "actionValues": {"change_output_style": {"styleOutputs": {"type": "specific", "outputs": {o: stijl for o in (output_id, *extra)}}}},
                     "customActivation": "", "midiEnabled": False})
-    for naam, sid in (("Ark scene: camera + liederen", "ark_scene_lt"), ("Ark scene: camera volledig", "ark_scene_cam"), ("Ark scene: dia's volledig", "ark_scene_dia")):
+    for naam, sid in (("Ark scene: camera + liederen", "ark_scene_lt"), ("Ark scene: camera volledig", "ark_scene_cam"), ("Ark scene: dia's volledig", "ark_scene_dia"), ("Ark scene: camera + lower third", "ark_scene_pres")):
         uit.append({"name": naam, "triggers": ["start_scene"], "actionValues": {"start_scene": {"id": sid}}, "customActivation": "", "midiEnabled": False})
     return uit
 
