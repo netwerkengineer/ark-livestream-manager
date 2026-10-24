@@ -4,6 +4,7 @@ shows te zetten zijn of terug te zetten zijn als iemand per ongeluk een actie va
 
   "Ark licht: <sfeer>"            HTTP-verzoek naar de Companion-knop van die sfeer (zelfde als de lichtactie in de liederen)
   "Ark stijl: livestream liederen" / "Ark stijl: livestream video"   stijlwissel van de livestream-uitvoer
+  "Ark scene: camera + liederen" / "camera volledig" / "dia's volledig"   start de scene (zie make_freeshow_scenes.py; vaste scene-id's)
 
 FreeShow bewaart zijn acties in Config/settings_synced.json onder "midiIn". Bestaande acties blijven staan; een actie met dezelfde naam
 wordt overgeslagen. Sluit FreeShow eerst af (FreeShow schrijft dit bestand zelf terug en zou de wijziging overschrijven).
@@ -39,6 +40,8 @@ def acties(companion_url, output_id, extra=()):
         uit.append({"name": naam, "triggers": ["change_output_style"],
                     "actionValues": {"change_output_style": {"styleOutputs": {"type": "specific", "outputs": {o: stijl for o in (output_id, *extra)}}}},
                     "customActivation": "", "midiEnabled": False})
+    for naam, sid in (("Ark scene: camera + liederen", "ark_scene_lt"), ("Ark scene: camera volledig", "ark_scene_cam"), ("Ark scene: dia's volledig", "ark_scene_dia")):
+        uit.append({"name": naam, "triggers": ["start_scene"], "actionValues": {"start_scene": {"id": sid}}, "customActivation": "", "midiEnabled": False})
     return uit
 
 
@@ -56,7 +59,9 @@ def main():
             if ontbreekt: bijwerken.append((k, v, ontbreekt, stijl))
     nieuw = [x for x in acties(a.companion_url, a.livestream_output_id, a.extra_output_id) if x["name"] not in namen]
     print(f"{len(mi)} acties in FreeShow; {len(nieuw)} nieuwe toe te voegen, {len(acties(a.companion_url, a.livestream_output_id, a.extra_output_id)) - len(nieuw)} bestaan al (zelfde naam).")
-    for x in nieuw: print("  +", x["name"], "->", (x["actionValues"].get("send_rest_command") or {}).get("url") or list(x["actionValues"]["change_output_style"]["styleOutputs"]["outputs"].items()))
+    for x in nieuw:
+        av = x["actionValues"]
+        print("  +", x["name"], "->", (av.get("send_rest_command") or {}).get("url") or (av.get("start_scene") or {}).get("id") or list(av["change_output_style"]["styleOutputs"]["outputs"].items()))
     for k, v, ontbreekt, stijl in bijwerken: print("  ~", v["name"], "+ uitvoer", ontbreekt)
     if not a.uitvoeren or not (nieuw or bijwerken):
         print("\nDROOG: er is niets gewijzigd." if not a.uitvoeren else "\nNiets te doen."); return
