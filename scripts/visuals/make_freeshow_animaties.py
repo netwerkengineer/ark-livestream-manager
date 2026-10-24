@@ -42,7 +42,7 @@ def main():
     cp = a.client_path.rstrip("/"); nieuw_ov, nieuw_ac = {}, []
     for oid, naam, video, duur, herhaal in OVERLAYS:
         o = {"name": naam, "color": None, "category": CATEGORIE, "modified": nu,
-             "items": [{"style": "left:0px;top:0px;width:1920px;height:1080px;", "type": "media", "src": f"{cp}/Media/Ark Livestream/{video}", "fit": "contain",
+             "items": [{"style": "left:0px;top:0px;width:1920px;height:1080px;z-index:10;", "type": "media", "src": f"{cp}/Media/Ark Livestream/{video}", "fit": "contain",
                         "muted": True, "loop": herhaal, "bindings": [a.youtube_output]}]}
         if duur: o["displayDuration"] = duur
         nieuw_ov[oid] = o
