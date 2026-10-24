@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Transparante lower thirds voor liederen (livestream via NDI): witte letters zonder blok.
 
-  LT Songs Transparant Zacht : witte letters, zachte schaduw, plus een heel lichte donkere verloop onderin (geen rand of blok) voor lichte beelden
+  LT Songs Transparant Zacht : witte letters, zachte schaduw, plus een zacht donker verloop onderin het beeld (geen rand of blok) voor lichte beelden; het verloop is een schaduw, want FreeShow toont geen CSS-verloop
   LT Songs Transparant Puur  : alleen witte letters met een zachte, brede schaduw
 
 Gebruik: make_lt_transparant.py <uitvoermap> [--voorbeeld voorbeeld.html --achtergronden a.jpg b.jpg ...]
@@ -19,18 +19,12 @@ def regel(tekst, schaduw):
 
 
 def tekstvak(schaduw):
+    # Eerste item: FreeShow zet de liedtekst in het eerste tekstvak van het sjabloon, extra (lege) vlakken komen dus erna.
     return {"style": "left:160px;top:842px;width:1600px;height:178px;padding:14px 50px;background-color:rgb(0 0 0 / 0.0);z-index:2;",
             "type": "text", "align": "align-items:center;", "auto": True, "textFit": "shrinkToFit",
             "lines": [regel("LINE 1", schaduw), regel("LINE 2", schaduw)],
             "specialStyle": {"lineGap": 4, "lineBg": "rgb(0 0 0 / 0.0);"}, "bindings": [],
             "conditions": {"showItem": [[[[{"element": "text", "operator": "isNot", "data": "value", "value": ""}]]]]}}
-
-
-def verloop(sterkte=0.5, hoogte=440):
-    """Leeg tekstvak over de onderkant van het beeld met een verloop van transparant naar donker (sterkte = dekking onderaan)."""
-    return {"style": f"z-index:1;left:0px;top:{1080 - hoogte}px;width:1920px;height:{hoogte}px;background-image:linear-gradient(to bottom, rgb(0 0 0 / 0.0) 0%, rgb(0 0 0 / {sterkte * 0.12:.2f}) 25%, rgb(0 0 0 / {sterkte * 0.44:.2f}) 55%, rgb(0 0 0 / {sterkte}) 100%);",
-            "type": "text", "align": "align-items:center;",
-            "lines": [{"align": "text-align:center;", "text": [{"value": "", "style": ""}]}], "bindings": []}
 
 
 def verloop_schaduw(sterkte=0.7, spreid=260, blur=300):
@@ -43,8 +37,7 @@ def verloop_schaduw(sterkte=0.7, spreid=260, blur=300):
 
 
 TEMPLATES = {
-    "LT Songs Transparant Zacht": {"name": "LT Songs Transparant Zacht", "color": "#4DB6AC", "category": "song", "items": [tekstvak(SCHADUW_ZACHT), verloop()]},
-    "LT Songs Transparant TEST Schaduwverloop": {"name": "LT Songs Transparant TEST Schaduwverloop", "color": "#E53935", "category": "song", "items": [tekstvak(SCHADUW_ZACHT), verloop_schaduw(0.75, 300, 340)]},
+    "LT Songs Transparant Zacht": {"name": "LT Songs Transparant Zacht", "color": "#4DB6AC", "category": "song", "items": [tekstvak(SCHADUW_ZACHT), verloop_schaduw(0.65, 230, 300)]},
     "LT Songs Transparant Puur": {"name": "LT Songs Transparant Puur", "color": "#4DB6AC", "category": "song", "items": [tekstvak(SCHADUW_PUUR)]},
 }
 
