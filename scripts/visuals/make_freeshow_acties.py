@@ -29,7 +29,7 @@ def knop_pad(knop):
     return f"{COMPANION_PAGINA}/{2 + knop // 8}/{knop % 8}"
 
 
-def acties(companion_url, output_id):
+def acties(companion_url, output_id, extra=()):
     uit = []
     for s in json.load(open(SFEREN)):
         uit.append({"name": f"Ark licht: {s['naam']}", "triggers": ["send_rest_command"],
@@ -37,26 +37,35 @@ def acties(companion_url, output_id):
                     "customActivation": "", "midiEnabled": False})
     for naam, stijl in (("Ark stijl: livestream liederen", STIJL_LIEDEREN), ("Ark stijl: livestream video", STIJL_VIDEO)):
         uit.append({"name": naam, "triggers": ["change_output_style"],
-                    "actionValues": {"change_output_style": {"styleOutputs": {"type": "specific", "outputs": {output_id: stijl}}}},
+                    "actionValues": {"change_output_style": {"styleOutputs": {"type": "specific", "outputs": {o: stijl for o in (output_id, *extra)}}}},
                     "customActivation": "", "midiEnabled": False})
     return uit
 
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("bestand"); ap.add_argument("--companion-url", required=True)
-    ap.add_argument("--livestream-output-id", required=True); ap.add_argument("--uitvoeren", action="store_true")
+    ap.add_argument("--livestream-output-id", required=True); ap.add_argument("--extra-output-id", action="append", default=[], help="extra uitvoer (bv. de RTMP-uitvoer) waarop de stijlacties ook werken; herhaalbaar"); ap.add_argument("--uitvoeren", action="store_true")
     a = ap.parse_args(); random.seed()
     d = json.load(open(a.bestand, encoding="utf-8")); mi = d.setdefault("midiIn", {})
     namen = {v.get("name") for v in mi.values()}
-    nieuw = [x for x in acties(a.companion_url, a.livestream_output_id) if x["name"] not in namen]
-    print(f"{len(mi)} acties in FreeShow; {len(nieuw)} nieuwe toe te voegen, {len(acties(a.companion_url, a.livestream_output_id)) - len(nieuw)} bestaan al (zelfde naam).")
+    bijwerken = []
+    for k, v in mi.items():
+        if v.get("name", "").startswith("Ark stijl:") and a.extra_output_id:
+            uit = v["actionValues"]["change_output_style"]["styleOutputs"]["outputs"]; stijl = next(iter(uit.values()))
+            ontbreekt = [o for o in a.extra_output_id if o not in uit]
+            if ontbreekt: bijwerken.append((k, v, ontbreekt, stijl))
+    nieuw = [x for x in acties(a.companion_url, a.livestream_output_id, a.extra_output_id) if x["name"] not in namen]
+    print(f"{len(mi)} acties in FreeShow; {len(nieuw)} nieuwe toe te voegen, {len(acties(a.companion_url, a.livestream_output_id, a.extra_output_id)) - len(nieuw)} bestaan al (zelfde naam).")
     for x in nieuw: print("  +", x["name"], "->", (x["actionValues"].get("send_rest_command") or {}).get("url") or list(x["actionValues"]["change_output_style"]["styleOutputs"]["outputs"].items()))
-    if not a.uitvoeren or not nieuw:
+    for k, v, ontbreekt, stijl in bijwerken: print("  ~", v["name"], "+ uitvoer", ontbreekt)
+    if not a.uitvoeren or not (nieuw or bijwerken):
         print("\nDROOG: er is niets gewijzigd." if not a.uitvoeren else "\nNiets te doen."); return
     bk = f"{a.bestand}.bak-acties-{time.strftime('%Y%m%d-%H%M%S')}"; shutil.copy2(a.bestand, bk); print("reservekopie:", bk)
     for x in nieuw: mi[rid(mi)] = x
+    for k, v, ontbreekt, stijl in bijwerken:
+        for o in ontbreekt: v["actionValues"]["change_output_style"]["styleOutputs"]["outputs"][o] = stijl
     tmp = a.bestand + ".tmp-acties"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, a.bestand)
-    print(f"klaar: {len(nieuw)} acties toegevoegd (nu {len(mi)}).")
+    print(f"klaar: {len(nieuw)} acties toegevoegd, {len(bijwerken)} bijgewerkt (nu {len(mi)}).")
 
 
 if __name__ == "__main__":
