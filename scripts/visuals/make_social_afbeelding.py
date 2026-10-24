@@ -87,10 +87,10 @@ def schermvullend(still, logo, namen, uit):
     img.convert("RGB").save(uit, quality=94, subsampling=0)
 
 
-def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6, suffix=""):
+def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6, suffix="", prefix="Volg ons - lower third animatie", y0=780, y1=1050, mov=True):
     """Lower third als video met transparantie: schuift van onder in, blijft staan, schuift weer weg. Schrijft MOV (ProRes 4444) en WebM (VP9)."""
     import numpy as np
-    stil = Image.open(png).convert("RGBA"); y0, y1 = 780, 1050; balk = stil.crop((0, y0, W, y1)); schuif = 330
+    stil = Image.open(png).convert("RGBA"); balk = stil.crop((0, y0, W, y1)); schuif = 330
 
     def frame(k, alpha):
         """k = 0 (weg, onder beeld) .. 1 (op zijn plek)"""
@@ -101,8 +101,8 @@ def animatie(png, uitmap, fps=30, in_s=0.7, houd_s=10.0, uit_s=0.6, suffix=""):
     n_in, n_uit, n_houd = round(in_s * fps), round(uit_s * fps), round(houd_s * fps)
     frames = [frame(ease((i + 1) / n_in), min(1, (i + 1) / n_in * 1.6)) for i in range(n_in)]
     hou = frame(1, 1); uit = [frame(1 - ease((i + 1) / n_uit), 1 - (i + 1) / n_uit * .6) for i in range(n_uit)]
-    for naam, opties in ((f"Volg ons - lower third animatie{suffix}.mov", ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]),
-                         (f"Volg ons - lower third animatie{suffix}.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0"])):
+    for naam, opties in (([(f"{prefix}{suffix}.mov", ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"])] if mov else []) + [
+                         (f"{prefix}{suffix}.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-auto-alt-ref", "0"])]):
         pr = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-"] + opties + [os.path.join(uitmap, naam)],
                               stdin=subprocess.PIPE)
         for fr in frames: pr.stdin.write(fr)
