@@ -103,6 +103,31 @@ def patch_paths(obj, old_prefixes, new_prefix):
         return [patch_paths(v, old_prefixes, new_prefix) for v in obj]
     return obj
 
+def _bestandsnaam_show(naam):
+    for char in ['/', '\\', '?', '%', '*', ':', '|', '"', '<', '>']:
+        naam = naam.replace(char, '_')
+    return naam + ".show"
+
+def neem_nieuwere_bibliotheekversie(show_id, show_val, shows_dir):
+    """Een project dat gisteren is gemaakt bevat de shows van toen. Zonder controle zet de import die oude versies over de shows in de
+    bibliotheek (en dus op de Beamer-pc) heen. Staat dezelfde show (zelfde id) in de showmap van de NAS met een nieuwere
+    timestamps.modified, dan gebruiken we die. Geeft (show_val, True) als de bibliotheekversie is gebruikt, anders (show_val, False)."""
+    try:
+        pad = os.path.join(shows_dir, _bestandsnaam_show(show_val.get("name") or ""))
+        if not os.path.isfile(pad):
+            return show_val, False
+        with open(pad, 'r', encoding='utf-8') as f:
+            sid, lib = json.load(f)
+        if sid != show_id or not isinstance(lib, dict):
+            return show_val, False
+        nieuw = (lib.get("timestamps") or {}).get("modified") or 0
+        oud = (show_val.get("timestamps") or {}).get("modified") or 0
+        if nieuw > oud:
+            return lib, True
+    except Exception as e:
+        print(f"Waarschuwing: bibliotheekversie van '{show_val.get('name')}' niet te vergelijken ({e}); projectversie blijft.")
+    return show_val, False
+
 def get_projects_dir(settings):
     default_dir = "/volume1/Beamer/FreeShow/projects" if os.path.exists("/volume1/Beamer/FreeShow/projects") else "/mnt/data/Projects/Beamer/FreeShow/projects"
     thumb_path = settings.get("thumbnailSavePath")
@@ -308,7 +333,12 @@ def import_project():
         local_shows_dir = os.path.join(temp_dir, "Shows")
         os.makedirs(local_shows_dir, exist_ok=True)
         
-        for show_id, show_val in shows_dict.items():
+        nas_shows_dir = os.path.join(os.path.dirname(projects_dir), "Shows")
+        for show_id, show_val in list(shows_dict.items()):
+            show_val, uit_bibliotheek = neem_nieuwere_bibliotheekversie(show_id, show_val, nas_shows_dir)
+            shows_dict[show_id] = show_val
+            if uit_bibliotheek:
+                print(f"Show '{show_val.get('name')}': de versie in de bibliotheek is nieuwer dan die in het project; die wordt gebruikt.")
             shows_data[show_id] = {
                 "name": show_val.get("name"),
                 "category": show_val.get("category", "presentation"),
