@@ -33,9 +33,18 @@ def verloop(sterkte=0.5, hoogte=440):
             "lines": [{"align": "text-align:center;", "text": [{"value": "", "style": ""}]}], "bindings": []}
 
 
+def verloop_schaduw(sterkte=0.7, spreid=260, blur=300):
+    """Vlak net ONDER het beeld (niet zichtbaar) met een grote zachte schaduw naar boven: geeft een vloeiend verloop zonder harde rand en
+    zonder background-image (dat toont FreeShow niet). De schaduw begint ~spreid px boven de onderrand en loopt over ~blur px uit."""
+    k = f"rgb(0 0 0 / {sterkte})"
+    return {"style": f"left:-400px;top:1080px;width:2720px;height:300px;background-color:rgb(0 0 0 / 0.0);box-shadow:0px 0px {blur}px {spreid}px {k};",
+            "type": "text", "align": "align-items:center;",
+            "lines": [{"align": "text-align:center;", "text": [{"value": "", "style": ""}]}], "bindings": []}
+
+
 TEMPLATES = {
     "LT Songs Transparant Zacht": {"name": "LT Songs Transparant Zacht", "color": "#4DB6AC", "category": "song", "items": [verloop(), tekstvak(SCHADUW_ZACHT)]},
-    "LT Songs Transparant TEST Sterk Verloop": {"name": "LT Songs Transparant TEST Sterk Verloop", "color": "#E53935", "category": "song", "items": [verloop(0.9, 600), tekstvak(SCHADUW_ZACHT)]},
+    "LT Songs Transparant TEST Schaduwverloop": {"name": "LT Songs Transparant TEST Schaduwverloop", "color": "#E53935", "category": "song", "items": [verloop_schaduw(0.75, 300, 340), tekstvak(SCHADUW_ZACHT)]},
     "LT Songs Transparant Puur": {"name": "LT Songs Transparant Puur", "color": "#4DB6AC", "category": "song", "items": [tekstvak(SCHADUW_PUUR)]},
 }
 
