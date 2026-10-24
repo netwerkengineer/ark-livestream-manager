@@ -47,7 +47,8 @@ def acties(companion_url, output_id, extra=()):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("bestand"); ap.add_argument("--companion-url", required=True)
-    ap.add_argument("--livestream-output-id", required=True); ap.add_argument("--extra-output-id", action="append", default=[], help="extra uitvoer (bv. de RTMP-uitvoer) waarop de stijlacties ook werken; herhaalbaar"); ap.add_argument("--uitvoeren", action="store_true")
+    ap.add_argument("--livestream-output-id", required=True); ap.add_argument("--extra-output-id", action="append", default=[], help="extra uitvoer (bv. de RTMP-uitvoer) waarop de stijlacties ook werken; herhaalbaar"); ap.add_argument("--categorie-acties", action="store_true", help="zet de scene-acties op de categorieën: liederen/Bijbel -> camera + liederen, presentation -> camera volledig")
+    ap.add_argument("--uitvoeren", action="store_true")
     a = ap.parse_args(); random.seed()
     d = json.load(open(a.bestand, encoding="utf-8")); mi = d.setdefault("midiIn", {})
     namen = {v.get("name") for v in mi.values()}
@@ -63,10 +64,25 @@ def main():
         av = x["actionValues"]
         print("  +", x["name"], "->", (av.get("send_rest_command") or {}).get("url") or (av.get("start_scene") or {}).get("id") or list(av["change_output_style"]["styleOutputs"]["outputs"].items()))
     for k, v, ontbreekt, stijl in bijwerken: print("  ~", v["name"], "+ uitvoer", ontbreekt)
-    if not a.uitvoeren or not (nieuw or bijwerken):
+    cat_wijz = []
+    if a.categorie_acties:
+        def actie_id(naam):  # id van een bestaande (of nog toe te voegen) actie
+            for k2, v2 in mi.items():
+                if v2.get("name") == naam: return k2
+            return None
+        cats = d.get("categories", {})
+        doel = {k: ("Ark scene: camera + liederen" if (k == "scripture" or v.get("icon") == "song") else "Ark scene: camera volledig" if k == "presentation" else None) for k, v in cats.items()}
+        for k, naam in doel.items():
+            if naam and (cats[k].get("action_naam_nieuw") is None): cat_wijz.append((k, cats[k].get("name") or k, naam))
+        print(f"\nCategorieën die een scene-actie krijgen: {len(cat_wijz)}")
+        for k, n, naam in cat_wijz: print("  ~", k, f"({n})", "->", naam, "| nu:", (mi.get(cats[k].get("action"), {}) or {}).get("name"))
+    if not a.uitvoeren or not (nieuw or bijwerken or cat_wijz):
         print("\nDROOG: er is niets gewijzigd." if not a.uitvoeren else "\nNiets te doen."); return
     bk = f"{a.bestand}.bak-acties-{time.strftime('%Y%m%d-%H%M%S')}"; shutil.copy2(a.bestand, bk); print("reservekopie:", bk)
     for x in nieuw: mi[rid(mi)] = x
+    if cat_wijz:
+        ids = {v["name"]: k2 for k2, v in mi.items()}
+        for k, n, naam in cat_wijz: d["categories"][k]["action"] = ids[naam]
     for k, v, ontbreekt, stijl in bijwerken:
         for o in ontbreekt: v["actionValues"]["change_output_style"]["styleOutputs"]["outputs"][o] = stijl
     tmp = a.bestand + ".tmp-acties"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, a.bestand)
