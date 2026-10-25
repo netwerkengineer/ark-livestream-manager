@@ -15,10 +15,11 @@ import argparse, copy, json, os, random, re, shutil, time
 
 KERN = {w.lower() for w in """God Heer Here Jezus Jesus Christus Koning King Vader Father Geest Spirit Lord Halleluja Hallelujah Alleluia Amen Heilig Holy
 liefde love genade grace glorie glory eer majesteit majesty vrede peace licht light leven life hemel heaven overwinning victory Redder Saviour Savior""".split()}
+# (kleur begin, kleur eind, gloed): FreeShow toont geen `background-clip:text`, dus het kleurverloop wordt per LETTER opgebouwd (elke letter een eigen vaste kleur)
 PALETTEN = {
-    "ark": ("linear-gradient(90deg,#9ff3e6 0%,#4db6ac 55%,#d8fff8 100%)", "rgba(77,182,172,.9)"),
-    "neon": ("linear-gradient(90deg,#5ff3ff 0%,#ff6bd6 100%)", "rgba(255,107,214,.85)"),
-    "goud": ("linear-gradient(90deg,#ffe29a 0%,#ffb347 55%,#fff1c9 100%)", "rgba(255,170,60,.9)"),
+    "ark": ((216, 255, 248), (79, 209, 197), "rgba(77,182,172,.95)"),
+    "neon": ((95, 243, 255), (255, 107, 214), "rgba(255,107,214,.9)"),
+    "goud": ((255, 241, 201), (255, 179, 71), "rgba(255,170,60,.95)"),
 }
 FONT = "font-family:CMGSans, Avenir, Arial, sans-serif;font-weight:bold;"
 GROOTTE = 96
@@ -30,15 +31,18 @@ def rid(n=11):
 
 
 def runs(tekst, palet):
-    verloop, gloed = PALETTEN[palet]
-    gewoon = f"{FONT}font-size:{GROOTTE}px;color:#ffffff;text-shadow:0px 4px 26px rgb(0 0 0 / 0.55);"
-    accent = f"{FONT}font-size:{GROOTTE}px;background-image:{verloop};-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;text-shadow:none;filter:drop-shadow(0px 0px 14px {gloed});"
+    van, naar, gloed = PALETTEN[palet]
+    basis = f"{FONT}font-size:{GROOTTE}px;"
+    gewoon = f"{basis}color:#ffffff;text-shadow:0px 4px 26px rgb(0 0 0 / 0.55);"
     uit, buf = [], ""
     for deel in re.split(r"(\s+)", tekst):
         kern = re.sub(r"[^\w]", "", deel).lower() in KERN and not deel.isspace()
         if kern:
             if buf: uit.append({"value": buf, "style": gewoon}); buf = ""
-            uit.append({"value": deel, "style": accent})
+            n = max(len(deel) - 1, 1)
+            for i, ch in enumerate(deel):  # kleurverloop van letter tot letter
+                k = tuple(round(van[j] + (naar[j] - van[j]) * i / n) for j in range(3))
+                uit.append({"value": ch, "style": f"{basis}font-style:italic;color:rgb({k[0]} {k[1]} {k[2]});text-shadow:0px 0px 22px {gloed}, 0px 0px 6px {gloed}, 0px 4px 24px rgb(0 0 0 / 0.45);"})
         else:
             buf += deel
     if buf: uit.append({"value": buf, "style": gewoon})
@@ -105,6 +109,8 @@ def main():
     pad = os.path.join(a.fs, "Shows", a.bron + ".show"); bron = json.load(open(pad, encoding="utf-8"))
     naam = a.bron.split(" - ")[0] + " (dynamisch)" + (" - " + a.bron.split(" - ", 1)[1] if " - " in a.bron else "")
     nid, c, n = maak_show(bron, a.palet, naam); zet_overlay_actie(c)
+    bestaand = os.path.join(a.fs, "Shows", naam + ".show")
+    if os.path.exists(bestaand): nid = json.load(open(bestaand, encoding="utf-8"))[0]  # zelfde show-id houden zodat de FreeShow-index klopt
     print(f"Nieuwe show: '{naam}' ({nid}) | {n} dia's omgezet | palet {a.palet} | overlay-actie op de startdia")
     if a.voorbeeld: voorbeeld(a.voorbeeld, c, a.achtergrond or "", a.glow_png or ""); print("voorbeeld:", a.voorbeeld)
     if not a.uitvoeren: print("\nDROOG: er is niets gewijzigd."); return
