@@ -74,14 +74,18 @@ def maak_show(bron, palet, naam):
     sid, c = copy.deepcopy(bron); nieuw_id = rid(); c["name"] = naam; nu = int(time.time() * 1000)
     c["timestamps"] = {"created": nu, "modified": nu, "used": nu}
     c.setdefault("settings", {})["template"] = None  # geen sjabloon ("Standaard"): FreeShow zou dat op het EERSTE tekstvak zetten en onze lettergrootte/-gewicht overschrijven
-    omgezet = 0
-    for sl in c["slides"].values():
+    omgezet = 0; omgezette_ids = set()
+    for sid_, sl in c["slides"].items():
         tekstitems = [i for i in sl.get("items", []) if i.get("type") == "text" and lijnen_van(i)]
         if not tekstitems: continue
         lijnen = [l for i in tekstitems for l in lijnen_van(i)][:4]
         rest = [i for i in sl["items"] if i not in tekstitems]
-        sl["items"] = rest + bouw_items(lijnen, palet); omgezet += 1
-    # nieuw show-id: layout-id's mogen blijven (ze zijn per show)
+        sl["items"] = rest + bouw_items(lijnen, palet); omgezet += 1; omgezette_ids.add(sid_)
+    # Overgang op dianiveau (gaat vóór de stijl van de uitvoer): staat die stijl op "geen", dan wisselt FreeShow meteen en worden de overgangen per regel
+    # niet gebruikt (de dia ervoor heeft andere item-overgangen). Met een fade op de dia loopt FreeShow de normale route en komen de invlieg-overgangen door.
+    for lay in c["layouts"].values():
+        for ls in lay["slides"]:
+            if ls["id"] in omgezette_ids: ls["transition"] = {"type": "fade", "duration": 600, "easing": "sine"}
     return nieuw_id, c, omgezet
 
 
