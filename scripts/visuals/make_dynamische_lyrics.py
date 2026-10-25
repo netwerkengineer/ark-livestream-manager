@@ -53,14 +53,20 @@ def lijnen_van(item):
     return [("".join(r["value"] for r in l["text"])).replace("\xa0", " ").strip() for l in item.get("lines", []) if "".join(r["value"] for r in l["text"]).strip()]
 
 
+def overgang(i):
+    """Regels komen afwisselend van links en van rechts binnen (svelte "fly" doet zonder afstand alleen een fade, dus x/y expliciet)."""
+    x = -220 if i % 2 == 0 else 220
+    fly = {"type": "fly", "duration": 900, "easing": "cubic", "custom": {"x": x, "y": 0, "opacity": 0}}
+    return {**fly, "in": dict(fly), "out": {"type": "fade", "duration": 350, "easing": "sine"}}
+
+
 def bouw_items(lijnen, palet):
     n = len(lijnen); hoogte = 200; items = []
     for i, tekst in enumerate(lijnen):
         top = 540 - n * hoogte // 2 + i * hoogte
         items.append({"style": f"top:{top}px;left:60px;width:1800px;height:{hoogte}px;z-index:2;", "type": "text", "align": "align-items:center;", "auto": True, "textFit": "shrinkToFit",
                       "lines": [{"align": "text-align:center;", "text": runs(tekst, palet)}], "specialStyle": {"lineGap": 0, "lineBg": ""}, "bindings": [],
-                      "actions": {"showTimer": round(i * 0.35, 2), "transition": {"type": "fly", "duration": 700, "easing": "cubic",
-                                                                                "in": {"type": "fly", "duration": 700, "easing": "cubic"}, "out": {"type": "fade", "duration": 300, "easing": "sine"}}}})
+                      "actions": {"showTimer": round(i * 0.4, 2), "transition": overgang(i)}})
     return items
 
 
