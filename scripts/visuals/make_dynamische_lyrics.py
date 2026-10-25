@@ -67,6 +67,7 @@ def bouw_items(lijnen, palet):
 def maak_show(bron, palet, naam):
     sid, c = copy.deepcopy(bron); nieuw_id = rid(); c["name"] = naam; nu = int(time.time() * 1000)
     c["timestamps"] = {"created": nu, "modified": nu, "used": nu}
+    c.setdefault("settings", {})["template"] = None  # geen sjabloon ("Standaard"): FreeShow zou dat op het EERSTE tekstvak zetten en onze lettergrootte/-gewicht overschrijven
     omgezet = 0
     for sl in c["slides"].values():
         tekstitems = [i for i in sl.get("items", []) if i.get("type") == "text" and lijnen_van(i)]
