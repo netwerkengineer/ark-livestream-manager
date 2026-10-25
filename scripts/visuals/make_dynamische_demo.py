@@ -13,13 +13,15 @@ import argparse, copy, json, os, random, shutil, subprocess, time, tempfile, re
 from make_dynamische_lyrics import PALETTEN, FONT, KERN, runs, lijnen_van, rid
 
 OV_GLOED, OV_GLANS = "ark_ov_gloed", "ark_ov_glans"
+CMG = os.environ.get("CMGSANS_MAP", "/private/tmp/claude-501/-Users-jeffreygo/e8c0863d-4b8f-4c9a-8c80-e3a86023c301/scratchpad/fsapp2/public/fonts")  # FreeShow-lettertype CMGSans (uit de app-bundel)
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
 def meet(woorden, grootte=96):
     """Breedte in px van elk (tekst, cursief) bij `grootte` px vet, gemeten in Chrome (zelfde lettertype-keten als FreeShow)."""
     uniek = sorted(set(woorden)); data = json.dumps([[t, i] for t, i in uniek])
-    html = f"<!doctype html><meta charset=utf-8><body><pre id=o></pre><script>const d={data};const r={{}};for(const [t,i] of d){{const s=document.createElement('span');s.style.cssText='{FONT}font-size:{grootte}px;white-space:pre;position:absolute;'+(i?'font-style:italic;':'');s.textContent=t;document.body.appendChild(s);r[t+'|'+i]=s.getBoundingClientRect().width;}}document.getElementById('o').textContent=JSON.stringify(r);</script>"
+    ff = "".join(f"@font-face{{font-family:CMGSans;font-weight:bold;font-style:{st};src:url('file://{CMG}/{fn}')}}" for st, fn in (("normal", "CMGSans-Bold.woff2"), ("italic", "CMGSans-BoldItalic.woff2")))
+    html = f"<!doctype html><meta charset=utf-8><style>{ff}</style><body><pre id=o></pre><script>const d={data};const r={{}};for(const [t,i] of d){{const s=document.createElement('span');s.style.cssText='{FONT}font-size:{grootte}px;white-space:pre;position:absolute;'+(i?'font-style:italic;':'');s.textContent=t;document.body.appendChild(s);r[t+'|'+i]=s.getBoundingClientRect().width;}}document.getElementById('o').textContent=JSON.stringify(r);</script>"
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f: f.write(html); pad = f.name
     uit = subprocess.run([CHROME, "--headless", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom", "file://" + pad], capture_output=True, text=True).stdout
     return json.loads(re.search(r'<pre id="o">(.*?)</pre>', uit, re.S).group(1).replace("&quot;", '"'))
@@ -52,7 +54,7 @@ def woorden(lijnen, palet, stap=0.16):
             stukken.append((w, r, metingen[f"{w}|{'true' if kern else 'false'}"]))
         totaal = sum(b for _, _, b in stukken) + ruimte * (len(stukken) - 1); x = (1920 - totaal) / 2; top = 540 - n * 100 + i * 200
         for w, r, b in stukken:
-            items.append(tekstvak(top, round(x - 15), round(b + 30), 200, r, teller * stap, fly(0, 70, 650, "cubic"))); x += b + ruimte; teller += 1
+            items.append(tekstvak(top, round(x - 60), round(b + 120), 200, r, teller * stap, fly(0, 70, 650, "cubic"))); x += b + ruimte; teller += 1
     return items
 
 
