@@ -251,7 +251,7 @@ function initYouTubeLivePolling() {
   }, YOUTUBE_LIVE_POLL_INTERVAL_MS);
 }
 
-export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null): Promise<boolean> {
+function sendLedUpdate(isActive: boolean, customText?: string | null, customColor?: string | null): Promise<boolean> {
   const settings = getSettings();
   if (!settings.ledPanelEnabled) return Promise.resolve(false);
 
@@ -342,7 +342,8 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
         execSshCommand(remoteUser, remoteHost, remoteCommand, (errRun, stdoutRun, stderrRun) => {
           if (errRun) {
             console.error(`[LED Control] ssh run failed: ${errRun.message}. Stderr: ${stderrRun}`);
-            logActivity('led', `LED-scherm bijwerken mislukt (${statusStr})`, { error: errRun.message, host: remoteHost });
+            const tail = (t: string) => (t || '').trim().split('\n').slice(-4).join(' | ').slice(-400);
+            logActivity('led', `LED-scherm bijwerken mislukt (${statusStr})`, { error: errRun.message, host: remoteHost, stdout: tail(stdoutRun), stderr: tail(stderrRun) });
             resolve(false);
           } else {
             console.log(`[LED Control] Remote LED panel updated successfully: ${stdoutRun.trim()}`);
@@ -353,6 +354,48 @@ export function handleStreamStateChange(isActive: boolean, customText?: string |
       });
     });
   });
+}
+
+// Het LED-paneel praat Bluetooth en accepteert maar één verbinding tegelijk, en een update duurt een paar tot ruim tien seconden (scannen,
+// verbinden, tot drie pogingen). lastStreamActiveState wordt pas bijgewerkt als de update slaagt, dus de volgende controle zag tijdens zo'n update
+// nog steeds een verschil en startte een tweede script ernaast: dat mislukte telkens ("SSH command failed with code 1") terwijl de eerste slaagde.
+// Daarom: nooit twee updates tegelijk. Vraagt iemand hetzelfde als wat al loopt, dan wacht hij op die update; vraagt iemand iets anders (de
+// stream ging live tijdens een OFFLINE-update), dan draait dat meteen daarna (alleen de laatste vraag telt).
+type LedRequest = { isActive: boolean; text?: string | null; color?: string | null };
+const sameLedRequest = (a: LedRequest, b: LedRequest) => a.isActive === b.isActive && (a.text || '') === (b.text || '') && (a.color || '') === (b.color || '');
+let ledRunning: { request: LedRequest; promise: Promise<boolean> } | null = null;
+let ledQueued: { request: LedRequest; promise: Promise<boolean>; resolve: (ok: boolean) => void } | null = null;
+
+export function handleStreamStateChange(isActive: boolean, customText?: string | null, customColor?: string | null): Promise<boolean> {
+  const request: LedRequest = { isActive, text: customText, color: customColor };
+
+  if (!ledRunning) return startLedRun(request);
+  if (sameLedRequest(ledRunning.request, request)) return ledRunning.promise;
+
+  // iets anders dan wat nu loopt: in de wachtrij (een eerdere wachtende vraag wordt vervangen en krijgt hetzelfde antwoord)
+  if (ledQueued) {
+    const previous = ledQueued;
+    ledQueued = { request, promise: previous.promise, resolve: previous.resolve };
+    return previous.promise;
+  }
+  let resolveQueued!: (ok: boolean) => void;
+  const promise = new Promise<boolean>(res => { resolveQueued = res; });
+  ledQueued = { request, promise, resolve: resolveQueued };
+  return promise;
+}
+
+function startLedRun(request: LedRequest): Promise<boolean> {
+  const promise = sendLedUpdate(request.isActive, request.text, request.color)
+    .catch(() => false)
+    .then(ok => {
+      ledRunning = null;
+      const queued = ledQueued;
+      ledQueued = null;
+      if (queued) startLedRun(queued.request).then(queued.resolve);
+      return ok;
+    });
+  ledRunning = { request, promise };
+  return promise;
 }
 
 interface OBSState {
