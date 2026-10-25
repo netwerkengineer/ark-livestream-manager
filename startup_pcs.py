@@ -156,6 +156,10 @@ def startup_single_plug(plug, settings):
     print(f"[{name}] Turning ON via control_plug.py...")
     subprocess.run(["python3", os.path.join(SCRIPT_DIR, "control_plug.py"), "on", plug_id])
     log_activity("plug", f"Stekker '{plug_id}' aangezet (opstartsequentie)")
+
+    # Standaardverlichting: start op de achtergrond een script dat wacht tot de Iceray online is en dan de standaard sfeer zet (zie lights_default.py)
+    if plug.get("lightsDefault"):
+        subprocess.Popen(["python3", os.path.join(SCRIPT_DIR, "lights_default.py"), plug_id], start_new_session=True)
     
     # 2. If host IP is associated, wait for SSH and launch apps
     if host_ip and host_ip != "":

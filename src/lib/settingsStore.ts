@@ -208,6 +208,16 @@ export interface TuyaPlug {
   hostIp?: string;
   // SSH user for the clean shutdown of hostIp; empty = the old defaults per host (see shutdown_pcs.py)
   sshUser?: string;
+  // Standaardverlichting na het aanzetten van deze stekker (de stekker van de lichtinstallatie/Iceray): zie lights_default.py. Wacht tot waitHost antwoordt,
+  // start dan de Companion-knop van de standaard sfeer en zet optioneel de fresnel-sliders (0-255). Staat licht_auto op "uit", dan gebeurt er niets.
+  lightsDefault?: {
+    waitHost?: string;
+    waitSeconds?: number;
+    delaySeconds?: number;
+    companionButton?: string;
+    label?: string;
+    fresnels?: { "1"?: number; "2"?: number; "3"?: number; "4"?: number; master?: number };
+  };
   // Which outlet/gang this entry controls, for multi-socket devices (e.g. a
   // 4-way power strip) that share one ip/deviceId/localKey but expose each
   // socket as its own DPS index. Omitted/1 keeps existing single-socket
