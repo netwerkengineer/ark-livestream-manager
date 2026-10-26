@@ -40,7 +40,19 @@ function indeling() {   // huidig blok gecentreerd en helder; eerdere blokken er
   }
   while (blokken.length > 4) blokken.shift().lijnen.forEach(el => setTimeout(() => el.remove(), 1000));
 }
+// modus=stream: voor de livestream-uitvoer, gewone liedtekst onderin (geen doorrol), zodat de zaaluitvoer en de stream beide uit dezelfde pagina komen
+const STREAM = P.get("modus") === "stream";
+let streamEl = null;
+function toonStream(tekst) {
+  maten(); const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
+  if (streamEl) { const oud = streamEl; oud.style.opacity = 0; setTimeout(() => oud.remove(), 400); streamEl = null; }
+  if (!t.length) return;
+  const el = document.createElement("div"); el.className = "regel"; el.style.cssText = `top:auto;bottom:${HOOGTE * .07}px;font-size:${HOOGTE * .052}px;line-height:1.3;opacity:0;transition:opacity 350ms ease;white-space:normal`;
+  el.innerHTML = t.map(r => r.split(" ").map(w => KERN.test(w.replace(/[^\p{L}]/gu, "")) ? `<span class="kern">${w}</span>` : w).join(" ")).join("<br>");
+  stage.appendChild(el); streamEl = el; void el.offsetWidth; el.style.opacity = 1;
+}
 function toon(tekst) {
+  if (STREAM) { if (tekst !== laatste) { laatste = tekst; toonStream(tekst); } return; }
   maten();
   if (tekst === laatste) return; laatste = tekst;
   const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
