@@ -55,6 +55,7 @@ export interface BridgeState {
   lastCmd: string;
   error?: string;
   outputMode?: string; // chosen output mode
+  fading?: boolean;    // the own player is fading the song out (then it stops)
   leadBeats?: number;  // FreeShow slides this many beats early
   master?: number;     // master volume (linear, 1 = 0 dB) for all busses together
   masterMute?: boolean;
@@ -185,6 +186,7 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       lastCmd: s.lastCmd || '',
       error: s.error ?? undefined,
       outputMode: s.outputMode ?? undefined,
+      fading: s.fading ?? undefined,
       leadBeats: typeof s.leadBeats === 'number' ? s.leadBeats : undefined,
       master: typeof s.master === 'number' ? s.master : undefined,
       masterMute: !!s.masterMute,

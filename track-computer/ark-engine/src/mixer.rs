@@ -26,6 +26,10 @@ pub struct Mixer {
     pub loop_start: i64,
     pub loop_end: i64,
     pub fade_in: i64,
+    /// uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
+    pub fading: bool,
+    pub fade_left: i64,
+    pub fade_total: i64,
     pub group_mute: [bool; 10],
     pub group_solo: [bool; 10],
     pub group_gain: [f32; 10],
@@ -70,6 +74,9 @@ impl Default for Mixer {
             loop_start: 0,
             loop_end: 0,
             fade_in: 0,
+            fading: false,
+            fade_left: 0,
+            fade_total: 1,
             group_mute: [false; 10],
             group_solo: [false; 10],
             group_gain: [1.0; 10],
@@ -203,6 +210,15 @@ impl Mixer {
         Ok(())
     }
 
+    pub fn start_fade_out(&mut self, secs: f64) {
+        if !self.playing || self.fading {
+            return;
+        }
+        self.fade_total = ((secs.max(0.2)) * self.sr) as i64;
+        self.fade_total = self.fade_total.max(1);
+        self.fade_left = self.fade_total;
+        self.fading = true;
+    }
     pub fn cancel_pending(&mut self) {
         self.pend_at = -1;
         self.pend_section = -1;
@@ -301,6 +317,16 @@ impl Mixer {
                 self.pos += seg as usize;
                 off += seg as usize;
             }
+            if self.fading && self.fade_left == 0 {
+                // uitgefaded: stoppen
+                self.fading = false;
+                self.playing = false;
+                self.env = 0.0;
+                self.pos = 0;
+                self.stop_loop();
+                self.cancel_pending();
+                break;
+            }
             match event {
                 1 => {
                     self.jump_count += 1;
@@ -387,6 +413,13 @@ impl Mixer {
             if self.fade_in > 0 {
                 g *= (self.dip - self.fade_in) as f32 / fdip;
                 self.fade_in -= 1;
+            }
+            if self.fading {
+                let r = self.fade_left as f32 / self.fade_total as f32;
+                g *= r * r;
+                if self.fade_left > 0 {
+                    self.fade_left -= 1;
+                }
             }
             self.env_buf[i] = g * self.master_now;
         }

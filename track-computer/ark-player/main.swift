@@ -31,6 +31,9 @@ case "cuetest":
 case "transtest":
     guard args.count >= 2 else { print("gebruik: ark-player transtest <songmapA> <songmapB>"); exit(2) }
     do { try transtest(a: args[0], b: args[1]) } catch { print("fout: \(error)"); exit(1) }
+case "fadetest":
+    guard let folder = args.first else { print("gebruik: ark-player fadetest <songmap met .RPP>"); exit(2) }
+    do { try fadetest(folder: folder) } catch { print("fout: \(error)"); exit(1) }
 case "serve":
     let port = UInt16(opt("--port") ?? "8099") ?? 8099
     let device = opt("--device")

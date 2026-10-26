@@ -233,6 +233,22 @@ func transtest(a: String, b: String) throws {
     print("Einde van het nummer: gestopt \(!p.mixer.playing) | actief nu: \((p.activePath as NSString).lastPathComponent) | positie \(String(format: "%.2f", p.mixer.posSec)) s")
 }
 
+// ------------------------------------------------------------- fadetest (offline): uitfaden en daarna stoppen
+func fadetest(folder: String) throws {
+    let sim = Sim(); let p = sim.player
+    setenv("ARK_PLAYER_CONFIG", NSTemporaryDirectory() + "ark-player-test-config.json", 1)
+    let rpp = folder + "/" + ((try? FileManager.default.contentsOfDirectory(atPath: folder))?.first { $0.hasSuffix(".RPP") } ?? "")
+    try sim.activate(rpp)
+    let m = p.mixer
+    m.pos = Int(30 * m.sr); m.playing = true
+    let before = render(m, secs: 1)
+    m.startFadeOut(sec: 3)
+    var peaks: [String] = []
+    for _ in 0..<5 { let o = render(m, secs: 1); peaks.append(peakDb(o.flatMap { $0 })) }
+    print("Voor het uitfaden: \(peakDb(before.flatMap { $0 })) dB | per seconde tijdens/na 3 s uitfaden: \(peaks.joined(separator: ", ")) dB")
+    print("Na afloop: speelt \(m.playing) | positie \(m.pos) | fading \(m.fading)")
+}
+
 // ------------------------------------------------------------- padtest (offline): pad laden, afspelen per uitgangsmodus, crossfade en stop
 func padtest(wav: String) throws {
     let dir = NSTemporaryDirectory() + "ark-padtest"

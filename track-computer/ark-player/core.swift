@@ -409,6 +409,8 @@ final class Mixer {
     var pendAt = -1, pendTo = 0, pendSection = -1
     var loopSec = -1, loopStart = 0, loopEnd = 0
     var fadeIn = 0
+    var fading = false, fadeLeft = 0, fadeTotal = 1     // uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
+    func startFadeOut(sec: Double) { guard playing, !fading else { return }; fadeTotal = max(1, Int(max(0.2, sec) * sr)); fadeLeft = fadeTotal; fading = true }
     var groupMute = [Bool](repeating: false, count: 10), groupSolo = [Bool](repeating: false, count: 10), groupGain = [Float](repeating: 1, count: 10)   // per bus (uitgangsnummer 1-8)
     var pendSongObj: Song? = nil, pendSongAt = -1, songFade = 0, switched = 0   // overgang naar een ander nummer
     let dip = 160                  // korte fade rond een sprong (~3,3 ms): geen klik
@@ -533,6 +535,7 @@ final class Mixer {
             }
             if event == 0 && total - pos <= seg { seg = max(0, total - pos); event = 3 }
             if seg > 0 { mix(n: seg, off: off, out: out); pos += seg; off += seg }
+            if fading && fadeLeft == 0 { fading = false; playing = false; env = 0; pos = 0; stopLoop(); cancelPending(); break }   // uitgefaded: stoppen
             if event == 1 { jumpCount += 1; lastJump = (pos, pendTo); pos = pendTo; pendAt = -1; pendSection = -1; fadeIn = dip; clearGuide() }
             else if event == 2 { jumpCount += 1; lastJump = (pos, loopStart); pos = loopStart; fadeIn = dip }
             else if event == 5 {
@@ -565,6 +568,7 @@ final class Mixer {
             if loopSec >= 0 { g *= min(1, max(0, Float(loopEnd - ap) / fdip)) }
             if pendSongAt >= 0 && songFade > 0 { g *= min(1, max(0, Float(pendSongAt - ap) / Float(songFade))) }
             if fadeIn > 0 { g *= Float(dip - fadeIn) / fdip; fadeIn -= 1 }
+            if fading { let r = Float(fadeLeft) / Float(fadeTotal); g *= r * r; if fadeLeft > 0 { fadeLeft -= 1 } }
             envBuf[i] = g * masterNow
         }
         let guideActive = gWs >= 0

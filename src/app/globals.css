@@ -1556,3 +1556,7 @@ textarea.input-field {
 .trk-wave canvas { display: block; cursor: pointer; }
 .trk-wave-tip { position: absolute; bottom: 4px; transform: translateX(-50%); padding: 2px 8px; border-radius: 6px; background: rgba(2, 6, 23, 0.85); color: #e2e8f0; font-size: 0.75rem; pointer-events: none; white-space: nowrap; }
 .trk-wave-time { position: absolute; right: 8px; bottom: 4px; font-size: 0.7rem; color: rgba(226, 232, 240, 0.7); pointer-events: none; }
+
+.trk-fade { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; }
+.trk-fade-secs { background: rgba(15,23,42,0.6); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; font-size: 0.72rem; padding: 4px 4px; }
+.trk-fade .trk-t-btn:disabled { opacity: 0.4; cursor: default; }

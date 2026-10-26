@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown } from "lucide-react";
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction, formatTime } from "./useReaper";
 import { parseSongName } from "./songName";
+import { hasDesktopEngine } from "@/lib/desktopEngine";
 import { dbToFader, UNITY, volumeToFader, faderToVolume, formatDb } from "./faderLaw";
 
 // Master volume: up to +6 dB (the X32 fader law, so the position means the same as on the desk)
@@ -52,6 +53,16 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
     if (final) hold.current = setTimeout(() => setLocalMaster(null), 800);
   };
 
+  // Fade out: only in the app's own player; after the chosen number of seconds the song is silent and stops
+  const [fadeSecs, setFadeSecs] = useState(() => {
+    try { const v = Number(localStorage.getItem("ark.fadeSecs")); return [4, 8, 12, 16].includes(v) ? v : 8; } catch { return 8; }
+  });
+  const fading = !!state?.bridge?.fading;
+  const canFade = hasDesktopEngine();
+  const fadeOut = async () => {
+    try { await reaperAction({ action: "fadeout", value: fadeSecs }); } catch (err) { onError(err instanceof Error ? err.message : "Uitfaden mislukt"); }
+  };
+
   const run = async (action: string) => {
     try {
       await reaperAction({ action });
@@ -80,6 +91,15 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         <button className={`trk-t-btn play${playState === 1 ? " active" : ""}`} onClick={() => run("play")} title="Afspelen"><Play size={stage ? 30 : 22} /></button>
         <button className={`trk-t-btn${playState === 2 ? " active" : ""}`} onClick={() => run("pause")} title="Pauze"><Pause size={stage ? 26 : 20} /></button>
         <button className="trk-t-btn stop" onClick={() => run("stop")} title="Stop"><Square size={stage ? 24 : 18} /></button>
+        {canFade && (
+          <span className="trk-fade">
+            <button className={`trk-t-btn${fading ? " active" : ""}`} onClick={fadeOut} disabled={playState !== 1 || fading} title={`Uitfaden in ${fadeSecs} seconden en dan stoppen`}><TrendingDown size={stage ? 26 : 20} /></button>
+            <select className="trk-fade-secs" value={fadeSecs} aria-label="Duur van het uitfaden"
+              onChange={e => { const v = Number(e.target.value); setFadeSecs(v); try { localStorage.setItem("ark.fadeSecs", String(v)); } catch { /* optional */ } }}>
+              {[4, 8, 12, 16].map(v => <option key={v} value={v}>{v} s</option>)}
+            </select>
+          </span>
+        )}
       </div>
       <div className="trk-clock">
         <span className="trk-time">{formatTime(position)}</span>

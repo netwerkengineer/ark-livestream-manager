@@ -62,7 +62,7 @@ pub fn state(p: &Arc<Player>) -> Value {
         "loading": !st.loading.is_empty(), "error": st.error.clone().unwrap_or_default(),
         "device": st.device_name, "outputs": if st.hw_channels > 0 { st.hw_channels } else { m.out_ch },
         "output_mode": m.requested, "output_applied": m.applied,
-        "master_db": db(m.master), "master_mute": m.master_muted, "jump_mode": m.jump_mode, "lead_beats": st.cfg.lead_beats,
+        "fading": m.fading, "master_db": db(m.master), "master_mute": m.master_muted, "jump_mode": m.jump_mode, "lead_beats": st.cfg.lead_beats,
         "freeshow": if fs_host.is_empty() { String::new() } else { format!("{}:{}", fs_host, Player::fs_port(&st)) },
         "freeshow_override": !st.cfg.fs_host.is_empty(),
         "has_cues": st.table.is_some(), "slide": st.sent.unwrap_or(0), "last_cmd": st.last_cmd,
@@ -147,16 +147,26 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
             if m.pos >= m.song.total() {
                 m.pos = 0;
             }
+            m.fading = false;
             m.playing = true;
             ok()
         }
+        "/fadeout" => {
+            mx().start_fade_out(q.f("secs").unwrap_or(8.0));
+            ok()
+        }
         "/pause" => {
-            mx().playing = false;
+            {
+                let mut m = mx();
+                m.playing = false;
+                m.fading = false;
+            }
             ok()
         }
         "/stop" => {
             {
                 let mut m = mx();
+                m.fading = false;
                 m.playing = false;
                 m.pos = 0;
                 m.stop_loop();
