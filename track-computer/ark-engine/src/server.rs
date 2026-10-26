@@ -236,6 +236,14 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
             }
             ok()
         }
+        "/unsolo" => {
+            let mut m = mx();
+            for s in m.song.stems.iter_mut() {
+                s.solo = false;
+            }
+            m.group_solo = [false; 10];
+            ok()
+        }
         "/group" => {
             let b = match q.i("bus") {
                 Some(b) if (1..=8).contains(&b) => b as usize,

@@ -1563,3 +1563,5 @@ textarea.input-field {
 .trk-click-on { color: #fbbf24; }
 .trk-click-off { color: #64748b; }
 .trk-fade { flex-wrap: wrap; }
+.mx-unmute.on { background: rgba(249,115,22,0.25); border-color: #f97316; color: #fed7aa; }
+.mx-badge.solo { background: rgba(250,204,21,0.2); color: #fde047; }

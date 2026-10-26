@@ -164,9 +164,13 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
 
   const playState = state?.playState || 0;
   const openBusData = state?.busses.find(b => b.track.index === openBus);
+  // All stems of all groups at once (the desk view), and clearing every solo in one go
+  const [allStems, setAllStems] = useState(false);
+  const anySolo = !!state?.busses.some(b => b.track.soloed || b.stems.some(s => s.soloed));
+  const clearSolo = async () => { await send({ action: "clearSolo" }); };
 
   // One channel strip like on a desk: value, fader + meter, M/S, name
-  const renderFader = (track: ReaperTrack, label: string, opts: { sub?: string; live?: boolean; bus?: boolean; stemCount?: number }) => {
+  const renderFader = (track: ReaperTrack, label: string, opts: { sub?: string; live?: boolean; bus?: boolean; stemCount?: number; soloStems?: number }) => {
     const f = localFaders[track.index] ?? volumeToFader(track.volume);
     const meter = playState === 1 || playState === 5 ? meterPercent(track.meterDb) : 0;
     return (
@@ -180,6 +184,7 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
         <span className="mx-name" title={label}>{label}</span>
         <div className="mx-tags">
           {track.muted && <span className="mx-badge muted">MUTE</span>}
+          {opts.bus && opts.soloStems ? <span className="mx-badge solo" title="Er staat een stem van deze groep op solo">SOLO {opts.soloStems}</span> : null}
           {opts.live && <span className="mx-badge live">LIVE</span>}
           {opts.sub && <span className="mx-badge out">{opts.sub}</span>}
         </div>
@@ -212,11 +217,15 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
             <h3 className="trk-title"><SlidersHorizontal size={16} style={{ color: openBusData ? "#f97316" : "var(--primary)" }} /> {openBusData ? `Stems – ${openBusData.label}` : "Groepen"}</h3>
             {error && <span className="trk-warn" style={{ margin: 0 }}><AlertTriangle size={14} /> Niet verbonden</span>}
             <button className="mx-unmute" onClick={unmuteAll} disabled={!state?.busses.some(b => b.track.muted || b.stems.some(s => s.muted))}>Alles unmuten</button>
+            <button className="mx-unmute" onClick={clearSolo} disabled={!anySolo} title="Alle solo's uitzetten, de mutes blijven">Solo wissen</button>
+            <button className={`mx-unmute${allStems ? " on" : ""}`} onClick={() => setAllStems(v => !v)} aria-pressed={allStems} title="Alle stems van alle groepen tegelijk">Alle stems</button>
           </div>
           <div className="mx-rack">
-            {openBusData
+            {allStems
+              ? state?.busses.flatMap(b => b.stems.map(s => renderFader(s, stemLabel(s.name), { live: isLiveStem(s.name), sub: b.label })))
+              : openBusData
               ? openBusData.stems.map(s => renderFader(s, stemLabel(s.name), { live: isLiveStem(s.name) }))
-              : state?.busses.map(b => renderFader(b.track, b.label, { sub: b.out ? `Out ${b.out}` : undefined, bus: true, stemCount: b.stems.length }))}
+              : state?.busses.map(b => renderFader(b.track, b.label, { sub: b.out ? `Out ${b.out}` : undefined, bus: true, stemCount: b.stems.length, soloStems: b.stems.filter(x => x.soloed).length }))}
           </div>
         </section>
         {statusMessage && <div className={`trk-toast ${statusMessage.type}`}>{statusMessage.text}</div>}
@@ -287,6 +296,8 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
           <button className="mx-unmute" onClick={unmuteAll} disabled={!state?.busses.some(b => b.track.muted || b.stems.some(s => s.muted))}>
             Alles unmuten
           </button>
+          <button className="mx-unmute" onClick={clearSolo} disabled={!anySolo} title="Alle solo's uitzetten, de mutes blijven">Solo wissen</button>
+          <button className={`mx-unmute${allStems ? " on" : ""}`} onClick={() => setAllStems(v => !v)} aria-pressed={allStems} title="Alle stems van alle groepen tegelijk">Alle stems</button>
         </div>
         {state && state.busses.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: "0.85rem", display: "flex", gap: "8px", alignItems: "center" }}>
@@ -298,13 +309,26 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
               sub: b.out ? `Out ${b.out}` : undefined,
               bus: true,
               stemCount: b.stems.length,
+              soloStems: b.stems.filter(x => x.soloed).length,
             }))}
           </div>
         )}
       </section>
 
+      {/* Every stem of every group, one section per group */}
+      {allStems && state?.busses.filter(b => b.stems.length > 0).map(b => (
+        <section className="glass-card" key={`all-${b.track.index}`}>
+          <div className="mx-head">
+            <h3 className="trk-title"><SlidersHorizontal size={18} style={{ color: "#f97316" }} /> {b.label}</h3>
+          </div>
+          <div className="mx-rack">
+            {b.stems.map(s => renderFader(s, stemLabel(s.name), { live: isLiveStem(s.name) }))}
+          </div>
+        </section>
+      ))}
+
       {/* Stems of the opened bus */}
-      {openBusData && (
+      {!allStems && openBusData && (
         <section className="glass-card">
           <div className="mx-head">
             <h3 className="trk-title"><SlidersHorizontal size={18} style={{ color: "#f97316" }} /> Stems – {openBusData.label}</h3>

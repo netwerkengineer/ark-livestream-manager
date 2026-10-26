@@ -201,6 +201,7 @@ async function reaperAction(body: Record<string, any>): Promise<Response> {
         break;
       }
       case "unmuteAll": await engineCall("/unmute"); break;
+      case "clearSolo": await engineCall("/unsolo"); break;
       case "master": {
         const params: Record<string, unknown> = {};
         if (value !== undefined) params.db = Number(value) <= 0 ? -90 : 20 * Math.log10(Number(value));

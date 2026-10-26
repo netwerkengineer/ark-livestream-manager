@@ -95,6 +95,10 @@ final class Server {
             if let v = qs["solo"] { mixer.groupSolo[b] = v != "0" }
             if let v = qs["gain"], let g = Double(v) { mixer.groupGain[b] = Float(max(0, min(4, g))) }
             return ok()
+        case "/unsolo":
+            for s in mixer.song.stems { s.solo = false }
+            for b in 0..<mixer.groupSolo.count { mixer.groupSolo[b] = false }
+            return ok()
         case "/unmute":
             for s in mixer.song.stems { s.mute = false; s.solo = false }
             for b in 0..<mixer.groupMute.count { mixer.groupMute[b] = false; mixer.groupSolo[b] = false }
