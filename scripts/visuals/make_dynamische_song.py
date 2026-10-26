@@ -21,9 +21,21 @@ def doorrol(lijnen):
     return [web, tekst]
 
 
-def bouw(bron, variant, heftig_re):
+# Washed (songmap: I V1 V2 C V3 V4 C C Vp B1 B1 B2 B1 R R R C E) als indexen in de dia's na de startdia; Vp (vamp) heeft geen tekst en blijft leeg
+VOLGORDE_WASHED = "0-2,3-5,6-9,10-12,13-15,16-19,16-19,20-21,20-21,20-21,20-21,22-23,22-23,22-23,24-27"
+
+
+def volgorde_lijst(tekst):
+    uit = []
+    for deel in tekst.split(","):
+        a, _, b = deel.partition("-"); uit += list(range(int(a), int(b or a) + 1))
+    return uit
+
+
+def bouw(bron, variant, heftig_re, volgorde=None):
     c0 = bron[1]; lay = list(c0["layouts"].values())[0]["slides"]; start, rest = lay[0], lay[1:]
     tek = [[l for it in c0["slides"][ls["id"]]["items"] if it.get("type") == "text" for l in lijnen_van(it)] for ls in rest]
+    if volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
     nieuwe = {}; volgorde = []
     s0 = copy.deepcopy(c0["slides"][start["id"]]); nieuwe[start["id"]] = s0; st = copy.deepcopy(start)
     st.setdefault("actions", {}).setdefault("slideActions", []).append(overlay_actie("Ark overlay: Gloed", OV_GLOED)); volgorde.append(st)
@@ -44,12 +56,12 @@ def bouw(bron, variant, heftig_re):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     bron = json.load(open(os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
     if OV_GLOED not in ov: raise SystemExit("overlay ark_ov_gloed ontbreekt: draai eerst make_dynamische_demo.py")
     for v in ("secties", "rollend", "doorrol"):
-        c = bouw(bron, v, a.heftig); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
+        c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
         nid = json.load(open(pad, encoding="utf-8"))[0] if os.path.exists(pad) else rid()
         n = len(list(c["layouts"].values())[0]["slides"]); heftig = sum(1 for s in c["slides"].values() if s["group"] == "Refrein")
         print(f"{c['name']}: {n} dia's, {heftig} refrein/heftig, id {nid}")
