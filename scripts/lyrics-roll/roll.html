@@ -12,12 +12,14 @@
 <script>
 // Doorrollende liedtekst: elke tekstregel is één blijvend element dat omhoog schuift (nieuw komt van onder, oud schuift weg en dimt).
 // Bron: FreeShow-API (via /api op dezelfde server) of ?demo voor een testreeks zonder FreeShow.
-const P = new URLSearchParams(location.search), HOOGTE = innerHeight, MIDDEN = HOOGTE * 0.5, STAP = HOOGTE * 0.17;
+const P = new URLSearchParams(location.search);
+let HOOGTE, MIDDEN, STAP, GROOT, KLEIN;
+function maten() { HOOGTE = innerHeight; MIDDEN = HOOGTE * .5; STAP = HOOGTE * .17; GROOT = HOOGTE * .095; KLEIN = HOOGTE * .058; }   // de webview in FreeShow wordt eerst klein aangemaakt en groeit daarna
+maten(); addEventListener("resize", () => { maten(); indeling(); });
 const KERN = /^(god|heer|jezus|halleluja|liefde|koning|geest|u)$/i;
 const stage = document.getElementById("stage");
 let blokken = [];  // per dia een blok regels; [-1] is de huidige. Elke regel is één blijvend element dat omhoog schuift
 let laatste = null;
-const GROOT = HOOGTE * .095, KLEIN = HOOGTE * .058;
 
 function maak(tekst) {
   const el = document.createElement("div"); el.className = "regel";
@@ -39,6 +41,7 @@ function indeling() {   // huidig blok gecentreerd en helder; eerdere blokken er
   while (blokken.length > 4) blokken.shift().lijnen.forEach(el => setTimeout(() => el.remove(), 1000));
 }
 function toon(tekst) {
+  maten();
   if (tekst === laatste) return; laatste = tekst;
   const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
   if (!t.length) { blokken.forEach(b => b.lijnen.forEach(el => el.style.opacity = 0)); return; }
@@ -48,6 +51,8 @@ function toon(tekst) {
   lijnen.forEach((el, i) => setTimeout(() => { delete el.dataset.w; el.style.transition = ""; indeling(); }, 40 + i * 450));
   setTimeout(indeling, 20);
 }
+// ontwikkelhulp: herlaadt zichzelf als dit bestand op de server verandert
+let versie = null; setInterval(async () => { try { const r = await fetch("/roll.html", { method: "HEAD", cache: "no-store" }); const v = r.headers.get("last-modified"); if (versie && v !== versie) location.reload(); versie = v; } catch (e) {} }, 2000);
 async function poll() {
   try {
     const r = await fetch("/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "get_output_slide_text" }) });
