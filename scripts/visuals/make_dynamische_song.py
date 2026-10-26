@@ -60,7 +60,7 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
     elif volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
     nieuwe = {}; volgorde = []
     s0 = copy.deepcopy(c0["slides"][start["id"]]); nieuwe[start["id"]] = s0; st = copy.deepcopy(start)
-    st.setdefault("actions", {}).setdefault("slideActions", []).append(overlay_actie("Ark overlay: Gloed", OV_GLOED)); volgorde.append(st)
+    st.setdefault("actions", {}).setdefault("slideActions", []).extend([overlay_actie("Ark overlay: Gloed", OV_GLOED), overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]); volgorde.append(st)
     for k, (ls, lijnen) in enumerate(zip(rest, tek)):
         if not lijnen and reeks is None: continue
         heftig = bool(re.search(heftig_re, " ".join(lijnen), re.I)); i = rid()
