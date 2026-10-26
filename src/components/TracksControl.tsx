@@ -15,6 +15,7 @@ import {
 import type { ReaperTrack } from "@/lib/reaperControl";
 import { useReaperState } from "@/components/tracks/useReaper";
 import TransportBar from "@/components/tracks/TransportBar";
+import Waveform from "@/components/tracks/Waveform";
 import SetlistPanel from "@/components/tracks/SetlistPanel";
 import SectionsPanel from "@/components/tracks/SectionsPanel";
 import TrackLibraryPanel from "@/components/tracks/TrackLibraryPanel";
@@ -202,6 +203,7 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
     return (
       <>
         <TransportBar state={state} onError={showError} stage />
+        <Waveform state={state} onError={showError} stage />
         <section className="glass-card trk-mixer-rack">
           <div className="mx-head">
             {openBusData ? (
@@ -260,6 +262,7 @@ export default function TracksControl({ settings, mixerOnly }: TracksControlProp
       )}
 
       <TransportBar state={state} onError={showError} onSaved={() => showSuccess("Project opgeslagen in REAPER.")} showSave />
+      <Waveform state={state} onError={showError} />
 
       <div className="trk-two-col">
         <SetlistPanel state={state} onError={showError} onStatus={showSuccess} />

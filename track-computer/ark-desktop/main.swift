@@ -572,6 +572,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func showError(_ e: Error) {
         // -999 = een navigatie werd vervangen door een volgende (een redirect, ook naar het inloggen): geen fout
         if (e as NSError).code == NSURLErrorCancelled { return }
+        // 102 = WebKit "Frame load interrupted": ons eigen annuleren (de 404-pagina hierboven of het doorsturen naar /desktop), geen fout van de server
+        if (e as NSError).domain == "WebKitErrorDomain", (e as NSError).code == 102 { return }
         // de server is er niet: met een bewaarde kopie kan de app gewoon doorwerken
         if OfflineMirror.available, web.url?.scheme != OfflineMirror.scheme, [NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost,
             NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorDNSLookupFailed].contains((e as NSError).code) {
