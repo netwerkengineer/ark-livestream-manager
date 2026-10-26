@@ -88,9 +88,6 @@ export interface AppSettings {
   freeshowClientPath?: string;
   // Adres van Companion zoals de FreeShow-computer dat bereikt (voor de lichtacties in de shows), bv. http://192.168.2.250:8000
   freeshowCompanionUrl?: string;
-  // Adres van FreeShow's API (REST/WebSocket-poort, standaard 5505) zoals deze app het bereikt, bv. http://192.168.2.101:5505; voor de doorrol-liedtekstpagina (/lyrics-roll.html)
-  freeshowApiUrl?: string;
-  freeshowApiPassword?: string;
   freeshowAdditionalTargets?: FreeShowSyncTarget[];
   // Output ID (local to whichever machine actually runs FreeShow for this
   // environment - the Beamer PC in production, the Mac when this app runs
