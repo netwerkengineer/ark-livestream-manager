@@ -7,7 +7,7 @@
 
 Gebruik: make_dynamische_song.py --fs <FreeShow-map> --bron "Washed - Elevation Rhythm" [--heftig "regex"] [--uitvoeren]
 Vereist de overlays uit make_dynamische_demo.py (gloed/glans). Zonder --uitvoeren gebeurt er niets. FreeShow moet dicht zijn."""
-import argparse, copy, json, os, re, shutil, time
+import argparse, copy, hashlib, json, os, re, shutil, time
 from make_dynamische_lyrics import lijnen_van, rid
 from make_dynamische_demo import OV_GLOED, OV_GLANS, ROL_URL, basis, sectie, rollend, overlay_actie, tekstvak
 
@@ -21,9 +21,10 @@ STREAM = ["da5f3b88e33", "d972fc42792"]      # livestream-uitvoer(en) (NDI en RT
 def doorrol(lijnen):
     # Twee webvakken uit dezelfde pagina: de doorrol voor de zaal en de gewone liedtekst (modus=stream) voor de livestream. Er staan bewust GEEN tekstvakken
     # op de dia: een FreeShow-sjabloon (uitvoerstijl of show) vervangt de bindings van tekstvakken door die van het sjabloon, waardoor de tekst dan ook in de zaal
-    # verscheen. De tekst voor FreeShow's API (get_output_slide_text) staat in de `lines` van het zaalvak; FreeShow leest die uit elk item.
+    # verscheen. De tekst voor FreeShow's API (get_output_slide_text) staat in de `lines` van het zaalvak; FreeShow leest die uit elk item, maar tekent ze ook
+    # (als reusachtige tekst), daarom staat ze op 1px en transparant.
     zaal = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": list(BEAMER),
-            "lines": [{"align": "text-align:center;", "text": [{"value": t, "style": "font-size:40px;color:#ffffff;"}]} for t in lijnen]}
+            "lines": [{"align": "text-align:center;", "text": [{"value": t, "style": "font-size:1px;line-height:0;color:rgba(0,0,0,0);text-shadow:none;"}]} for t in lijnen]}
     stream = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL + "&modus=stream", "noNavigation": True}, "bindings": list(STREAM)}
     return [zaal, stream]
 
@@ -95,7 +96,10 @@ def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False, zonder_o
             c = bouw(bron, v, heftig_re, vg, rk, t)
             if soort == "Opname" and rk is None: continue
             if soort == "Songmap" and not vg: continue
-            nieuw["slides"].update(c["slides"]); lid, lay = next(iter(c["layouts"].items())); lay["name"] = f"{soort} - {namen[v]}"; nieuw["layouts"][lid] = lay
+            nieuw["slides"].update(c["slides"]); lid, lay = next(iter(c["layouts"].items())); lay["name"] = f"{soort} - {namen[v]}"
+            lid = "b" + hashlib.md5(lay["name"].encode()).hexdigest()[:10]   # vast id per arrangementnaam: projecten die er naar verwijzen blijven kloppen na opnieuw genereren
+            for a in lay.get("timeline", {}).get("actions", []): a["data"] = {**a["data"], "layoutId": lid} if a.get("type") == "show" else a["data"]
+            nieuw["layouts"][lid] = lay
     nieuw["name"] = c0["name"] if naam_behouden else f"{c0['name']} (dynamisch)"; nieuw["settings"] = {**nieuw.get("settings", {}), "activeLayout": eerste}
     nu = int(time.time() * 1000); nieuw["timestamps"] = {**nieuw.get("timestamps", {}), "modified": nu}
     return nieuw
