@@ -3,7 +3,7 @@
 <title>Lyrics roll</title>
 <style>
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: CMGSans, Montserrat, Avenir, Arial, sans-serif; font-weight: 700; }
-  #stage { position: absolute; inset: 0; }
+  #stage { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; }
   .regel { position: absolute; left: 0; right: 0; text-align: center; color: #fff; white-space: nowrap;
            text-shadow: 0 4px 26px rgb(0 0 0 / .55); transition: transform 900ms cubic-bezier(.22,.8,.25,1), opacity 900ms ease, font-size 900ms ease; will-change: transform, opacity; }
   .regel .kern { font-style: italic; background: linear-gradient(90deg, #d8fff8, #7de8ff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 16px rgb(110 230 255 / .6)); }
@@ -14,7 +14,7 @@
 // Bron: FreeShow-API (via /api op dezelfde server) of ?demo voor een testreeks zonder FreeShow.
 const P = new URLSearchParams(location.search);
 let HOOGTE, MIDDEN, STAP, GROOT, KLEIN;
-function maten() { HOOGTE = innerHeight; MIDDEN = HOOGTE * .5; STAP = HOOGTE * .17; GROOT = HOOGTE * .095; KLEIN = HOOGTE * .058; }   // de webview in FreeShow wordt eerst klein aangemaakt en groeit daarna
+function maten() { HOOGTE = +P.get('h') || innerHeight; MIDDEN = HOOGTE * .5; STAP = HOOGTE * .17; GROOT = HOOGTE * .095; KLEIN = HOOGTE * .058; }   // de webview in FreeShow wordt eerst klein aangemaakt en groeit daarna
 maten(); fetch(`/log?w=${innerWidth}&h=${innerHeight}&dpr=${devicePixelRatio}`); addEventListener("resize", () => { maten(); indeling(); });
 const KERN = /^(god|heer|jezus|halleluja|liefde|koning|geest|u)$/i;
 const stage = document.getElementById("stage");
