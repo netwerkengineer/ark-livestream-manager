@@ -432,6 +432,10 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
       }
     }
     if (songTemplateId) item.templateId = songTemplateId;
+    // Gekozen arrangement: alleen als de show van het lied dat arrangement echt heeft (anders blijft het actieve arrangement staan)
+    const gekozenLayout = song.layoutId;
+    if (gekozenLayout && item.fullData?.data?.layouts?.[gekozenLayout]) item.layoutId = gekozenLayout;
+    else if (gekozenLayout) notes.push(`${song.title}: gekozen arrangement bestaat niet (meer) in het lied; het standaardarrangement wordt gebruikt.`);
     showsList.push(item);
   }
   const bijbelStijlSlug = resolveBijbelStijlSlug((draft as any).bijbelStijl);

@@ -20,6 +20,7 @@ export interface DraftSong {
   chordsText?: string; // free-text, hand-entered by a worship leader - never parsed/rendered as ChordPro
   chordsFileName?: string; // original filename of an uploaded chord chart (txt/pdf), e.g. a band's own scanned sheet
   chordsFilePath?: string; // where that upload was saved - attached verbatim rather than retyped into chordsText
+  layoutId?: string; // gekozen arrangement (layout-id uit de show van het lied); leeg = het arrangement dat de show zelf actief heeft
   sfeer?: string; // gekozen sfeer (achtergrondvideo + lichtschema), zie lib/sferen.json; leeg = het lied laten zoals het is
 }
 
@@ -317,7 +318,7 @@ export function addMediaToDraft(
 export function updateSongInDraft(
   serviceDate: string,
   songId: string,
-  patch: Partial<Pick<DraftSong, 'title' | 'artist' | 'category' | 'section' | 'lyricsText' | 'chordsText' | 'chordsFileName' | 'chordsFilePath' | 'sfeer'>>
+  patch: Partial<Pick<DraftSong, 'title' | 'artist' | 'category' | 'section' | 'lyricsText' | 'chordsText' | 'chordsFileName' | 'chordsFilePath' | 'sfeer' | 'layoutId'>>
 ): DraftService | null {
   const store = readStore();
   const draft = store.services[serviceDate];

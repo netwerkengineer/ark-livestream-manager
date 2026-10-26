@@ -17,6 +17,7 @@ interface DraftSong {
   chordsFileName?: string;
   chordsFilePath?: string;
   sfeer?: string;
+  layoutId?: string;
 }
 
 interface DraftScripture {
@@ -519,6 +520,29 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   useEffect(() => {
     fetch('/api/sferen').then(r => r.ok ? r.json() : null).then(d => { if (d?.sferen) setSferen(d.sferen); }).catch(() => {});
   }, []);
+
+  // Arrangement per lied (alleen voor liederen waarvan de show er meerdere heeft): wordt bij "Project aanmaken/bijwerken" op het lied in het project gezet
+  const [arrangementen, setArrangementen] = useState<Record<string, { actief: string; opties: { id: string; naam: string }[] }>>({});
+  const songKey = draft?.songs.map(x => `${x.id}:${x.title}:${x.artist || ''}`).join('|') || '';
+  useEffect(() => {
+    if (!songKey) return;
+    fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/arrangementen`).then(r => r.ok ? r.json() : null).then(d => { if (d?.arrangementen) setArrangementen(d.arrangementen); }).catch(() => {});
+  }, [serviceDate, songKey]);
+
+  const changeArrangement = async (songId: string, layoutId: string) => {
+    if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, layoutId } : x) });
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layoutId })
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Kon arrangement niet opslaan');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
 
   const changeBijbelStijl = async (stijl: string) => {
     if (!draft || !stijl) return;
@@ -1285,6 +1309,16 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                         {(s.lyricsText || s.chordsText) && <span title="Tekst/akkoorden toegevoegd" style={{ flexShrink: 0 }}>📝</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                        {arrangementen[s.id] && (
+                          <select
+                            value={s.layoutId && arrangementen[s.id].opties.some(o => o.id === s.layoutId) ? s.layoutId : arrangementen[s.id].actief}
+                            onChange={e => changeArrangement(s.id, e.target.value)}
+                            title="Arrangement van dit lied (zo wordt het in het project gezet)"
+                            style={{ background: 'rgba(255,255,255,0.06)', color: 'inherit', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', fontSize: '0.72rem', padding: '2px 4px', maxWidth: '12rem' }}
+                          >
+                            {arrangementen[s.id].opties.map(o => <option key={o.id} value={o.id} style={{ color: '#000' }}>{o.naam}</option>)}
+                          </select>
+                        )}
                         {sferen.length > 0 && (
                           <SfeerKiezer value={s.sfeer || ''} opties={sferen} onChange={slug => changeSfeer(s.id, slug)} />
                         )}

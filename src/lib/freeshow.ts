@@ -753,8 +753,11 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
       // catalog. A genuinely new song (no fullData) still falls back to
       // its own id, which is fine since there's no existing entry to match.
       const realId = item.fullData?.id || showId;
-      showsToPush.push({ id: realId });
       let showData = item.fullData?.data || createShowObject(item);
+      // Gekozen arrangement: in het project-onderdeel (zo speelt FreeShow vanuit het project dat arrangement) en als actief arrangement in de show
+      const layoutKeuze = item.type === 'song' && item.layoutId && showData.layouts?.[item.layoutId] ? item.layoutId as string : null;
+      showsToPush.push(layoutKeuze ? { id: realId, layout: layoutKeuze, layoutInfo: { name: showData.layouts[layoutKeuze].name || '' } } : { id: realId });
+      if (layoutKeuze) showData = { ...showData, settings: { ...(showData.settings || {}), activeLayout: layoutKeuze } };
       // Gekozen sjabloon voor liedteksten (Instellingen -> FreeShow): ook op een bestaand lied uit de catalogus. Het project bevat
       // de hele show, dus FreeShow neemt dit bij het importeren over.
       if (item.type === 'song' && item.templateId) {
