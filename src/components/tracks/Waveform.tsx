@@ -17,8 +17,17 @@ interface WaveformProps {
   stage?: boolean;
 }
 
-const HEIGHT = 104;
-const LABEL_H = 18;
+const HEIGHT = 120;
+const LABEL_H = 22;
+const GAP = 2;   // space between two sections
+
+// A section that is too narrow for its name gets a short form (Refrain 4 -> R4) and, if that does not fit either, no label
+const SHORT: Record<string, string> = { verse: "V", chorus: "C", bridge: "B", refrain: "R", intro: "I", outro: "O", turnaround: "T", ending: "E", "count off": "CO", pre: "P", "pre-chorus": "PC", interlude: "IL", instrumental: "IN", tag: "TG" };
+function shortName(name: string): string {
+  const m = name.trim().match(/^(.*?)\s*(\d+)?$/);
+  const base = (m?.[1] || name).trim().toLowerCase();
+  return (SHORT[base] || base.slice(0, 2).toUpperCase()) + (m?.[2] || "");
+}
 
 export default function Waveform({ state, onError, stage }: WaveformProps) {
   const [data, setData] = useState<Peaks | null>(null);
@@ -94,30 +103,26 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     for (const r of regions) {
       const x0 = xOf(r.start), x1 = xOf(Math.min(r.end, total));
       const col = sectionColor(r.name);
-      ctx.fillStyle = col + (r.id === current ? "40" : "22");
-      ctx.fillRect(x0, 0, x1 - x0, HEIGHT);
+      const a0 = x0 + GAP / 2, a1 = x1 - GAP / 2, w = Math.max(1, a1 - a0);
+      ctx.fillStyle = col + (r.id === current ? "50" : "28");
+      ctx.fillRect(a0, 0, w, HEIGHT);
       ctx.fillStyle = col;
-      ctx.fillRect(x0, 0, x1 - x0, 3);
+      ctx.fillRect(a0, 0, w, 4);
       if (r.id === b?.pending) {
         ctx.save();
         ctx.setLineDash([5, 4]);
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(x0 + 1, 1, Math.max(0, x1 - x0 - 2), HEIGHT - 2);
+        ctx.strokeRect(a0 + 1, 1, Math.max(0, w - 2), HEIGHT - 2);
         ctx.restore();
       }
-      if (x1 - x0 > 26) {
-        ctx.fillStyle = "#e2e8f0";
-        const label = (r.id === b?.loop ? "⟲ " : "") + r.name;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x0, 0, x1 - x0 - 2, LABEL_H);
-        ctx.clip();
-        ctx.fillText(label, x0 + 5, LABEL_H / 2 + 1);
-        ctx.restore();
+      const loop = r.id === b?.loop ? "⟲ " : "";
+      const room = w - 8;
+      const label = [loop + r.name, loop + shortName(r.name)].find(t => ctx.measureText(t).width <= room);
+      if (label) {
+        ctx.fillStyle = "#f1f5f9";
+        ctx.fillText(label, a0 + 4, LABEL_H / 2 + 2);
       }
-      ctx.fillStyle = "rgba(255,255,255,0.25)";
-      ctx.fillRect(x0, 0, 1, HEIGHT);
     }
 
     // waveform: the peak per block as a mirrored bar, the effective value inside it (the part that has been played is brighter)
