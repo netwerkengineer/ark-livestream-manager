@@ -1,25 +1,44 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSettings } from "@/lib/settingsStore";
 
 export const dynamic = "force-dynamic";
 
-// Deliberately unauthenticated (like /api/public/live-status): the lyrics-roll page (public/lyrics-roll.html) runs inside a
-// FreeShow web item on the beamer computer, which has no login. It only returns the text of the slide that is on screen anyway.
+// Deliberately unauthenticated (like /api/public/live-status): the lyrics-roll page (public/lyrics-roll.html) runs inside FreeShow web items
+// on the beamer computer, which has no login. It only returns the text of the slide that is on screen anyway.
 // The browser can't ask FreeShow's REST API itself (no CORS headers), so this route does it, with the FreeShow address that is already
 // in the settings (Instellingen -> Verbindingen: FreeShow IP and port, the same API port FreeShow listens on).
-const TTL_MS = 150;
+//
+// One shared poller asks FreeShow what is on the output (every ~100 ms, only while some page is asking); pages long-poll this route with the
+// version they have and get the answer the moment it changes. So the number of open pages (FreeShow draws one per slide thumbnail) does not
+// multiply the load on FreeShow, and a slide change reaches the page within ~100-150 ms.
+//
+// Slides of the roll arrangements (web items of this page) carry no text items (a FreeShow template would show them in the hall too), so their
+// text lives in the slide notes: it is looked up through the output state (show, layout, index) and the show itself, which is cached because it is large.
 const NO_STORE = { "Cache-Control": "no-store" };
-let cache: { at: number; text: string } | null = null;
+const POLL_MS = 100;
+const SHOW_TTL_MS = 30000;
+const IDLE_STOP_MS = 15000;
+const LONGPOLL_MS = 8000;
 
-// Slides of the roll arrangements (web items of this page) carry no text items (a FreeShow template would show them in the hall too), so FreeShow's own
-// "text of the slide on screen" is empty for them. Their text is kept in the slide notes: look the slide up through the output state
-// (show, layout, index) and the show itself, which is cached because it is large.
 type ShowData = {
   layouts?: Record<string, { slides?: { id: string }[] }>;
   slides?: Record<string, { notes?: string; items?: { type?: string; web?: { src?: string } }[] }>;
 };
+type Out = { id?: string; layout?: string; index?: number };
+
+const state = { key: "", text: "", v: 0, at: 0, error: "" };
 const showCache = new Map<string, { at: number; show: ShowData }>();
-const SHOW_TTL_MS = 30000;
+let lastDemand = 0;
+let looping: Promise<void> | null = null;
+const sizes: { t: string; w: string }[] = [];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function baseUrl(): string {
+  const { freeShowHost, freeShowPort } = getSettings();
+  const host = String(freeShowHost || "").trim();
+  return host ? `http://${host}:${freeShowPort || 5505}` : "";
+}
 
 async function freeshow(base: string, action: string, extra: Record<string, unknown> = {}) {
   const res = await fetch(base, {
@@ -31,38 +50,79 @@ async function freeshow(base: string, action: string, extra: Record<string, unkn
   return (await res.json())?.data;
 }
 
-async function textFromNotes(base: string): Promise<string> {
-  const slide = (await freeshow(base, "get_output"))?.slide as { id?: string; layout?: string; index?: number } | undefined;
-  if (!slide?.id || !slide.layout || typeof slide.index !== "number") return "";
-  let entry = showCache.get(slide.id);
-  if (!entry || Date.now() - entry.at > SHOW_TTL_MS) {
-    const show = (await freeshow(base, "get_show", { id: slide.id })) as ShowData | undefined;
-    if (!show) return "";
-    entry = { at: Date.now(), show };
-    showCache.set(slide.id, entry);
+async function textFor(base: string, slide: Out): Promise<string> {
+  if (slide.id && slide.layout && typeof slide.index === "number") {
+    let entry = showCache.get(slide.id);
+    if (!entry || Date.now() - entry.at > SHOW_TTL_MS) {
+      const show = (await freeshow(base, "get_show", { id: slide.id })) as ShowData | undefined;
+      if (show) {
+        entry = { at: Date.now(), show };
+        showCache.set(slide.id, entry);
+      }
+    }
+    const ref = entry?.show.layouts?.[slide.layout]?.slides?.[slide.index];
+    const found = ref ? entry?.show.slides?.[ref.id] : undefined;
+    // only slides of the roll arrangements (they hold a web item of this page); the notes of any other slide are operator hints, not lyrics
+    if (found?.items?.some((item) => item.type === "web" && String(item.web?.src || "").includes("lyrics-roll"))) {
+      return typeof found.notes === "string" ? found.notes : "";
+    }
   }
-  const ref = entry.show.layouts?.[slide.layout]?.slides?.[slide.index];
-  const found = ref ? entry.show.slides?.[ref.id] : undefined;
-  // only slides of the roll arrangements (they hold a web item of this page); the notes of any other slide are operator hints, not lyrics
-  if (!found?.items?.some((item) => item.type === "web" && String(item.web?.src || "").includes("lyrics-roll"))) return "";
-  return typeof found.notes === "string" ? found.notes : "";
+  const text = await freeshow(base, "get_output_slide_text");
+  return typeof text === "string" ? text : "";
 }
 
-export async function GET() {
-  if (cache && Date.now() - cache.at < TTL_MS) return NextResponse.json({ text: cache.text }, { headers: NO_STORE });
-
-  const { freeShowHost, freeShowPort } = getSettings();
-  const host = String(freeShowHost || "").trim();
-  if (!host) return NextResponse.json({ text: "", error: "FreeShow IP is niet ingesteld (Instellingen, Verbindingen)" }, { status: 503, headers: NO_STORE });
-  const base = `http://${host}:${freeShowPort || 5505}`;
-
+async function refresh(base: string) {
   try {
-    let text = await freeshow(base, "get_output_slide_text");
-    text = typeof text === "string" ? text : "";
-    if (!text) text = await textFromNotes(base);
-    cache = { at: Date.now(), text };
-    return NextResponse.json({ text }, { headers: NO_STORE });
+    const slide = ((await freeshow(base, "get_output"))?.slide || null) as Out | null;
+    const key = slide ? `${slide.id}|${slide.layout}|${slide.index}` : "";
+    if (key !== state.key || state.error) {
+      const text = slide ? await textFor(base, slide) : "";
+      if (text !== state.text || key !== state.key) state.v++;
+      state.key = key;
+      state.text = text;
+    }
+    state.error = "";
   } catch {
-    return NextResponse.json({ text: "", error: "FreeShow niet bereikbaar" }, { status: 502, headers: NO_STORE });
+    state.error = "FreeShow niet bereikbaar";
   }
+  state.at = Date.now();
+}
+
+function ensureLoop() {
+  lastDemand = Date.now();
+  if (looping) return;
+  looping = (async () => {
+    try {
+      while (Date.now() - lastDemand < IDLE_STOP_MS) {
+        const base = baseUrl();
+        if (base) await refresh(base);
+        await sleep(POLL_MS);
+      }
+    } finally {
+      looping = null;
+    }
+  })();
+}
+
+export async function GET(req: NextRequest) {
+  const log = req.nextUrl.searchParams.get("log");
+  if (log === "read") return NextResponse.json({ sizes }, { headers: NO_STORE });
+  if (log) {
+    sizes.push({ t: new Date().toISOString(), w: log.slice(0, 80) });
+    if (sizes.length > 40) sizes.shift();
+    return new NextResponse(null, { status: 204 });
+  }
+
+  if (!baseUrl()) return NextResponse.json({ text: "", error: "FreeShow IP is niet ingesteld (Instellingen, Verbindingen)" }, { status: 503, headers: NO_STORE });
+
+  const wasIdle = !looping;
+  ensureLoop();
+  if (wasIdle || Date.now() - state.at > 2000) await refresh(baseUrl());
+
+  const clientV = Number(req.nextUrl.searchParams.get("v"));
+  if (Number.isFinite(clientV) && clientV >= 0 && clientV === state.v) {
+    const until = Date.now() + LONGPOLL_MS;
+    while (state.v === clientV && Date.now() < until && !req.signal.aborted) await sleep(40);
+  }
+  return NextResponse.json({ text: state.text, v: state.v, ...(state.error ? { error: state.error } : {}) }, { headers: NO_STORE });
 }

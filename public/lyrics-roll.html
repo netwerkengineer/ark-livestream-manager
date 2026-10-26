@@ -10,7 +10,7 @@
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Ark Montserrat', CMGSans, Montserrat, Avenir, Arial, sans-serif; font-weight: 700; }
   #stage { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; }
   .regel { position: absolute; left: 0; right: 0; text-align: center; color: #fff; white-space: nowrap;
-           text-shadow: 0 4px 26px rgb(0 0 0 / .55); transition: transform 900ms cubic-bezier(.22,.8,.25,1), opacity 900ms ease, font-size 900ms ease; will-change: transform, opacity; }
+           text-shadow: 0 4px 26px rgb(0 0 0 / .55); transition: transform 650ms cubic-bezier(.22,.8,.25,1), opacity 650ms ease, font-size 650ms ease; will-change: transform, opacity; }
   .regel .kern { font-style: italic; background: linear-gradient(90deg, #d8fff8, #7de8ff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 16px rgb(110 230 255 / .6)); }
 </style>
 <div id="stage"></div>
@@ -47,6 +47,7 @@ function indeling() {   // huidig blok gecentreerd en helder; eerdere blokken er
 }
 // modus=stream: voor de livestream-uitvoer, gewone liedtekst onderin (geen doorrol), zodat de zaaluitvoer en de stream beide uit dezelfde pagina komen
 const STREAM = P.get("modus") === "stream";
+try { fetch(`/api/public/lyrics-roll?log=${innerWidth}x${innerHeight},${P.get("modus") || "zaal"}`); } catch (e) {}   // tijdelijk: welke afmetingen hebben de webvakken in uitvoeren en miniaturen
 let streamEl = null;
 function toonStream(tekst) {
   maten(); const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
@@ -65,17 +66,21 @@ function toon(tekst) {
   const lijnen = t.map(maak);
   lijnen.forEach((el, i) => { el.dataset.w = 1; el.style.transition = "none"; stel(el, STAP * (3 + i), GROOT, 0); });   // nieuwe regels starten onderaan
   blokken.push({ lijnen }); void stage.offsetWidth;
-  lijnen.forEach((el, i) => setTimeout(() => { delete el.dataset.w; el.style.transition = ""; indeling(); }, 40 + i * 450));
+  lijnen.forEach((el, i) => setTimeout(() => { delete el.dataset.w; el.style.transition = ""; indeling(); }, 20 + i * 160));
   setTimeout(indeling, 20);
 }
 // ontwikkelhulp: herlaadt zichzelf als dit bestand op de server verandert
 let versie = null; setInterval(async () => { try { const r = await fetch(location.pathname, { method: "HEAD", cache: "no-store" }); const v = r.headers.get("last-modified"); if (versie && v !== versie) location.reload(); versie = v; } catch (e) {} }, 2000);
+let versie2 = -1;
 async function poll() {
+  let wacht = 0;
   try {
-    const r = await fetch("/api/public/lyrics-roll", { cache: "no-store" });
+    const r = await fetch(`/api/public/lyrics-roll?v=${versie2}`, { cache: "no-store" });
     const j = await r.json(); toon(j.text ?? "");
-  } catch (e) {}
-  setTimeout(poll, 250);
+    if (typeof j.v === "number") versie2 = j.v; else wacht = 250;   // geen versie (proefserver): gewoon vaak vragen
+    if (j.error) wacht = 1000;
+  } catch (e) { wacht = 1000; }
+  setTimeout(poll, wacht);
 }
 if (P.has("demo")) {
   const d = ["Heer U bent goed en Uw liefde\nen trouw zijn voor eeuwig", "Door heel de wereld\nen in elke taal", "Wij prijzen U Halleluja Halleluja\nWij prijzen U om wie U bent", "U bent goed"];
