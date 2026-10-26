@@ -85,11 +85,11 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
             "layouts": {lid: {"name": "Default", "notes": "", "slides": volgorde, **({"timeline": tijdlijn} if tijdlijn else {})}}, "media": copy.deepcopy(c0["media"])}
 
 
-def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False):
+def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False, zonder_opname=False):
     """Alle varianten als arrangementen (layouts) in één show: Origineel + songmap-volgorde (3 stijlen) + opname-volgorde met tijdlijn (3 stijlen)."""
     c0 = bron[1]; nieuw = copy.deepcopy(c0); lay0 = list(nieuw["layouts"].values())[0]; lay0["name"] = "Origineel"
     eerste = next(iter(nieuw["layouts"])); namen = {"secties": "Secties (rustig/heftig)", "rollend": "Rollend", "doorrol": "Doorrol (webpagina)"}
-    for soort, vg, rk, t in (("Songmap", volgorde, None, None), ("Opname", None, reeks, tl)):
+    for soort, vg, rk, t in (("Songmap", volgorde, None, None),) + (() if zonder_opname else (("Opname", None, reeks, tl),)):
         for v in ("secties", "rollend", "doorrol"):
             c = bouw(bron, v, heftig_re, vg, rk, t)
             if soort == "Opname" and rk is None: continue
@@ -101,7 +101,7 @@ def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--beamer-output", default=",".join(BEAMER), help="uitvoer-id('s) van de zaal (komma's)"); ap.add_argument("--stream-outputs", default=",".join(STREAM), help="uitvoer-id's van de livestream (komma's)"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--beamer-output", default=",".join(BEAMER), help="uitvoer-id('s) van de zaal (komma's)"); ap.add_argument("--stream-outputs", default=",".join(STREAM), help="uitvoer-id's van de livestream (komma's)"); ap.add_argument("--zonder-opname", action="store_true", help="met --een-show: geen Opname-arrangementen (en geen audio/tijdlijn), alleen Origineel + Songmap-varianten; voor productie"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     BEAMER[:] = a.beamer_output.split(","); STREAM[:] = a.stream_outputs.split(",")
     bron = json.load(open(a.bron_pad or os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
@@ -115,7 +115,7 @@ def main():
     overlays_alleen_zaal(a.fs, a.uitvoeren)
     if a.een_show:
         vg = volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None
-        c = een_show(bron, a.heftig, vg, reeks, tl, a.naam_behouden); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
+        c = een_show(bron, a.heftig, vg, reeks, tl, a.naam_behouden, a.zonder_opname); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
         nid = bron[0] if a.naam_behouden else (json.load(open(pad, encoding="utf-8"))[0] if os.path.exists(pad) else rid())
         if a.naam_behouden and a.uitvoeren and os.path.exists(pad):
             bk = os.path.join(a.fs, "Shows", "_backup-arrangementen-" + time.strftime("%Y%m%d-%H%M%S")); os.makedirs(bk); shutil.copy2(pad, bk); print("reservekopie:", bk)
