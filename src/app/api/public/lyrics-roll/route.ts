@@ -11,10 +11,13 @@ const TTL_MS = 150;
 const NO_STORE = { "Cache-Control": "no-store" };
 let cache: { at: number; text: string } | null = null;
 
-// Slides of the roll arrangements carry no text items (a FreeShow template would show them in the hall too), so FreeShow's own
+// Slides of the roll arrangements (web items of this page) carry no text items (a FreeShow template would show them in the hall too), so FreeShow's own
 // "text of the slide on screen" is empty for them. Their text is kept in the slide notes: look the slide up through the output state
 // (show, layout, index) and the show itself, which is cached because it is large.
-type ShowData = { layouts?: Record<string, { slides?: { id: string }[] }>; slides?: Record<string, { notes?: string }> };
+type ShowData = {
+  layouts?: Record<string, { slides?: { id: string }[] }>;
+  slides?: Record<string, { notes?: string; items?: { type?: string; web?: { src?: string } }[] }>;
+};
 const showCache = new Map<string, { at: number; show: ShowData }>();
 const SHOW_TTL_MS = 30000;
 
@@ -39,8 +42,10 @@ async function textFromNotes(base: string): Promise<string> {
     showCache.set(slide.id, entry);
   }
   const ref = entry.show.layouts?.[slide.layout]?.slides?.[slide.index];
-  const notes = ref ? entry.show.slides?.[ref.id]?.notes : "";
-  return typeof notes === "string" ? notes : "";
+  const found = ref ? entry.show.slides?.[ref.id] : undefined;
+  // only slides of the roll arrangements (they hold a web item of this page); the notes of any other slide are operator hints, not lyrics
+  if (!found?.items?.some((item) => item.type === "web" && String(item.web?.src || "").includes("lyrics-roll"))) return "";
+  return typeof found.notes === "string" ? found.notes : "";
 }
 
 export async function GET() {
