@@ -31,6 +31,10 @@ services:
       dockerfile: Dockerfile.companion
     container_name: companion
     restart: always
+    # Het QLC+-onderdeel van Companion lekt geheugen (2026-10-26: 1,2 GB na 4 dagen, de NAS had geen RAM meer en swapte dood; builds van 3 naar 22 minuten).
+    # Een harde grens laat Docker de container herstarten (restart: always) in plaats van de hele NAS te laten verdrinken.
+    mem_limit: 768m
+    memswap_limit: 768m
     ports:
       - "8000:8000"
       - "12321:12321/udp"
