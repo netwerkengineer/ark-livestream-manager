@@ -1565,3 +1565,9 @@ textarea.input-field {
 .trk-fade { flex-wrap: wrap; }
 .mx-unmute.on { background: rgba(249,115,22,0.25); border-color: #f97316; color: #fed7aa; }
 .mx-badge.solo { background: rgba(250,204,21,0.2); color: #fde047; }
+
+.trk-wave { position: relative; }
+.trk-wave-cuebtn { position: absolute; top: 4px; right: 46px; z-index: 2; font-size: 0.68rem; padding: 2px 8px; border-radius: 999px; background: rgba(15,23,42,0.7); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.35); cursor: pointer; }
+.trk-wave-cuebtn.on { background: rgba(249,115,22,0.3); border-color: #f97316; color: #fed7aa; }
+.trk-wave-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 4px 2px; }
+.trk-wave-seltext { flex: 1 1 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
