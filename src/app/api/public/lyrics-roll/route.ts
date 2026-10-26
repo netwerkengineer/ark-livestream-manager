@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 // version they have and get the answer the moment it changes. So the number of open pages (FreeShow draws one per slide thumbnail) does not
 // multiply the load on FreeShow, and a slide change reaches the page within ~100-150 ms.
 //
-// Slides of the roll arrangements (web items of this page) carry no text items (a FreeShow template would show them in the hall too), so their
-// text lives in the slide notes: it is looked up through the output state (show, layout, index) and the show itself, which is cached because it is large.
+// Slides of the roll arrangements carry no items at all (a FreeShow template would show them in the hall too), so their
+// text lives in the slide notes (the page itself comes from two overlays that the start slide switches on): it is looked up through the output state (show, layout, index) and the show itself, which is cached because it is large.
 const NO_STORE = { "Cache-Control": "no-store" };
 const POLL_MS = 100;
 const SHOW_TTL_MS = 30000;
@@ -21,9 +21,10 @@ const IDLE_STOP_MS = 15000;
 const LONGPOLL_MS = 8000;
 
 type ShowData = {
-  layouts?: Record<string, { slides?: { id: string }[] }>;
-  slides?: Record<string, { notes?: string; items?: { type?: string; web?: { src?: string } }[] }>;
+  layouts?: Record<string, { notes?: string; slides?: { id: string }[] }>;
+  slides?: Record<string, { notes?: string }>;
 };
+const MARKER = "ark-doorrol"; // in the notes of a roll arrangement (scripts/visuals/make_dynamische_song.py)
 type Out = { id?: string; layout?: string; index?: number };
 
 const state = { key: "", text: "", v: 0, at: 0, error: "" };
@@ -51,24 +52,22 @@ async function freeshow(base: string, action: string, extra: Record<string, unkn
 }
 
 async function textFor(base: string, slide: Out): Promise<string> {
-  if (slide.id && slide.layout && typeof slide.index === "number") {
-    let entry = showCache.get(slide.id);
-    if (!entry || Date.now() - entry.at > SHOW_TTL_MS) {
-      const show = (await freeshow(base, "get_show", { id: slide.id })) as ShowData | undefined;
-      if (show) {
-        entry = { at: Date.now(), show };
-        showCache.set(slide.id, entry);
-      }
-    }
-    const ref = entry?.show.layouts?.[slide.layout]?.slides?.[slide.index];
-    const found = ref ? entry?.show.slides?.[ref.id] : undefined;
-    // only slides of the roll arrangements (they hold a web item of this page); the notes of any other slide are operator hints, not lyrics
-    if (found?.items?.some((item) => item.type === "web" && String(item.web?.src || "").includes("lyrics-roll"))) {
-      return typeof found.notes === "string" ? found.notes : "";
+  if (!slide.id || !slide.layout || typeof slide.index !== "number") return "";
+  let entry = showCache.get(slide.id);
+  if (!entry || Date.now() - entry.at > SHOW_TTL_MS) {
+    const show = (await freeshow(base, "get_show", { id: slide.id })) as ShowData | undefined;
+    if (show) {
+      entry = { at: Date.now(), show };
+      showCache.set(slide.id, entry);
     }
   }
-  const text = await freeshow(base, "get_output_slide_text");
-  return typeof text === "string" ? text : "";
+  const layout = entry?.show.layouts?.[slide.layout];
+  // only slides of a roll arrangement; every other slide (and the notes on it, which are operator hints) shows nothing here
+  if (layout?.notes !== MARKER) return "";
+  if (slide.index === 0) return ""; // the start slide keeps its operator hint in the notes
+  const ref = layout.slides?.[slide.index];
+  const notes = ref ? entry?.show.slides?.[ref.id]?.notes : "";
+  return typeof notes === "string" ? notes : "";
 }
 
 async function refresh(base: string) {

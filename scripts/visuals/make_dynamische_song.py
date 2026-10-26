@@ -18,24 +18,30 @@ BEAMER = ["default"]                         # uitvoer(en) in de zaal: daar teke
 STREAM = ["da5f3b88e33", "d972fc42792"]      # livestream-uitvoer(en) (NDI en RTMP): daar blijft de gewone liedtekst staan
 
 
-def doorrol(lijnen):
-    # Twee webvakken uit dezelfde pagina: de doorrol voor de zaal en de gewone liedtekst (modus=stream) voor de livestream. Er staan bewust GEEN tekstvakken en geen
-    # `lines` op de dia: een FreeShow-sjabloon vervangt de bindings van tekstvakken (de tekst verscheen dan ook in de zaal) en een item met `lines` wordt als tekst
-    # getekend en verstoort het webvak. De tekst voor de pagina staat in de notities van de dia (zie /api/public/lyrics-roll).
-    zaal = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": list(BEAMER)}
-    stream = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL + "&modus=stream", "noNavigation": True}, "bindings": list(STREAM)}
-    return [zaal, stream]
+OV_ROL_ZAAL, OV_ROL_STREAM = "ark_ov_rol_zaal", "ark_ov_rol_stream"
+MARKER = "ark-doorrol"   # staat in de notities van het arrangement; de route van de app geeft alleen tekst voor arrangementen met deze markering
 
 
-def overlays_alleen_zaal(fs, uitvoeren):
-    """Gloed- en glans-overlay alleen op de zaaluitvoer (item-bindings), zodat ze niet over het camerabeeld in de livestream liggen."""
-    pad = os.path.join(fs, "Config", "overlays.json"); ov = json.load(open(pad, encoding="utf-8")); n = 0
+def overlay_uit(naam, oid):
+    return {"id": rid(), "name": naam, "triggers": ["clear_overlay"], "actionValues": {"clear_overlay": {"id": oid}}, "customActivation": "", "midiEnabled": False}
+
+
+def overlays_zorgen(fs, uitvoeren, rol=True):
+    """Gloed/glans alleen in de zaal (item-bindings) en, voor het doorrol-arrangement, de twee overlays met de webpagina: zaal (doorrol) en livestream (gewone tekst, modus=stream).
+    De dia's zelf hebben dan geen webvakken: FreeShow tekent anders voor elke miniatuur een eigen browser (honderden processen) en wordt traag."""
+    pad = os.path.join(fs, "Config", "overlays.json"); ov = json.load(open(pad, encoding="utf-8")); n = 0; nu = int(time.time() * 1000)
     for oid in (OV_GLOED, OV_GLANS):
         for it in ov.get(oid, {}).get("items", []):
             if it.get("bindings") != BEAMER: it["bindings"] = list(BEAMER); n += 1
-    print(f"overlays alleen op de zaaluitvoer {BEAMER}: {n} item(s) aangepast")
+    if rol:
+        cat = (ov.get(OV_GLOED) or {}).get("category")
+        vlak = "top:0px;left:0px;width:1920px;height:1080px;z-index:3;"
+        for oid, naam, src, uit in ((OV_ROL_ZAAL, "Doorrol (zaal)", ROL_URL, BEAMER), (OV_ROL_STREAM, "Liedtekst (livestream)", ROL_URL + "&modus=stream", STREAM)):
+            nieuw = {"name": naam, "color": None, "category": cat, "modified": nu, "items": [{"style": vlak, "type": "web", "web": {"src": src, "noNavigation": True}, "bindings": list(uit)}]}
+            if ov.get(oid, {}).get("items") != nieuw["items"]: ov[oid] = nieuw; n += 1
+    print(f"overlays: {n} onderdeel/onderdelen aangepast (gloed/glans alleen in de zaal {BEAMER}" + (", doorrol-overlays aangemaakt)" if rol else ")"))
     if uitvoeren and n:
-        shutil.copy2(pad, f"{pad}.bak-zaal-{time.strftime('%Y%m%d-%H%M%S')}"); tmp = pad + ".tmp-zaal"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
+        shutil.copy2(pad, f"{pad}.bak-rol-{time.strftime('%Y%m%d-%H%M%S')}"); tmp = pad + ".tmp-rol"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
 
 
 # Washed (songmap: I V1 V2 C V3 V4 C C Vp B1 B1 B2 B1 R R R C E) als indexen in de dia's na de startdia; Vp (vamp) heeft geen tekst en blijft leeg
@@ -60,18 +66,26 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
     elif volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
     nieuwe = {}; volgorde = []
     s0 = copy.deepcopy(c0["slides"][start["id"]]); nieuwe[start["id"]] = s0; st = copy.deepcopy(start)
-    st.setdefault("actions", {}).setdefault("slideActions", []).extend([overlay_actie("Ark overlay: Gloed", OV_GLOED), overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]); volgorde.append(st)
+    acties_start = [overlay_actie("Ark overlay: Gloed", OV_GLOED), overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]
+    if variant == "doorrol": acties_start += [overlay_actie("Ark overlay: Doorrol (zaal)", OV_ROL_ZAAL), overlay_actie("Ark overlay: Liedtekst (livestream)", OV_ROL_STREAM)]
+    st.setdefault("actions", {}).setdefault("slideActions", []).extend(acties_start); volgorde.append(st)
     for k, (ls, lijnen) in enumerate(zip(rest, tek)):
         if not lijnen and reeks is None: continue
         heftig = bool(re.search(heftig_re, " ".join(lijnen), re.I)); i = rid()
         if not lijnen: items = []
         elif variant == "secties": items = sectie(lijnen, heftig)
         elif variant == "rollend": items = rollend(lijnen, tek[k - 1][-1] if k > 0 and tek[k - 1] else None, tek[k + 1][0] if k + 1 < len(tek) and tek[k + 1] else None, "ark")
-        else: items = doorrol(lijnen)
+        else: items = []   # doorrol: geen items op de dia; de tekst staat in de notities en de pagina komt via de overlays van de startdia
         nieuwe[i] = {"group": "Refrein" if heftig else "Couplet", "color": "#ef4444" if heftig else "#4db6ac", "settings": {}, "notes": "\n".join(lijnen) if variant == "doorrol" else "", "items": items, "globalGroup": None}
         l = {"id": i}
         if variant != "doorrol": l["transition"] = {"type": "fade", "duration": 600, "easing": "sine"}
         volgorde.append(l)
+    if variant == "doorrol":   # aan het eind de overlays weer uit: op de laatste (lege) dia van de opname, anders op een nieuwe lege dia "Einde"
+        uit = [overlay_uit("Ark overlay uit: Doorrol (zaal)", OV_ROL_ZAAL), overlay_uit("Ark overlay uit: Liedtekst (livestream)", OV_ROL_STREAM), overlay_uit("Ark overlay uit: Gloed", OV_GLOED), overlay_uit("Ark overlay uit: Glans", OV_GLANS)]
+        if reeks is not None and not tek[-1]: volgorde[-1].setdefault("actions", {}).setdefault("slideActions", []).extend(uit)
+        else:
+            i = rid(); nieuwe[i] = {"group": "Einde", "color": "#6b7280", "settings": {}, "notes": "", "items": [], "globalGroup": None}
+            volgorde.append({"id": i, "actions": {"slideActions": uit}})
     lid = "b" + rid(10); nu = int(time.time() * 1000)
     tijdlijn = None
     if tl:   # FreeShow-tijdlijn: audio + dia-wissels op tijd; de startdia start de tijdlijn (actie start_timeline)
@@ -82,7 +96,7 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
         tijdlijn = {"actions": acties}
     return {"name": f"{c0['name']} (dynamisch: {variant})", "private": False, "category": c0.get("category", "song"), "settings": {"activeLayout": lid, "template": None},
             "timestamps": {"created": nu, "modified": nu, "used": nu}, "quickAccess": {}, "meta": copy.deepcopy(c0.get("meta", {})), "slides": nieuwe,
-            "layouts": {lid: {"name": "Default", "notes": "", "slides": volgorde, **({"timeline": tijdlijn} if tijdlijn else {})}}, "media": copy.deepcopy(c0["media"])}
+            "layouts": {lid: {"name": "Default", "notes": MARKER if variant == "doorrol" else "", "slides": volgorde, **({"timeline": tijdlijn} if tijdlijn else {})}}, "media": copy.deepcopy(c0["media"])}
 
 
 def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False, zonder_opname=False, varianten=("secties", "rollend", "doorrol")):
@@ -115,7 +129,7 @@ def main():
         dur = float(os.popen(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{a.audio}"').read().strip())
         tl = {"events": tdata["events"], "start": tdata["start"], "audio": f"{cp}/Media/Opnames/{os.path.basename(a.audio)}", "duur": int(dur)}
         if a.uitvoeren: os.makedirs(os.path.dirname(doel), exist_ok=True); shutil.copy2(a.audio, doel)
-    overlays_alleen_zaal(a.fs, a.uitvoeren)
+    overlays_zorgen(a.fs, a.uitvoeren, rol="doorrol" in a.varianten.split(","))
     if a.een_show:
         vg = volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None
         c = een_show(bron, a.heftig, vg, reeks, tl, a.naam_behouden, a.zonder_opname, tuple(a.varianten.split(","))); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
