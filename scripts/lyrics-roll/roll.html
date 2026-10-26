@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Lyrics roll</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: CMGSans, Montserrat, Avenir, Arial, sans-serif; font-weight: 700; }
+  #stage { position: absolute; inset: 0; }
+  .regel { position: absolute; left: 0; right: 0; text-align: center; color: #fff; white-space: nowrap;
+           text-shadow: 0 4px 26px rgb(0 0 0 / .55); transition: transform 900ms cubic-bezier(.22,.8,.25,1), opacity 900ms ease, font-size 900ms ease; will-change: transform, opacity; }
+  .regel .kern { font-style: italic; background: linear-gradient(90deg, #d8fff8, #7de8ff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 16px rgb(110 230 255 / .6)); }
+</style>
+<div id="stage"></div>
+<script>
+// Doorrollende liedtekst: elke tekstregel is één blijvend element dat omhoog schuift (nieuw komt van onder, oud schuift weg en dimt).
+// Bron: FreeShow-API (via /api op dezelfde server) of ?demo voor een testreeks zonder FreeShow.
+const P = new URLSearchParams(location.search), HOOGTE = innerHeight, MIDDEN = HOOGTE * 0.5, STAP = HOOGTE * 0.17;
+const KERN = /^(god|heer|jezus|halleluja|liefde|koning|geest|u)$/i;
+const stage = document.getElementById("stage");
+let blokken = [];  // per dia een blok regels; [-1] is de huidige. Elke regel is één blijvend element dat omhoog schuift
+let laatste = null;
+const GROOT = HOOGTE * .095, KLEIN = HOOGTE * .058;
+
+function maak(tekst) {
+  const el = document.createElement("div"); el.className = "regel";
+  el.innerHTML = tekst.split(" ").map(w => KERN.test(w.replace(/[^\p{L}]/gu, "")) ? `<span class="kern">${w}</span>` : w).join(" ");
+  stage.appendChild(el); return el;
+}
+function stel(el, y, maat, dim) {
+  el.style.fontSize = maat + "px"; el.style.top = (MIDDEN - maat / 2) + "px"; el.style.opacity = dim; el.style.transform = `translateY(${y}px)`;
+}
+function indeling() {   // huidig blok gecentreerd en helder; eerdere blokken er bovenaan, kleiner en steeds doffer
+  let boven = null;
+  for (let k = blokken.length - 1; k >= 0; k--) {
+    const b = blokken[k], n = b.lijnen.length, ouderdom = blokken.length - 1 - k;
+    const maat = ouderdom === 0 ? GROOT : KLEIN, gap = ouderdom === 0 ? STAP * 1.15 : STAP * .8, dim = ouderdom === 0 ? 1 : (ouderdom === 1 ? .38 : .14);
+    let begin = ouderdom === 0 ? -(n - 1) / 2 * gap : boven - (n - 1) * gap - gap * 1.05;
+    b.lijnen.forEach((el, i) => { if (el.dataset.w) return; if (ouderdom > 2) { el.style.opacity = 0; } else stel(el, begin + i * gap, maat, dim); b.y = begin; });
+    boven = begin;
+  }
+  while (blokken.length > 4) blokken.shift().lijnen.forEach(el => setTimeout(() => el.remove(), 1000));
+}
+function toon(tekst) {
+  if (tekst === laatste) return; laatste = tekst;
+  const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
+  if (!t.length) { blokken.forEach(b => b.lijnen.forEach(el => el.style.opacity = 0)); return; }
+  const lijnen = t.map(maak);
+  lijnen.forEach((el, i) => { el.dataset.w = 1; el.style.transition = "none"; stel(el, STAP * (3 + i), GROOT, 0); });   // nieuwe regels starten onderaan
+  blokken.push({ lijnen }); void stage.offsetWidth;
+  lijnen.forEach((el, i) => setTimeout(() => { delete el.dataset.w; el.style.transition = ""; indeling(); }, 40 + i * 450));
+  setTimeout(indeling, 20);
+}
+async function poll() {
+  try {
+    const r = await fetch("/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "get_output_slide_text" }) });
+    const j = await r.json(); toon(typeof j === "string" ? j : (j.data ?? j.text ?? ""));
+  } catch (e) {}
+  setTimeout(poll, 250);
+}
+if (P.has("demo")) {
+  const d = ["Heer U bent goed en Uw liefde\nen trouw zijn voor eeuwig", "Door heel de wereld\nen in elke taal", "Wij prijzen U Halleluja Halleluja\nWij prijzen U om wie U bent", "U bent goed"];
+  let i = 0; (function volgende() { toon(d[i++ % d.length]); setTimeout(volgende, 4000); })();
+} else poll();
+</script>
