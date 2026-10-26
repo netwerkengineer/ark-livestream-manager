@@ -14,11 +14,28 @@ from make_dynamische_demo import OV_GLOED, OV_GLANS, ROL_URL, basis, sectie, rol
 HEFTIG = r"washed in the water|as good as new|all because of you|here i come|took away my shame|nailed it to the cross"
 
 
+BEAMER = ["default"]                         # uitvoer(en) in de zaal: daar tekent de webpagina de doorrol
+STREAM = ["da5f3b88e33", "d972fc42792"]      # livestream-uitvoer(en) (NDI en RTMP): daar blijft de gewone liedtekst staan
+
+
 def doorrol(lijnen):
-    web = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": []}
-    tekst = tekstvak(440, 60, 1800, 200, [], 0, {"type": "none", "duration": 0}, "opacity:0;")
+    # De webpagina alleen in de zaal; de gewone tekst (nodig voor FreeShow's API) alleen op de livestream, waar de stijl "Livestream Liederen" hem onderin zet
+    web = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": list(BEAMER)}
+    tekst = tekstvak(440, 60, 1800, 200, [], 0, {"type": "none", "duration": 0})
     tekst["lines"] = [{"align": "text-align:center;", "text": [{"value": t, "style": "font-size:40px;color:#ffffff;"}]} for t in lijnen]
+    tekst["bindings"] = list(STREAM)
     return [web, tekst]
+
+
+def overlays_alleen_zaal(fs, uitvoeren):
+    """Gloed- en glans-overlay alleen op de zaaluitvoer (item-bindings), zodat ze niet over het camerabeeld in de livestream liggen."""
+    pad = os.path.join(fs, "Config", "overlays.json"); ov = json.load(open(pad, encoding="utf-8")); n = 0
+    for oid in (OV_GLOED, OV_GLANS):
+        for it in ov.get(oid, {}).get("items", []):
+            if it.get("bindings") != BEAMER: it["bindings"] = list(BEAMER); n += 1
+    print(f"overlays alleen op de zaaluitvoer {BEAMER}: {n} item(s) aangepast")
+    if uitvoeren and n:
+        shutil.copy2(pad, f"{pad}.bak-zaal-{time.strftime('%Y%m%d-%H%M%S')}"); tmp = pad + ".tmp-zaal"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
 
 
 # Washed (songmap: I V1 V2 C V3 V4 C C Vp B1 B1 B2 B1 R R R C E) als indexen in de dia's na de startdia; Vp (vamp) heeft geen tekst en blijft leeg
@@ -84,7 +101,8 @@ def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--beamer-output", default=",".join(BEAMER), help="uitvoer-id('s) van de zaal (komma's)"); ap.add_argument("--stream-outputs", default=",".join(STREAM), help="uitvoer-id's van de livestream (komma's)"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    BEAMER[:] = a.beamer_output.split(","); STREAM[:] = a.stream_outputs.split(",")
     bron = json.load(open(a.bron_pad or os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
     if OV_GLOED not in ov: raise SystemExit("overlay ark_ov_gloed ontbreekt: draai eerst make_dynamische_demo.py")
@@ -94,6 +112,7 @@ def main():
         dur = float(os.popen(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{a.audio}"').read().strip())
         tl = {"events": tdata["events"], "start": tdata["start"], "audio": f"{cp}/Media/Opnames/{os.path.basename(a.audio)}", "duur": int(dur)}
         if a.uitvoeren: os.makedirs(os.path.dirname(doel), exist_ok=True); shutil.copy2(a.audio, doel)
+    overlays_alleen_zaal(a.fs, a.uitvoeren)
     if a.een_show:
         vg = volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None
         c = een_show(bron, a.heftig, vg, reeks, tl, a.naam_behouden); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
