@@ -11,7 +11,7 @@ import argparse, copy, json, os, re, time
 from make_dynamische_lyrics import lijnen_van, rid
 from make_dynamische_demo import OV_GLOED, OV_GLANS, ROL_URL, basis, sectie, rollend, overlay_actie, tekstvak
 
-HEFTIG = r"washed in the water|as good as new|all because of you|here i come"
+HEFTIG = r"washed in the water|as good as new|all because of you|here i come|took away my shame|nailed it to the cross"
 
 
 def doorrol(lijnen):
@@ -32,17 +32,19 @@ def volgorde_lijst(tekst):
     return uit
 
 
-def bouw(bron, variant, heftig_re, volgorde=None):
+def bouw(bron, variant, heftig_re, volgorde=None, reeks=None):
     c0 = bron[1]; lay = list(c0["layouts"].values())[0]["slides"]; start, rest = lay[0], lay[1:]
     tek = [[l for it in c0["slides"][ls["id"]]["items"] if it.get("type") == "text" for l in lijnen_van(it)] for ls in rest]
-    if volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
+    if reeks is not None: rest = [None] * len(reeks); tek = reeks   # reeks = regels per dia in de volgorde van een opname (lege lijst = lege dia)
+    elif volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
     nieuwe = {}; volgorde = []
     s0 = copy.deepcopy(c0["slides"][start["id"]]); nieuwe[start["id"]] = s0; st = copy.deepcopy(start)
     st.setdefault("actions", {}).setdefault("slideActions", []).append(overlay_actie("Ark overlay: Gloed", OV_GLOED)); volgorde.append(st)
     for k, (ls, lijnen) in enumerate(zip(rest, tek)):
-        if not lijnen: continue
+        if not lijnen and reeks is None: continue
         heftig = bool(re.search(heftig_re, " ".join(lijnen), re.I)); i = rid()
-        if variant == "secties": items = sectie(lijnen, heftig)
+        if not lijnen: items = []
+        elif variant == "secties": items = sectie(lijnen, heftig)
         elif variant == "rollend": items = rollend(lijnen, tek[k - 1][-1] if k > 0 and tek[k - 1] else None, tek[k + 1][0] if k + 1 < len(tek) and tek[k + 1] else None, "ark")
         else: items = doorrol(lijnen)
         nieuwe[i] = {"group": "Refrein" if heftig else "Couplet", "color": "#ef4444" if heftig else "#4db6ac", "settings": {}, "notes": "", "items": items, "globalGroup": None}
@@ -56,12 +58,15 @@ def bouw(bron, variant, heftig_re, volgorde=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     bron = json.load(open(os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
     if OV_GLOED not in ov: raise SystemExit("overlay ark_ov_gloed ontbreekt: draai eerst make_dynamische_demo.py")
+    reeks = [e["lines"] for e in json.load(open(a.tijdlijn, encoding="utf-8"))["events"]] if a.tijdlijn else None
     for v in ("secties", "rollend", "doorrol"):
-        c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
+        c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None, reeks)
+        if reeks is not None: c["name"] = c["name"].replace("(dynamisch:", "(opname, dynamisch:")
+        pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
         nid = json.load(open(pad, encoding="utf-8"))[0] if os.path.exists(pad) else rid()
         n = len(list(c["layouts"].values())[0]["slides"]); heftig = sum(1 for s in c["slides"].values() if s["group"] == "Refrein")
         print(f"{c['name']}: {n} dia's, {heftig} refrein/heftig, id {nid}")
