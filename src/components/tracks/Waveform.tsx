@@ -43,6 +43,9 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
   const [edits, setEdits] = useState<Record<string, Record<number, number>>>({});
   const [sel, setSel] = useState<{ section: string; index: number } | null>(null);
   const [saving, setSaving] = useState(false);
+  // zoom while placing slides: the whole song, the section under the playhead, or 30 seconds around it
+  const [zoom, setZoom] = useState<"all" | "section" | "near">("section");
+  const view = useRef({ v0: 0, v1: 1 });
   const drag = useRef<CueMarker | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -100,6 +103,18 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
   const show = data && data.path === active ? data : null;
   const total = show?.total || 0;
   const canvasH = cueMode ? HEIGHT + LANE : HEIGHT;
+  // the part of the song that is on screen (everything unless a zoom is chosen while placing slides)
+  const viewFor = (pos: number): { v0: number; v1: number } => {
+    if (!cueMode || zoom === "all" || !total) return { v0: 0, v1: total || 1 };
+    if (zoom === "section") {
+      const r = state?.regions.find(x => pos >= x.start && pos < x.end) ?? state?.regions[0];
+      if (!r) return { v0: 0, v1: total };
+      return { v0: Math.max(0, r.start - 4), v1: Math.min(total, r.end + 1) };
+    }
+    const span = Math.min(30, total);
+    const v0 = Math.min(Math.max(0, pos - span * 0.35), total - span);
+    return { v0, v1: v0 + span };
+  };
   const beatTimes = show?.beats;
   const markers = React.useMemo<CueMarker[]>(
     () => (cueMode && timing && beatTimes && beatTimes.length > 1 ? buildMarkers(timing.sections, state?.regions || [], beatTimes, timing.lead, edits) : []),
@@ -120,7 +135,11 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, canvasH);
 
-    const xOf = (t: number) => (t / total) * width;
+    const pos0 = st.position + (st.playState === 1 && st.receivedAt ? Math.min(1, (Date.now() - st.receivedAt) / 1000) : 0);
+    const { v0, v1 } = viewFor(Math.min(total, pos0));
+    view.current = { v0, v1 };
+    const span = Math.max(0.001, v1 - v0);
+    const xOf = (t: number) => ((t - v0) / span) * width;
     const mid = LABEL_H + (HEIGHT - LABEL_H) / 2;
     const amp = (HEIGHT - LABEL_H) / 2 - 3;
 
@@ -138,8 +157,9 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     ctx.textBaseline = "middle";
     for (const r of regions) {
       const x0 = xOf(r.start), x1 = xOf(Math.min(r.end, total));
+      if (x1 < 0 || x0 > width) continue;
       const col = sectionColor(r.name);
-      const a0 = x0 + GAP / 2, a1 = x1 - GAP / 2, w = Math.max(1, a1 - a0);
+      const a0 = Math.max(0, x0 + GAP / 2), a1 = Math.min(width, x1 - GAP / 2), w = Math.max(1, a1 - a0);
       ctx.fillStyle = col + (r.id === current ? "50" : "28");
       ctx.fillRect(a0, 0, w, HEIGHT);
       ctx.fillStyle = col;
@@ -164,8 +184,10 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     // waveform: the peak per block as a mirrored bar, the effective value inside it (the part that has been played is brighter)
     const n = show.peaks.length;
     const rmsTop = Math.max(1, ...show.rms);
+    const perSec = n / (total || 1);
     for (let x = 0; x < width; x++) {
-      const i0 = Math.floor((x / width) * n), i1 = Math.max(i0 + 1, Math.floor(((x + 1) / width) * n));
+      const i0 = Math.floor((v0 + (x / width) * span) * perSec), i1 = Math.max(i0 + 1, Math.floor((v0 + ((x + 1) / width) * span) * perSec));
+      if (i0 < 0 || i0 >= n) continue;
       let p = 0, r = 0;
       for (let i = i0; i < i1 && i < n; i++) { if (show.peaks[i] > p) p = show.peaks[i]; if (show.rms[i] > r) r = show.rms[i]; }
       const played = x < px;
@@ -179,10 +201,10 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     // bar grid: ticks for the beats and bars, the bar number every so many bars (as many as fit)
     const bars = show.bars || [], beats = show.beats || [];
     if (bars.length > 1) {
-      const barPx = (xOf(bars[bars.length - 1]) - xOf(bars[0])) / (bars.length - 1);
+      const barPx = ((bars[bars.length - 1] - bars[0]) / (bars.length - 1) / span) * width;
       if (beats.length && barPx / 4 >= 5) {
         ctx.fillStyle = "rgba(226,232,240,0.18)";
-        for (const t of beats) ctx.fillRect(Math.round(xOf(t)), HEIGHT - 5, 1, 5);
+        for (const t of beats) { const bx = xOf(t); if (bx >= 0 && bx <= width) ctx.fillRect(Math.round(bx), HEIGHT - 5, 1, 5); }
       }
       if (barPx >= 3) {
         const every = [1, 2, 4, 8, 16, 32].find(n => barPx * n >= 34) || 32;
@@ -190,6 +212,7 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
         ctx.textBaseline = "alphabetic";
         bars.forEach((t, i) => {
           const x = Math.round(xOf(t));
+          if (x < 0 || x > width) return;
           const numbered = i % every === 0;
           ctx.fillStyle = numbered ? "rgba(226,232,240,0.45)" : "rgba(226,232,240,0.28)";
           ctx.fillRect(x, HEIGHT - (numbered ? 12 : 8), 1, numbered ? 12 : 8);
@@ -203,20 +226,21 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     if (cueMode) {
       ctx.fillStyle = "rgba(15,23,42,0.65)";
       ctx.fillRect(0, HEIGHT, width, LANE);
-      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.font = "700 9px system-ui, sans-serif";
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
       for (const m of markers) {
         const x = Math.round(xOf(m.t));
+        if (x < -12 || x > width + 12) continue;
         const col = sectionColor(m.section);
         const selected = sel?.section === m.section && sel.index === m.index;
         ctx.fillStyle = selected ? "rgba(255,255,255,0.55)" : "rgba(226,232,240,0.18)";
         ctx.fillRect(x, LABEL_H, 1, HEIGHT - LABEL_H);
         const cy = HEIGHT + LANE / 2;
         ctx.beginPath();
-        ctx.arc(x, cy, 9, 0, Math.PI * 2);
+        ctx.arc(x, cy, 8, 0, Math.PI * 2);
         if (m.manual || m.fixed) { ctx.fillStyle = col; ctx.fill(); } else { ctx.fillStyle = "rgba(15,23,42,0.9)"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.stroke(); }
-        if (selected) { ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.arc(x, cy, 11, 0, Math.PI * 2); ctx.stroke(); }
+        if (selected) { ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.arc(x, cy, 10, 0, Math.PI * 2); ctx.stroke(); }
         ctx.fillStyle = m.manual || m.fixed ? "#0b1222" : "#f1f5f9";
         ctx.fillText(String(m.index), x, cy + 0.5);
       }
@@ -232,7 +256,7 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     ctx.lineTo(px, 7);
     ctx.closePath();
     ctx.fill();
-  }, [show, width, total, state, cueMode, markers, sel, canvasH]);
+  }, [show, width, total, state, cueMode, markers, sel, canvasH, zoom]);
 
   // Redraw: often while playing (smooth playhead), otherwise when something changes
   useEffect(() => {
@@ -245,7 +269,7 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
   const at = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const t = (x / rect.width) * total;
+    const t = view.current.v0 + (x / rect.width) * (view.current.v1 - view.current.v0);
     return { x, t, region: state?.regions.find(r => t >= r.start && t < r.end) };
   };
 
@@ -255,7 +279,8 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
     if (y < HEIGHT) return undefined;
     let best: CueMarker | undefined, dist = 12;
-    for (const m of markers) { const d = Math.abs((m.t / total) * rect.width - x); if (d < dist) { dist = d; best = m; } }
+    const { v0, v1 } = view.current;
+    for (const m of markers) { const d = Math.abs(((m.t - v0) / (v1 - v0)) * rect.width - x); if (d < dist) { dist = d; best = m; } }
     return best;
   };
 
@@ -380,6 +405,17 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
 
   return (
     <div className={`trk-wave${stage ? " stage" : ""}`} ref={box} role="group" aria-label="Golfvorm van het nummer met de secties">
+      <div className="trk-wave-top">
+        <button className={`trk-icon-btn${cueMode ? " pinned" : ""}`} onClick={() => setCueMode(v => !v)} aria-pressed={cueMode}
+          title="De FreeShow-dia's op de golfvorm plaatsen en verschuiven">{cueMode ? "Klaar met dia's" : "Dia's plaatsen"}</button>
+        {cueMode && (["all", "section", "near"] as const).map(z => (
+          <button key={z} className={`trk-icon-btn${zoom === z ? " pinned" : ""}`} onClick={() => setZoom(z)} aria-pressed={zoom === z}
+            title={z === "all" ? "Het hele nummer" : z === "section" ? "De sectie onder de speelkop" : "30 seconden rond de speelkop (loopt mee)"}>
+            {z === "all" ? "Hele nummer" : z === "section" ? "Sectie" : "30 s"}
+          </button>
+        ))}
+      </div>
+      <div className="trk-wave-canvas">
       <canvas
         ref={canvas}
         style={{ width: "100%", height: canvasH, touchAction: cueMode ? "none" : undefined }}
@@ -389,10 +425,9 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
         onPointerUp={onUp}
         title={cueMode ? "Sleep een dia naar een ander moment, of klik op de golfvorm om de speelkop daar te zetten" : "Tik op een sectie om ernaartoe te springen (volgens het sprongmoment hieronder)"}
       />
-      <button className={`trk-wave-cuebtn${cueMode ? " on" : ""}`} onClick={() => setCueMode(v => !v)} aria-pressed={cueMode}
-        title="De FreeShow-dia's op de golfvorm plaatsen">Dia&apos;s</button>
       {tip && <span className="trk-wave-tip" style={{ left: Math.min(Math.max(tip.x, 40), Math.max(40, width - 40)) }}>{tip.text}</span>}
-      <span className="trk-wave-time" style={{ top: canvasH - 20, bottom: "auto" }}>{formatTime(total)}</span>
+      <span className="trk-wave-time">{formatTime(total)}</span>
+      </div>
       {cueMode && (
         <div className="trk-wave-bar">
           {timingError ? <span className="trk-meta">{timingError}</span> : (

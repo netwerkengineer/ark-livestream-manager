@@ -1571,3 +1571,5 @@ textarea.input-field {
 .trk-wave-cuebtn.on { background: rgba(249,115,22,0.3); border-color: #f97316; color: #fed7aa; }
 .trk-wave-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 4px 2px; }
 .trk-wave-seltext { flex: 1 1 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trk-wave-top { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 4px 2px; align-items: center; }
+.trk-wave-canvas { position: relative; }
