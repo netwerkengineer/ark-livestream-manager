@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown } from "lucide-react";
+import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown, Metronome } from "lucide-react";
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction, formatTime } from "./useReaper";
 import { parseSongName } from "./songName";
@@ -62,6 +62,12 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
   });
   const countBeat = state?.bridge?.countBeat || 0;
   const countBeats = state?.bridge?.countBeats || 0;
+  const clickDiv = state?.bridge?.clickDiv ?? 0;
+  const clickAccent = state?.bridge?.clickAccent ?? true;
+  const clickDb = Math.round(state?.bridge?.clickDb ?? -6);
+  const setClick = async (body: object) => {
+    try { await reaperAction({ action: "click", ...body }); } catch (err) { onError(err instanceof Error ? err.message : "Click wijzigen mislukt"); }
+  };
   const fading = !!state?.bridge?.fading;
   const canFade = hasDesktopEngine();
   const fadeOut = async () => {
@@ -98,6 +104,23 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         <button className="trk-t-btn stop" onClick={() => run("stop")} title="Stop"><Square size={stage ? 24 : 18} /></button>
         {canFade && (
           <span className="trk-fade">
+            <Metronome size={stage ? 20 : 16} className={clickDiv ? "trk-click-on" : "trk-click-off"} aria-hidden />
+            <select className="trk-fade-secs" value={clickDiv} aria-label="Click" title="Eigen click: loopt mee met de maten van het nummer"
+              onChange={e => setClick({ div: Number(e.target.value) })}>
+              <option value={0}>Click uit</option>
+              <option value={1}>Click ¼</option>
+              <option value={2}>Click ⅛</option>
+              <option value={3}>Click ⅛ triool</option>
+              <option value={4}>Click 1/16</option>
+            </select>
+            {clickDiv > 0 && (
+              <>
+                <button className={`trk-icon-btn${clickAccent ? " pinned" : ""}`} onClick={() => setClick({ accent: !clickAccent })} title="Accent: de één van elke maat hoger en harder" aria-pressed={clickAccent}>Accent</button>
+                <select className="trk-fade-secs" value={clickDb} aria-label="Sterkte van de click" onChange={e => setClick({ db: Number(e.target.value) })}>
+                  {[-24, -18, -12, -6, 0].map(v => <option key={v} value={v}>{v} dB</option>)}
+                </select>
+              </>
+            )}
             <select className="trk-fade-secs" value={countBars} aria-label="Voorteller" title="Voorteller: click vooraf, alleen als het nummer vanaf het begin start"
               onChange={e => { const v = Number(e.target.value); setCountBars(v); try { localStorage.setItem(COUNT_IN_KEY, String(v)); } catch { /* optional */ } }}>
               <option value={0}>Voorteller uit</option>

@@ -24,7 +24,7 @@ final class Server {
         let cur = m.sectionIndex(at: m.pos)
         var d: [String: Any] = ["title": s.title, "path": p.activePath, "state": st, "position": m.posSec, "position_beats": s.tempo.barBeat(qn: s.tempo.qn(sec: m.posSec)), "duration": dur, "loading": !p.loading.isEmpty, "error": p.error ?? "",
                 "device": p.output?.deviceName ?? "", "outputs": p.output?.hwChannels ?? m.outCh, "output_mode": m.requested, "output_applied": m.applied,
-                "fading": m.fading, "counting": m.counting, "count_beat": m.countBeat, "count_beats": m.countBeats, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
+                "fading": m.fading, "click_div": m.clickDiv, "click_accent": m.clickAccent, "click_db": Double(m.clickDb), "counting": m.counting, "count_beat": m.countBeat, "count_beats": m.countBeats, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
                 "freeshow": p.fsHost.isEmpty ? "" : "\(p.fsHost):\(p.fsPort)", "freeshow_override": !p.cfg.fsHost.isEmpty,
                 "has_cues": p.table != nil, "slide": p.sent ?? 0, "last_cmd": p.lastCmd,
                 "setlist": p.setlist, "loaded": p.cache.keys.sorted(),
@@ -65,6 +65,12 @@ final class Server {
                 let bars = Int(qs["count"] ?? "") ?? 0
                 let own = mixer.song.sections.first.map { $0.name.lowercased().hasPrefix("count") && Double(mixer.pos) / mixer.sr < $0.end } ?? false
                 if bars > 0 && !mixer.playing && !mixer.counting && mixer.pos == 0 && !own { mixer.startCountIn(bars: min(4, bars)) } else if !mixer.counting { mixer.playing = true } }; p.lock.unlock(); return ok()
+        case "/click":
+            p.lock.lock()
+            if let v = Int(qs["div"] ?? "") { mixer.clickDiv = min(4, max(0, v)) }
+            if let v = qs["accent"] { mixer.clickAccent = v != "0" }
+            if let v = Double(qs["db"] ?? "") { mixer.clickDb = Float(min(6, max(-40, v))) }
+            p.lock.unlock(); return ok()
         case "/fadeout": p.lock.lock(); mixer.startFadeOut(sec: Double(qs["secs"] ?? "") ?? 8); p.lock.unlock(); return ok()
         case "/pause": mixer.playing = false; mixer.counting = false; mixer.fading = false; return ok()
         case "/stop": mixer.counting = false; mixer.fading = false; mixer.playing = false; mixer.pos = 0; mixer.stopLoop(); mixer.cancelPending(); p.cancelSong(); return ok()

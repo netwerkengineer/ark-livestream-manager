@@ -446,6 +446,57 @@ final class Mixer {
         if countLeft <= 0 { counting = false; playing = true; env = 1 }
         return n
     }
+    // Eigen click: loopt mee met de maten van het nummer (tempo-kaart), met te kiezen onderverdeling en accent, op de uitgang van de click-stem
+    var clickDiv = 0                // 0 = uit; anders het aantal klikken per kwartnoot: 1 = kwart, 2 = achtste, 3 = achtste triool, 4 = zestiende
+    var clickAccent = true          // de één van elke maat hoger en harder, de rest zachter
+    var clickDb: Float = -6
+    private var clickAge = Int.max, clickFreq = 1000.0, clickAmp: Float = 0
+    func clickBeat(qn g: Double) -> (strong: Bool, onBeat: Bool) {
+        let i = song.tempo.sigs.lastIndex(where: { $0.qn <= g + 1e-6 }) ?? 0
+        let bar = (g - song.tempo.sigs[i].qn) / max(0.25, song.tempo.sigs[i].qpb)
+        let onBeat = abs(g - g.rounded()) < 1e-6
+        return (abs(bar - bar.rounded()) < 1e-6, onBeat)
+    }
+    func clickMix(n: Int, off: Int, out: [UnsafeMutablePointer<Float>]) {
+        guard clickDiv > 0, n > 0 else { return }
+        let nOut = out.count
+        let q0 = song.tempo.qn(sec: Double(pos) / sr)
+        let bpm = max(30, (song.tempo.seg.last(where: { $0.qn <= q0 }) ?? song.tempo.seg[0]).bpm)
+        let dq = bpm / 60 / sr
+        let d = Double(clickDiv), eps = 1e-6
+        var triggers: [(j: Int, strong: Bool, onBeat: Bool)] = []
+        var g = ((q0 - eps) * d).rounded(.up) / d
+        while g < q0 + Double(n) * dq - eps && triggers.count < 16 {
+            let j = min(n - 1, max(0, Int(((g - q0) / dq).rounded(.up))))
+            let b = clickBeat(qn: g)
+            triggers.append((j, b.strong, b.onBeat))
+            g += 1 / d
+        }
+        let st = song.stems.first(where: { $0.name.lowercased().hasPrefix("click") && !$0.name.hasPrefix("Click 1/") }) ?? song.stems.first(where: { $0.monitor && !$0.isGuide })
+        let bus = min(max(st?.bus ?? 0, 0), 9)
+        if groupMute[bus] { return }
+        let o0 = out[min(max(0, st?.outA ?? 0), nOut - 1)] + off
+        let ob = st?.outB ?? -1
+        let o1: UnsafeMutablePointer<Float> = ob >= 0 && ob < nOut ? out[ob] + off : o0
+        let mono = st?.mono ?? false
+        let gain = Float(pow(10, Double(clickDb) / 20))
+        var t = 0
+        for i in 0..<n {
+            while t < triggers.count && triggers[t].j == i {
+                let tr = triggers[t]; t += 1
+                clickAge = 0
+                if clickAccent { clickFreq = tr.strong ? 1600 : (tr.onBeat ? 1000 : 800); clickAmp = tr.strong ? 0.9 : (tr.onBeat ? 0.6 : 0.35) }
+                else { clickFreq = 1000; clickAmp = 0.6 }
+            }
+            if clickAge < Int(0.08 * sr) {
+                let tt = Double(clickAge) / sr
+                let v = Float(sin(2 * Double.pi * clickFreq * tt) * exp(-tt / 0.014)) * clickAmp * gain * min(1, Float(clickAge) / 24) * envBuf[i]
+                o0[i] += v
+                if !mono && o1 != o0 { o1[i] += v }
+                clickAge += 1
+            }
+        }
+    }
     var fading = false, fadeLeft = 0, fadeTotal = 1     // uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
     func startFadeOut(sec: Double) { guard playing, !fading else { return }; fadeTotal = max(1, Int(max(0.2, sec) * sr)); fadeLeft = fadeTotal; fading = true }
     var groupMute = [Bool](repeating: false, count: 10), groupSolo = [Bool](repeating: false, count: 10), groupGain = [Float](repeating: 1, count: 10)   // per bus (uitgangsnummer 1-8)
@@ -609,6 +660,7 @@ final class Mixer {
             if fading { let r = Float(fadeLeft) / Float(fadeTotal); g *= r * r; if fadeLeft > 0 { fadeLeft -= 1 } }
             envBuf[i] = g * masterNow
         }
+        clickMix(n: n, off: off, out: out)
         let guideActive = gWs >= 0
         let soloActive = groupSolo.contains(true) || song.stems.contains { $0.solo }
         for s in song.stems {

@@ -37,6 +37,9 @@ case "fadetest":
 case "counttest":
     guard let folder = args.first else { print("gebruik: ark-player counttest <songmap met .RPP>"); exit(2) }
     do { try counttest(folder: folder) } catch { print("fout: \(error)"); exit(1) }
+case "clicktest":
+    guard let folder = args.first else { print("gebruik: ark-player clicktest <songmap met .RPP>"); exit(2) }
+    do { try clicktest(folder: folder) } catch { print("fout: \(error)"); exit(1) }
 case "serve":
     let port = UInt16(opt("--port") ?? "8099") ?? 8099
     let device = opt("--device")

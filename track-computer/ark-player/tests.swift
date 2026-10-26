@@ -270,6 +270,28 @@ func counttest(folder: String) throws {
     print("Per halve seconde (piek): \(secsPeak.joined(separator: ", ")) dB | tellen gezien: \(beatsSeen.sorted()) | daarna: counting \(m.counting), speelt \(m.playing), positie \(String(format: "%.2f", m.posSec)) s")
 }
 
+// ------------------------------------------------------------- clicktest (offline): eigen click met onderverdeling en accent
+func clicktest(folder: String) throws {
+    let sim = Sim(); let p = sim.player
+    setenv("ARK_PLAYER_CONFIG", NSTemporaryDirectory() + "ark-player-test-config.json", 1)
+    let rpp = folder + "/" + ((try? FileManager.default.contentsOfDirectory(atPath: folder))?.first { $0.hasSuffix(".RPP") } ?? "")
+    try sim.activate(rpp)
+    let m = p.mixer
+    for s in m.song.stems { s.mute = true }          // alleen de eigen click horen
+    let bpm = m.song.tempo.seg[0].bpm
+    for (div, accent) in [(1, true), (2, true), (3, true), (4, false)] {
+        m.clickDiv = div; m.clickAccent = accent; m.clickDb = 0
+        m.pos = Int(30 * m.sr); m.playing = true
+        let o = render(m, secs: 4)[0]
+        var onsets: [Float] = [], quiet = 0, hi = false
+        for x in o { let a = abs(x); if a > 0.02 { if !hi && quiet > Int(0.01 * m.sr) { onsets.append(0) }; hi = true; quiet = 0; if !onsets.isEmpty { onsets[onsets.count - 1] = max(onsets[onsets.count - 1], a) } } else { quiet += 1; if quiet > Int(0.03 * m.sr) { hi = false } } }
+        let expected = 4 * bpm / 60 * Double(div)
+        print("onderverdeling \(div) accent \(accent): \(onsets.count) klikken in 4 s (verwacht ~\(String(format: "%.1f", expected))) | pieken: \(onsets.prefix(8).map { String(format: "%.2f", $0) }.joined(separator: " "))")
+    }
+    m.clickDiv = 0; m.pos = Int(30 * m.sr); m.playing = true
+    print("Uit: piek \(peakDb(render(m, secs: 2).flatMap { $0 })) dB")
+}
+
 // ------------------------------------------------------------- padtest (offline): pad laden, afspelen per uitgangsmodus, crossfade en stop
 func padtest(wav: String) throws {
     let dir = NSTemporaryDirectory() + "ark-padtest"

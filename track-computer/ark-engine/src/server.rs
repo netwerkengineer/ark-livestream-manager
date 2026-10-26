@@ -78,6 +78,9 @@ pub fn state(p: &Arc<Player>) -> Value {
     });
     let o = d.as_object_mut().unwrap();
     o.insert("counting".into(), json!(m.counting));
+    o.insert("click_div".into(), json!(m.click_div));
+    o.insert("click_accent".into(), json!(m.click_accent));
+    o.insert("click_db".into(), json!(m.click_db as f64));
     o.insert("count_beat".into(), json!(m.count_beat()));
     o.insert("count_beats".into(), json!(m.count_beats));
     if !pad.error.is_empty() {
@@ -158,6 +161,19 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
                 m.start_count_in(bars.min(4));
             } else if !m.counting {
                 m.playing = true;
+            }
+            ok()
+        }
+        "/click" => {
+            let mut m = mx();
+            if let Some(v) = q.f("div") {
+                m.click_div = (v as i64).clamp(0, 4);
+            }
+            if let Some(v) = q.s("accent") {
+                m.click_accent = v != "0";
+            }
+            if let Some(v) = q.f("db") {
+                m.click_db = v.clamp(-40.0, 6.0) as f32;
             }
             ok()
         }

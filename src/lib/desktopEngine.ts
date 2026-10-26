@@ -31,7 +31,7 @@ export const engineCall = (path: string, params?: Record<string, unknown>) => wi
 interface EngineState {
   title: string; path: string; state: "playing" | "paused" | "stopped"; position: number; position_beats: string; duration: number;
   loading: boolean; error: string; output_mode: string; output_applied: string; jump_mode: string; lead_beats: number; freeshow: string;
-  fading?: boolean; counting?: boolean; count_beat?: number; count_beats?: number; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
+  fading?: boolean; click_div?: number; click_accent?: boolean; click_db?: number; counting?: boolean; count_beat?: number; count_beats?: number; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
   sections: { id: number; region: number; name: string; start: number; end: number; start_qn: number; end_qn: number }[];
   stems: { name: string; bus: number; bus_name: string; mute: boolean; solo: boolean; live: boolean; gain: number; meter_db: number }[];
   busses: { bus: number; name: string; mute: boolean; solo: boolean; gain: number }[];
@@ -81,6 +81,9 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     error: es.error || undefined,
     outputMode: es.output_mode,
     fading: es.fading,
+    clickDiv: es.click_div ?? 0,
+    clickAccent: es.click_accent ?? true,
+    clickDb: es.click_db ?? -6,
     countBeat: es.counting ? es.count_beat || 1 : 0,
     countBeats: es.count_beats || 0,
     leadBeats: es.lead_beats,
@@ -203,6 +206,14 @@ async function reaperAction(body: Record<string, any>): Promise<Response> {
         if (value !== undefined) params.db = Number(value) <= 0 ? -90 : 20 * Math.log10(Number(value));
         if (body.mute !== undefined) params.mute = body.mute ? 1 : 0;
         await engineCall("/master", params);
+        break;
+      }
+      case "click": {
+        const params: Record<string, unknown> = {};
+        if (body.div !== undefined) params.div = Number(body.div);
+        if (body.accent !== undefined) params.accent = body.accent ? 1 : 0;
+        if (body.db !== undefined) params.db = Number(body.db);
+        await engineCall("/click", params);
         break;
       }
       case "seek": await engineCall("/seek", { t: Number(pos) }); break;

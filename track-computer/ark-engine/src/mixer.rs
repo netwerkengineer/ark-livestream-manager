@@ -27,6 +27,13 @@ pub struct Mixer {
     pub loop_end: i64,
     pub fade_in: i64,
     /// uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
+    /// Eigen click: loopt mee met de maten van het nummer, met te kiezen onderverdeling en accent, op de uitgang van de click-stem
+    pub click_div: i64, // 0 = uit; anders klikken per kwartnoot: 1 = kwart, 2 = achtste, 3 = achtste triool, 4 = zestiende
+    pub click_accent: bool,
+    pub click_db: f32,
+    click_age: i64,
+    click_freq: f64,
+    click_amp: f32,
     pub fading: bool,
     pub fade_left: i64,
     pub fade_total: i64,
@@ -85,6 +92,12 @@ impl Default for Mixer {
             loop_start: 0,
             loop_end: 0,
             fade_in: 0,
+            click_div: 0,
+            click_accent: true,
+            click_db: -6.0,
+            click_age: i64::MAX,
+            click_freq: 1000.0,
+            click_amp: 0.0,
             fading: false,
             fade_left: 0,
             fade_total: 1,
@@ -231,6 +244,76 @@ impl Mixer {
         Ok(())
     }
 
+    fn click_beat(&self, g: f64) -> (bool, bool) {
+        let sigs = &self.song.tempo.sigs;
+        let i = sigs.iter().rposition(|s| s.0 <= g + 1e-6).unwrap_or(0);
+        let bar = (g - sigs[i].0) / sigs[i].1.max(0.25);
+        ((bar - bar.round()).abs() < 1e-6, (g - g.round()).abs() < 1e-6)
+    }
+    fn click_mix(&mut self, n: usize, off: usize, out: &mut [Vec<f32>]) {
+        if self.click_div <= 0 || n == 0 {
+            return;
+        }
+        let n_out = out.len();
+        let q0 = self.song.tempo.qn_sec(self.pos as f64 / self.sr);
+        let bpm = self.song.tempo.seg.iter().rev().find(|s| s.qn <= q0).unwrap_or(&self.song.tempo.seg[0]).bpm.max(30.0);
+        let dq = bpm / 60.0 / self.sr;
+        let d = self.click_div as f64;
+        let eps = 1e-6;
+        let mut triggers: Vec<(usize, bool, bool)> = Vec::new();
+        let mut g = ((q0 - eps) * d).ceil() / d;
+        while g < q0 + n as f64 * dq - eps && triggers.len() < 16 {
+            let j = (((g - q0) / dq).ceil().max(0.0) as usize).min(n - 1);
+            let (strong, on_beat) = self.click_beat(g);
+            triggers.push((j, strong, on_beat));
+            g += 1.0 / d;
+        }
+        let st = self
+            .song
+            .stems
+            .iter()
+            .find(|s| s.name.to_lowercase().starts_with("click") && !s.name.starts_with("Click 1/"))
+            .or_else(|| self.song.stems.iter().find(|s| s.monitor && !s.is_guide));
+        let (a, b, mono, bus) = match st {
+            Some(s) => (s.out_a.min(n_out - 1), s.out_b.filter(|&b| b < n_out), s.mono, s.bus.min(9)),
+            None => (0, None, false, 0),
+        };
+        if self.group_mute[bus] {
+            return;
+        }
+        let gain = 10f32.powf(self.click_db / 20.0);
+        let sr = self.sr;
+        let limit = (0.08 * sr) as i64;
+        let mut t = 0;
+        for i in 0..n {
+            while t < triggers.len() && triggers[t].0 == i {
+                let (_, strong, on_beat) = triggers[t];
+                t += 1;
+                self.click_age = 0;
+                if self.click_accent {
+                    self.click_freq = if strong { 1600.0 } else if on_beat { 1000.0 } else { 800.0 };
+                    self.click_amp = if strong { 0.9 } else if on_beat { 0.6 } else { 0.35 };
+                } else {
+                    self.click_freq = 1000.0;
+                    self.click_amp = 0.6;
+                }
+            }
+            if self.click_age < limit {
+                let tt = self.click_age as f64 / sr;
+                let v = ((2.0 * std::f64::consts::PI * self.click_freq * tt).sin() * (-tt / 0.014).exp()) as f32
+                    * self.click_amp * gain * (self.click_age as f32 / 24.0).min(1.0) * self.env_buf[i];
+                out[a][off + i] += v;
+                if !mono {
+                    if let Some(b) = b {
+                        if b != a {
+                            out[b][off + i] += v;
+                        }
+                    }
+                }
+                self.click_age += 1;
+            }
+        }
+    }
     pub fn count_beat(&self) -> i64 {
         if self.counting {
             (self.count_total - self.count_left) / self.count_beat_frames.max(1) + 1
@@ -515,6 +598,7 @@ impl Mixer {
             }
             self.env_buf[i] = g * self.master_now;
         }
+        self.click_mix(n, off, out);
         let guide_active = self.g_ws >= 0;
         let solo_active = self.group_solo.iter().any(|&b| b) || self.song.stems.iter().any(|s| s.solo);
         let (g_ws, g_we, g_src) = (self.g_ws, self.g_we, self.g_src);
@@ -671,5 +755,63 @@ mod count_tests {
         }
         assert!(!m.counting && m.playing);
         assert!(m.pos > 0);
+    }
+}
+
+#[cfg(test)]
+mod click_tests {
+    use super::*;
+    use crate::song::Stem;
+
+    #[test]
+    fn click_follows_the_bars() {
+        let n = 20 * 48000;
+        let mut song = Song::default();
+        song.stems.push(Stem::new("Keys", vec![vec![0.0; n], vec![0.0; n]]));
+        song.stems.push(Stem::new("Click", vec![vec![0.0; n]]));
+        let mut m = Mixer::default();
+        m.sr = 48000.0;
+        m.song = song;
+        m.out_ch = 2;
+        m.apply_routing();
+        m.click_db = 0.0;
+        m.playing = true;
+        m.env = 1.0;
+        let mut counts = Vec::new();
+        for div in [1, 2, 3, 4] {
+            m.click_div = div;
+            m.pos = 0;
+            let mut out = vec![vec![0.0f32; 480]; 2];
+            let (mut onsets, mut quiet, mut hi) = (0, 0, false);
+            for _ in 0..400 {
+                // 4 s in blokken van 10 ms
+                m.render(480, &mut out);
+                for x in out[0].iter() {
+                    if x.abs() > 0.02 {
+                        if !hi && quiet > 480 {
+                            onsets += 1;
+                        }
+                        hi = true;
+                        quiet = 0;
+                    } else {
+                        quiet += 1;
+                        if quiet > 1440 {
+                            hi = false;
+                        }
+                    }
+                }
+            }
+            counts.push(onsets);
+        }
+        // 120 bpm = 2 per s: 4 s geeft 8, 16, 24 (triool: 6 per kwart-paar) en 32 klikken (+/- 1 aan de rand)
+        for (got, want) in counts.iter().zip([8, 16, 24, 32]) {
+            assert!((got - want as i32).abs() <= 1, "{:?}", counts);
+        }
+        m.click_div = 0;
+        m.pos = 0;
+        let mut out = vec![vec![0.0f32; 480]; 2];
+        m.render(480, &mut out);
+        m.render(480, &mut out);
+        assert!(out[0].iter().all(|v| v.abs() < 1e-6));
     }
 }

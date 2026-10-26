@@ -55,6 +55,9 @@ export interface BridgeState {
   lastCmd: string;
   error?: string;
   outputMode?: string; // chosen output mode
+  clickDiv?: number;   // the own click of the own player: clicks per quarter note, 0 = off
+  clickAccent?: boolean;
+  clickDb?: number;
   countBeat?: number;  // the own player is playing the count-in: which beat (1..countBeats), otherwise 0
   countBeats?: number;
   fading?: boolean;    // the own player is fading the song out (then it stops)
@@ -189,6 +192,9 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       error: s.error ?? undefined,
       outputMode: s.outputMode ?? undefined,
       fading: s.fading ?? undefined,
+      clickDiv: typeof s.clickDiv === 'number' ? s.clickDiv : undefined,
+      clickAccent: typeof s.clickAccent === 'boolean' ? s.clickAccent : undefined,
+      clickDb: typeof s.clickDb === 'number' ? s.clickDb : undefined,
       countBeat: typeof s.countBeat === 'number' ? s.countBeat : undefined,
       countBeats: typeof s.countBeats === 'number' ? s.countBeats : undefined,
       leadBeats: typeof s.leadBeats === 'number' ? s.leadBeats : undefined,

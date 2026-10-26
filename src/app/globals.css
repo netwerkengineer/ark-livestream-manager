@@ -1560,3 +1560,6 @@ textarea.input-field {
 .trk-fade { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; }
 .trk-fade-secs { background: rgba(15,23,42,0.6); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); border-radius: 8px; font-size: 0.72rem; padding: 4px 4px; }
 .trk-fade .trk-t-btn:disabled { opacity: 0.4; cursor: default; }
+.trk-click-on { color: #fbbf24; }
+.trk-click-off { color: #64748b; }
+.trk-fade { flex-wrap: wrap; }
