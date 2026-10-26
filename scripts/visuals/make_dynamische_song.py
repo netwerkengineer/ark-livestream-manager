@@ -68,8 +68,23 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
             "layouts": {lid: {"name": "Default", "notes": "", "slides": volgorde, **({"timeline": tijdlijn} if tijdlijn else {})}}, "media": copy.deepcopy(c0["media"])}
 
 
+def een_show(bron, heftig_re, volgorde, reeks, tl):
+    """Alle varianten als arrangementen (layouts) in één show: Origineel + songmap-volgorde (3 stijlen) + opname-volgorde met tijdlijn (3 stijlen)."""
+    c0 = bron[1]; nieuw = copy.deepcopy(c0); lay0 = list(nieuw["layouts"].values())[0]; lay0["name"] = "Origineel"
+    eerste = next(iter(nieuw["layouts"])); namen = {"secties": "Secties (rustig/heftig)", "rollend": "Rollend", "doorrol": "Doorrol (webpagina)"}
+    for soort, vg, rk, t in (("Songmap", volgorde, None, None), ("Opname", None, reeks, tl)):
+        for v in ("secties", "rollend", "doorrol"):
+            c = bouw(bron, v, heftig_re, vg, rk, t)
+            if soort == "Opname" and rk is None: continue
+            if soort == "Songmap" and not vg: continue
+            nieuw["slides"].update(c["slides"]); lid, lay = next(iter(c["layouts"].items())); lay["name"] = f"{soort} - {namen[v]}"; nieuw["layouts"][lid] = lay
+    nieuw["name"] = f"{c0['name']} (dynamisch)"; nieuw["settings"] = {**nieuw.get("settings", {}), "activeLayout": eerste}
+    nu = int(time.time() * 1000); nieuw["timestamps"] = {**nieuw.get("timestamps", {}), "modified": nu}
+    return nieuw
+
+
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     bron = json.load(open(os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
     if OV_GLOED not in ov: raise SystemExit("overlay ark_ov_gloed ontbreekt: draai eerst make_dynamische_demo.py")
@@ -79,6 +94,13 @@ def main():
         dur = float(os.popen(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{a.audio}"').read().strip())
         tl = {"events": tdata["events"], "start": tdata["start"], "audio": f"{cp}/Media/Opnames/{os.path.basename(a.audio)}", "duur": int(dur)}
         if a.uitvoeren: os.makedirs(os.path.dirname(doel), exist_ok=True); shutil.copy2(a.audio, doel)
+    if a.een_show:
+        vg = volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None
+        c = een_show(bron, a.heftig, vg, reeks, tl); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
+        nid = json.load(open(pad, encoding="utf-8"))[0] if os.path.exists(pad) else rid()
+        print(f"{c['name']}: {len(c['layouts'])} arrangementen, {len(c['slides'])} dia's, id {nid}\n  " + "\n  ".join(l["name"] for l in c["layouts"].values()))
+        if a.uitvoeren: tmp = pad + ".tmp"; json.dump([nid, c], open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
+        print("\nklaar." if a.uitvoeren else "\nDROOG: er is niets gewijzigd."); return
     for v in ("secties", "rollend", "doorrol"):
         c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None, reeks, tl)
         if reeks is not None: c["name"] = c["name"].replace("(dynamisch:", "(opname, dynamisch:")
