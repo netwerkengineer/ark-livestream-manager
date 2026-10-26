@@ -16,6 +16,7 @@ OV_GLOED, OV_GLANS = "ark_ov_gloed", "ark_ov_glans"
 CMG = os.environ.get("CMGSANS_MAP", "/private/tmp/claude-501/-Users-jeffreygo/e8c0863d-4b8f-4c9a-8c80-e3a86023c301/scratchpad/fsapp2/public/fonts")  # FreeShow-lettertype CMGSans (uit de app-bundel)
 # FreeShow toont de woorden ~10% breder dan de CMGSans-meting (gemeten aan de echte uitvoer)
 BREEDTE_FACTOR = 1.10
+ROL_URL = "http://localhost:8099/roll.html"  # scripts/lyrics-roll/server.py
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
@@ -111,6 +112,13 @@ def bouw(bron, palet):
     slide("3 Glans", "#f59e0b", basis(s1, palet), [overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]); slide("3 Glans", "#f59e0b", basis(s2, palet))
     # 4 per onderdeel (glans uit bij de eerste dia)
     slide("4 Couplet (rustig)", "#4db6ac", sectie(s1, False), [overlay_actie("Ark overlay: Glans (uit)", OV_GLANS)]); slide("4 Refrein (heftig)", "#ef4444", sectie(s2, True)); slide("4 Bridge (heftig)", "#ef4444", sectie(s3, True))
+    # 5 doorrol als webpagina (scripts/lyrics-roll): de dia bevat onzichtbare tekst voor FreeShow's API, de pagina tekent de beweging
+    def doorrol(lijnen):
+        web = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": []}
+        tekst = tekstvak(440, 60, 1800, 200, [], 0, {"type": "none", "duration": 0}, "opacity:0;")
+        tekst["lines"] = [{"align": "text-align:center;", "text": [{"value": t, "style": "font-size:40px;color:#ffffff;"}]} for t in lijnen]
+        return [web, tekst]
+    for k, regels in enumerate((s1, s2, s3, s4)): slide("5 Doorrol (web)", "#22d3ee", doorrol(regels), [overlay_actie("Ark overlay: Glans (uit)", OV_GLANS)] if k == 0 else None, trans=False)
     nid = rid(); lid = "b" + rid(10)
     nc = {"name": "Dynamische lyrics demo", "private": False, "category": "song", "settings": {"activeLayout": lid, "template": None},
           "timestamps": {"created": int(time.time() * 1000), "modified": int(time.time() * 1000), "used": int(time.time() * 1000)}, "quickAccess": {}, "meta": {},
