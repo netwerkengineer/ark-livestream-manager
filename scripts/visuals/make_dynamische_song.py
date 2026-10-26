@@ -19,12 +19,10 @@ STREAM = ["da5f3b88e33", "d972fc42792"]      # livestream-uitvoer(en) (NDI en RT
 
 
 def doorrol(lijnen):
-    # Twee webvakken uit dezelfde pagina: de doorrol voor de zaal en de gewone liedtekst (modus=stream) voor de livestream. Er staan bewust GEEN tekstvakken
-    # op de dia: een FreeShow-sjabloon (uitvoerstijl of show) vervangt de bindings van tekstvakken door die van het sjabloon, waardoor de tekst dan ook in de zaal
-    # verscheen. De tekst voor FreeShow's API (get_output_slide_text) staat in de `lines` van het zaalvak; FreeShow leest die uit elk item, maar tekent ze ook
-    # (als reusachtige tekst), daarom staat ze op 1px en transparant.
-    zaal = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": list(BEAMER),
-            "lines": [{"align": "text-align:center;", "text": [{"value": t, "style": "font-size:1px;line-height:0;color:rgba(0,0,0,0);text-shadow:none;"}]} for t in lijnen]}
+    # Twee webvakken uit dezelfde pagina: de doorrol voor de zaal en de gewone liedtekst (modus=stream) voor de livestream. Er staan bewust GEEN tekstvakken en geen
+    # `lines` op de dia: een FreeShow-sjabloon vervangt de bindings van tekstvakken (de tekst verscheen dan ook in de zaal) en een item met `lines` wordt als tekst
+    # getekend en verstoort het webvak. De tekst voor de pagina staat in de notities van de dia (zie /api/public/lyrics-roll).
+    zaal = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL, "noNavigation": True}, "bindings": list(BEAMER)}
     stream = {"style": "top:0px;left:0px;width:1920px;height:1080px;z-index:3;", "type": "web", "web": {"src": ROL_URL + "&modus=stream", "noNavigation": True}, "bindings": list(STREAM)}
     return [zaal, stream]
 
@@ -70,7 +68,7 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
         elif variant == "secties": items = sectie(lijnen, heftig)
         elif variant == "rollend": items = rollend(lijnen, tek[k - 1][-1] if k > 0 and tek[k - 1] else None, tek[k + 1][0] if k + 1 < len(tek) and tek[k + 1] else None, "ark")
         else: items = doorrol(lijnen)
-        nieuwe[i] = {"group": "Refrein" if heftig else "Couplet", "color": "#ef4444" if heftig else "#4db6ac", "settings": {}, "notes": "", "items": items, "globalGroup": None}
+        nieuwe[i] = {"group": "Refrein" if heftig else "Couplet", "color": "#ef4444" if heftig else "#4db6ac", "settings": {}, "notes": "\n".join(lijnen) if variant == "doorrol" else "", "items": items, "globalGroup": None}
         l = {"id": i}
         if variant != "doorrol": l["transition"] = {"type": "fade", "duration": 600, "easing": "sine"}
         volgorde.append(l)

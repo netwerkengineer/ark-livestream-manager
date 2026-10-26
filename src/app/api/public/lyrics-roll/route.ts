@@ -11,6 +11,38 @@ const TTL_MS = 150;
 const NO_STORE = { "Cache-Control": "no-store" };
 let cache: { at: number; text: string } | null = null;
 
+// Slides of the roll arrangements carry no text items (a FreeShow template would show them in the hall too), so FreeShow's own
+// "text of the slide on screen" is empty for them. Their text is kept in the slide notes: look the slide up through the output state
+// (show, layout, index) and the show itself, which is cached because it is large.
+type ShowData = { layouts?: Record<string, { slides?: { id: string }[] }>; slides?: Record<string, { notes?: string }> };
+const showCache = new Map<string, { at: number; show: ShowData }>();
+const SHOW_TTL_MS = 30000;
+
+async function freeshow(base: string, action: string, extra: Record<string, unknown> = {}) {
+  const res = await fetch(base, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action, ...extra }),
+    signal: AbortSignal.timeout(2000),
+  });
+  return (await res.json())?.data;
+}
+
+async function textFromNotes(base: string): Promise<string> {
+  const slide = (await freeshow(base, "get_output"))?.slide as { id?: string; layout?: string; index?: number } | undefined;
+  if (!slide?.id || !slide.layout || typeof slide.index !== "number") return "";
+  let entry = showCache.get(slide.id);
+  if (!entry || Date.now() - entry.at > SHOW_TTL_MS) {
+    const show = (await freeshow(base, "get_show", { id: slide.id })) as ShowData | undefined;
+    if (!show) return "";
+    entry = { at: Date.now(), show };
+    showCache.set(slide.id, entry);
+  }
+  const ref = entry.show.layouts?.[slide.layout]?.slides?.[slide.index];
+  const notes = ref ? entry.show.slides?.[ref.id]?.notes : "";
+  return typeof notes === "string" ? notes : "";
+}
+
 export async function GET() {
   if (cache && Date.now() - cache.at < TTL_MS) return NextResponse.json({ text: cache.text }, { headers: NO_STORE });
 
@@ -20,14 +52,9 @@ export async function GET() {
   const base = `http://${host}:${freeShowPort || 5505}`;
 
   try {
-    const res = await fetch(base, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "get_output_slide_text" }),
-      signal: AbortSignal.timeout(2000),
-    });
-    const j = await res.json();
-    const text = typeof j?.data === "string" ? j.data : "";
+    let text = await freeshow(base, "get_output_slide_text");
+    text = typeof text === "string" ? text : "";
+    if (!text) text = await textFromNotes(base);
     cache = { at: Date.now(), text };
     return NextResponse.json({ text }, { headers: NO_STORE });
   } catch {
