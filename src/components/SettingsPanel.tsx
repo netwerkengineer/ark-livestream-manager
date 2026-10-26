@@ -1720,6 +1720,28 @@ export default function SettingsPanel({
               </div>
 
               <div className="input-group">
+                <label className="input-label">FreeShow-API-adres, zoals deze app het bereikt (voor de doorrol-liedtekst)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={settings.freeshowApiUrl || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, freeshowApiUrl: e.target.value })}
+                  placeholder="http://192.168.2.101:5505"
+                />
+                <input
+                  type="password"
+                  className="input-field"
+                  style={{ marginTop: '6px' }}
+                  value={settings.freeshowApiPassword || ""}
+                  onChange={(e) => onSettingsChange({ ...settings, freeshowApiPassword: e.target.value })}
+                  placeholder="API-wachtwoord (alleen als in FreeShow ingesteld)"
+                />
+                <p style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px' }}>
+                  Zet in FreeShow de API aan (Instellingen, Connections). Een dia met een web-item naar /lyrics-roll.html?h=1080 van deze app toont dan de liedtekst met doorrol; de pagina vraagt de actieve regels via deze app aan FreeShow. Leeg laten betekent: pagina toont niets.
+                </p>
+              </div>
+
+              <div className="input-group">
                 <label className="input-label">Sjabloon voor liedteksten (naam in FreeShow)</label>
                 <input
                   type="text"

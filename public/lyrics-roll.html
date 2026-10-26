@@ -11,11 +11,11 @@
 <div id="stage"></div>
 <script>
 // Doorrollende liedtekst: elke tekstregel is één blijvend element dat omhoog schuift (nieuw komt van onder, oud schuift weg en dimt).
-// Bron: FreeShow-API (via /api op dezelfde server) of ?demo voor een testreeks zonder FreeShow.
+// Bron: /api/public/lyrics-roll (de app vraagt de actieve regels aan FreeShow) of ?demo voor een testreeks zonder FreeShow. ?h=1080 zet de hoogte vast (FreeShow's webview meldt een te kleine hoogte).
 const P = new URLSearchParams(location.search);
 let HOOGTE, MIDDEN, STAP, GROOT, KLEIN;
 function maten() { HOOGTE = +P.get('h') || innerHeight; MIDDEN = HOOGTE * .5; STAP = HOOGTE * .17; GROOT = HOOGTE * .095; KLEIN = HOOGTE * .058; }   // de webview in FreeShow wordt eerst klein aangemaakt en groeit daarna
-maten(); fetch(`/log?w=${innerWidth}&h=${innerHeight}&dpr=${devicePixelRatio}`); addEventListener("resize", () => { maten(); indeling(); });
+maten(); addEventListener("resize", () => { maten(); indeling(); });
 const KERN = /^(god|heer|jezus|halleluja|liefde|koning|geest|u)$/i;
 const stage = document.getElementById("stage");
 let blokken = [];  // per dia een blok regels; [-1] is de huidige. Elke regel is één blijvend element dat omhoog schuift
@@ -52,11 +52,11 @@ function toon(tekst) {
   setTimeout(indeling, 20);
 }
 // ontwikkelhulp: herlaadt zichzelf als dit bestand op de server verandert
-let versie = null; setInterval(async () => { try { const r = await fetch("/roll.html", { method: "HEAD", cache: "no-store" }); const v = r.headers.get("last-modified"); if (versie && v !== versie) location.reload(); versie = v; } catch (e) {} }, 2000);
+let versie = null; setInterval(async () => { try { const r = await fetch(location.pathname, { method: "HEAD", cache: "no-store" }); const v = r.headers.get("last-modified"); if (versie && v !== versie) location.reload(); versie = v; } catch (e) {} }, 2000);
 async function poll() {
   try {
-    const r = await fetch("/api", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "get_output_slide_text" }) });
-    const j = await r.json(); toon(typeof j === "string" ? j : (j.data ?? j.text ?? ""));
+    const r = await fetch("/api/public/lyrics-roll", { cache: "no-store" });
+    const j = await r.json(); toon(j.text ?? "");
   } catch (e) {}
   setTimeout(poll, 250);
 }

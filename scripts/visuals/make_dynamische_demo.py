@@ -16,7 +16,7 @@ OV_GLOED, OV_GLANS = "ark_ov_gloed", "ark_ov_glans"
 CMG = os.environ.get("CMGSANS_MAP", "/private/tmp/claude-501/-Users-jeffreygo/e8c0863d-4b8f-4c9a-8c80-e3a86023c301/scratchpad/fsapp2/public/fonts")  # FreeShow-lettertype CMGSans (uit de app-bundel)
 # FreeShow toont de woorden ~10% breder dan de CMGSans-meting (gemeten aan de echte uitvoer)
 BREEDTE_FACTOR = 1.10
-ROL_URL = "http://localhost:8099/roll.html?h=1080&v=" + str(int(time.time()))  # versie in de URL: FreeShow's webview bewaart anders de oude pagina in de cache  # scripts/lyrics-roll/server.py
+ROL_URL = os.environ.get("ROL_URL", "http://localhost:8099/lyrics-roll.html") + "?h=1080&v=" + str(int(time.time()))  # versie in de URL: FreeShow's webview bewaart anders de oude pagina in de cache  # ROL_URL = adres van public/lyrics-roll.html (de app, of scripts/lyrics-roll/server.py voor een proef)
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
