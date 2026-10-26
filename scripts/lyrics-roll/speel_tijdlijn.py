@@ -12,17 +12,21 @@ def secs(t):
 def stuur(api, actie):
     r = urllib.request.urlopen(urllib.request.Request(api, json.dumps(actie).encode(), {"content-type": "application/json"}), timeout=3); return r.read()
 
-ap = argparse.ArgumentParser(); ap.add_argument("--show", required=True); ap.add_argument("--tijdlijn", required=True); ap.add_argument("--vanaf"); ap.add_argument("--api", default="http://127.0.0.1:5505/")
+ap = argparse.ArgumentParser(); ap.add_argument("--show", required=True); ap.add_argument("--tijdlijn", required=True); ap.add_argument("--vanaf"); ap.add_argument("--api", default="http://127.0.0.1:5505/"); ap.add_argument("--aftellen", type=int, default=0, help="in plaats van Enter: aftellen van n seconden, druk op play bij 0")
 a = ap.parse_args()
 show_id = json.load(open(a.show, encoding="utf-8"))[0]; tl = json.load(open(a.tijdlijn, encoding="utf-8"))
 start = secs(tl["start"]); gebeurtenissen = [(start, 0)] + [(secs(e["t"]), i + 1) for i, e in enumerate(tl["events"])]
 vanaf = secs(a.vanaf) if a.vanaf else start
 huidig = [g for g in gebeurtenissen if g[0] <= vanaf]; komend = [g for g in gebeurtenissen if g[0] > vanaf]
-input(f"Zet de video klaar op {int(vanaf//60)}:{vanaf%60:04.1f} en druk Enter op het moment dat je hem start... ")
+print(f"Zet de video klaar op {int(vanaf//60)}:{vanaf%60:04.1f}.")
+if a.aftellen:
+    for n in range(a.aftellen, 0, -1): print(f"  {n}...", flush=True); time.sleep(1)
+    print("  NU: druk op play", flush=True)
+else: input("Druk Enter op het moment dat je de video start... ")
 t0 = time.monotonic()
-if huidig: print("→ dia", huidig[-1][1]); stuur(a.api, {"action": "index_select_slide", "showId": show_id, "index": huidig[-1][1]})
+if huidig: print("→ dia", huidig[-1][1], flush=True); stuur(a.api, {"action": "index_select_slide", "showId": show_id, "index": huidig[-1][1]})
 for t, idx in komend:
     wacht = (t - vanaf) - (time.monotonic() - t0)
     if wacht > 0: time.sleep(wacht)
-    print(f"{int(t//60)}:{t%60:04.1f} → dia {idx}"); stuur(a.api, {"action": "index_select_slide", "showId": show_id, "index": idx})
+    print(f"{int(t//60)}:{t%60:04.1f} → dia {idx}", flush=True); stuur(a.api, {"action": "index_select_slide", "showId": show_id, "index": idx})
 print("klaar")
