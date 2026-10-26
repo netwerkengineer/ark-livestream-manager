@@ -7,7 +7,7 @@
 
 Gebruik: make_dynamische_song.py --fs <FreeShow-map> --bron "Washed - Elevation Rhythm" [--heftig "regex"] [--uitvoeren]
 Vereist de overlays uit make_dynamische_demo.py (gloed/glans). Zonder --uitvoeren gebeurt er niets. FreeShow moet dicht zijn."""
-import argparse, copy, json, os, re, time
+import argparse, copy, json, os, re, shutil, time
 from make_dynamische_lyrics import lijnen_van, rid
 from make_dynamische_demo import OV_GLOED, OV_GLANS, ROL_URL, basis, sectie, rollend, overlay_actie, tekstvak
 
@@ -32,7 +32,11 @@ def volgorde_lijst(tekst):
     return uit
 
 
-def bouw(bron, variant, heftig_re, volgorde=None, reeks=None):
+def secs(t):
+    m, _, x = t.partition(":"); return int(m) * 60 + float(x)
+
+
+def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
     c0 = bron[1]; lay = list(c0["layouts"].values())[0]["slides"]; start, rest = lay[0], lay[1:]
     tek = [[l for it in c0["slides"][ls["id"]]["items"] if it.get("type") == "text" for l in lijnen_van(it)] for ls in rest]
     if reeks is not None: rest = [None] * len(reeks); tek = reeks   # reeks = regels per dia in de volgorde van een opname (lege lijst = lege dia)
@@ -52,19 +56,31 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None):
         if variant != "doorrol": l["transition"] = {"type": "fade", "duration": 600, "easing": "sine"}
         volgorde.append(l)
     lid = "b" + rid(10); nu = int(time.time() * 1000)
+    tijdlijn = None
+    if tl:   # FreeShow-tijdlijn: audio + dia-wissels op tijd; de startdia start de tijdlijn (actie start_timeline)
+        st.setdefault("actions", {}).setdefault("slideActions", []).append({"id": rid(), "name": "Start tijdlijn (opname + dia's)", "triggers": ["start_timeline"], "actionValues": {}, "customActivation": "", "midiEnabled": False})
+        t0 = secs(tl["start"]); acties = [{"id": rid(6), "time": 0, "duration": tl["duur"], "name": os.path.basename(tl["audio"]), "type": "audio", "data": {"path": tl["audio"]}}]
+        for i, e in enumerate(tl["events"]):
+            acties.append({"id": rid(6), "time": int(round((secs(e["t"]) - t0) * 1000)), "name": f"dia {i + 1}", "type": "slide", "data": {"id": volgorde[i + 1]["id"], "index": i + 1}})
+        tijdlijn = {"actions": acties}
     return {"name": f"{c0['name']} (dynamisch: {variant})", "private": False, "category": c0.get("category", "song"), "settings": {"activeLayout": lid, "template": None},
             "timestamps": {"created": nu, "modified": nu, "used": nu}, "quickAccess": {}, "meta": copy.deepcopy(c0.get("meta", {})), "slides": nieuwe,
-            "layouts": {lid: {"name": "Default", "notes": "", "slides": volgorde}}, "media": copy.deepcopy(c0["media"])}
+            "layouts": {lid: {"name": "Default", "notes": "", "slides": volgorde, **({"timeline": tijdlijn} if tijdlijn else {})}}, "media": copy.deepcopy(c0["media"])}
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     bron = json.load(open(os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
     if OV_GLOED not in ov: raise SystemExit("overlay ark_ov_gloed ontbreekt: draai eerst make_dynamische_demo.py")
-    reeks = [e["lines"] for e in json.load(open(a.tijdlijn, encoding="utf-8"))["events"]] if a.tijdlijn else None
+    tdata = json.load(open(a.tijdlijn, encoding="utf-8")) if a.tijdlijn else None; reeks = [e["lines"] for e in tdata["events"]] if tdata else None; tl = None
+    if a.audio:
+        doel = os.path.join(a.fs, "Media", "Opnames", os.path.basename(a.audio)); cp = (a.client_path or a.fs).rstrip("/")
+        dur = float(os.popen(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{a.audio}"').read().strip())
+        tl = {"events": tdata["events"], "start": tdata["start"], "audio": f"{cp}/Media/Opnames/{os.path.basename(a.audio)}", "duur": int(dur)}
+        if a.uitvoeren: os.makedirs(os.path.dirname(doel), exist_ok=True); shutil.copy2(a.audio, doel)
     for v in ("secties", "rollend", "doorrol"):
-        c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None, reeks)
+        c = bouw(bron, v, a.heftig, volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None, reeks, tl)
         if reeks is not None: c["name"] = c["name"].replace("(dynamisch:", "(opname, dynamisch:")
         pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")
         nid = json.load(open(pad, encoding="utf-8"))[0] if os.path.exists(pad) else rid()
