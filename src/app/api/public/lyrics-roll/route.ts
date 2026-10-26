@@ -31,7 +31,6 @@ const state = { key: "", text: "", v: 0, at: 0, error: "" };
 const showCache = new Map<string, { at: number; show: ShowData }>();
 let lastDemand = 0;
 let looping: Promise<void> | null = null;
-const sizes: { t: string; w: string }[] = [];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -104,14 +103,6 @@ function ensureLoop() {
 }
 
 export async function GET(req: NextRequest) {
-  const log = req.nextUrl.searchParams.get("log");
-  if (log === "read") return NextResponse.json({ sizes }, { headers: NO_STORE });
-  if (log) {
-    sizes.push({ t: new Date().toISOString(), w: log.slice(0, 80) });
-    if (sizes.length > 40) sizes.shift();
-    return new NextResponse(null, { status: 204 });
-  }
-
   if (!baseUrl()) return NextResponse.json({ text: "", error: "FreeShow IP is niet ingesteld (Instellingen, Verbindingen)" }, { status: 503, headers: NO_STORE });
 
   const wasIdle = !looping;

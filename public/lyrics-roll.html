@@ -47,7 +47,6 @@ function indeling() {   // huidig blok gecentreerd en helder; eerdere blokken er
 }
 // modus=stream: voor de livestream-uitvoer, gewone liedtekst onderin (geen doorrol), zodat de zaaluitvoer en de stream beide uit dezelfde pagina komen
 const STREAM = P.get("modus") === "stream";
-try { fetch(`/api/public/lyrics-roll?log=${innerWidth}x${innerHeight},${P.get("modus") || "zaal"}`); } catch (e) {}   // tijdelijk: welke afmetingen hebben de webvakken in uitvoeren en miniaturen
 let streamEl = null;
 function toonStream(tekst) {
   maten(); const t = (tekst || "").split("\n").map(x => x.trim()).filter(Boolean);
