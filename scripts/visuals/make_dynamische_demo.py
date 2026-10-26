@@ -65,7 +65,7 @@ def rollend(huidig, vorige, volgende, palet):
     items = []; n = len(huidig); hoogte = 200; top0 = 540 - n * hoogte // 2
     dim = "opacity:0.35;"
     for i, t in enumerate(huidig): items.append(tekstvak(top0 + i * hoogte, 60, 1800, hoogte, runs(t, palet), 0.15 + 0.5 * i, fly(0, 160, 800, "cubic")))
-    if vorige: items.append(tekstvak(top0 - 175, 60, 1800, 160, [{"value": vorige, "style": f"{FONT}font-size:64px;color:#ffffff;text-shadow:0px 4px 20px rgb(0 0 0 / 0.5);"}], 0, fly(0, 250, 900, "cubic"), dim))
+    if vorige: items.append(tekstvak(top0 - 175, 60, 1800, 160, [{"value": vorige, "style": f"{FONT}font-size:64px;color:#ffffff;text-shadow:0px 4px 20px rgb(0 0 0 / 0.5);"}], 0, fly(0, 160, 800, "cubic"), dim))
     if volgende: items.append(tekstvak(top0 + n * hoogte + 15, 60, 1800, 160, [{"value": volgende, "style": f"{FONT}font-size:64px;color:#ffffff;text-shadow:0px 4px 20px rgb(0 0 0 / 0.5);"}], 0.15 + 0.5 * n, fly(0, 160, 800, "cubic"), dim))
     return items
 
