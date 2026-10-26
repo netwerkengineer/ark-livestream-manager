@@ -14,6 +14,8 @@ from make_dynamische_lyrics import PALETTEN, FONT, KERN, runs, lijnen_van, rid
 
 OV_GLOED, OV_GLANS = "ark_ov_gloed", "ark_ov_glans"
 CMG = os.environ.get("CMGSANS_MAP", "/private/tmp/claude-501/-Users-jeffreygo/e8c0863d-4b8f-4c9a-8c80-e3a86023c301/scratchpad/fsapp2/public/fonts")  # FreeShow-lettertype CMGSans (uit de app-bundel)
+# FreeShow toont de woorden ~10% breder dan de CMGSans-meting (gemeten aan de echte uitvoer)
+BREEDTE_FACTOR = 1.10
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
@@ -46,6 +48,7 @@ def woorden(lijnen, palet, stap=0.16):
     alle = [(w, False) for t in lijnen for w in t.split()]
     # kernwoorden zijn cursief (per letter gekleurd); meet beide mogelijkheden
     metingen = meet([(w, False) for t in lijnen for w in t.split()] + [(w, True) for t in lijnen for w in t.split()] + [("a a", False), ("aa", False)])
+    metingen = {k: v * BREEDTE_FACTOR for k, v in metingen.items()}
     ruimte = metingen["a a|false"] - metingen["aa|false"]
     for i, t in enumerate(lijnen):
         delen = t.split(); stukken = []
