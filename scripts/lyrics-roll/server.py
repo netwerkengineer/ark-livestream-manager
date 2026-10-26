@@ -15,6 +15,11 @@ class H(http.server.SimpleHTTPRequestHandler):
             r = urllib.request.urlopen(urllib.request.Request(FS, data, {"content-type": "application/json"}), timeout=3); body = r.read()
         except Exception as e: body = json.dumps({"error": str(e)}).encode()
         self.send_response(200); self.send_header("content-type", "application/json"); self.end_headers(); self.wfile.write(body)
+    def do_GET(self):
+        if self.path.startswith('/log'): open('/tmp/roll-log.txt','a').write(self.path+'\n'); self.send_response(204); self.end_headers(); return
+        super().do_GET()
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store'); super().end_headers()
     def log_message(self, *a): pass
 
 http.server.ThreadingHTTPServer(("127.0.0.1", POORT), H).serve_forever()

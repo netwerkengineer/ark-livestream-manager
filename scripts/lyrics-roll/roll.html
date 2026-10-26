@@ -15,7 +15,7 @@
 const P = new URLSearchParams(location.search);
 let HOOGTE, MIDDEN, STAP, GROOT, KLEIN;
 function maten() { HOOGTE = innerHeight; MIDDEN = HOOGTE * .5; STAP = HOOGTE * .17; GROOT = HOOGTE * .095; KLEIN = HOOGTE * .058; }   // de webview in FreeShow wordt eerst klein aangemaakt en groeit daarna
-maten(); addEventListener("resize", () => { maten(); indeling(); });
+maten(); fetch(`/log?w=${innerWidth}&h=${innerHeight}&dpr=${devicePixelRatio}`); addEventListener("resize", () => { maten(); indeling(); });
 const KERN = /^(god|heer|jezus|halleluja|liefde|koning|geest|u)$/i;
 const stage = document.getElementById("stage");
 let blokken = [];  // per dia een blok regels; [-1] is de huidige. Elke regel is één blijvend element dat omhoog schuift
