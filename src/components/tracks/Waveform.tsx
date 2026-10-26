@@ -9,7 +9,7 @@ import { sectionColor } from "./songName";
 // Waveform of the whole song with the sections on it, the playhead, and a click to jump to a section (with the jump mode that is set).
 // The peaks come from the app's own player (/peaks): with REAPER as the player there is no waveform and nothing is shown here.
 
-interface Peaks { rate: number; total: number; path: string; peaks: number[]; rms: number[] }
+interface Peaks { rate: number; total: number; path: string; peaks: number[]; rms: number[]; bars?: number[]; beats?: number[] }
 
 interface WaveformProps {
   state: ReaperState | null;
@@ -140,6 +140,29 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
       ctx.fillRect(x, mid - hr, 1, Math.max(1, hr * 2));
     }
 
+    // bar grid: ticks for the beats and bars, the bar number every so many bars (as many as fit)
+    const bars = show.bars || [], beats = show.beats || [];
+    if (bars.length > 1) {
+      const barPx = (xOf(bars[bars.length - 1]) - xOf(bars[0])) / (bars.length - 1);
+      if (beats.length && barPx / 4 >= 5) {
+        ctx.fillStyle = "rgba(226,232,240,0.18)";
+        for (const t of beats) ctx.fillRect(Math.round(xOf(t)), HEIGHT - 5, 1, 5);
+      }
+      if (barPx >= 3) {
+        const every = [1, 2, 4, 8, 16, 32].find(n => barPx * n >= 34) || 32;
+        ctx.font = "500 9px system-ui, sans-serif";
+        ctx.textBaseline = "alphabetic";
+        bars.forEach((t, i) => {
+          const x = Math.round(xOf(t));
+          const numbered = i % every === 0;
+          ctx.fillStyle = numbered ? "rgba(226,232,240,0.45)" : "rgba(226,232,240,0.28)";
+          ctx.fillRect(x, HEIGHT - (numbered ? 12 : 8), 1, numbered ? 12 : 8);
+          if (numbered && x + 3 < width - 24) { ctx.fillStyle = "rgba(226,232,240,0.7)"; ctx.fillText(String(i + 1), x + 3, HEIGHT - 3); }
+        });
+        ctx.textBaseline = "middle";
+      }
+    }
+
     // playhead
     ctx.fillStyle = "#fff";
     ctx.fillRect(Math.round(px) - 1, 0, 2, HEIGHT);
@@ -168,7 +191,10 @@ export default function Waveform({ state, onError, stage }: WaveformProps) {
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const { x, t, region } = at(e);
-    setTip({ x, text: `${region ? region.name + " · " : ""}${formatTime(t)}` });
+    const bars = show?.bars || [];
+    let bar = 0;
+    while (bar + 1 < bars.length && bars[bar + 1] <= t) bar++;
+    setTip({ x, text: `${region ? region.name + " · " : ""}${formatTime(t)}${bars.length ? " · maat " + (bar + 1) : ""}` });
   };
 
   const onClick = async (e: React.PointerEvent<HTMLCanvasElement>) => {

@@ -56,7 +56,9 @@ final class Server {
         case "/state": return (200, jsonString(state()))
         case "/peaks":   // golfvorm van het geladen nummer voor het podium (blokjes van 1/rate seconde, 0-255)
             p.lock.lock(); let sg = mixer.song; let path = p.activePath; p.lock.unlock()
-            return (200, jsonString(["rate": peakRate, "total": Double(sg.total) / sg.sampleRate, "path": path, "peaks": sg.peaks.map { Int($0) }, "rms": sg.rms.map { Int($0) }]))
+            let total = Double(sg.total) / sg.sampleRate
+            let grid = sg.tempo.grid(until: total)
+            return (200, jsonString(["rate": peakRate, "total": total, "path": path, "peaks": sg.peaks.map { Int($0) }, "rms": sg.rms.map { Int($0) }, "bars": grid.bars, "beats": grid.beats]))
         case "/play":
             p.lock.lock(); if !mixer.song.stems.isEmpty { if mixer.pos >= mixer.song.total { mixer.pos = 0 }; mixer.playing = true }; p.lock.unlock(); return ok()
         case "/pause": mixer.playing = false; return ok()

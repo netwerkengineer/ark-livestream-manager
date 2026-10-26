@@ -127,6 +127,22 @@ struct TempoMap {
         if i + 1 < sigs.count && sigs[i + 1].qn < cand - 1e-9 { cand = sigs[i + 1].qn }   // een maatwissel begint op een maatgrens
         return sec(qn: cand)
     }
+    /// Begin van elke maat en van elke tel (kwartnoot) tot en met tijdstip `total`, voor het raster op de golfvorm
+    func grid(until total: Double) -> (bars: [Double], beats: [Double]) {
+        var bars: [Double] = [], beats: [Double] = []
+        var q = 0.0
+        while sec(qn: q) <= total && beats.count < 20000 {
+            let i = sigs.lastIndex(where: { $0.qn <= q + 1e-9 }) ?? 0
+            let qpb = max(0.25, sigs[i].qpb)
+            var end = q + qpb
+            if i + 1 < sigs.count && sigs[i + 1].qn < end - 1e-9 { end = sigs[i + 1].qn }
+            bars.append(sec(qn: q))
+            var b = q
+            while b < end - 1e-9 { let t = sec(qn: b); if t <= total { beats.append(t) }; b += 1 }
+            q = end
+        }
+        return (bars, beats)
+    }
     /// "maat.tel.honderdsten" zoals REAPER het toont, bijvoorbeeld 12.3.50
     func barBeat(qn q: Double) -> String {
         let q = max(0, q)

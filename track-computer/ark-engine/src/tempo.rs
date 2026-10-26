@@ -94,6 +94,30 @@ impl TempoMap {
         }
         self.sec_qn(cand)
     }
+    /// Begin van elke maat en van elke tel (kwartnoot) tot en met `total` seconden, voor het raster op de golfvorm
+    pub fn grid(&self, total: f64) -> (Vec<f64>, Vec<f64>) {
+        let (mut bars, mut beats) = (Vec::new(), Vec::new());
+        let mut q = 0.0;
+        while self.sec_qn(q) <= total && beats.len() < 20000 {
+            let i = self.sigs.iter().rposition(|s| s.0 <= q + 1e-9).unwrap_or(0);
+            let qpb = self.sigs[i].1.max(0.25);
+            let mut end = q + qpb;
+            if i + 1 < self.sigs.len() && self.sigs[i + 1].0 < end - 1e-9 {
+                end = self.sigs[i + 1].0;
+            }
+            bars.push(self.sec_qn(q));
+            let mut b = q;
+            while b < end - 1e-9 {
+                let t = self.sec_qn(b);
+                if t <= total {
+                    beats.push(t);
+                }
+                b += 1.0;
+            }
+            q = end;
+        }
+        (bars, beats)
+    }
     pub fn next_beat(&self, t: f64) -> f64 {
         self.sec_qn(self.qn_sec(t).ceil())
     }
@@ -130,5 +154,18 @@ mod tests {
         let m = TempoMap::from_qn(vec![(0.0, 120.0), (4.0, 60.0)], vec![(0.0, 4.0, 4.0)]);
         assert!((m.sec_qn(6.0) - 4.0).abs() < 1e-12);
         assert!((m.qn_sec(4.0) - 6.0).abs() < 1e-12);
+    }
+}
+
+#[cfg(test)]
+mod grid_tests {
+    use super::*;
+    #[test]
+    fn grid_of_four_four_at_120() {
+        let m = TempoMap::default();
+        let (bars, beats) = m.grid(4.0);
+        assert_eq!(bars.len(), 3); // 0, 2, 4 s
+        assert!((bars[1] - 2.0).abs() < 1e-9);
+        assert_eq!(beats.len(), 9); // elke halve seconde, 0 t/m 4
     }
 }
