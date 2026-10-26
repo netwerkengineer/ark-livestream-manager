@@ -30,6 +30,17 @@ pub struct Mixer {
     pub fading: bool,
     pub fade_left: i64,
     pub fade_total: i64,
+    /// Voorteller: een paar maten click voordat het nummer begint (alleen vanaf stilstand); de klikken worden hier gemaakt, op de uitgang van de click-stem
+    pub counting: bool,
+    pub count_left: i64,
+    pub count_total: i64,
+    pub count_beat_frames: i64,
+    pub count_beats: i64,
+    pub count_per_bar: i64,
+    pub count_out_a: usize,
+    pub count_out_b: Option<usize>,
+    pub count_mono: bool,
+    pub count_bus: usize,
     pub group_mute: [bool; 10],
     pub group_solo: [bool; 10],
     pub group_gain: [f32; 10],
@@ -77,6 +88,16 @@ impl Default for Mixer {
             fading: false,
             fade_left: 0,
             fade_total: 1,
+            counting: false,
+            count_left: 0,
+            count_total: 0,
+            count_beat_frames: 1,
+            count_beats: 0,
+            count_per_bar: 4,
+            count_out_a: 0,
+            count_out_b: None,
+            count_mono: false,
+            count_bus: 0,
             group_mute: [false; 10],
             group_solo: [false; 10],
             group_gain: [1.0; 10],
@@ -210,6 +231,74 @@ impl Mixer {
         Ok(())
     }
 
+    pub fn count_beat(&self) -> i64 {
+        if self.counting {
+            (self.count_total - self.count_left) / self.count_beat_frames.max(1) + 1
+        } else {
+            0
+        }
+        .min(self.count_beats)
+    }
+    pub fn start_count_in(&mut self, bars: i64) {
+        let q = self.song.tempo.qn_sec(self.pos as f64 / self.sr);
+        let seg = self.song.tempo.seg.iter().rev().find(|s| s.qn <= q).unwrap_or(&self.song.tempo.seg[0]);
+        let bpm = seg.bpm.max(30.0);
+        let qpb = self.song.tempo.sigs.iter().rev().find(|s| s.0 <= q + 1e-9).unwrap_or(&self.song.tempo.sigs[0]).1;
+        self.count_per_bar = (qpb.round() as i64).max(1);
+        self.count_beats = bars.max(1) * self.count_per_bar;
+        self.count_beat_frames = ((60.0 / bpm * self.sr) as i64).max(1);
+        self.count_total = self.count_beats * self.count_beat_frames;
+        self.count_left = self.count_total;
+        let st = self
+            .song
+            .stems
+            .iter()
+            .find(|s| s.name.to_lowercase().starts_with("click") && !s.name.starts_with("Click 1/"))
+            .or_else(|| self.song.stems.iter().find(|s| s.monitor && !s.is_guide));
+        self.count_out_a = st.map(|s| s.out_a).unwrap_or(0);
+        self.count_out_b = st.and_then(|s| s.out_b);
+        self.count_mono = st.map(|s| s.mono).unwrap_or(false);
+        self.count_bus = st.map(|s| s.bus).unwrap_or(0).min(9);
+        self.counting = true;
+        self.playing = false;
+    }
+    /// Maakt de klikken van de voorteller voor dit blok; geeft het aantal frames terug dat daarmee gevuld is (de rest is voor het nummer zelf)
+    fn count_render(&mut self, frames: usize, out: &mut [Vec<f32>]) -> usize {
+        let n_out = out.len();
+        let n = (frames as i64).min(self.count_left).max(0) as usize;
+        let a = self.count_out_a.min(n_out - 1);
+        let b = match self.count_out_b {
+            Some(b) if b < n_out && b != a => Some(b),
+            _ => None,
+        };
+        if !self.group_mute[self.count_bus] {
+            let sr = self.sr;
+            for j in 0..n {
+                let k = self.count_total - self.count_left + j as i64;
+                let beat = k / self.count_beat_frames;
+                let within = k % self.count_beat_frames;
+                if within as f64 > 0.08 * sr {
+                    continue;
+                }
+                let t = within as f64 / sr;
+                let f = if beat % self.count_per_bar == 0 { 1600.0 } else { 1000.0 };
+                let v = ((2.0 * std::f64::consts::PI * f * t).sin() * (-t / 0.014).exp() * 0.5) as f32 * self.master_now * (within as f32 / 24.0).min(1.0);
+                out[a][j] += v;
+                if !self.count_mono {
+                    if let Some(b) = b {
+                        out[b][j] += v;
+                    }
+                }
+            }
+        }
+        self.count_left -= n as i64;
+        if self.count_left <= 0 {
+            self.counting = false;
+            self.playing = true;
+            self.env = 1.0;
+        }
+        n
+    }
     pub fn start_fade_out(&mut self, secs: f64) {
         if !self.playing || self.fading {
             return;
@@ -271,6 +360,9 @@ impl Mixer {
         }
         let mut total = self.song.total() as i64;
         let mut off = 0usize;
+        if self.counting {
+            off = self.count_render(frames, out);
+        }
         while off < frames {
             if !(self.playing || self.env > 0.0001) || total == 0 {
                 for st in &mut self.song.stems {
@@ -539,5 +631,45 @@ pub fn out_count(mode: &str) -> usize {
         "multi" | "auto" => 8,
         "3ch" => 3,
         _ => 2,
+    }
+}
+
+#[cfg(test)]
+mod count_tests {
+    use super::*;
+    use crate::song::Stem;
+
+    #[test]
+    fn count_in_then_song() {
+        let n = 10 * 48000;
+        let mut song = Song::default();
+        song.stems.push(Stem::new("Keys", vec![vec![0.0; n], vec![0.0; n]]));
+        song.stems.push(Stem::new("Click", vec![vec![0.0; n]]));
+        let mut m = Mixer::default();
+        m.sr = 48000.0;
+        m.song = song;
+        m.out_ch = 2;
+        m.apply_routing();
+        m.start_count_in(1); // 120 bpm, 4/4: 4 tellen van 0,5 s
+        assert_eq!(m.count_beats, 4);
+        let mut out = vec![vec![0.0f32; 480]; 2];
+        let mut peak = 0.0f32;
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..100 {
+            m.render(480, &mut out);
+            if m.counting {
+                seen.insert(m.count_beat());
+            }
+            peak = peak.max(out[0].iter().fold(0.0, |a, v| a.max(v.abs())));
+        }
+        // 100 x 10 ms = 1 s: nog in de voorteller (2 s), er is geklikt, het nummer is niet begonnen
+        assert!(m.counting && !m.playing && m.pos == 0);
+        assert!(peak > 0.3);
+        assert!(seen.contains(&1) && seen.contains(&2));
+        for _ in 0..120 {
+            m.render(480, &mut out);
+        }
+        assert!(!m.counting && m.playing);
+        assert!(m.pos > 0);
     }
 }

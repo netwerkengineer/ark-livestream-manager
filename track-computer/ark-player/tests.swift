@@ -249,6 +249,27 @@ func fadetest(folder: String) throws {
     print("Na afloop: speelt \(m.playing) | positie \(m.pos) | fading \(m.fading)")
 }
 
+// ------------------------------------------------------------- counttest (offline): voorteller van 1 maat, daarna begint het nummer
+func counttest(folder: String) throws {
+    let sim = Sim(); let p = sim.player
+    setenv("ARK_PLAYER_CONFIG", NSTemporaryDirectory() + "ark-player-test-config.json", 1)
+    let rpp = folder + "/" + ((try? FileManager.default.contentsOfDirectory(atPath: folder))?.first { $0.hasSuffix(".RPP") } ?? "")
+    try sim.activate(rpp)
+    let m = p.mixer
+    m.pos = Int(60 * m.sr)       // midden in het nummer; alleen de voorteller moet klinken
+    m.playing = false
+    m.startCountIn(bars: 1)
+    print("Voorteller: \(m.countBeats) tellen van \(String(format: "%.3f", Double(m.countBeatFrames) / m.sr)) s, kanaal \(m.countOutA)")
+    var beatsSeen = Set<Int>()
+    var secsPeak: [String] = []
+    print("Maatsoorten: \(m.song.tempo.sigs) | tempo: \(m.song.tempo.seg.prefix(2))")
+    for _ in 0..<6 {
+        let o = render(m, secs: 0.5, onBlock: { _, mm in if mm.counting { beatsSeen.insert(mm.countBeat) } })
+        secsPeak.append(peakDb(o.flatMap { $0 }))
+    }
+    print("Per halve seconde (piek): \(secsPeak.joined(separator: ", ")) dB | tellen gezien: \(beatsSeen.sorted()) | daarna: counting \(m.counting), speelt \(m.playing), positie \(String(format: "%.2f", m.posSec)) s")
+}
+
 // ------------------------------------------------------------- padtest (offline): pad laden, afspelen per uitgangsmodus, crossfade en stop
 func padtest(wav: String) throws {
     let dir = NSTemporaryDirectory() + "ark-padtest"

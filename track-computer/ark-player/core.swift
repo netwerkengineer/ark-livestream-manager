@@ -409,6 +409,43 @@ final class Mixer {
     var pendAt = -1, pendTo = 0, pendSection = -1
     var loopSec = -1, loopStart = 0, loopEnd = 0
     var fadeIn = 0
+    // Voorteller: een paar maten click voordat het nummer begint (alleen vanaf stilstand). De klikken worden hier gemaakt, op de uitgang van de click-stem.
+    var counting = false, countLeft = 0, countTotal = 0, countBeatFrames = 1, countBeats = 0, countPerBar = 4
+    var countOutA = 0, countOutB = -1, countMono = false, countBus = 0
+    var countBeat: Int { counting ? min(countBeats, (countTotal - countLeft) / max(1, countBeatFrames) + 1) : 0 }
+    func startCountIn(bars: Int) {
+        let q = song.tempo.qn(sec: Double(pos) / sr)
+        let bpm = max(30, (song.tempo.seg.last(where: { $0.qn <= q }) ?? song.tempo.seg[0]).bpm)
+        let qpb = (song.tempo.sigs.last(where: { $0.qn <= q + 1e-9 }) ?? song.tempo.sigs[0]).qpb
+        countPerBar = max(1, Int(qpb.rounded()))
+        countBeats = max(1, bars) * countPerBar
+        countBeatFrames = max(1, Int(60 / bpm * sr))
+        countTotal = countBeats * countBeatFrames; countLeft = countTotal
+        let st = song.stems.first(where: { $0.name.lowercased().hasPrefix("click") && !$0.name.hasPrefix("Click 1/") }) ?? song.stems.first(where: { $0.monitor && !$0.isGuide })
+        countOutA = st?.outA ?? 0; countOutB = st?.outB ?? -1; countMono = st?.mono ?? false; countBus = min(max(st?.bus ?? 0, 0), 9)
+        counting = true; playing = false
+    }
+    /// Maakt de klikken van de voorteller voor dit blok; geeft het aantal frames terug dat daarmee gevuld is (de rest is voor het nummer zelf)
+    func countRender(frames: Int, out: [UnsafeMutablePointer<Float>]) -> Int {
+        let nOut = out.count
+        let n = min(frames, countLeft)
+        let o0 = out[min(max(0, countOutA), nOut - 1)]
+        let o1: UnsafeMutablePointer<Float> = countOutB >= 0 && countOutB < nOut ? out[countOutB] : o0
+        let audible = !groupMute[countBus]
+        for j in 0..<n where audible {
+            let k = countTotal - countLeft + j
+            let beat = k / countBeatFrames, within = k % countBeatFrames
+            if Double(within) > 0.08 * sr { continue }
+            let t = Double(within) / sr
+            let f = beat % countPerBar == 0 ? 1600.0 : 1000.0
+            let v = Float(sin(2 * Double.pi * f * t) * exp(-t / 0.014) * 0.5) * masterNow * min(1, Float(within) / 24)
+            o0[j] += v
+            if !countMono && o1 != o0 { o1[j] += v }
+        }
+        countLeft -= n
+        if countLeft <= 0 { counting = false; playing = true; env = 1 }
+        return n
+    }
     var fading = false, fadeLeft = 0, fadeTotal = 1     // uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
     func startFadeOut(sec: Double) { guard playing, !fading else { return }; fadeTotal = max(1, Int(max(0.2, sec) * sr)); fadeLeft = fadeTotal; fading = true }
     var groupMute = [Bool](repeating: false, count: 10), groupSolo = [Bool](repeating: false, count: 10), groupGain = [Float](repeating: 1, count: 10)   // per bus (uitgangsnummer 1-8)
@@ -520,6 +557,7 @@ final class Mixer {
         for c in 0..<nOut { out[c].update(repeating: 0, count: frames) }
         var total = song.total
         var off = 0
+        if counting { off = countRender(frames: frames, out: out) }
         while off < frames {
             if !(playing || env > 0.0001) || total == 0 { for st in song.stems { st.peak *= 0.9 }; break }
             var seg = frames - off

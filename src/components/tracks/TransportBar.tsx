@@ -5,7 +5,7 @@ import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown } f
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction, formatTime } from "./useReaper";
 import { parseSongName } from "./songName";
-import { hasDesktopEngine } from "@/lib/desktopEngine";
+import { hasDesktopEngine, COUNT_IN_KEY } from "@/lib/desktopEngine";
 import { dbToFader, UNITY, volumeToFader, faderToVolume, formatDb } from "./faderLaw";
 
 // Master volume: up to +6 dB (the X32 fader law, so the position means the same as on the desk)
@@ -57,6 +57,11 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
   const [fadeSecs, setFadeSecs] = useState(() => {
     try { const v = Number(localStorage.getItem("ark.fadeSecs")); return [4, 8, 12, 16].includes(v) ? v : 8; } catch { return 8; }
   });
+  const [countBars, setCountBars] = useState(() => {
+    try { const v = Number(localStorage.getItem(COUNT_IN_KEY)); return [1, 2].includes(v) ? v : 0; } catch { return 0; }
+  });
+  const countBeat = state?.bridge?.countBeat || 0;
+  const countBeats = state?.bridge?.countBeats || 0;
   const fading = !!state?.bridge?.fading;
   const canFade = hasDesktopEngine();
   const fadeOut = async () => {
@@ -93,6 +98,12 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         <button className="trk-t-btn stop" onClick={() => run("stop")} title="Stop"><Square size={stage ? 24 : 18} /></button>
         {canFade && (
           <span className="trk-fade">
+            <select className="trk-fade-secs" value={countBars} aria-label="Voorteller" title="Voorteller: click vooraf, alleen als het nummer vanaf het begin start"
+              onChange={e => { const v = Number(e.target.value); setCountBars(v); try { localStorage.setItem(COUNT_IN_KEY, String(v)); } catch { /* optional */ } }}>
+              <option value={0}>Voorteller uit</option>
+              <option value={1}>1 maat voor</option>
+              <option value={2}>2 maten voor</option>
+            </select>
             <button className={`trk-t-btn${fading ? " active" : ""}`} onClick={fadeOut} disabled={playState !== 1 || fading} title={`Uitfaden in ${fadeSecs} seconden en dan stoppen`}><TrendingDown size={stage ? 26 : 20} /></button>
             <select className="trk-fade-secs" value={fadeSecs} aria-label="Duur van het uitfaden"
               onChange={e => { const v = Number(e.target.value); setFadeSecs(v); try { localStorage.setItem("ark.fadeSecs", String(v)); } catch { /* optional */ } }}>
@@ -102,8 +113,8 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         )}
       </div>
       <div className="trk-clock">
-        <span className="trk-time">{formatTime(position)}</span>
-        <span className="trk-meta">Maat {state?.positionBeats || "-"}</span>
+        <span className="trk-time">{countBeat > 0 ? `${countBeat}/${countBeats}` : formatTime(position)}</span>
+        <span className="trk-meta">{countBeat > 0 ? "Voorteller" : `Maat ${state?.positionBeats || "-"}`}</span>
       </div>
       <div className="trk-current">
         <span className="trk-label">Sectie</span>

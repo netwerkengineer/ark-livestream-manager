@@ -49,7 +49,7 @@ pub fn state(p: &Arc<Player>) -> Value {
     let m = p.mx();
     let s = &m.song;
     let dur = s.total() as f64 / m.sr;
-    let state = if m.playing { "playing" } else if m.pos > 0 && m.pos < s.total() { "paused" } else { "stopped" };
+    let state = if m.playing || m.counting { "playing" } else if m.pos > 0 && m.pos < s.total() { "paused" } else { "stopped" };
     let cur = m.section_index(m.pos);
     let tm = &s.tempo;
     let pad = m.pads.meta();
@@ -77,6 +77,9 @@ pub fn state(p: &Arc<Player>) -> Value {
             "output": m.applied, "device": st.device_name, "sets": pad.library, "lastCmd": pad.last_cmd},
     });
     let o = d.as_object_mut().unwrap();
+    o.insert("counting".into(), json!(m.counting));
+    o.insert("count_beat".into(), json!(m.count_beat()));
+    o.insert("count_beats".into(), json!(m.count_beats));
     if !pad.error.is_empty() {
         o.insert("pads_error".into(), json!(pad.error));
     }
@@ -148,7 +151,14 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
                 m.pos = 0;
             }
             m.fading = false;
-            m.playing = true;
+            // voorteller: alleen vanaf het begin van het nummer, en niet als het nummer zelf met een Count Off begint
+            let bars = q.f("count").unwrap_or(0.0) as i64;
+            let own = m.song.sections.first().map(|s| s.name.to_lowercase().starts_with("count") && (m.pos as f64 / m.sr) < s.end).unwrap_or(false);
+            if bars > 0 && !m.playing && !m.counting && m.pos == 0 && !own {
+                m.start_count_in(bars.min(4));
+            } else if !m.counting {
+                m.playing = true;
+            }
             ok()
         }
         "/fadeout" => {
@@ -159,6 +169,7 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
             {
                 let mut m = mx();
                 m.playing = false;
+                m.counting = false;
                 m.fading = false;
             }
             ok()
@@ -166,6 +177,7 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
         "/stop" => {
             {
                 let mut m = mx();
+                m.counting = false;
                 m.fading = false;
                 m.playing = false;
                 m.pos = 0;

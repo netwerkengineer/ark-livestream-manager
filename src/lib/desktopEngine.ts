@@ -31,7 +31,7 @@ export const engineCall = (path: string, params?: Record<string, unknown>) => wi
 interface EngineState {
   title: string; path: string; state: "playing" | "paused" | "stopped"; position: number; position_beats: string; duration: number;
   loading: boolean; error: string; output_mode: string; output_applied: string; jump_mode: string; lead_beats: number; freeshow: string;
-  fading?: boolean; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
+  fading?: boolean; counting?: boolean; count_beat?: number; count_beats?: number; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
   sections: { id: number; region: number; name: string; start: number; end: number; start_qn: number; end_qn: number }[];
   stems: { name: string; bus: number; bus_name: string; mute: boolean; solo: boolean; live: boolean; gain: number; meter_db: number }[];
   busses: { bus: number; name: string; mute: boolean; solo: boolean; gain: number }[];
@@ -81,6 +81,8 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     error: es.error || undefined,
     outputMode: es.output_mode,
     fading: es.fading,
+    countBeat: es.counting ? es.count_beat || 1 : 0,
+    countBeats: es.count_beats || 0,
     leadBeats: es.lead_beats,
     freeshow: es.freeshow || undefined,
     nextSong: es.next_song,
@@ -164,11 +166,17 @@ class LocalEventSource {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+// Count-in before the song starts (bars of click, 0 = off); chosen on the transport bar, kept per computer
+export const COUNT_IN_KEY = "ark.countBars";
+function countInBars(): number {
+  try { const v = Number(localStorage.getItem(COUNT_IN_KEY)); return [1, 2].includes(v) ? v : 0; } catch { return 0; }
+}
+
 async function reaperAction(body: Record<string, any>): Promise<Response> {
   const { action, track, value, final, region, mode, path, pos } = body;
   try {
     switch (action) {
-      case "play": await engineCall("/play"); break;
+      case "play": await engineCall("/play", { count: countInBars() }); break;
       case "pause": await engineCall("/pause"); break;
       case "stop": await engineCall("/stop"); break;
       case "fadeout": await engineCall("/fadeout", { secs: Number(value) || 8 }); break;

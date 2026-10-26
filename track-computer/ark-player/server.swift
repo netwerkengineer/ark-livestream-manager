@@ -20,11 +20,11 @@ final class Server {
         p.lock.lock(); defer { p.lock.unlock() }
         let m = p.mixer, s = m.song
         let dur = Double(s.total) / m.sr
-        let st: String = m.playing ? "playing" : (m.pos > 0 && m.pos < s.total ? "paused" : "stopped")
+        let st: String = m.playing || m.counting ? "playing" : (m.pos > 0 && m.pos < s.total ? "paused" : "stopped")
         let cur = m.sectionIndex(at: m.pos)
         var d: [String: Any] = ["title": s.title, "path": p.activePath, "state": st, "position": m.posSec, "position_beats": s.tempo.barBeat(qn: s.tempo.qn(sec: m.posSec)), "duration": dur, "loading": !p.loading.isEmpty, "error": p.error ?? "",
                 "device": p.output?.deviceName ?? "", "outputs": p.output?.hwChannels ?? m.outCh, "output_mode": m.requested, "output_applied": m.applied,
-                "fading": m.fading, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
+                "fading": m.fading, "counting": m.counting, "count_beat": m.countBeat, "count_beats": m.countBeats, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
                 "freeshow": p.fsHost.isEmpty ? "" : "\(p.fsHost):\(p.fsPort)", "freeshow_override": !p.cfg.fsHost.isEmpty,
                 "has_cues": p.table != nil, "slide": p.sent ?? 0, "last_cmd": p.lastCmd,
                 "setlist": p.setlist, "loaded": p.cache.keys.sorted(),
@@ -60,10 +60,14 @@ final class Server {
             let grid = sg.tempo.grid(until: total)
             return (200, jsonString(["rate": peakRate, "total": total, "path": path, "peaks": sg.peaks.map { Int($0) }, "rms": sg.rms.map { Int($0) }, "bars": grid.bars, "beats": grid.beats]))
         case "/play":
-            p.lock.lock(); if !mixer.song.stems.isEmpty { if mixer.pos >= mixer.song.total { mixer.pos = 0 }; mixer.fading = false; mixer.playing = true }; p.lock.unlock(); return ok()
+            p.lock.lock(); if !mixer.song.stems.isEmpty { if mixer.pos >= mixer.song.total { mixer.pos = 0 }; mixer.fading = false
+                // voorteller: alleen vanaf het begin van het nummer, en niet als het nummer zelf met een Count Off begint
+                let bars = Int(qs["count"] ?? "") ?? 0
+                let own = mixer.song.sections.first.map { $0.name.lowercased().hasPrefix("count") && Double(mixer.pos) / mixer.sr < $0.end } ?? false
+                if bars > 0 && !mixer.playing && !mixer.counting && mixer.pos == 0 && !own { mixer.startCountIn(bars: min(4, bars)) } else if !mixer.counting { mixer.playing = true } }; p.lock.unlock(); return ok()
         case "/fadeout": p.lock.lock(); mixer.startFadeOut(sec: Double(qs["secs"] ?? "") ?? 8); p.lock.unlock(); return ok()
-        case "/pause": mixer.playing = false; mixer.fading = false; return ok()
-        case "/stop": mixer.fading = false; mixer.playing = false; mixer.pos = 0; mixer.stopLoop(); mixer.cancelPending(); p.cancelSong(); return ok()
+        case "/pause": mixer.playing = false; mixer.counting = false; mixer.fading = false; return ok()
+        case "/stop": mixer.counting = false; mixer.fading = false; mixer.playing = false; mixer.pos = 0; mixer.stopLoop(); mixer.cancelPending(); p.cancelSong(); return ok()
         case "/seek":
             guard let t = Double(qs["t"] ?? "") else { return bad("t ontbreekt") }
             mixer.pos = max(0, min(mixer.song.total, Int(t * mixer.sr))); return ok()
