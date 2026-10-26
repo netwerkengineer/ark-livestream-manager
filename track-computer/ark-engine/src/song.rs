@@ -120,11 +120,79 @@ pub struct Song {
     pub tempo: TempoMap,
     pub has_original_click: bool,
     pub rpp: Option<String>,
+    /// Golfvorm van het hele nummer: piek per 1/PEAK_RATE seconde (0-255, na compressie), zonder click en guide
+    pub peaks: Vec<u8>,
+    /// Idem, effectieve waarde (het "volume" van de mix)
+    pub rms: Vec<u8>,
 }
+
+/// Aantal golfvormblokjes per seconde (10 = elk blokje 100 ms)
+pub const PEAK_RATE: f64 = 10.0;
 
 impl Song {
     pub fn total(&self) -> usize {
         self.stems.iter().map(|s| s.frames).max().unwrap_or(0)
+    }
+
+    /// Golfvorm voor de weergave op het podium: alle stems behalve click en guide, in stappen van 1 s opgeteld (geen kopie van het hele
+    /// nummer in het geheugen), genormaliseerd op de hoogste piek en met x^0,6 samengedrukt zodat een rustig begin zichtbaar blijft naast een hard refrein.
+    pub fn compute_peaks(&mut self) {
+        let bucket = ((SR / PEAK_RATE) as usize).max(1);
+        let total = self.total();
+        if total == 0 {
+            return;
+        }
+        let n = (total + bucket - 1) / bucket;
+        let (mut pk, mut sq) = (vec![0.0f32; n], vec![0.0f32; n]);
+        let stems: Vec<&Stem> = self.stems.iter().filter(|s| !s.monitor).collect();
+        let chunk = bucket * 10; // een veelvoud van het blokje: elk stuk begint op een blokgrens
+        let mut mix = vec![0.0f32; chunk];
+        let mut start = 0usize;
+        while start < total {
+            let len = chunk.min(total - start);
+            for v in mix[..len].iter_mut() {
+                *v = 0.0;
+            }
+            for s in &stems {
+                if start >= s.frames {
+                    continue;
+                }
+                let l = len.min(s.frames - start);
+                if s.ch.len() > 1 {
+                    let (a, b) = (&s.ch[0][start..start + l], &s.ch[1][start..start + l]);
+                    for i in 0..l {
+                        mix[i] += (a[i] + b[i]) * 0.5;
+                    }
+                } else {
+                    let a = &s.ch[0][start..start + l];
+                    for i in 0..l {
+                        mix[i] += a[i];
+                    }
+                }
+            }
+            let (mut b, mut i) = (start / bucket, 0usize);
+            while i < len {
+                let e = (i + bucket).min(len);
+                let (mut m, mut ss) = (0.0f32, 0.0f32);
+                for k in i..e {
+                    let v = mix[k];
+                    let a = v.abs();
+                    if a > m {
+                        m = a;
+                    }
+                    ss += v * v;
+                }
+                pk[b] = m;
+                sq[b] = (ss / (e - i) as f32).sqrt();
+                b += 1;
+                i = e;
+            }
+            start += len;
+        }
+        let top = pk.iter().cloned().fold(0.0f32, f32::max).max(1e-6);
+        let scale = |v: f32| -> u8 { ((v / top).powf(0.6) * 255.0).clamp(0.0, 255.0) as u8 };
+        self.peaks = pk.iter().map(|&v| scale(v)).collect();
+        self.rms = sq.iter().map(|&v| scale(v)).collect();
     }
 }
 
@@ -261,6 +329,7 @@ pub fn load_player_file(folder: &str, j: &Value) -> Result<Song, String> {
     song.rpp = j["rpp"].as_str().map(String::from);
     song.sections = secs;
     song.has_original_click = song.stems.iter().any(|s| s.name.to_lowercase().starts_with("click") && !s.name.starts_with("Click 1/"));
+    song.compute_peaks();
     Ok(song)
 }
 
@@ -272,6 +341,22 @@ mod tests {
         assert!(fnmatch("drum*", "drums bus"));
         assert!(!fnmatch("bass", "bass 2"));
         assert!(fnmatch("a?c", "abc"));
+    }
+    #[test]
+    fn peaks_of_two_stems() {
+        // 2 s stilte, daarna 1 s sinus; click telt niet mee
+        let n = 3 * 48000;
+        let tone: Vec<f32> = (0..n).map(|i| if i < 96000 { 0.0 } else { 0.5 * (i as f32 * 0.05).sin() }).collect();
+        let mut song = Song::default();
+        song.stems.push(Stem::new("Keys", vec![tone.clone(), tone.clone()]));
+        song.stems.push(Stem::new("Click", vec![vec![1.0; n]]));
+        song.compute_peaks();
+        assert_eq!(song.peaks.len(), 30);
+        assert_eq!(song.rms.len(), 30);
+        assert_eq!(song.peaks[0], 0);
+        assert_eq!(song.peaks[19], 0);
+        assert_eq!(song.peaks[25], 255); // de hoogste piek is 255
+        assert!(song.rms[25] > 100 && song.rms[25] < song.peaks[25]);
     }
     #[test]
     fn buses() {

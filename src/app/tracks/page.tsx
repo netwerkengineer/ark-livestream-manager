@@ -6,6 +6,7 @@ import { homeHref, installDesktopAdapter } from "@/lib/desktopEngine";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { useReaperState } from "@/components/tracks/useReaper";
 import TransportBar from "@/components/tracks/TransportBar";
+import Waveform from "@/components/tracks/Waveform";
 import SetlistPanel from "@/components/tracks/SetlistPanel";
 import SectionsPanel from "@/components/tracks/SectionsPanel";
 import PadsPanel from "@/components/tracks/PadsPanel";
@@ -100,6 +101,7 @@ export default function TracksStagePage() {
       </header>
 
       <TransportBar state={state} onError={showError} stage />
+      <Waveform state={state} onError={showError} stage />
       <div className="trk-phone-tabs" role="tablist" aria-label="Onderdeel">
         {([["sections", "Secties"], ["setlist", "Setlist"], ["pads", "Pads"]] as const).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={panel === id} className={`trk-phone-tab${panel === id ? " on" : ""}`} onClick={() => setPanel(id)}>{label}</button>

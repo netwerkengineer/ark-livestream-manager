@@ -128,6 +128,15 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
     let mx = || p.mx();
     match path {
         "/state" => (200, state(p).to_string()),
+        // golfvorm van het geladen nummer voor het podium (blokjes van 1/rate seconde, 0-255)
+        "/peaks" => {
+            let (pk, rms, total, path) = {
+                let st = p.lock();
+                let m = p.mx();
+                (m.song.peaks.clone(), m.song.rms.clone(), m.song.total() as f64 / m.sr, st.active_path.clone())
+            };
+            (200, json!({"rate": crate::song::PEAK_RATE, "total": total, "path": path, "peaks": pk, "rms": rms}).to_string())
+        }
         "/play" => {
             let mut m = mx();
             if m.song.stems.is_empty() {

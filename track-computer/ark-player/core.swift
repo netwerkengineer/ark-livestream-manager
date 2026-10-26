@@ -152,7 +152,51 @@ final class Song {
     var sampleRate = 48000.0
     var hasOriginalClick = false
     var rpp: String?                // naam van het REAPER-project naast de stems (de cuetabel heet <rpp>.cues)
+    var peaks: [UInt8] = []         // golfvorm van het hele nummer: piek per 1/peakRate seconde (0-255, na compressie), zonder click en guide
+    var rms: [UInt8] = []           // idem, effectieve waarde (het "volume" van de mix)
     var total: Int { stems.map { $0.frames }.max() ?? 0 }
+}
+
+/// Aantal golfvormblokjes per seconde (10 = elk blokje 100 ms; een nummer van 6 minuten is 3600 blokjes)
+let peakRate = 10.0
+
+/// Golfvorm van het hele nummer, voor de weergave op het podium. Alle stems behalve click en guide, in stappen van 1 s opgeteld (geen kopie van het hele nummer in het geheugen).
+/// De waarden zijn genormaliseerd op de hoogste piek en met x^0,6 samengedrukt, zodat een rustig begin zichtbaar blijft naast een hard refrein.
+func computePeaks(_ song: Song) {
+    let bucket = max(1, Int(song.sampleRate / peakRate)), total = song.total
+    guard total > 0 else { return }
+    let n = (total + bucket - 1) / bucket
+    var pk = [Float](repeating: 0, count: n), sq = [Float](repeating: 0, count: n)
+    let stems = song.stems.filter { !$0.monitor }
+    let chunk = bucket * 10                                  // een veelvoud van het blokje: elk stuk begint op een blokgrens
+    var mix = [Float](repeating: 0, count: chunk)
+    var start = 0
+    while start < total {
+        let len = min(chunk, total - start)
+        for i in 0..<len { mix[i] = 0 }
+        for s in stems where start < s.frames {
+            let l = min(len, s.frames - start)
+            let c0 = s.ch[0] + start
+            if s.ch.count > 1 {
+                let c1 = s.ch[1] + start
+                for i in 0..<l { mix[i] += (c0[i] + c1[i]) * 0.5 }
+            } else {
+                for i in 0..<l { mix[i] += c0[i] }
+            }
+        }
+        var b = start / bucket, i = 0
+        while i < len {
+            let e = min(i + bucket, len)
+            var m: Float = 0, ss: Float = 0
+            for k in i..<e { let v = mix[k]; let a = v < 0 ? -v : v; if a > m { m = a }; ss += v * v }
+            pk[b] = m; sq[b] = (ss / Float(e - i)).squareRoot()
+            b += 1; i = e
+        }
+        start += len
+    }
+    let top = max(pk.max() ?? 0, 1e-6)
+    func scale(_ v: Float) -> UInt8 { UInt8(max(0, min(255, powf(v / top, 0.6) * 255))) }
+    song.peaks = pk.map(scale); song.rms = sq.map(scale)
 }
 
 func parseSong(_ j: [String: Any], total: Double) -> (sections: [Section], tempo: TempoMap) {
@@ -287,6 +331,7 @@ func loadPlayerFile(folder: String, json j: [String: Any]) throws -> Song {
     song.rpp = j["rpp"] as? String
     song.sections = secs
     song.hasOriginalClick = song.stems.contains { $0.name.lowercased().hasPrefix("click") && !$0.name.hasPrefix("Click 1/") }
+    computePeaks(song)
     return song
 }
 
@@ -325,6 +370,7 @@ func loadSongJson(folder: String) throws -> Song {
         if s.live { s.mute = true }                                   // de band speelt dit zelf
         if s.name.hasPrefix("Click 1/") { s.mute = !(song.hasOriginalClick && s.name == "Click 1/4") }  // zoals mt2reaper
     }
+    computePeaks(song)
     return song
 }
 
