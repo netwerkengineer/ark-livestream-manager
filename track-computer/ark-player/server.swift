@@ -15,6 +15,15 @@ final class Server {
     let q = DispatchQueue(label: "ark-player.http")
     init(player: Player) { self.player = player }
 
+    /// Laadt de referentie van het actieve nummer als dat nog niet gedaan is
+    func ensureReference() throws {
+        player.lock.lock(); let sg = mixer.song; let path = sg.refPath; let has = sg.reference != nil; player.lock.unlock()
+        if has { return }
+        guard let path else { throw PlayerError("Dit nummer heeft nog geen referentie") }
+        let st = try loadStem(url: URL(fileURLWithPath: path), name: "Reference")
+        player.lock.lock(); if sg.reference == nil { sg.reference = st }; player.lock.unlock()
+    }
+
     func state() -> [String: Any] {
         let p = player
         p.lock.lock(); defer { p.lock.unlock() }
@@ -24,7 +33,7 @@ final class Server {
         let cur = m.sectionIndex(at: m.pos)
         var d: [String: Any] = ["title": s.title, "path": p.activePath, "state": st, "position": m.posSec, "position_beats": s.tempo.barBeat(qn: s.tempo.qn(sec: m.posSec)), "duration": dur, "loading": !p.loading.isEmpty, "error": p.error ?? "",
                 "device": p.output?.deviceName ?? "", "outputs": p.output?.hwChannels ?? m.outCh, "output_mode": m.requested, "output_applied": m.applied,
-                "fading": m.fading, "click_div": m.clickDiv, "click_accent": m.clickAccent, "click_db": Double(m.clickDb), "counting": m.counting, "count_beat": m.countBeat, "count_beats": m.countBeats, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
+                "fading": m.fading, "reference": ["available": s.refPath != nil, "loaded": s.reference != nil, "on": m.refOn, "offset": Double(s.refOffset) / 48000, "db": Double(m.refDb), "file": (s.refPath as NSString?)?.lastPathComponent ?? ""] as [String: Any], "click_div": m.clickDiv, "click_accent": m.clickAccent, "click_db": Double(m.clickDb), "counting": m.counting, "count_beat": m.countBeat, "count_beats": m.countBeats, "master_db": db(m.master), "master_mute": m.masterMuted, "jump_mode": m.jumpMode, "lead_beats": p.cfg.leadBeats,
                 "freeshow": p.fsHost.isEmpty ? "" : "\(p.fsHost):\(p.fsPort)", "freeshow_override": !p.cfg.fsHost.isEmpty,
                 "has_cues": p.table != nil, "slide": p.sent ?? 0, "last_cmd": p.lastCmd,
                 "setlist": p.setlist, "loaded": p.cache.keys.sorted(),
@@ -65,6 +74,31 @@ final class Server {
                 let bars = Int(qs["count"] ?? "") ?? 0
                 let own = mixer.song.sections.first.map { $0.name.lowercased().hasPrefix("count") && Double(mixer.pos) / mixer.sr < $0.end } ?? false
                 if bars > 0 && !mixer.playing && !mixer.counting && mixer.pos == 0 && !own { mixer.startCountIn(bars: min(4, bars)) } else if !mixer.counting { mixer.playing = true } }; p.lock.unlock(); return ok()
+        case "/reference":
+            // aanzetten laadt het bestand eerst (buiten de lock: dat kan even duren)
+            if qs["on"].map({ $0 != "0" }) == true { do { try ensureReference() } catch { return bad("\(error.localizedDescription)") } }
+            p.lock.lock(); defer { p.lock.unlock() }
+            let sg = mixer.song
+            if let v = qs["on"] { mixer.refOn = v != "0" && sg.reference != nil }
+            if let v = Double(qs["db"] ?? "") { mixer.refDb = Float(min(6, max(-30, v))) }
+            if let v = Double(qs["offset"] ?? "") { sg.refOffset = Int((v * 48000).rounded()); saveReferenceOffset(sg) }
+            if let v = Double(qs["nudge"] ?? "") { sg.refOffset += Int((v * 48000).rounded()); saveReferenceOffset(sg) }
+            return ok()
+        case "/reference/load":
+            guard let src = qs["path"], FileManager.default.fileExists(atPath: src) else { return bad("bestand niet gevonden") }
+            p.lock.lock(); let folder = mixer.song.folder; p.lock.unlock()
+            let ext = (src as NSString).pathExtension.lowercased()
+            guard !folder.isEmpty, referenceExts.contains(ext) else { return bad("geen geluidsbestand (wav, mp3, m4a, flac, aiff)") }
+            let fm = FileManager.default
+            let dest = folder + "/Reference." + ext
+            // een eerdere referentie wordt niet weggegooid maar hernoemd
+            for n in (try? fm.contentsOfDirectory(atPath: folder)) ?? [] where n.lowercased().hasPrefix("reference.") {
+                try? fm.moveItem(atPath: folder + "/" + n, toPath: folder + "/Reference (vorige)." + (n as NSString).pathExtension)
+            }
+            do { try fm.copyItem(atPath: src, toPath: dest) } catch { return bad("kopiëren mislukt: \(error.localizedDescription)") }
+            p.lock.lock(); let sg = mixer.song; sg.refOffset = 0; findReference(sg); if let old = sg.reference { mixer.retiredRefs.append(old) }; sg.reference = nil; mixer.refOn = false; p.lock.unlock()
+            saveReferenceOffset(sg)
+            return ok()
         case "/click":
             p.lock.lock()
             if let v = Int(qs["div"] ?? "") { mixer.clickDiv = min(4, max(0, v)) }

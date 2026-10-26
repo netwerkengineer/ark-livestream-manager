@@ -67,6 +67,12 @@ pub struct Mixer {
     pub sum_micros: f64,
     pub max_micros: f64,
     env_buf: Vec<f32>,
+    env_ref: Vec<f32>,
+    env_non: Vec<f32>,
+    /// Referentie: A/B tussen de mix van de stems en de originele opname (de click en de guide blijven gewoon klinken)
+    pub ref_on: bool,
+    pub ref_now: f32,
+    pub ref_db: f32,
 }
 
 impl Default for Mixer {
@@ -129,6 +135,11 @@ impl Default for Mixer {
             sum_micros: 0.0,
             max_micros: 0.0,
             env_buf: vec![0.0; 16384],
+            env_ref: vec![0.0; 16384],
+            env_non: vec![0.0; 16384],
+            ref_on: false,
+            ref_now: 0.0,
+            ref_db: 0.0,
         }
     }
 }
@@ -599,10 +610,24 @@ impl Mixer {
             self.env_buf[i] = g * self.master_now;
         }
         self.click_mix(n, off, out);
+        let ref_target: f32 = if self.ref_on && self.song.reference.is_some() { 1.0 } else { 0.0 };
+        let ref_active = self.ref_now > 0.0 || ref_target > 0.0;
+        if ref_active {
+            let rk = (1.0 / (0.02 * self.sr)) as f32;
+            for i in 0..n {
+                self.ref_now += (ref_target - self.ref_now) * rk;
+                if (ref_target - self.ref_now).abs() < 1e-4 {
+                    self.ref_now = ref_target;
+                }
+                self.env_ref[i] = self.env_buf[i] * self.ref_now;
+                self.env_non[i] = self.env_buf[i] * (1.0 - self.ref_now);
+            }
+        }
         let guide_active = self.g_ws >= 0;
         let solo_active = self.group_solo.iter().any(|&b| b) || self.song.stems.iter().any(|s| s.solo);
         let (g_ws, g_we, g_src) = (self.g_ws, self.g_we, self.g_src);
         let env_buf = &self.env_buf;
+        let e_non = if ref_active { &self.env_non } else { &self.env_buf };
         let (group_mute, group_solo, group_gain) = (&self.group_mute, &self.group_solo, &self.group_gain);
         let pos_u = self.pos;
         for s in self.song.stems.iter_mut() {
@@ -612,6 +637,7 @@ impl Mixer {
                 continue;
             }
             let g = s.gain * group_gain[b] * s.trim;
+            let eb = if s.monitor { env_buf } else { e_non };
             let mut pk: f32 = 0.0;
             let a_idx = s.out_a.min(n_out - 1);
             let b_idx = match s.out_b {
@@ -631,7 +657,7 @@ impl Mixer {
                         continue;
                     }
                     let idx = idx as usize;
-                    let e = g * env_buf[i];
+                    let e = g * eb[i];
                     if s.mono {
                         let v = (l[idx] + r[idx]) * 0.5 * e;
                         out[a_idx][off + i] += v;
@@ -654,13 +680,13 @@ impl Mixer {
                 let rp = &r[pos_u..pos_u + m];
                 if s.mono {
                     for i in 0..m {
-                        let v = (lp[i] + rp[i]) * 0.5 * g * env_buf[i];
+                        let v = (lp[i] + rp[i]) * 0.5 * g * eb[i];
                         out[a_idx][off + i] += v;
                         pk = pk.max(v.abs());
                     }
                 } else {
                     for i in 0..m {
-                        let e = g * env_buf[i];
+                        let e = g * eb[i];
                         let a = lp[i] * e;
                         let b2 = rp[i] * e;
                         out[a_idx][off + i] += a;
@@ -670,6 +696,46 @@ impl Mixer {
                 }
             }
             s.peak = pk.max(s.peak * 0.9);
+        }
+        if self.ref_now > 0.0 {
+            self.reference_mix(n, off, out);
+        }
+    }
+
+    fn reference_route(&self) -> (usize, Option<usize>, bool) {
+        match self.applied.as_str() {
+            "multi" => (6, Some(7), false),
+            "2ch" => (1, None, true),
+            "3ch" => (1, Some(2), false),
+            _ => (0, Some(1), false),
+        }
+    }
+    fn reference_mix(&mut self, n: usize, off: usize, out: &mut [Vec<f32>]) {
+        let n_out = out.len();
+        let (a, b, mono) = self.reference_route();
+        let a = a.min(n_out - 1);
+        let b = b.filter(|&b| b < n_out && b != a);
+        let g = 10f32.powf(self.ref_db / 20.0);
+        let pos = self.pos as i64;
+        let offset = self.song.ref_offset;
+        let Some(r) = self.song.reference.as_ref() else { return };
+        let l = &r.ch[0];
+        let rr = if r.ch.len() > 1 { &r.ch[1] } else { &r.ch[0] };
+        for i in 0..n {
+            let idx = pos + i as i64 + offset;
+            if idx < 0 || idx as usize >= r.frames {
+                continue;
+            }
+            let idx = idx as usize;
+            let e = g * self.env_ref[i];
+            if mono {
+                out[a][off + i] += (l[idx] + rr[idx]) * 0.5 * e;
+            } else {
+                out[a][off + i] += l[idx] * e;
+                if let Some(b) = b {
+                    out[b][off + i] += rr[idx] * e;
+                }
+            }
         }
     }
 }
@@ -813,5 +879,47 @@ mod click_tests {
         m.render(480, &mut out);
         m.render(480, &mut out);
         assert!(out[0].iter().all(|v| v.abs() < 1e-6));
+    }
+}
+
+#[cfg(test)]
+mod reference_tests {
+    use super::*;
+    use crate::song::Stem;
+
+    #[test]
+    fn reference_replaces_the_stems_but_not_the_click() {
+        let n = 10 * 48000;
+        let mut song = Song::default();
+        song.stems.push(Stem::new("Keys", vec![vec![0.2; n], vec![0.2; n]]));
+        song.stems.push(Stem::new("Click", vec![vec![0.05; n]]));
+        // referentie: 0,4 vanaf 1 s in het bestand
+        let r: Vec<f32> = (0..n).map(|i| if i < 48000 { 0.0 } else { 0.4 }).collect();
+        song.reference = Some(Stem::new("Reference", vec![r.clone(), r]));
+        let mut m = Mixer::default();
+        m.sr = 48000.0;
+        m.song = song;
+        m.out_ch = 2;
+        m.apply_routing();
+        m.playing = true;
+        m.env = 1.0;
+        let mut out = vec![vec![0.0f32; 480]; 2];
+        let last = |m: &mut Mixer, out: &mut Vec<Vec<f32>>, blocks: usize| {
+            for _ in 0..blocks {
+                m.render(480, out);
+            }
+            out[0][479]
+        };
+        let with_stems = last(&mut m, &mut out, 10);
+        assert!(with_stems > 0.19 && with_stems < 0.4, "{with_stems}");
+        m.ref_on = true;
+        let with_ref = last(&mut m, &mut out, 10); // 100 ms later: de wissel (20 ms) is klaar, pos < 1 s dus de referentie is nog stil
+        assert!(with_ref < 0.1, "{with_ref}"); // alleen de click (0,05) blijft
+        m.song.ref_offset = 48000 * 2; // de referentie ligt 2 s verder: nu klinkt hij meteen
+        let shifted = last(&mut m, &mut out, 2);
+        assert!(shifted > 0.38 && shifted < 0.5, "{shifted}");
+        m.ref_on = false;
+        let back = last(&mut m, &mut out, 10);
+        assert!(back > 0.19 && back < 0.4, "{back}");
     }
 }

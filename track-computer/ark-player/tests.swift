@@ -292,6 +292,38 @@ func clicktest(folder: String) throws {
     print("Uit: piek \(peakDb(render(m, secs: 2).flatMap { $0 })) dB")
 }
 
+// ------------------------------------------------------------- reftest (offline): A/B tussen de stems en een referentiebestand
+func reftest(folder: String) throws {
+    let sim = Sim(); let p = sim.player
+    setenv("ARK_PLAYER_CONFIG", NSTemporaryDirectory() + "ark-player-test-config.json", 1)
+    let rpp = folder + "/" + ((try? FileManager.default.contentsOfDirectory(atPath: folder))?.first { $0.hasSuffix(".RPP") } ?? "")
+    try sim.activate(rpp)
+    let m = p.mixer
+    for s in m.song.stems where s.monitor { s.mute = true }
+    // referentie: 1 kHz sinus, amplitude 0,3, 70 s; vanaf 10 s in het bestand klinkt 2 kHz zodat de verschuiving te meten is
+    let n = 70 * 48000
+    let sine: [Float] = (0..<n).map { i in Float(0.3 * sin(2 * Double.pi * (i < 10 * 48000 ? 1000.0 : 2000.0) * Double(i) / 48000)) }
+    let tmp = NSTemporaryDirectory() + "ark-ref-test.wav"
+    try writeWav(path: tmp, channels: [sine, sine], sr: 48000)
+    m.song.reference = try loadStem(url: URL(fileURLWithPath: tmp), name: "Reference")
+    m.pos = Int(30 * m.sr); m.playing = true
+    let a = render(m, secs: 1).flatMap { $0 }
+    m.refOn = true
+    _ = render(m, secs: 0.2)
+    let b = render(m, secs: 1)
+    let bAll = b.flatMap { $0 }
+    print("Stems: piek \(peakDb(a)) dB | referentie aan (sinus 0,3 = -10,5 dB): piek \(peakDb(bAll)) dB, links \(peakDb(b[0])) / rechts \(peakDb(b[1]))")
+    m.refOn = false
+    _ = render(m, secs: 0.2)
+    print("Weer terug naar de stems: piek \(peakDb(render(m, secs: 1).flatMap { $0 })) dB (was \(peakDb(a)))")
+    // verschuiving: 25 s offset -> bij positie 30 s zit de referentie op 55 s (2 kHz)
+    m.song.refOffset = 25 * 48000; m.refOn = true; m.pos = Int(30 * m.sr)
+    _ = render(m, secs: 0.2)
+    let c = render(m, secs: 0.5)[0]
+    var zc = 0; for i in 1..<c.count where (c[i - 1] < 0) != (c[i] < 0) { zc += 1 }
+    print("Met 25 s verschuiving: ~\(Int(Double(zc) / 2 / 0.5)) Hz (verwacht 2000)")
+}
+
 // ------------------------------------------------------------- padtest (offline): pad laden, afspelen per uitgangsmodus, crossfade en stop
 func padtest(wav: String) throws {
     let dir = NSTemporaryDirectory() + "ark-padtest"

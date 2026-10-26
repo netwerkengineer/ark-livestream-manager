@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown, Metronome } from "lucide-react";
+import { Play, Pause, Square, SkipBack, Save, Volume2, VolumeX, TrendingDown, Metronome, Disc3 } from "lucide-react";
 import type { ReaperState } from "@/lib/reaperControl";
 import { reaperAction, formatTime } from "./useReaper";
 import { parseSongName } from "./songName";
@@ -68,6 +68,19 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
   const setClick = async (body: object) => {
     try { await reaperAction({ action: "click", ...body }); } catch (err) { onError(err instanceof Error ? err.message : "Click wijzigen mislukt"); }
   };
+  const ref = state?.bridge?.reference;
+  const sendRef = async (body: object) => {
+    try { await reaperAction({ action: "reference", ...body }); } catch (err) { onError(err instanceof Error ? err.message : "Referentie mislukt"); }
+  };
+  // The reference is a file of the original recording; the app (desktop) lets you pick it and keeps a copy with the song
+  const pickReference = async () => {
+    const pick = (window as { arkDesktop?: { pickAudio?: () => Promise<{ path: string }> } }).arkDesktop?.pickAudio;
+    if (!pick) { onError("Een referentie kiezen kan alleen in de desktop-app."); return; }
+    try {
+      const { path } = await pick();
+      if (path) await reaperAction({ action: "referenceLoad", path });
+    } catch (err) { onError(err instanceof Error ? err.message : "Referentie kiezen mislukt"); }
+  };
   const fading = !!state?.bridge?.fading;
   const canFade = hasDesktopEngine();
   const fadeOut = async () => {
@@ -104,6 +117,25 @@ export default function TransportBar({ state, onError, onSaved, showSave, stage 
         <button className="trk-t-btn stop" onClick={() => run("stop")} title="Stop"><Square size={stage ? 24 : 18} /></button>
         {canFade && (
           <span className="trk-fade">
+            {ref && (ref.available ? (
+              <>
+                <button className={`trk-icon-btn${ref.on ? " pinned" : ""}`} onClick={() => sendRef({ on: !ref.on })} aria-pressed={ref.on}
+                  title={ref.on ? `Je hoort de referentie (${ref.file}); tik om terug te gaan naar de stems` : `Vergelijk met de originele opname (${ref.file}); click en guide blijven klinken`}>
+                  <Disc3 size={stage ? 18 : 14} /> {ref.on ? "Referentie aan" : "Referentie"}
+                </button>
+                {ref.on && (
+                  <>
+                    {[-1, -0.1, 0.1, 1].map(v => (
+                      <button key={v} className="trk-icon-btn" onClick={() => sendRef({ nudge: v })} title="Verschuif de referentie zodat hij gelijk loopt met de stems">{v > 0 ? "+" : "−"}{Math.abs(v)}</button>
+                    ))}
+                    <span className="trk-meta" title="Waar 0:00 van het nummer in de referentie ligt">{ref.offset.toFixed(2)} s</span>
+                  </>
+                )}
+                <button className="trk-icon-btn" onClick={pickReference} title="Een ander referentiebestand kiezen (het vorige blijft bewaard)">…</button>
+              </>
+            ) : (
+              <button className="trk-icon-btn" onClick={pickReference} title="Kies de originele opname (mp3, m4a, wav, flac) om mee te vergelijken"><Disc3 size={stage ? 18 : 14} /> Referentie kiezen…</button>
+            ))}
             <Metronome size={stage ? 20 : 16} className={clickDiv ? "trk-click-on" : "trk-click-off"} aria-hidden />
             <select className="trk-fade-secs" value={clickDiv} aria-label="Click" title="Eigen click: loopt mee met de maten van het nummer"
               onChange={e => setClick({ div: Number(e.target.value) })}>

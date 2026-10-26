@@ -55,6 +55,7 @@ export interface BridgeState {
   lastCmd: string;
   error?: string;
   outputMode?: string; // chosen output mode
+  reference?: { available: boolean; loaded: boolean; on: boolean; offset: number; db: number; file: string }; // the original recording to compare with (own player)
   clickDiv?: number;   // the own click of the own player: clicks per quarter note, 0 = off
   clickAccent?: boolean;
   clickDb?: number;
@@ -192,6 +193,7 @@ function parseBridgeState(raw: string | undefined): BridgeState | null {
       error: s.error ?? undefined,
       outputMode: s.outputMode ?? undefined,
       fading: s.fading ?? undefined,
+      reference: s.reference && typeof s.reference === 'object' ? s.reference : undefined,
       clickDiv: typeof s.clickDiv === 'number' ? s.clickDiv : undefined,
       clickAccent: typeof s.clickAccent === 'boolean' ? s.clickAccent : undefined,
       clickDb: typeof s.clickDb === 'number' ? s.clickDb : undefined,

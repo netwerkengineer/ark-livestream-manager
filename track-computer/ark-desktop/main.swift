@@ -328,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
       openSettings: () => window.webkit.messageHandlers.shell.postMessage({ action: "settings" }),
       openExternal: (url) => window.webkit.messageHandlers.shell.postMessage({ action: "openExternal", url }),
       chooseFolder: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "chooseFolder" })),
+      pickAudio: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "pickAudio" })),
       // nummers van de server op deze computer zetten ({ id, folder, title, rpp }), de stand opvragen en een nummer weghalen (Prullenbak)
       fetchSong: (song) => window.webkit.messageHandlers.shell.postMessage({ action: "fetchSong", song }),
       fetchStatus: async () => JSON.parse(await window.webkit.messageHandlers.shellcall.postMessage({ action: "fetchStatus" })),
@@ -371,6 +372,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if m.name == "shellcall" {
             if let b = m.body as? [String: Any], b["action"] as? String == "chooseFolder" {
                 let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.prompt = "Kies"
+                let ok = panel.runModal() == .OK
+                replyHandler(jsonString(["path": ok ? (panel.url?.path ?? "") : ""]), nil)
+            } else if let b = m.body as? [String: Any], b["action"] as? String == "pickAudio" {
+                let panel = NSOpenPanel(); panel.canChooseFiles = true; panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
+                panel.allowedContentTypes = [.audio]; panel.prompt = "Kies"; panel.message = "Kies de originele opname als referentie (mp3, m4a, wav, flac)"
                 let ok = panel.runModal() == .OK
                 replyHandler(jsonString(["path": ok ? (panel.url?.path ?? "") : ""]), nil)
             } else if let b = m.body as? [String: Any], b["action"] as? String == "fetchStatus" {

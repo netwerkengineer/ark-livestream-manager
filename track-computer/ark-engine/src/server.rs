@@ -78,6 +78,11 @@ pub fn state(p: &Arc<Player>) -> Value {
     });
     let o = d.as_object_mut().unwrap();
     o.insert("counting".into(), json!(m.counting));
+    o.insert(
+        "reference".into(),
+        json!({"available": s.ref_path.is_some(), "loaded": s.reference.is_some(), "on": m.ref_on, "offset": s.ref_offset as f64 / 48000.0, "db": m.ref_db as f64,
+            "file": s.ref_path.as_deref().and_then(|p| std::path::Path::new(p).file_name()).map(|f| f.to_string_lossy().to_string()).unwrap_or_default()}),
+    );
     o.insert("click_div".into(), json!(m.click_div));
     o.insert("click_accent".into(), json!(m.click_accent));
     o.insert("click_db".into(), json!(m.click_db as f64));
@@ -162,6 +167,76 @@ fn handle_inner(p: &Arc<Player>, path: &str, q: &Query) -> (u16, String) {
             } else if !m.counting {
                 m.playing = true;
             }
+            ok()
+        }
+        "/reference" => {
+            // aanzetten laadt het bestand eerst (buiten de lock: dat kan even duren)
+            if q.s("on").map(|v| v != "0").unwrap_or(false) {
+                let path = {
+                    let m = mx();
+                    if m.song.reference.is_some() { None } else { m.song.ref_path.clone() }
+                };
+                let has = mx().song.reference.is_some();
+                if !has {
+                    let Some(path) = path else { return bad("Dit nummer heeft nog geen referentie") };
+                    match crate::song::load_stem(std::path::Path::new(&path), "Reference", 0) {
+                        Ok(st) => {
+                            let mut m = mx();
+                            if m.song.reference.is_none() {
+                                m.song.reference = Some(st);
+                            }
+                        }
+                        Err(e) => return bad(&e),
+                    }
+                }
+            }
+            let mut m = mx();
+            if let Some(v) = q.s("on") {
+                m.ref_on = v != "0" && m.song.reference.is_some();
+            }
+            if let Some(v) = q.f("db") {
+                m.ref_db = v.clamp(-30.0, 6.0) as f32;
+            }
+            if let Some(v) = q.f("offset") {
+                m.song.ref_offset = (v * 48000.0).round() as i64;
+                m.song.save_reference_offset();
+            }
+            if let Some(v) = q.f("nudge") {
+                m.song.ref_offset += (v * 48000.0).round() as i64;
+                m.song.save_reference_offset();
+            }
+            ok()
+        }
+        "/reference/load" => {
+            let Some(src) = q.s("path") else { return bad("path ontbreekt") };
+            let src = std::path::PathBuf::from(src);
+            if !src.is_file() {
+                return bad("bestand niet gevonden");
+            }
+            let ext = src.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let folder = mx().song.folder.clone();
+            if folder.is_empty() || !crate::song::REFERENCE_EXTS.contains(&ext.as_str()) {
+                return bad("geen geluidsbestand (wav, mp3, m4a, flac, aiff)");
+            }
+            // een eerdere referentie wordt niet weggegooid maar hernoemd
+            if let Ok(rd) = std::fs::read_dir(&folder) {
+                for e in rd.flatten() {
+                    let n = e.file_name().to_string_lossy().to_string();
+                    if n.to_lowercase().starts_with("reference.") {
+                        let e2 = n.rsplit('.').next().unwrap_or("wav").to_string();
+                        let _ = std::fs::rename(e.path(), std::path::Path::new(&folder).join(format!("Reference (vorige).{e2}")));
+                    }
+                }
+            }
+            if let Err(e) = std::fs::copy(&src, std::path::Path::new(&folder).join(format!("Reference.{ext}"))) {
+                return bad(&format!("kopiëren mislukt: {e}"));
+            }
+            let mut m = mx();
+            m.song.ref_offset = 0;
+            m.song.find_reference();
+            m.song.reference = None;
+            m.ref_on = false;
+            m.song.save_reference_offset();
             ok()
         }
         "/click" => {

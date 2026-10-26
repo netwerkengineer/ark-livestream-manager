@@ -124,12 +124,50 @@ pub struct Song {
     pub peaks: Vec<u8>,
     /// Idem, effectieve waarde (het "volume" van de mix)
     pub rms: Vec<u8>,
+    /// Referentie: de originele opname (een eigen bestand Reference.<mp3|m4a|wav|flac|aiff> in de songmap) om mee te vergelijken; wordt pas geladen als je hem aanzet
+    pub ref_path: Option<String>,
+    pub reference: Option<Stem>,
+    /// frames: waar 0:00 van het nummer in de referentie ligt (positief = de referentie begint eerder)
+    pub ref_offset: i64,
 }
 
 /// Aantal golfvormblokjes per seconde (10 = elk blokje 100 ms)
 pub const PEAK_RATE: f64 = 10.0;
 
+pub const REFERENCE_EXTS: [&str; 8] = ["wav", "mp3", "m4a", "aac", "flac", "aif", "aiff", "caf"];
+
 impl Song {
+    /// Zoekt Reference.* in de songmap en leest de verschuiving uit ark-reference.json
+    pub fn find_reference(&mut self) {
+        self.ref_path = None;
+        if self.folder.is_empty() {
+            return;
+        }
+        if let Ok(rd) = std::fs::read_dir(&self.folder) {
+            for e in rd.flatten() {
+                let n = e.file_name().to_string_lossy().to_string();
+                let l = n.to_lowercase();
+                if l.starts_with("reference.") && REFERENCE_EXTS.contains(&l.rsplit('.').next().unwrap_or("")) {
+                    self.ref_path = Some(format!("{}/{}", self.folder, n));
+                    break;
+                }
+            }
+        }
+        if let Ok(d) = std::fs::read(Path::new(&self.folder).join("ark-reference.json")) {
+            if let Ok(j) = serde_json::from_slice::<Value>(&d) {
+                if let Some(o) = j["offset"].as_f64() {
+                    self.ref_offset = (o * 48000.0).round() as i64;
+                }
+            }
+        }
+    }
+    pub fn save_reference_offset(&self) {
+        if self.folder.is_empty() {
+            return;
+        }
+        let j = serde_json::json!({"offset": self.ref_offset as f64 / 48000.0});
+        let _ = std::fs::write(Path::new(&self.folder).join("ark-reference.json"), j.to_string());
+    }
     pub fn total(&self) -> usize {
         self.stems.iter().map(|s| s.frames).max().unwrap_or(0)
     }
@@ -200,7 +238,7 @@ fn num(v: &Value) -> Option<f64> {
     v.as_f64()
 }
 
-fn load_stem(path: &Path, name: &str, offset: usize) -> Result<Stem, String> {
+pub fn load_stem(path: &Path, name: &str, offset: usize) -> Result<Stem, String> {
     let d = decode_file(path, 0)?;
     let mut ch = if d.rate != 48000 { crate::resample::to_rate(d.ch, d.rate, 48000).map_err(|e| format!("{name}: {e}"))? } else { d.ch };
     if offset > 0 {
@@ -330,6 +368,7 @@ pub fn load_player_file(folder: &str, j: &Value) -> Result<Song, String> {
     song.sections = secs;
     song.has_original_click = song.stems.iter().any(|s| s.name.to_lowercase().starts_with("click") && !s.name.starts_with("Click 1/"));
     song.compute_peaks();
+    song.find_reference();
     Ok(song)
 }
 

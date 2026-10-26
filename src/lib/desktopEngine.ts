@@ -15,7 +15,7 @@ interface ArkEngine { available: boolean; call: (path: string, params?: Record<s
 declare global {
   interface Window {
     arkEngine?: ArkEngine;
-    arkDesktop?: { offline?: boolean; remote?: { enabled: boolean; name: string }; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }>; importZip: () => void };
+    arkDesktop?: { offline?: boolean; remote?: { enabled: boolean; name: string }; version: string; server: string; openSettings: () => void; openExternal: (url: string) => void; chooseFolder: () => Promise<{ path: string }>; pickAudio?: () => Promise<{ path: string }>; fetchSong: (song: { id: string; folder: string; title: string; rpp: string }) => void; fetchStatus: () => Promise<{ jobs: FetchJob[] }>; removeSong: (folder: string) => Promise<{ ok: boolean }>; importZip: () => void };
   }
 }
 
@@ -31,7 +31,7 @@ export const engineCall = (path: string, params?: Record<string, unknown>) => wi
 interface EngineState {
   title: string; path: string; state: "playing" | "paused" | "stopped"; position: number; position_beats: string; duration: number;
   loading: boolean; error: string; output_mode: string; output_applied: string; jump_mode: string; lead_beats: number; freeshow: string;
-  fading?: boolean; click_div?: number; click_accent?: boolean; click_db?: number; counting?: boolean; count_beat?: number; count_beats?: number; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
+  fading?: boolean; reference?: { available: boolean; loaded: boolean; on: boolean; offset: number; db: number; file: string }; click_div?: number; click_accent?: boolean; click_db?: number; counting?: boolean; count_beat?: number; count_beats?: number; has_cues: boolean; setlist: string[]; loaded: string[]; master_db: number; master_mute: boolean;
   sections: { id: number; region: number; name: string; start: number; end: number; start_qn: number; end_qn: number }[];
   stems: { name: string; bus: number; bus_name: string; mute: boolean; solo: boolean; live: boolean; gain: number; meter_db: number }[];
   busses: { bus: number; name: string; mute: boolean; solo: boolean; gain: number }[];
@@ -81,6 +81,7 @@ export function toReaperState(es: EngineState, lib: LibSong[]): ReaperState {
     error: es.error || undefined,
     outputMode: es.output_mode,
     fading: es.fading,
+    reference: es.reference,
     clickDiv: es.click_div ?? 0,
     clickAccent: es.click_accent ?? true,
     clickDb: es.click_db ?? -6,
@@ -209,6 +210,15 @@ async function reaperAction(body: Record<string, any>): Promise<Response> {
         await engineCall("/master", params);
         break;
       }
+      case "reference": {
+        const params: Record<string, unknown> = {};
+        if (body.on !== undefined) params.on = body.on ? 1 : 0;
+        if (body.nudge !== undefined) params.nudge = Number(body.nudge);
+        if (body.db !== undefined) params.db = Number(body.db);
+        await engineCall("/reference", params);
+        break;
+      }
+      case "referenceLoad": await engineCall("/reference/load", { path: String(body.path) }); break;
       case "click": {
         const params: Record<string, unknown> = {};
         if (body.div !== undefined) params.div = Number(body.div);

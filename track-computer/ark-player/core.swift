@@ -168,6 +168,10 @@ final class Song {
     var sampleRate = 48000.0
     var hasOriginalClick = false
     var rpp: String?                // naam van het REAPER-project naast de stems (de cuetabel heet <rpp>.cues)
+    // Referentie: de originele opname (een eigen bestand Reference.<mp3|m4a|wav|flac|aiff> in de songmap) om mee te vergelijken; wordt pas geladen als je hem aanzet
+    var refPath: String?
+    var reference: Stem?
+    var refOffset = 0               // frames: waar 0:00 van het nummer in de referentie ligt (positief = de referentie begint eerder)
     var peaks: [UInt8] = []         // golfvorm van het hele nummer: piek per 1/peakRate seconde (0-255, na compressie), zonder click en guide
     var rms: [UInt8] = []           // idem, effectieve waarde (het "volume" van de mix)
     var total: Int { stems.map { $0.frames }.max() ?? 0 }
@@ -259,6 +263,21 @@ func loadStem(url: URL, name: String, offsetFrames: Int = 0) throws -> Stem {
     return Stem(name: name, frames: lead + done, ch: ch)
 }
 
+let referenceExts = ["wav", "mp3", "m4a", "aac", "flac", "aif", "aiff", "caf"]
+/// Zoekt Reference.* in de songmap en leest de verschuiving uit ark-reference.json
+func findReference(_ song: Song) {
+    song.refPath = nil
+    guard !song.folder.isEmpty else { return }
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: song.folder)) ?? []
+    if let f = names.first(where: { n in let l = n.lowercased(); return l.hasPrefix("reference.") && referenceExts.contains((l as NSString).pathExtension) }) { song.refPath = song.folder + "/" + f }
+    if let d = FileManager.default.contents(atPath: song.folder + "/ark-reference.json"), let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let o = j["offset"] as? Double { song.refOffset = Int((o * 48000).rounded()) }
+}
+func saveReferenceOffset(_ song: Song) {
+    guard !song.folder.isEmpty else { return }
+    let j: [String: Any] = ["offset": Double(song.refOffset) / 48000]
+    if let d = try? JSONSerialization.data(withJSONObject: j) { try? d.write(to: URL(fileURLWithPath: song.folder + "/ark-reference.json")) }
+}
+
 /// Een stem met een andere samplefrequentie (MultiTracks: 44,1 kHz) naar 48 kHz omrekenen, in het geheugen, met de beste kwaliteit.
 /// De speler werkt altijd op 48 kHz; zonder omrekenen klinkt zo'n nummer te snel en te hoog.
 func loadStemResampled(file f: AVAudioFile, name: String, lead: Int, chn: Int) throws -> Stem {
@@ -348,6 +367,7 @@ func loadPlayerFile(folder: String, json j: [String: Any]) throws -> Song {
     song.sections = secs
     song.hasOriginalClick = song.stems.contains { $0.name.lowercased().hasPrefix("click") && !$0.name.hasPrefix("Click 1/") }
     computePeaks(song)
+    findReference(song)
     return song
 }
 
@@ -387,6 +407,7 @@ func loadSongJson(folder: String) throws -> Song {
         if s.name.hasPrefix("Click 1/") { s.mute = !(song.hasOriginalClick && s.name == "Click 1/4") }  // zoals mt2reaper
     }
     computePeaks(song)
+    findReference(song)
     return song
 }
 
@@ -495,6 +516,29 @@ final class Mixer {
                 if !mono && o1 != o0 { o1[i] += v }
                 clickAge += 1
             }
+        }
+    }
+    // Referentie: A/B tussen de mix van de stems en de originele opname (de click en de guide blijven gewoon klinken)
+    var refOn = false, refNow: Float = 0, refDb: Float = 0
+    var retiredRefs: [Stem] = []       // vervangen referenties: niet vrijgeven terwijl de audio ze nog kan lezen
+    let envRef = UnsafeMutablePointer<Float>.allocate(capacity: 16384)
+    let envNon = UnsafeMutablePointer<Float>.allocate(capacity: 16384)
+    func refRoute() -> (a: Int, b: Int, mono: Bool) {
+        switch applied { case "multi": return (6, 7, false); case "2ch": return (1, -1, true); case "3ch": return (1, 2, false); default: return (0, 1, false) }
+    }
+    func referenceMix(n: Int, off: Int, out: [UnsafeMutablePointer<Float>]) {
+        guard let r = song.reference, refNow > 0 else { return }
+        let nOut = out.count
+        let rt = refRoute()
+        let o0 = out[min(max(0, rt.a), nOut - 1)] + off
+        let o1: UnsafeMutablePointer<Float> = rt.b >= 0 && rt.b < nOut ? out[rt.b] + off : o0
+        let l = r.ch[0], rr = r.ch.count > 1 ? r.ch[1] : r.ch[0]
+        let g = Float(pow(10, Double(refDb) / 20))
+        for i in 0..<n {
+            let idx = pos + i + song.refOffset
+            if idx < 0 || idx >= r.frames { continue }
+            let e = g * envRef[i]
+            if rt.mono { o0[i] += (l[idx] + rr[idx]) * 0.5 * e } else { o0[i] += l[idx] * e; if o1 != o0 { o1[i] += rr[idx] * e } }
         }
     }
     var fading = false, fadeLeft = 0, fadeTotal = 1     // uitfaden: de stand loopt in secondes naar stil, daarna stopt het nummer (positie 0)
@@ -661,12 +705,24 @@ final class Mixer {
             envBuf[i] = g * masterNow
         }
         clickMix(n: n, off: off, out: out)
+        let refTarget: Float = refOn && song.reference != nil ? 1 : 0
+        let refActive = refNow > 0 || refTarget > 0
+        if refActive {
+            let rk = Float(1.0 / (0.02 * sr))
+            for i in 0..<n {
+                refNow += (refTarget - refNow) * rk
+                if abs(refTarget - refNow) < 1e-4 { refNow = refTarget }
+                envRef[i] = envBuf[i] * refNow; envNon[i] = envBuf[i] * (1 - refNow)
+            }
+        }
+        let eNon = refActive ? envNon : envBuf
         let guideActive = gWs >= 0
         let soloActive = groupSolo.contains(true) || song.stems.contains { $0.solo }
         for s in song.stems {
             let b = min(max(s.bus, 0), 9)
             if s.mute || groupMute[b] || (soloActive && !(s.solo || groupSolo[b])) { s.peak *= 0.9; continue }
             let g = s.gain * groupGain[b] * s.trim
+            let eb = s.monitor ? envBuf : eNon
             var pk: Float = 0
             let o0 = out[min(max(0, s.outA), nOut - 1)] + off
             let o1: UnsafeMutablePointer<Float> = s.outB >= 0 && s.outB < nOut ? out[s.outB] + off : o0
@@ -677,7 +733,7 @@ final class Mixer {
                     var idx = ap
                     if ap >= gWs && ap < gWe { idx = gSrc >= 0 ? gSrc + (ap - gWs) : -1 }
                     if idx < 0 || idx >= s.frames { continue }
-                    let e = g * envBuf[i]
+                    let e = g * eb[i]
                     if s.mono { let v = (l[idx] + r[idx]) * 0.5 * e; o0[i] += v; pk = max(pk, abs(v)) }
                     else { let a = l[idx] * e, b2 = r[idx] * e; o0[i] += a; o1[i] += b2; pk = max(pk, max(abs(a), abs(b2))) }
                 }
@@ -686,13 +742,14 @@ final class Mixer {
                 if m == 0 { s.peak *= 0.9; continue }
                 let lp = l + pos, rp = r + pos
                 if s.mono {
-                    for i in 0..<m { let v = (lp[i] + rp[i]) * 0.5 * g * envBuf[i]; o0[i] += v; pk = max(pk, abs(v)) }
+                    for i in 0..<m { let v = (lp[i] + rp[i]) * 0.5 * g * eb[i]; o0[i] += v; pk = max(pk, abs(v)) }
                 } else {
-                    for i in 0..<m { let e = g * envBuf[i]; let a = lp[i] * e, b2 = rp[i] * e; o0[i] += a; o1[i] += b2; pk = max(pk, max(abs(a), abs(b2))) }
+                    for i in 0..<m { let e = g * eb[i]; let a = lp[i] * e, b2 = rp[i] * e; o0[i] += a; o1[i] += b2; pk = max(pk, max(abs(a), abs(b2))) }
                 }
             }
             s.peak = max(pk, s.peak * 0.9)
         }
+        if refNow > 0 { referenceMix(n: n, off: off, out: out) }
     }
 }
 
