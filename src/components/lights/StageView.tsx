@@ -87,7 +87,7 @@ export default function StageView({ override, compact }: StageViewProps) {
     controls.enableDamping = true;
     const room = new THREE.Group(); scene.add(room);
     const rig = new THREE.Group(); scene.add(rig);
-    let live: { fixture: QlcFixture; kind: FixtureKind; head: number; lamp: THREE.SpotLight; beam: THREE.Mesh; lens: THREE.MeshBasicMaterial | undefined }[] = [];
+    let live: { fixture: QlcFixture; kind: FixtureKind; head: number; lamp: THREE.SpotLight; beam: THREE.Mesh; share: number; lens: THREE.MeshBasicMaterial | undefined }[] = [];
     let framed = false;
 
     const disposeGroup = (grp: THREE.Group) => {
@@ -152,21 +152,38 @@ export default function StageView({ override, compact }: StageViewProps) {
             const onStage = Math.abs(u.x) <= s.stageWidth / 2 && u.z <= s.stageDepth;
             rig.add(buildStand(origin, onStage ? s.stageHeight : 0));
           }
+          const isBar = kind === "ubar" || kind === "bar" || kind === "colorbar";
           model.heads.forEach((local, h) => {
             const from = origin.clone().add(local.clone().applyQuaternion(orient));
             const len = rayLen(from, dir);
-            const radius = Math.tan(THREE.MathUtils.degToRad(p.beam / 2)) * len;
-            const cone = new THREE.ConeGeometry(radius, len, 24, 1, true);
-            cone.translate(0, -len / 2, 0);
-            const beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+            const reach = Math.tan(THREE.MathUtils.degToRad(p.beam / 2)) * len;
+            let geo: THREE.BufferGeometry;
+            if (isBar) {
+              // a bar is a line of light: a wedge as long as the bar that opens across it (the cone below would look like a V from one point)
+              const hl = 0.5, ex = hl + reach * 0.35, d0 = 0.04;
+              const v = [-hl, 0, -d0, hl, 0, -d0, hl, 0, d0, -hl, 0, d0, -ex, -len, -reach, ex, -len, -reach, ex, -len, reach, -ex, -len, reach];
+              geo = new THREE.BufferGeometry();
+              geo.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+              geo.setIndex([0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7]);
+            } else {
+              geo = new THREE.ConeGeometry(reach, len, 24, 1, true);
+              geo.translate(0, -len / 2, 0);
+            }
+            const beam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
             beam.position.copy(from);
-            beam.quaternion.setFromUnitVectors(down, dir);
+            if (isBar) beam.quaternion.copy(orient); else beam.quaternion.setFromUnitVectors(down, dir);
             rig.add(beam);
-            const lamp = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(Math.min(80, p.beam / 2)), 0.6, 1);
-            lamp.position.copy(from);
-            lamp.target.position.copy(from).addScaledVector(dir, len);
-            rig.add(lamp); rig.add(lamp.target);
-            live.push({ fixture: f, kind, head: h, lamp, beam, lens: kind === "kls" ? model.lenses[h] : model.lenses[0] });
+            // a bar lights its wall from five points along its length, so the wall gets an even colour
+            const spots = isBar ? 5 : 1;
+            const xAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(orient);
+            for (let k = 0; k < spots; k++) {
+              const at = from.clone().addScaledVector(xAxis, spots === 1 ? 0 : (k / (spots - 1) - 0.5) * 0.9);
+              const lamp = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(Math.min(80, p.beam / 2)), 0.6, 1);
+              lamp.position.copy(at);
+              lamp.target.position.copy(at).addScaledVector(dir, len);
+              rig.add(lamp); rig.add(lamp.target);
+              live.push({ fixture: f, kind, head: h, lamp, beam, share: spots, lens: kind === "kls" ? model.lenses[h] : model.lenses[0] });
+            }
           });
         }
       }
@@ -193,7 +210,7 @@ export default function StageView({ override, compact }: StageViewProps) {
         color.setRGB(c.r, c.g, c.b);
         // a KLS200 on white is a soft wash in the room, the colour bars are what you see: so it counts for less than a bar
         const gain = GAIN[l.kind] ?? 1;
-        l.lamp.color.copy(color); l.lamp.intensity = c.level * 35 * gain;
+        l.lamp.color.copy(color); l.lamp.intensity = (c.level * 35 * gain) / l.share;
         const mat = l.beam.material as THREE.MeshBasicMaterial;
         mat.color.copy(color); mat.opacity = c.level * 0.07 * gain;
         if (l.lens) l.lens.color.copy(c.level > 0.01 ? color : color.setRGB(0.07, 0.07, 0.07));
