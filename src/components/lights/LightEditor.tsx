@@ -104,10 +104,15 @@ export default function LightEditor() {
 
   /** Give a fixture a colour: the red, green and blue channels follow it, a lone dimmer follows the brightness, a master dimmer goes full when there is light */
   const colourFixture = (fx: QlcFixture, rgb: [number, number, number]) => {
+    const known = Array.from({ length: fx.channels }, (_, k) => describe(types[fx.address + k], k));
+    if (!known.some(i => i.hex || i.master)) {
+      setMessage({ ok: false, text: types.some(Boolean) ? `${fx.name} heeft geen kleur- of dimmerkanaal dat ik herken: stel de kanalen ("Kanalen") met de hand in.` : `De kanaalsoorten zijn nog niet bekend, dus kleuren kiezen werkt niet. ${feed.info || "QLC+ is niet bereikbaar."}` });
+      return;
+    }
     setEditing(e => {
       if (!e || e.kind !== "scene") return e;
       const arr = (e.values[fx.id] || Array.from({ length: fx.channels }, () => 0)).slice();
-      const infos = Array.from({ length: fx.channels }, (_, k) => describe(types[fx.address + k], k));
+      const infos = known;
       const hasColour = infos.some(i => i.hex);
       const on = Math.max(...rgb) > 0;
       infos.forEach((info, k) => {
@@ -210,6 +215,7 @@ export default function LightEditor() {
 
       <section className="led-main">
         {message && <div className={`stg-msg ${message.ok ? "ok" : "err"}`}>{message.text}</div>}
+        {!types.some(Boolean) && <div className="stg-msg err">Kanaalsoorten onbekend: kleuren kiezen werkt pas als QLC+ bereikbaar is. {feed.info}</div>}
         {!editing && <p className="stg-meta">Kies links een scène of chase, of maak een nieuwe. Wat je maakt komt in het werkbestand van QLC+ te staan en QLC+ laadt het meteen opnieuw.</p>}
         {editing && (
           <>

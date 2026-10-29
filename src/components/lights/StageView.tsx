@@ -292,9 +292,10 @@ export default function StageView({ override, compact }: StageViewProps) {
       <div className="stg-3d" ref={mount} aria-label="3D-weergave van het podium" />
       {!compact && <div className="stg-side">
         <div className="stg-status">
-          <span className={`stg-dot${connected ? " on" : ""}`} /> {connected ? "Live van QLC+" : "Geen verbinding met QLC+"}
+          <span className={`stg-dot${connected ? " on" : ""}`} /> {connected ? "Live van QLC+" : "Geen live waarden van QLC+"}
           <button className="stg-btn" onClick={save} disabled={!dirty}>Opstelling opslaan</button>
         </div>
+        {!connected && feed.info && <div className="stg-msg err">{feed.info}</div>}
         {message && <div className={`stg-msg ${message.ok ? "ok" : "err"}`}>{message.text}</div>}
         <svg ref={plan} className="stg-plan" viewBox={`0 0 ${PW} ${PH}`}
           onPointerMove={e => { if (dragging.current !== null) { const p = fromPlan(e); updateUnit(dragging.current.id, dragging.current.unit, { x: p.x, z: p.z }); } }}

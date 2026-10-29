@@ -3,6 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import LightAutoBanner from "@/components/LightAutoBanner";
+import dynamic from "next/dynamic";
+
+// three.js only loads when the live stage window is shown
+const StageView = dynamic(() => import("@/components/lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 import { useSession, signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -22,6 +26,10 @@ export default function LightsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // The live 3D stage next to the controls; the choice is kept per browser
+  const [showStage, setShowStage] = useState(true);
+  useEffect(() => { try { setShowStage(localStorage.getItem("ark.lightsStage") !== "0"); } catch { /* default: shown */ } }, []);
+  const toggleStage = () => setShowStage(v => { const n = !v; try { localStorage.setItem("ark.lightsStage", n ? "1" : "0"); } catch { /* optional */ } return n; });
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // States for Fresnel faders
@@ -710,6 +718,17 @@ export default function LightsPage() {
           )}
         </div>
       </header>
+
+      {/* Live 3D-podium: je ziet meteen wat een knop doet */}
+      <section className="glass-card" style={{ padding: "14px", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: showStage ? "10px" : 0 }}>
+          <strong style={{ fontSize: "0.95rem" }}>Podium live</strong>
+          <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>wat QLC+ nu stuurt</span>
+          <Link href="/lights/stage" style={{ marginLeft: "auto", fontSize: "0.8rem", color: "var(--muted)" }}>Groot, met plan en opstelling</Link>
+          <button className="btn-outline" onClick={toggleStage} style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "0.78rem" }}>{showStage ? "Verberg" : "Toon"}</button>
+        </div>
+        {showStage && <StageView compact />}
+      </section>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
