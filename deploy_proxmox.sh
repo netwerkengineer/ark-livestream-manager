@@ -37,7 +37,7 @@ echo "  $(wc -l < deploy.manifest | tr -d ' ') bestanden in de lijst"
 
 # Staat elk bestand dat in git zit (src, config, scripts) ook echt in het archief? Zo niet, dan sloot een uitsluiting iets uit.
 cut -c35- deploy.manifest > deploy.paths
-MIST=$(git ls-files src config scripts | grep -v '^config/qlcplus/config/' | while IFS= read -r f; do [ -f "$f" ] && [ ! -L "$f" ] && ! grep -qxF "./$f" deploy.paths && echo "$f"; done || true)
+MIST=$(git ls-files src config scripts | grep -v '^config/qlcplus/config/' | grep -v '^config/ark_church_lighting.qxw$' | grep -v '^config/qlcplus/runtime/' | while IFS= read -r f; do [ -f "$f" ] && [ ! -L "$f" ] && ! grep -qxF "./$f" deploy.paths && echo "$f"; done || true)
 rm -f deploy.paths
 if [ -n "$MIST" ]; then
   echo "FOUT: deze bestanden uit git zitten niet in het archief (een uitsluiting in de tar-opdracht?), deploy gestopt:"
