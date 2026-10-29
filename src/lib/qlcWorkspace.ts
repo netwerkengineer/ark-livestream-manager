@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
 
-export const WORKSPACE_FILE = path.join(process.cwd(), "config", "ark_church_lighting.qxw");
+export const WORKSPACE_FILE = process.env.QLC_WORKSPACE_FILE || path.join(process.cwd(), "config", "ark_church_lighting.qxw");
 
 export interface QlcFixture {
   id: number;

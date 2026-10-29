@@ -57,6 +57,7 @@ services:
     volumes:
       - ./config/ark_church_lighting.qxw:/QLC/ark_church_lighting.qxw
       - ./config/qlcplus/config:/root/.config/qlcplus
+      - ./config/qlcplus/runtime:/QLC/runtime
 
   x32-emulator:
     build:

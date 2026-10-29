@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import LightAutoBanner from "./LightAutoBanner";
 import SferenKaart from "./SferenKaart";
+import Link from "next/link";
 
 interface LightsControlProps {
   settings: any;
@@ -641,6 +642,11 @@ export default function LightsControl({ settings }: LightsControlProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      {/* Podium in 2D/3D en de editor voor scènes en chases */}
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <Link href="/lights/stage" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link>
+        <Link href="/lights/editor" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Scènes en chases maken</Link>
+      </div>
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
         autoCount={Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length}

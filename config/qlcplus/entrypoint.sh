@@ -55,28 +55,47 @@ if [ -z "$OSC_LINE" ]; then OSC_LINE="0"; fi
 
 echo "Auto-detected: IP=$NAS_IP, ArtNet Line=$ARTNET_LINE, OSC Line=$OSC_LINE"
 
-cp "$PROJECT" /tmp/project.qxw
+load_project() {
+  cp "$PROJECT" /tmp/project.qxw
 
-if [ "$QLC_OUTPUT_IP" != "broadcast" ] && [ -n "$QLC_OUTPUT_IP" ]; then
-    OUTPUT_PARAMS="<PluginParameters outputIP=\"$QLC_OUTPUT_IP\"/>"
-else
-    OUTPUT_PARAMS="<PluginParameters/>"
-fi
+  if [ "$QLC_OUTPUT_IP" != "broadcast" ] && [ -n "$QLC_OUTPUT_IP" ]; then
+      OUTPUT_PARAMS="<PluginParameters outputIP=\"$QLC_OUTPUT_IP\"/>"
+  else
+      OUTPUT_PARAMS="<PluginParameters/>"
+  fi
 
-# Injecteer de gedetecteerde poorten in het XML-bestand
-sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
- <InputOutputMap>\
-  <Universe Name="Universe 1" ID="0" Passthrough="True">\
-   <Input Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'"><PluginParameters/></Input>\
-   <Output Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'">'"$OUTPUT_PARAMS"'</Output>\
-  </Universe>\
-  <Universe Name="Universe 2" ID="1">\
-   <Input Plugin="OSC" UID="'"$NAS_IP"'" Line="'"$OSC_LINE"'"><PluginParameters/></Input>\
-  </Universe>\
- </InputOutputMap>' /tmp/project.qxw
+  # Injecteer de gedetecteerde poorten in het XML-bestand
+  sed -i '/<InputOutputMap>/,/<\/InputOutputMap>/c\
+   <InputOutputMap>\
+    <Universe Name="Universe 1" ID="0" Passthrough="True">\
+     <Input Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'"><PluginParameters/></Input>\
+     <Output Plugin="ArtNet" UID="'"$NAS_IP"'" Line="'"$ARTNET_LINE"'">'"$OUTPUT_PARAMS"'</Output>\
+    </Universe>\
+    <Universe Name="Universe 2" ID="1">\
+     <Input Plugin="OSC" UID="'"$NAS_IP"'" Line="'"$OSC_LINE"'"><PluginParameters/></Input>\
+    </Universe>\
+   </InputOutputMap>' /tmp/project.qxw
 
-echo "Loading project into QLC+ v5 via /loadProject..."
-curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject > /dev/null
-echo "=== QLC+ v5 Project succesvol geladen! ==="
+  echo "Loading project into QLC+ v5 via /loadProject..."
+  curl -s -F "qlcprj=@/tmp/project.qxw" http://localhost:9999/loadProject > /dev/null
+  echo "=== QLC+ v5 Project succesvol geladen! ==="
+}
 
-wait $QLC_PID
+load_project
+
+# De webapp past scenes en chases aan in het werkbestand en vraagt hier om opnieuw laden: een bestand "reload" in /QLC/runtime.
+# Het antwoord ("ok" of een foutmelding) komt in "reload.result".
+RUNTIME=/QLC/runtime
+mkdir -p "$RUNTIME"
+while kill -0 $QLC_PID 2>/dev/null; do
+    if [ -f "$RUNTIME/reload" ]; then
+        rm -f "$RUNTIME/reload"
+        echo "Reload requested by the web app"
+        if OUT=$( { load_project; } 2>&1 ); then
+            echo "ok $(date +%s)" > "$RUNTIME/reload.result"
+        else
+            echo "fout: $(echo "$OUT" | tail -1)" > "$RUNTIME/reload.result"
+        fi
+    fi
+    sleep 1
+done

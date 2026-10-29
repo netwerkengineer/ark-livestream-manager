@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { QlcFixture } from "@/lib/qlcWorkspace";
 import type { StageConfig, StageFixture, FixtureKind } from "@/lib/lightsStage";
+import { useQlcFeed } from "@/lib/useQlcFeed";
 
 // 2D plan and 3D view of the lights: the fixtures where they hang, lit with the DMX values QLC+ has right now.
 
@@ -44,16 +45,22 @@ const KINDS: { id: FixtureKind; label: string }[] = [
   { id: "par", label: "Par" }, { id: "fresnel", label: "Fresnel" }, { id: "bar", label: "Ledbalk" }, { id: "spot", label: "Spot" },
 ];
 
-export default function StageView() {
+interface StageViewProps {
+  /** DMX values to show instead of what QLC+ sends now (the scene editor previews the scene it is editing) */
+  override?: number[];
+  /** only the 3D view, without the plan and the panel */
+  compact?: boolean;
+}
+
+export default function StageView({ override, compact }: StageViewProps) {
   const [stage, setStage] = useState<StageConfig | null>(null);
   const [fixtures, setFixtures] = useState<QlcFixture[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [lights, setLights] = useState<Record<number, Light>>({});
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [connected, setConnected] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const values = useRef<number[]>([]);
-  const types = useRef<string[]>([]);
+  const overrideRef = useRef<number[] | undefined>(override);
+  overrideRef.current = override;
   const mount = useRef<HTMLDivElement>(null);
   const three = useRef<{ rebuild: (s: StageConfig, fx: QlcFixture[]) => void; dispose: () => void } | null>(null);
   const stageRef = useRef<StageConfig | null>(null);
@@ -73,23 +80,15 @@ export default function StageView() {
       .catch(err => setMessage({ ok: false, text: err instanceof Error ? err.message : "Laden mislukt" }));
   }, []);
 
-  // Live values from QLC+
-  useEffect(() => {
-    const es = new EventSource("/api/qlc/channels");
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-    es.onmessage = ev => {
-      try {
-        const d = JSON.parse(ev.data);
-        if (Array.isArray(d.v)) values.current = d.v;
-        if (Array.isArray(d.t)) types.current = d.t;
-        const next: Record<number, Light> = {};
-        for (const f of fixturesRef.current) next[f.id] = fixtureLight(f, values.current, types.current);
-        setLights(next);
-      } catch { /* ignore a broken message */ }
-    };
-    return () => es.close();
+  // Live values from QLC+ (or the override of the editor)
+  const lightsFor = useCallback((vals: number[], types: string[]) => {
+    const next: Record<number, Light> = {};
+    for (const f of fixturesRef.current) next[f.id] = fixtureLight(f, vals, types);
+    setLights(next);
   }, []);
+  const feed = useQlcFeed((v, t) => { if (!overrideRef.current) lightsFor(v, t); });
+  const values = feed.values, types = feed.types, connected = feed.connected;
+  useEffect(() => { lightsFor(override ?? values.current, types.current); }, [override, fixtures, lightsFor, values, types]);
 
   // The 3D scene: built once, the fixtures are rebuilt when the layout changes and the colours are read from the live values every frame
   useEffect(() => {
@@ -178,7 +177,7 @@ export default function StageView() {
     const tick = () => {
       raf = requestAnimationFrame(tick);
       for (const l of live) {
-        const c = fixtureLight(l.fixture, values.current, types.current);
+        const c = fixtureLight(l.fixture, overrideRef.current ?? values.current, types.current);
         color.setRGB(c.r, c.g, c.b);
         l.lamp.color.copy(color); l.lamp.intensity = c.level * 60;
         const mat = l.beam.material as THREE.MeshBasicMaterial;
@@ -250,9 +249,9 @@ export default function StageView() {
   );
 
   return (
-    <div className="stg">
+    <div className={`stg${compact ? " compact" : ""}`}>
       <div className="stg-3d" ref={mount} aria-label="3D-weergave van het podium" />
-      <div className="stg-side">
+      {!compact && <div className="stg-side">
         <div className="stg-status">
           <span className={`stg-dot${connected ? " on" : ""}`} /> {connected ? "Live van QLC+" : "Geen verbinding met QLC+"}
           <button className="stg-btn" onClick={save} disabled={!dirty}>Opstelling opslaan</button>
@@ -308,7 +307,7 @@ export default function StageView() {
             <label className="stg-field"><span>Hoogte</span><input type="number" min={2} max={15} step={0.5} value={stage.height} onChange={e => { setStage({ ...stage, height: Number(e.target.value) }); setDirty(true); }} /><em>m</em></label>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

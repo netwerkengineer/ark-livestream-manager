@@ -65,3 +65,6 @@ __pycache__/
 # ark-player / desktop app build output
 /track-computer/ark-desktop/build/
 /track-computer/ark-player/ark-player
+config/qlcplus/runtime/reload
+config/qlcplus/runtime/reload.result
+config/backups/

@@ -20,7 +20,7 @@ if [ -d freeshow ]; then
 fi
 
 echo "Inpakken lokaal..."
-tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude ".git" --exclude "deploy.tar.gz" --exclude "deploy.manifest" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" $FRESHOW_EXCLUDES -czf deploy.tar.gz .
+tar --format=ustar --no-xattrs --exclude "._*" --exclude ".DS_Store" --exclude "node_modules" --exclude ".next" --exclude "data" --exclude "companion-data" --exclude "config/qlcplus/config" --exclude "config/ark_church_lighting.qxw" --exclude "config/backups" --exclude "config/qlcplus/runtime" --exclude ".git" --exclude "deploy.tar.gz" --exclude "deploy.manifest" --exclude "track-computer/ark-engine/target" --exclude "track-computer/ark-desktop/build" --exclude "__pycache__" --exclude ".claude" $FRESHOW_EXCLUDES -czf deploy.tar.gz .
 
 echo "Terugzetten placeholder (repo blijft schoon)..."
 git checkout -- src/lib/gitSha.generated.json

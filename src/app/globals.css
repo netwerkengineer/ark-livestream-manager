@@ -1594,3 +1594,40 @@ textarea.input-field {
 .stg-field { display: flex; flex-direction: column; gap: 2px; font-size: 0.72rem; color: var(--muted); position: relative; }
 .stg-field input, .stg-field select { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 4px 6px; font-size: 0.85rem; width: 100%; }
 .stg-field em { position: absolute; right: 8px; bottom: 6px; font-style: normal; font-size: 0.7rem; color: #64748b; pointer-events: none; }
+.stg.compact { grid-template-columns: 1fr; min-height: 0; }
+.stg.compact .stg-3d { min-height: 0; height: 340px; }
+
+/* Lights: scene and chase editor */
+.led { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; flex: 1; }
+@media (max-width: 900px) { .led { grid-template-columns: 1fr; } }
+.led-list { display: flex; flex-direction: column; gap: 4px; max-height: 80vh; overflow: auto; padding: 12px; border-radius: 12px; background: rgba(15,23,42,0.55); border: 1px solid rgba(255,255,255,0.08); }
+.led-list h4 { margin: 10px 0 4px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.led-actions { display: flex; gap: 8px; }
+.led-search { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 5px 8px; font-size: 0.85rem; }
+.led-item { display: flex; justify-content: space-between; gap: 8px; text-align: left; background: transparent; color: #cbd5e1; border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; }
+.led-item em { font-style: normal; color: #64748b; font-size: 0.72rem; }
+.led-item:hover { background: rgba(148,163,184,0.12); }
+.led-item.on { background: rgba(249,115,22,0.2); border-color: #f97316; color: #fed7aa; }
+.led-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.led-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.led-name, .led-path { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 6px 8px; font-size: 0.95rem; }
+.led-name { flex: 1 1 220px; font-weight: 600; }
+.led-path { flex: 0 1 160px; }
+.stg-btn.danger { background: rgba(248,113,113,0.15); color: #fca5a5; }
+.led-scene, .led-chase { display: flex; flex-direction: column; gap: 6px; }
+.led-select { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(15,23,42,0.55); border: 1px solid rgba(255,255,255,0.08); }
+.led-groups { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.led-fx { display: grid; grid-template-columns: minmax(150px, 1.2fr) 44px minmax(120px, 2fr) auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 10px; background: rgba(15,23,42,0.4); border: 1px solid rgba(255,255,255,0.06); }
+.led-fx.sel { border-color: #f97316; }
+.led-fxhead { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; }
+.led-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); }
+.led-more { background: rgba(148,163,184,0.12); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; cursor: pointer; }
+.led-channels { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 14px; padding-top: 4px; }
+.led-ch { display: grid; grid-template-columns: 80px 1fr 28px; gap: 6px; align-items: center; font-size: 0.75rem; color: var(--muted); }
+.led-ch em { font-style: normal; text-align: right; color: #94a3b8; }
+.led-chase-opts { display: flex; gap: 16px; font-size: 0.8rem; color: var(--muted); }
+.led-chase-opts select, .led-step select, .led-step input[type=number] { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 4px 6px; font-size: 0.85rem; }
+.led-step { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(15,23,42,0.4); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem; color: var(--muted); cursor: pointer; }
+.led-step.on { border-color: #f97316; }
+.led-step input[type=number] { width: 64px; }
+.led-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(148,163,184,0.2); display: inline-flex; align-items: center; justify-content: center; color: #e2e8f0; }
