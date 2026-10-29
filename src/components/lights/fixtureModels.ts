@@ -78,7 +78,14 @@ export function aimOf(u: { pan: number; tilt: number }): THREE.Vector3 {
 /** Turns the lamp's own frame (beam along -Y, bar along X) to where it is aimed, then rolls it around the beam */
 export function orientOf(u: { pan: number; tilt: number; roll?: number }): THREE.Quaternion {
   const dir = aimOf(u);
-  return new THREE.Quaternion().setFromAxisAngle(dir, THREE.MathUtils.degToRad(u.roll || 0)).multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir));
+  // the bar axis (local X) lies level and across the beam; a lamp that points straight up or down keeps X along the world X axis
+  const up = new THREE.Vector3(0, 1, 0);
+  const x = Math.abs(dir.y) > 0.999 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3().crossVectors(up, dir).normalize();
+  const y = dir.clone().negate();                       // local +Y points away from the beam
+  const z = new THREE.Vector3().crossVectors(x, y).normalize();
+  const m = new THREE.Matrix4().makeBasis(x, y, z);
+  const base = new THREE.Quaternion().setFromRotationMatrix(m);
+  return new THREE.Quaternion().setFromAxisAngle(dir, THREE.MathUtils.degToRad(u.roll || 0)).multiply(base);
 }
 
 export interface Model {
@@ -160,18 +167,23 @@ export function buildModel(kind: FixtureKind, headCount: number): Model {
   return { group, lenses, heads };
 }
 
-/** Where a stand under a lamp goes: a pole to the floor with three legs (for the KLS bars) */
+const cylBetween = (a: THREE.Vector3, b: THREE.Vector3, r: number) => {
+  const v = b.clone().sub(a), len = v.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), BLACK());
+  m.position.copy(a).addScaledVector(v, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize());
+  return m;
+};
+
+/** A tripod stand under a lamp: a pole up to the lamp with three legs that spread out near the floor */
 export function buildStand(top: THREE.Vector3, floorY: number): THREE.Group {
   const g = new THREE.Group();
-  const h = Math.max(0.2, top.y - floorY - 0.05);
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, h, 8), BLACK());
-  pole.position.set(top.x, floorY + h / 2, top.z); g.add(pole);
+  const base = new THREE.Vector3(top.x, floorY, top.z);
+  g.add(cylBetween(base.clone().setY(floorY + 0.35), new THREE.Vector3(top.x, top.y - 0.02, top.z), 0.016));   // the pole
+  const hub = new THREE.Vector3(top.x, floorY + 0.55, top.z);
   for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + 0.5;
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 6), BLACK());
-    leg.position.set(top.x + Math.cos(a) * 0.22, floorY + 0.3, top.z + Math.sin(a) * 0.22);
-    leg.rotation.set(Math.sin(a) * 0.33, 0, -Math.cos(a) * 0.33);
-    g.add(leg);
+    const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
+    g.add(cylBetween(hub, new THREE.Vector3(top.x + Math.cos(a) * 0.5, floorY + 0.01, top.z + Math.sin(a) * 0.5), 0.011));
   }
   return g;
 }

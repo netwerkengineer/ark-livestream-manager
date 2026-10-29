@@ -86,7 +86,7 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
   if (/lightmaxx|color bar/.test(s)) {
     const left = i < 2;
     const z = left ? 6 + i * 3.5 : 7.5;
-    return { ...base, x: left ? -4.3 : 4.3, y: 0.3, z, pan: left ? -90 : 90, tilt: 100, roll: 90, beam: 70, kind: "colorbar" };
+    return { ...base, x: left ? -4.3 : 4.3, y: 0.3, z, pan: left ? -90 : 90, tilt: 100, roll: 0, beam: 70, kind: "colorbar" };
   }
   void index;
   return null;
