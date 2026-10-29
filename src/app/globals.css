@@ -1631,3 +1631,7 @@ textarea.input-field {
 .led-step.on { border-color: #f97316; }
 .led-step input[type=number] { width: 64px; }
 .led-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(148,163,184,0.2); display: inline-flex; align-items: center; justify-content: center; color: #e2e8f0; }
+.stg-units { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+.stg-chip { min-width: 26px; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(148,163,184,0.35); background: rgba(15,23,42,0.6); color: #cbd5e1; cursor: pointer; font-size: 0.78rem; }
+.stg-chip.on { background: rgba(249,115,22,0.25); border-color: #f97316; color: #fed7aa; }
+.stg-plan { max-height: 62vh; }
