@@ -5,6 +5,7 @@
 import fs from "fs";
 import path from "path";
 import { WORKSPACE_FILE, readFixtures } from "./qlcWorkspace";
+import { TEMPO_PATH, TEMPO_MAX_MS, oscChannel } from "./lightsTempo";
 
 export interface SceneFn { id: number; type: "Scene"; name: string; path: string; values: Record<number, number[]>; button?: boolean }
 export interface ChaserStep { scene: number; fadeIn: number; hold: number; fadeOut: number }
@@ -13,6 +14,8 @@ export interface ChaserFn {
   direction: "Forward" | "Backward"; runOrder: "Loop" | "SingleShot" | "PingPong" | "Random";
   steps: ChaserStep[];
   button?: boolean;
+  /** follows the tap tempo: a step lasts one beat */
+  tempo?: boolean;
 }
 export interface OtherFn { id: number; type: string; name: string; path: string; button?: boolean }
 export type QlcFunction = SceneFn | ChaserFn | OtherFn;
@@ -59,7 +62,8 @@ export function readFunctions(file = WORKSPACE_FILE): QlcFunction[] {
     } else out.push({ id, type, name, path: pth });
   }
   const buttons = new Set(customButtons(xml).map(b => b.id));
-  for (const f of out) f.button = buttons.has(f.id);
+  const tempo = new Set(customTempo(xml));
+  for (const f of out) { f.button = buttons.has(f.id); if (f.type === "Chaser") (f as ChaserFn).tempo = tempo.has(f.id); }
   return out;
 }
 
@@ -82,8 +86,36 @@ export function customButtons(xml: string): { id: number; caption: string }[] {
   return [...xml.slice(r.start, r.end).matchAll(/<Button Caption="([^"]*)" ID="(\d+)">/g)].map(m => ({ id: Number(m[2]), caption: unescapeXml(m[1]) }));
 }
 
-function customFrameXml(buttons: { id: number; caption: string }[]): string {
+const TEMPO_DIAL_ID = 410;
+// The speed dial multiplier of a function that follows the dial one to one (the same value the Strobe Speed dial of this workspace uses)
+const ONE_TO_ONE = 6;
+
+/** The chases that follow the tap tempo: the functions of the "Tempo" speed dial in the frame */
+export function customTempo(xml: string): number[] {
+  const r = customRange(xml);
+  if (!r) return [];
+  const frame = xml.slice(r.start, r.end);
+  const dial = /<SpeedDial Caption="Tempo" ID="\d+">[\s\S]*?<\/SpeedDial>/.exec(frame);
+  return dial ? [...dial[0].matchAll(/<Function FadeIn="\d+" FadeOut="\d+" Duration="\d+">(\d+)<\/Function>/g)].map(m => Number(m[1])) : [];
+}
+
+function tempoDialXml(ids: number[], y: number): string {
+  return `    <SpeedDial Caption="Tempo" ID="${TEMPO_DIAL_ID}">
+     <Appearance>
+      <FrameStyle>Sunken</FrameStyle>
+      <Font>Arial,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font>
+     </Appearance>
+     <WindowState Visible="True" X="10" Y="${y}" Width="170" Height="170" />
+     <Visibility>43</Visibility>
+${ids.map(id => `     <Function FadeIn="0" FadeOut="0" Duration="${ONE_TO_ONE}">${id}</Function>`).join("\n")}
+     <AbsoluteValue Minimum="0" Maximum="${TEMPO_MAX_MS}"><Input Universe="1" Channel="${oscChannel(TEMPO_PATH)}" /></AbsoluteValue>
+     <Time>0</Time>
+    </SpeedDial>`;
+}
+
+function customFrameXml(buttons: { id: number; caption: string }[], tempo: number[]): string {
   const rows = Math.max(1, Math.ceil(buttons.length / 2));
+  const dialY = 40 + rows * 70;
   const btn = buttons.map((b, i) => `    <Button Caption="${escapeXml(b.caption)}" ID="${b.id}">
      <WindowState Visible="True" X="${10 + (i % 2) * 190}" Y="${40 + Math.floor(i / 2) * 70}" Width="180" Height="60" />
      <Function ID="${b.id}" />
@@ -94,26 +126,26 @@ function customFrameXml(buttons: { id: number; caption: string }[]): string {
      <FrameStyle>Sunken</FrameStyle>
      <Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font>
     </Appearance>
-    <WindowState Visible="True" X="760" Y="40" Width="390" Height="${60 + rows * 70}" />
+    <WindowState Visible="True" X="760" Y="40" Width="390" Height="${60 + rows * 70 + (tempo.length ? 180 : 0)}" />
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>True</ShowHeader>
     <ShowEnableButton>True</ShowEnableButton>
     <Collapsed>False</Collapsed>
     <Disabled>False</Disabled>
-${btn}
+${btn}${tempo.length ? "\n" + tempoDialXml(tempo, dialY) : ""}
    </Frame>`;
 }
 
 /** Make sure the frame has exactly these buttons (an empty list removes the frame) */
-function setCustomButtons(xml: string, buttons: { id: number; caption: string }[]): string {
+function setCustomButtons(xml: string, buttons: { id: number; caption: string }[], tempo: number[] = customTempo(xml)): string {
   const r = customRange(xml);
-  if (buttons.length === 0) {
+  if (buttons.length === 0 && tempo.length === 0) {
     if (!r) return xml;
     const from = xml.lastIndexOf("\n", r.start);
     return xml.slice(0, from < 0 ? r.start : from) + xml.slice(r.end);
   }
-  const frame = customFrameXml(buttons);
+  const frame = customFrameXml(buttons, tempo);
   if (r) {
     const from = xml.lastIndexOf("\n", r.start);
     return xml.slice(0, from < 0 ? r.start : from + 1) + frame + xml.slice(r.end);
@@ -137,6 +169,15 @@ function applyButton(xml: string, id: number, caption: string, want: boolean | u
   if (want) list.push({ id, caption });
   else if (!had) return xml;
   return setCustomButtons(xml, list.sort((a, b) => a.id - b.id));
+}
+
+/** Put a chase on the tap tempo dial, or take it off */
+function applyTempo(xml: string, id: number, want: boolean | undefined): string {
+  if (want === undefined) return xml;
+  const cur = customTempo(xml);
+  if (want === cur.includes(id)) return xml;
+  const next = want ? [...cur, id].sort((a, b) => a - b) : cur.filter(x => x !== id);
+  return setCustomButtons(xml, customButtons(xml), next);
 }
 
 const nextId = (xml: string): number => {
@@ -205,7 +246,7 @@ export function saveScene(input: { id?: number; name?: unknown; path?: unknown; 
   return r.id;
 }
 
-export function saveChaser(input: { id?: number; name?: unknown; path?: unknown; direction?: unknown; runOrder?: unknown; steps?: unknown; button?: boolean }): number {
+export function saveChaser(input: { id?: number; name?: unknown; path?: unknown; direction?: unknown; runOrder?: unknown; steps?: unknown; button?: boolean; tempo?: boolean }): number {
   const name = cleanName(input.name);
   const pth = typeof input.path === "string" ? input.path.trim().slice(0, 60) : "";
   const known = new Set(readFunctions().map(f => f.id));
@@ -224,7 +265,7 @@ export function saveChaser(input: { id?: number; name?: unknown; path?: unknown;
   const block = `  <Function ID="${input.id ?? "__ID__"}" Type="Chaser" Name="${escapeXml(name)}"${pth ? ` Path="${escapeXml(pth)}"` : ""}>\n   <Speed FadeIn="${first.fadeIn}" FadeOut="${first.fadeOut}" Duration="${first.fadeIn + first.hold}" />\n   <Direction>${direction}</Direction>\n   <RunOrder>${runOrder}</RunOrder>\n   <SpeedModes FadeIn="Default" FadeOut="Default" Duration="Common" />\n${stepXml}\n  </Function>`;
   const xml = fs.readFileSync(WORKSPACE_FILE, "utf-8");
   const r = replaceOrAppend(xml, input.id, block);
-  writeWorkspace(WORKSPACE_FILE, applyButton(r.xml, r.id, name, input.button));
+  writeWorkspace(WORKSPACE_FILE, applyTempo(applyButton(r.xml, r.id, name, input.button), r.id, input.tempo));
   return r.id;
 }
 
@@ -251,7 +292,7 @@ export function deleteFunction(id: number) {
   const start = xml.indexOf("<Engine>"), end = xml.indexOf("</Engine>");
   const re = new RegExp(`[ \\t]*<Function ID="${id}" Type="\\w+"[^>]*>[\\s\\S]*?</Function>\\n?`);
   const eng = xml.slice(start, end).replace(re, "");
-  writeWorkspace(WORKSPACE_FILE, applyButton(xml.slice(0, start) + eng + xml.slice(end), id, "", false));
+  writeWorkspace(WORKSPACE_FILE, applyTempo(applyButton(xml.slice(0, start) + eng + xml.slice(end), id, "", false), id, false));
 }
 
 /** Ask the QLC+ container to load the workspace again (its start script watches this trigger file) and wait for the answer */

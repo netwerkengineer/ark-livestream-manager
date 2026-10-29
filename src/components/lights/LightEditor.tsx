@@ -5,6 +5,9 @@ import type { QlcFixture } from "@/lib/qlcWorkspace";
 import type { QlcFunction, SceneFn, ChaserFn, ChaserStep } from "@/lib/qlcFunctions";
 import { useQlcFeed } from "@/lib/useQlcFeed";
 import StageView, { fixtureLight } from "./StageView";
+import TempoTap from "./TempoTap";
+
+interface LibColor { id: string; name: string; hex: string }
 
 // Make and change scenes and chases of the QLC+ workspace. A scene is the value of every channel of the fixtures it contains;
 // a chase plays scenes one after another. Saving writes the workspace and has QLC+ load it again.
@@ -12,7 +15,7 @@ import StageView, { fixtureLight } from "./StageView";
 type Values = Record<number, number[]>;
 type Editing =
   | { kind: "scene"; id?: number; name: string; path: string; values: Values; button: boolean }
-  | { kind: "chase"; id?: number; name: string; path: string; button: boolean; steps: ChaserStep[]; direction: "Forward" | "Backward"; runOrder: ChaserFn["runOrder"] }
+  | { kind: "chase"; id?: number; name: string; path: string; button: boolean; tempo: boolean; steps: ChaserStep[]; direction: "Forward" | "Backward"; runOrder: ChaserFn["runOrder"] }
   | null;
 
 const COLOR_NAMES: Record<string, string> = { FF0000: "Rood", "00FF00": "Groen", "0000FF": "Blauw", FFFFFF: "Wit", FF7E00: "Amber", "9400D3": "UV", "00FFFF": "Cyaan", FF00FF: "Magenta", FFFF00: "Geel" };
@@ -44,6 +47,9 @@ export default function LightEditor() {
   const [openFx, setOpenFx] = useState<number | null>(null);
   const [previewStep, setPreviewStep] = useState<number>(0);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [palette, setPalette] = useState<LibColor[]>([]);
+  const [manage, setManage] = useState(false);
+  const [pick, setPick] = useState("#ff0000");
   const feed = useQlcFeed();
 
   const load = useCallback(async () => {
@@ -51,6 +57,9 @@ export default function LightEditor() {
     const j = await res.json();
     if (!res.ok || j.error) throw new Error(j.error || `HTTP ${res.status}`);
     setFixtures(j.fixtures); setFunctions(j.functions);
+  }, []);
+  useEffect(() => {
+    fetch("/api/lights/colors", { cache: "no-store" }).then(r => r.json()).then(j => { if (Array.isArray(j.colors)) setPalette(j.colors); }).catch(() => { /* the library stays empty */ });
   }, []);
   useEffect(() => { load().catch(err => setMessage({ ok: false, text: err instanceof Error ? err.message : "Laden mislukt" })); }, [load]);
 
@@ -76,7 +85,7 @@ export default function LightEditor() {
   }, [editing, previewStep, sceneById, fixtures, dmxSize]);
 
   const newScene = () => { setEditing({ kind: "scene", name: "Nieuwe scène", path: "", values: blank(), button: true }); setDirty(true); setSelection(new Set()); };
-  const newChase = () => { setEditing({ kind: "chase", name: "Nieuwe chase", path: "", button: true, steps: [], direction: "Forward", runOrder: "Loop" }); setDirty(true); setPreviewStep(0); };
+  const newChase = () => { setEditing({ kind: "chase", name: "Nieuwe chase", path: "", button: true, tempo: false, steps: [], direction: "Forward", runOrder: "Loop" }); setDirty(true); setPreviewStep(0); };
   const openFunction = (f: QlcFunction) => {
     if (dirty && !confirm("Niet-opgeslagen wijzigingen weggooien?")) return;
     if (f.type === "Scene") {
@@ -87,7 +96,7 @@ export default function LightEditor() {
       setEditing({ kind: "scene", id: sc.id, name: sc.name, path: sc.path, values, button: !!sc.button }); setSelection(new Set());
     } else if (f.type === "Chaser") {
       const c = f as ChaserFn;
-      setEditing({ kind: "chase", id: c.id, name: c.name, path: c.path, button: !!c.button, steps: c.steps.map(s => ({ ...s })), direction: c.direction, runOrder: c.runOrder }); setPreviewStep(0);
+      setEditing({ kind: "chase", id: c.id, name: c.name, path: c.path, button: !!c.button, tempo: !!c.tempo, steps: c.steps.map(s => ({ ...s })), direction: c.direction, runOrder: c.runOrder }); setPreviewStep(0);
     } else return;
     setDirty(false); setMessage(null);
   };
@@ -124,6 +133,28 @@ export default function LightEditor() {
       return { ...e, values: { ...e.values, [fx.id]: arr } };
     });
     setDirty(true);
+  };
+
+  const rgbOf = (h: string): [number, number, number] => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const colourSelection = (h: string) => fixtures.filter(f => selection.has(f.id)).forEach(f => colourFixture(f, rgbOf(h)));
+
+  const savePalette = async (colors: LibColor[]) => {
+    setPalette(colors);
+    try {
+      const res = await fetch("/api/lights/colors", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ colors }) });
+      const j = await res.json();
+      if (!res.ok || j.error) throw new Error(j.error || `HTTP ${res.status}`);
+      setPalette(j.colors);
+    } catch (err) { setMessage({ ok: false, text: `Kleurenbibliotheek opslaan mislukt: ${err instanceof Error ? err.message : "onbekende fout"}` }); }
+  };
+  const addColor = () => {
+    const name = (prompt("Naam van de kleur?") || "").trim();
+    if (!name) return;
+    savePalette([...palette, { id: `c${Date.now().toString(36)}`, name, hex: pick }]);
+  };
+  const renameColor = (c: LibColor) => {
+    const name = (prompt("Nieuwe naam?", c.name) || "").trim();
+    if (name) savePalette(palette.map(x => (x.id === c.id ? { ...x, name } : x)));
   };
 
   const fixtureColour = (fx: QlcFixture, vals: Values) => {
@@ -169,7 +200,7 @@ export default function LightEditor() {
     if (!editing) return;
     const body = editing.kind === "scene"
       ? { action: "save-scene", id: editing.id, name: editing.name, path: editing.path, values: editing.values, button: editing.button }
-      : { action: "save-chaser", id: editing.id, name: editing.name, path: editing.path, button: editing.button, steps: editing.steps, direction: editing.direction, runOrder: editing.runOrder };
+      : { action: "save-chaser", id: editing.id, name: editing.name, path: editing.path, button: editing.button, tempo: editing.tempo, steps: editing.steps, direction: editing.direction, runOrder: editing.runOrder };
     const j = await post(body);
     if (!j) return;
     setEditing({ ...editing, id: j.id });
@@ -214,6 +245,7 @@ export default function LightEditor() {
       </aside>
 
       <section className="led-main">
+        <TempoTap />
         {message && <div className={`stg-msg ${message.ok ? "ok" : "err"}`}>{message.text}</div>}
         {!types.some(Boolean) && <div className="stg-msg err">Kanaalsoorten onbekend: kleuren kiezen werkt pas als QLC+ bereikbaar is. {feed.info}</div>}
         {!editing && <p className="stg-meta">Kies links een scène of chase, of maak een nieuwe. Wat je maakt komt in het werkbestand van QLC+ te staan en QLC+ laadt het meteen opnieuw.</p>}
@@ -236,8 +268,19 @@ export default function LightEditor() {
                 <div className="led-select">
                   <strong>Kleur voor de selectie ({selection.size})</strong>
                   <input type="color" aria-label="Kleur" disabled={selection.size === 0}
-                    onChange={e => { const h = e.target.value; const rgb: [number, number, number] = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; fixtures.filter(f => selection.has(f.id)).forEach(f => colourFixture(f, rgb)); }} />
+                    value={pick} onChange={e => { setPick(e.target.value); colourSelection(e.target.value); }} />
                   <button className="stg-btn" style={{ marginLeft: 0 }} onClick={() => fixtures.filter(f => selection.has(f.id)).forEach(f => colourFixture(f, [0, 0, 0]))} disabled={selection.size === 0}>Uit</button>
+                  <span className="led-palette" role="group" aria-label="Kleurenbibliotheek">
+                    {palette.map(c => (
+                      <span key={c.id} className="led-pal">
+                        <button className="led-pal-sw" style={{ background: c.hex }} title={manage ? `${c.name} (klik om de naam te wijzigen)` : c.name} aria-label={c.name}
+                          disabled={!manage && selection.size === 0} onClick={() => (manage ? renameColor(c) : (setPick(c.hex), colourSelection(c.hex)))} />
+                        {manage && <button className="led-pal-x" aria-label={`${c.name} verwijderen`} onClick={() => savePalette(palette.filter(x => x.id !== c.id))}>✕</button>}
+                      </span>
+                    ))}
+                    <button className="stg-btn" style={{ marginLeft: 0 }} onClick={addColor} title="Bewaar de gekozen kleur in de bibliotheek">+ Bewaar</button>
+                    <button className={`stg-btn${manage ? " on" : ""}`} style={{ marginLeft: 0 }} onClick={() => setManage(m => !m)}>{manage ? "Klaar" : "Beheer"}</button>
+                  </span>
                   <span className="led-groups">
                     <button className="stg-btn" style={{ marginLeft: 0 }} onClick={() => setSelection(new Set(fixtures.map(f => f.id)))}>Alle</button>
                     {models.map(m => <button key={m} className="stg-btn" style={{ marginLeft: 0 }} onClick={() => setSelection(new Set(fixtures.filter(f => `${f.manufacturer} ${f.model}` === m).map(f => f.id)))}>{m}</button>)}
@@ -288,6 +331,7 @@ export default function LightEditor() {
                       <option value="Loop">Herhalen</option><option value="SingleShot">Eén keer</option><option value="PingPong">Heen en weer</option><option value="Random">Willekeurig</option>
                     </select>
                   </label>
+                  <label className="led-btnopt" title="Elke stap duurt één tel van het tempo dat je tikt; de wachttijd hieronder telt dan niet mee"><input type="checkbox" checked={editing.tempo} onChange={e => patchChase({ tempo: e.target.checked })} /> Volgt het tempo (tik tempo)</label>
                   <label>Richting
                     <select value={editing.direction} onChange={e => patchChase({ direction: e.target.value as "Forward" | "Backward" })}>
                       <option value="Forward">Vooruit</option><option value="Backward">Achteruit</option>

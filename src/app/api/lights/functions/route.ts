@@ -5,6 +5,7 @@ import { isAuthorized } from "@/lib/authHelper";
 import { readFixtures } from "@/lib/qlcWorkspace";
 import { readFunctions, saveScene, saveChaser, deleteFunction, reloadQlc } from "@/lib/qlcFunctions";
 import { getSettings } from "@/lib/settingsStore";
+import { readTempo, sendTempo } from "@/lib/lightsTempo";
 import WebSocket from "ws";
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
     else if (body.action === "delete") { id = Number(body.id); deleteFunction(id); }
     else return NextResponse.json({ error: "Onbekende actie" }, { status: 400 });
     const reload = body.reload === false ? { ok: true, message: "" } : await reloadQlc();
+    // QLC+ starts from the saved speeds again after loading: give the chases that follow the beat the tempo that was set
+    const tempo = readTempo();
+    if (reload.ok && tempo) setTimeout(() => sendTempo(tempo), 1500);
     return NextResponse.json({ id, reload, ...(await getLists()) });
   } catch (err) {
     return NextResponse.json({ error: message(err) }, { status: 400 });
