@@ -59,6 +59,7 @@ export default function StageView() {
   const stageRef = useRef<StageConfig | null>(null);
   const fixturesRef = useRef<QlcFixture[]>([]);
   stageRef.current = stage;
+  const ready = stage !== null;
   fixturesRef.current = fixtures;
 
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function StageView() {
   // The 3D scene: built once, the fixtures are rebuilt when the layout changes and the colours are read from the live values every frame
   useEffect(() => {
     const el = mount.current;
-    if (!el) return;
+    if (!el || !ready) return;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -181,7 +182,7 @@ export default function StageView() {
         color.setRGB(c.r, c.g, c.b);
         l.lamp.color.copy(color); l.lamp.intensity = c.level * 60;
         const mat = l.beam.material as THREE.MeshBasicMaterial;
-        mat.color.copy(color); mat.opacity = c.level * 0.22;
+        mat.color.copy(color); mat.opacity = c.level * 0.13;
         (l.glow.material as THREE.MeshBasicMaterial).color.copy(c.level > 0.01 ? color : color.setRGB(0.07, 0.07, 0.07));
       }
       controls.update();
@@ -201,7 +202,7 @@ export default function StageView() {
       if (renderer.domElement.parentElement === el) el.removeChild(renderer.domElement);
       three.current = null;
     };
-  }, []);
+  }, [ready]);
 
   useEffect(() => { if (stage && three.current) three.current.rebuild(stage, fixtures); }, [stage, fixtures]);
 
