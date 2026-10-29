@@ -69,10 +69,10 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
     const sp = spots[Math.min(i, spots.length - 1)] || spots[0];
     return { ...base, x: sp.x, y: STAGE_H + 0.1, z: sp.z, pan: sp.pan, tilt: sp.tilt, beam: 25, kind: "par" };
   }
-  // Eurolite KLS-200: on a stand in the corners of the stage, the three heads towards the hall
+  // Eurolite KLS-200: on a stand in the corners of the stage, the three heads pointing in at the stage
   if (/kls/.test(s)) {
     const left = i % 2 === 0;
-    return { ...base, x: left ? -3.2 : 3.2, y: STAGE_H + 1.5, z: left ? 2.8 : 1.0, pan: left ? 20 : -20, tilt: 55, roll: 0, beam: 90, kind: "bar" };
+    return { ...base, x: left ? -3.2 : 3.2, y: STAGE_H + 1.5, z: left ? 2.8 : 1.0, pan: left ? 112 : -81, tilt: 70, roll: 0, beam: 90, kind: "bar" };
   }
   // ADJ Encor FR50Z fresnels: hanging under the ceiling in front of the stage
   if (/fr50|fresnel/.test(s)) {
