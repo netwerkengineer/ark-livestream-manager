@@ -1573,3 +1573,24 @@ textarea.input-field {
 .trk-wave-seltext { flex: 1 1 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trk-wave-top { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 4px 2px; align-items: center; }
 .trk-wave-canvas { position: relative; }
+
+/* Lights: 2D/3D stage view */
+.stg { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 16px; flex: 1; min-height: 560px; }
+@media (max-width: 1000px) { .stg { grid-template-columns: 1fr; } }
+.stg-3d { position: relative; min-height: 420px; border-radius: 12px; overflow: hidden; background: #04060d; border: 1px solid rgba(255,255,255,0.08); }
+.stg-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.stg-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.stg-dot { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; }
+.stg-dot.on { background: #4ade80; }
+.stg-btn { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(249,115,22,0.18); color: #fed7aa; cursor: pointer; font-size: 0.8rem; }
+.stg-btn:disabled { opacity: 0.4; cursor: default; }
+.stg-msg { padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; }
+.stg-msg.ok { background: rgba(74,222,128,0.12); color: #86efac; }
+.stg-msg.err { background: rgba(248,113,113,0.12); color: #fca5a5; }
+.stg-plan { width: 100%; height: auto; border-radius: 10px; touch-action: none; user-select: none; }
+.stg-panel { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: rgba(15,23,42,0.55); border: 1px solid rgba(255,255,255,0.08); }
+.stg-meta { font-size: 0.75rem; color: var(--muted); }
+.stg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stg-field { display: flex; flex-direction: column; gap: 2px; font-size: 0.72rem; color: var(--muted); position: relative; }
+.stg-field input, .stg-field select { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 4px 6px; font-size: 0.85rem; width: 100%; }
+.stg-field em { position: absolute; right: 8px; bottom: 6px; font-style: normal; font-size: 0.7rem; color: #64748b; pointer-events: none; }

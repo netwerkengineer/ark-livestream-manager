@@ -697,6 +697,7 @@ export default function LightsPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Link href="/lights/stage" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link>
           {isQlcEnabled ? (
             <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", background: "rgba(74, 222, 128, 0.1)", border: "1px solid rgba(74, 222, 128, 0.2)", color: "#4ade80", padding: "6px 12px", borderRadius: "20px" }}>
               <span className="dot bg-green" /> Verbonden met QLC+
