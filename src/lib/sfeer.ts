@@ -143,6 +143,7 @@ export async function applySfeerToShowFile(filePath: string, slug: string, achte
 
   c.slides = c.slides || {};
   let startId: string | null = null;
+  const replaced = new Set<string>();   // achtergronden die hier door een andere zijn vervangen; de lijst met media van de show ruimt ze op als niets ze meer gebruikt
   for (const layout of Object.values<any>(c.layouts || {})) {
     const sls: any[] = layout.slides || [];
     if (!sls.length) continue;
@@ -159,7 +160,7 @@ export async function applySfeerToShowFile(filePath: string, slug: string, achte
     }
     const start = sls[0];
     const prevBackground = start.background;
-    if (backgroundChanges) { if (mid) start.background = mid; else delete start.background; }
+    if (backgroundChanges) { if (mid) start.background = mid; else delete start.background; if (prevBackground && prevBackground !== mid) replaced.add(prevBackground); }
     // Oude Ark-achtergronden op andere dia's weghalen (eigen, handmatig gekozen achtergronden blijven staan)
     sls.forEach((sl: any, i: number) => {
       if (i > 0 && oldIds.includes(sl.background)) delete sl.background;
@@ -180,8 +181,16 @@ export async function applySfeerToShowFile(filePath: string, slug: string, achte
         if (lightAction) textActs.push({ ...lightAction, id: rid() });
       }
       // Zelfde met de achtergrond; een eigen, handmatig gekozen achtergrond op die dia blijft staan (oude Ark-achtergronden zijn hierboven al weg)
-      if (mid && (!firstText.background || firstText.background === prevBackground)) firstText.background = mid;
+      if (mid && (!firstText.background || firstText.background === prevBackground)) { if (firstText.background && firstText.background !== mid) replaced.add(firstText.background); firstText.background = mid; }
     }
+  }
+
+  // Een vervangen achtergrond blijft in de mediabestanden van de show staan; weghalen als geen dia of ander onderdeel er nog naar verwijst
+  // (het bestand zelf in de mediamap blijft bestaan)
+  if (replaced.size) {
+    const { media, ...rest } = c;
+    const rest_ = JSON.stringify(rest);
+    for (const id of replaced) if (c.media[id] && !rest_.includes(`"${id}"`)) delete c.media[id];
   }
 
   c.timestamps = { ...(c.timestamps || {}), modified: Date.now() };
