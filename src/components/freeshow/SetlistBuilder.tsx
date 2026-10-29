@@ -1318,9 +1318,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                 {draft.songs.map((s, i) => (
                   <div key={s.id} className="glass-card" style={{ padding: '0.7rem 0.9rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, flex: 1 }}>
                         <span style={{ opacity: 0.4, fontSize: '0.75rem', width: '1.2rem', textAlign: 'right', flexShrink: 0 }}>{i + 1}.</span>
-                        <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span title={s.title + (s.artist ? ' - ' + s.artist : '')} style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                           {s.title}{s.artist ? <span style={{ opacity: 0.5 }}> - {s.artist}</span> : ''}
                         </span>
                         <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--muted)', flexShrink: 0 }}>
@@ -1330,7 +1330,18 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                         {(s.lyricsText || s.chordsText) && <span title="Tekst/akkoorden toegevoegd" style={{ flexShrink: 0 }}>📝</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                        <button onClick={() => moveSong(i, -1)} disabled={i === 0} title="Omhoog" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
+                        <button onClick={() => moveSong(i, 1)} disabled={i === draft.songs.length - 1} title="Omlaag" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === draft.songs.length - 1 ? 0.3 : 1 }}>▼</button>
+                        <button onClick={() => startEditing(s)} title="Tekst/akkoorden bewerken" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.3rem' }}>✏️</button>
+                        <button onClick={() => removeSong(s.id)} disabled={deletingId === s.id} title="Verwijderen" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}>
+                          {deletingId === s.id ? '...' : '🗑️'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.5rem 0.9rem', marginTop: '0.45rem', paddingLeft: '1.6rem' }}>
                         {arrangementen[s.id] && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.62rem', color: 'var(--muted)' }}>Arrangement
                           <select
                             value={s.layoutId && arrangementen[s.id].opties.some(o => o.id === s.layoutId) ? s.layoutId : arrangementen[s.id].actief}
                             onChange={e => changeArrangement(s.id, e.target.value)}
@@ -1339,20 +1350,18 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                           >
                             {arrangementen[s.id].opties.map(o => <option key={o.id} value={o.id} style={{ color: '#000' }}>{o.naam}</option>)}
                           </select>
+                        </div>
                         )}
                         {sferen.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.62rem', color: 'var(--muted)' }}>Sfeer (licht en filmpje)
                           <SfeerKiezer value={s.sfeer || ''} opties={sferen} onChange={slug => changeSfeer(s.id, slug)} />
+                        </div>
                         )}
                         {freeshowMediaPath && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.62rem', color: 'var(--muted)' }}>Achtergrond
                           <AchtergrondKiezer value={s.achtergrond || ''} mediaPath={freeshowMediaPath} onChange={pad => changeAchtergrond(s.id, pad)} />
+                        </div>
                         )}
-                        <button onClick={() => moveSong(i, -1)} disabled={i === 0} title="Omhoog" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
-                        <button onClick={() => moveSong(i, 1)} disabled={i === draft.songs.length - 1} title="Omlaag" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === draft.songs.length - 1 ? 0.3 : 1 }}>▼</button>
-                        <button onClick={() => startEditing(s)} title="Tekst/akkoorden bewerken" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.3rem' }}>✏️</button>
-                        <button onClick={() => removeSong(s.id)} disabled={deletingId === s.id} title="Verwijderen" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}>
-                          {deletingId === s.id ? '...' : '🗑️'}
-                        </button>
-                      </div>
                     </div>
 
                     {expandedId === s.id && (
