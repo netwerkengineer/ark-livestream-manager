@@ -15,6 +15,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import LightAutoBanner from "./LightAutoBanner";
 import SferenKaart from "./SferenKaart";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+// three.js only loads when the live stage window is shown
+const StageView = dynamic(() => import("./lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 
 interface LightsControlProps {
   settings: any;
@@ -42,6 +46,10 @@ const FADE_PRESETS = [
 ];
 
 export default function LightsControl({ settings }: LightsControlProps) {
+  // The live 3D stage next to the controls; the choice is kept per browser
+  const [showStage, setShowStage] = useState(true);
+  useEffect(() => { try { setShowStage(localStorage.getItem("ark.lightsStage") !== "0"); } catch { /* default: shown */ } }, []);
+  const toggleStage = () => setShowStage(v => { const n = !v; try { localStorage.setItem("ark.lightsStage", n ? "1" : "0"); } catch { /* optional */ } return n; });
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // States for Fresnel faders
@@ -647,6 +655,17 @@ export default function LightsControl({ settings }: LightsControlProps) {
         <Link href="/lights/stage" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link>
         <Link href="/lights/editor" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Scènes en chases maken</Link>
       </div>
+      {/* Live 3D-podium: je ziet meteen wat een knop doet */}
+      <section className="glass-card" style={{ padding: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: showStage ? "10px" : 0 }}>
+          <strong style={{ fontSize: "0.95rem" }}>Podium live</strong>
+          <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>wat QLC+ nu stuurt</span>
+          <Link href="/lights/stage" style={{ marginLeft: "auto", fontSize: "0.8rem", color: "var(--muted)" }}>Groot, met plan en opstelling</Link>
+          <button className="btn-outline" onClick={toggleStage} style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "0.78rem" }}>{showStage ? "Verberg" : "Toon"}</button>
+        </div>
+        {showStage && <StageView compact />}
+      </section>
+
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
         autoCount={Object.keys(autoColors).filter(k => activeColors[Number(k)] && autoColors[Number(k)]).length}

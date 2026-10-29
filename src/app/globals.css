@@ -1595,7 +1595,7 @@ textarea.input-field {
 .stg-field input, .stg-field select { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 4px 6px; font-size: 0.85rem; width: 100%; }
 .stg-field em { position: absolute; right: 8px; bottom: 6px; font-style: normal; font-size: 0.7rem; color: #64748b; pointer-events: none; }
 .stg.compact { grid-template-columns: 1fr; min-height: 0; }
-.stg.compact .stg-3d { min-height: 0; height: 340px; }
+.stg.compact .stg-3d { min-height: 0; height: 400px; }
 
 /* Lights: scene and chase editor */
 .led { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; flex: 1; }
