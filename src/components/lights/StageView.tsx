@@ -16,6 +16,7 @@ export function fixtureLight(f: QlcFixture, values: number[], types: string[]): 
 }
 
 const cssColor = (l: Light) => `rgb(${Math.round(60 + 195 * l.r)}, ${Math.round(60 + 195 * l.g)}, ${Math.round(60 + 195 * l.b)})`;
+const GAIN: Partial<Record<FixtureKind, number>> = { kls: 0.25, par: 1.2, ubar: 1.3, bar: 1.3, colorbar: 1.3 };
 const OFF: Light = { r: 0, g: 0, b: 0, level: 0 };
 const brightest = (list: Light[] | undefined): Light => (list && list.length ? list.reduce((b, l) => (l.level > b.level ? l : b), list[0]) : OFF);
 
@@ -190,9 +191,11 @@ export default function StageView({ override, compact }: StageViewProps) {
         if (!hs) { hs = headLights(l.fixture, vals, types.current, l.kind); cache.set(l.fixture, hs); }
         const c = hs[l.head] ?? hs[0] ?? OFF;
         color.setRGB(c.r, c.g, c.b);
-        l.lamp.color.copy(color); l.lamp.intensity = c.level * 35;
+        // a KLS200 on white is a soft wash in the room, the colour bars are what you see: so it counts for less than a bar
+        const gain = GAIN[l.kind] ?? 1;
+        l.lamp.color.copy(color); l.lamp.intensity = c.level * 35 * gain;
         const mat = l.beam.material as THREE.MeshBasicMaterial;
-        mat.color.copy(color); mat.opacity = c.level * 0.07;
+        mat.color.copy(color); mat.opacity = c.level * 0.07 * gain;
         if (l.lens) l.lens.color.copy(c.level > 0.01 ? color : color.setRGB(0.07, 0.07, 0.07));
       }
       controls.update();
