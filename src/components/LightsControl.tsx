@@ -680,7 +680,13 @@ export default function LightsControl({ settings }: LightsControlProps) {
             <div className="color-group-header" style={{ marginBottom: "20px" }}>
               <h3 className="section-title" style={{ margin: 0 }}><Sun size={18} className="text-orange" /> Hoofdscènes & Lichtshows</h3>
               <div style={{ display: "flex", gap: "8px" }}>
-
+                <button 
+                  onClick={handleResetAll} 
+                  className="btn-group-action off"
+                  style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'rgba(249, 115, 22, 0.4)', color: '#fdba74' }}
+                >
+                  RESET ALLES
+                </button>
                 <button 
                   onClick={handleBlackout} 
                   className="btn-group-action off"
