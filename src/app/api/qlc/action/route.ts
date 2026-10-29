@@ -39,28 +39,32 @@ export async function POST(req: NextRequest) {
             }, index * 2); // Small delay to avoid flooding QLC+ too fast
           });
 
-          // Kleuren die automatisch (via Companion/FreeShow) zijn gestart draaien als functie, zonder dat de
-          // knop is ingedrukt. Een "0" naar de knop stopt die niet, dus stop de functies ook rechtstreeks.
-          const FUNCTION_IDS = [
-            0, 1, 2, 3, 20, 24,
-            ...Array.from({ length: 30 }, (_, i) => 300 + i), // kleurenschema's (Ark paletten)
-            ...[10, 30, 40, 50, 60, 100, 110, 120, 130].flatMap(base => Array.from({ length: 8 }, (_, i) => base + i))
-          ];
-          FUNCTION_IDS.forEach((id, index) => {
+          // Kleuren die automatisch (via Companion/FreeShow) zijn gestart, chases uit de editor en alles wat de knoppen niet kennen draaien als
+          // functie. Een "0" naar de knop stopt die niet: stop dus alle functies van het werkbestand rechtstreeks (QLC+ geeft de lijst).
+          const stopFunctions = (ids: number[]) => {
+            const all = [...new Set([0, 1, 2, 3, 20, 24, ...ids])];
+            all.forEach((id, index) => {
+              setTimeout(() => {
+                if (ws.readyState === WebSocket.OPEN) ws.send(`QLC+API|setFunctionStatus|${id}|0`);
+              }, index * 3);
+            });
+            // Give it enough time to send all messages before closing
             setTimeout(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(`QLC+API|setFunctionStatus|${id}|0`);
-              }
-            }, WIDGET_IDS.length * 2 + index * 2);
+              if (ws.readyState === WebSocket.OPEN) ws.close();
+              resolve(NextResponse.json({ success: true, stopped: all.length }));
+            }, all.length * 3 + 300);
+          };
+          let listed = false;
+          ws.on('message', (raw) => {
+            const parts = String(raw).split('|');
+            if (parts[1] !== 'getFunctionsList' || listed) return;
+            listed = true;
+            const ids: number[] = [];
+            for (let i = 2; i + 1 < parts.length; i += 2) if (Number.isFinite(Number(parts[i]))) ids.push(Number(parts[i]));
+            stopFunctions(ids);
           });
-
-          // Give it enough time to send all messages before closing
-          setTimeout(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.close();
-            }
-            resolve(NextResponse.json({ success: true }));
-          }, (WIDGET_IDS.length + 120) * 2 + 100);
+          setTimeout(() => { if (!listed) { listed = true; stopFunctions([]); } }, (WIDGET_IDS.length + 5) * 2 + 800);   // no list: the known ones at least
+          setTimeout(() => { if (ws.readyState === WebSocket.OPEN) ws.send("QLC+API|getFunctionsList"); }, WIDGET_IDS.length * 2 + 50);
         });
 
         ws.on('error', (err) => {

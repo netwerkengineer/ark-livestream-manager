@@ -391,13 +391,13 @@ export default function LightsPage() {
     if (now - lastActionTime.current < 400) return;
     lastActionTime.current = now;
 
-    // 1. WebSocket stopAllFunctions (if connected)
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      try {
-        wsRef.current.send("QLC+API|stopAllFunctions");
-      } catch (err) {
-        console.error("Failed to send stopAllFunctions over WS:", err);
-      }
+    // 1. Stop everything in QLC+ (the server stops every function of the workspace and turns the buttons off)
+    try {
+      const res = await fetch("/api/qlc/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resetAll" }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      showStatus("error", `Reset mislukt: ${err instanceof Error ? err.message : "geen verbinding met QLC+"}`);
+      return;
     }
 
     // 2. Set all Fresnel dimmers to 0 (OSC)

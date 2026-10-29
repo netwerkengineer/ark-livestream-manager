@@ -347,31 +347,13 @@ export default function LightsControl({ settings }: LightsControlProps) {
     if (now - lastActionTime.current < 400) return;
     lastActionTime.current = now;
 
-    // Collect all ACTIVE widget IDs from our local state
-    const activeWidgetIds: number[] = [];
-    if (activeScene !== null) activeWidgetIds.push(activeScene);
-    if (activeChase !== null) activeWidgetIds.push(activeChase);
-    if (activeStrobe !== null) activeWidgetIds.push(activeStrobe);
-    
-    Object.keys(activeColors).forEach(idStr => {
-      const id = Number(idStr);
-      if (activeColors[id]) {
-        activeWidgetIds.push(id);
-      }
-    });
-
-    // 1. Send toggle commands ONLY to the widgets that are currently ON
-    for (const widgetId of activeWidgetIds) {
-      try {
-        await fetch("/api/qlc/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sceneId: widgetId }),
-        });
-        await new Promise(resolve => setTimeout(resolve, 40)); // Small delay
-      } catch (err) {
-        console.error(`Failed to toggle off widget ${widgetId}:`, err);
-      }
+    // 1. Stop everything in QLC+ (the server stops every function of the workspace and turns the buttons off)
+    try {
+      const res = await fetch("/api/qlc/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resetAll" }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      showStatus("error", `Reset mislukt: ${err instanceof Error ? err.message : "geen verbinding met QLC+"}`);
+      return;
     }
 
     // 2. Set all Fresnel dimmers to 0 (OSC)
