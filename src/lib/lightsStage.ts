@@ -9,7 +9,7 @@ import { readFixtures, type QlcFixture } from "./qlcWorkspace";
 
 const FILE = path.join(process.cwd(), "data", "lights_stage.json");
 
-export type FixtureKind = "par" | "fresnel" | "bar" | "spot";
+export type FixtureKind = "par" | "fresnel" | "bar" | "spot" | "kls" | "ubar" | "colorbar";
 
 export interface StageCopy { x: number; y: number; z: number; pan: number; tilt: number; roll: number }
 
@@ -35,7 +35,10 @@ export interface StageConfig {
 export function kindOf(f: QlcFixture): FixtureKind {
   const s = `${f.manufacturer} ${f.model} ${f.name}`.toLowerCase();
   if (/fr50|fresnel/.test(s)) return "fresnel";
-  if (/bar|ub 9h|kls/.test(s)) return "bar";
+  if (/kls/.test(s)) return "kls";                         // a bar on a stand with four panels
+  if (/ub 9h/.test(s)) return "ubar";                      // the ADJ bar with nine lenses
+  if (/lightmaxx|color ?bar/.test(s)) return "colorbar";   // the long bar of small LEDs
+  if (/bar/.test(s)) return "bar";
   if (/spot|beam|mover|moving/.test(s)) return "spot";
   return "par";
 }
@@ -57,7 +60,7 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
       ...[1.0, 2.2].flatMap(z => [copy(-3.25, y, z, 0, 180, 90), copy(3.25, y, z, 0, 180, 90)]),         // along both sides of the stage
     ];
     const [first, ...rest] = units;
-    return { ...base, x: first.x, y: first.y, z: first.z, pan: 0, tilt: 180, roll: 0, beam: 70, kind: "bar", copies: rest };
+    return { ...base, x: first.x, y: first.y, z: first.z, pan: 0, tilt: 180, roll: 0, beam: 70, kind: "ubar", copies: rest };
   }
   // Chauvet SlimPAR 56: on the stage floor, pointing up: one at the left below the KLS, one under the cross, one at the drums
   if (/slimpar/.test(s)) {
@@ -72,7 +75,7 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
   // Eurolite KLS-200: on a stand in the corners of the stage, the three heads pointing in at the stage
   if (/kls/.test(s)) {
     const left = i % 2 === 0;
-    return { ...base, x: left ? -3.2 : 3.2, y: STAGE_H + 1.5, z: left ? 2.8 : 1.0, pan: left ? 112 : -81, tilt: 70, roll: 0, beam: 90, kind: "bar" };
+    return { ...base, x: left ? -3.2 : 3.2, y: STAGE_H + 1.5, z: left ? 2.8 : 1.0, pan: left ? 112 : -81, tilt: 70, roll: 0, beam: 60, kind: "kls" };
   }
   // ADJ Encor FR50Z fresnels: hanging under the ceiling in front of the stage
   if (/fr50|fresnel/.test(s)) {
@@ -83,7 +86,7 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
   if (/lightmaxx|color bar/.test(s)) {
     const left = i < 2;
     const z = left ? 6 + i * 3.5 : 7.5;
-    return { ...base, x: left ? -4.3 : 4.3, y: 0.3, z, pan: left ? -90 : 90, tilt: 100, roll: 90, beam: 70, kind: "bar" };
+    return { ...base, x: left ? -4.3 : 4.3, y: 0.3, z, pan: left ? -90 : 90, tilt: 100, roll: 90, beam: 70, kind: "colorbar" };
   }
   void index;
   return null;
@@ -106,7 +109,7 @@ export function defaultStage(fixtures: QlcFixture[]): StageConfig {
   return cfg;
 }
 
-const KINDS: FixtureKind[] = ["par", "fresnel", "bar", "spot"];
+const KINDS: FixtureKind[] = ["par", "fresnel", "bar", "spot", "kls", "ubar", "colorbar"];
 const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
 
 /** Saved layout, with defaults for fixtures that are new in the workspace */
@@ -122,7 +125,10 @@ export function readStage(): { stage: StageConfig; fixtures: QlcFixture[] } {
   };
   for (const f of fixtures) {
     const s = saved.fixtures?.[String(f.id)];
-    stage.fixtures[String(f.id)] = { ...base.fixtures[String(f.id)], ...(s || {}), id: f.id, copies: s ? (s.copies || []) : base.fixtures[String(f.id)].copies };
+    const merged = { ...base.fixtures[String(f.id)], ...(s || {}), id: f.id, copies: s ? (s.copies || []) : base.fixtures[String(f.id)].copies };
+    // a layout saved before the lamps had their own shapes: the generic bar or par becomes the real shape for lamps we know
+    if (s && (merged.kind === "bar" || merged.kind === "par") && ["kls", "ubar", "colorbar"].includes(kindOf(f))) merged.kind = kindOf(f);
+    stage.fixtures[String(f.id)] = merged;
   }
   return { stage, fixtures };
 }

@@ -6,43 +6,22 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { QlcFixture } from "@/lib/qlcWorkspace";
 import type { StageConfig, StageFixture, StageCopy, FixtureKind } from "@/lib/lightsStage";
 import { useQlcFeed } from "@/lib/useQlcFeed";
+import { headsOf, headLights, fixtureLightOf, orientOf, aimOf, buildModel, buildStand, type Light } from "./fixtureModels";
 
 // 2D plan and 3D view of the lights: the fixtures where they hang, lit with the DMX values QLC+ has right now.
 
-interface Light { r: number; g: number; b: number; level: number }
-
-const WARM = [1, 0.84, 0.66];
-
-/** What a fixture shows right now, from its DMX channels and the channel types QLC+ reports ("0.#FF0000" = intensity with a colour) */
+/** One colour for the whole lamp (editor swatches): the brightest head */
 export function fixtureLight(f: QlcFixture, values: number[], types: string[]): Light {
-  let r = 0, g = 0, b = 0, master = -1, coloured = false;
-  for (let k = 0; k < f.channels; k++) {
-    const i = f.address + k;
-    const v = (values[i] || 0) / 255;
-    const m = /^(\d+)(?:\.#([0-9A-Fa-f]{6}))?$/.exec(types[i] || "");
-    if (!m || m[1] !== "0") continue;   // only intensity channels (group 0) make light
-    const hex = m[2] ? m[2].toUpperCase() : "000000";
-    if (hex === "000000") { master = Math.max(master, v); continue; }
-    coloured = true;
-    r += v * parseInt(hex.slice(0, 2), 16) / 255;
-    g += v * parseInt(hex.slice(2, 4), 16) / 255;
-    b += v * parseInt(hex.slice(4, 6), 16) / 255;
-  }
-  if (!coloured) { const v = Math.max(0, master); return { r: WARM[0] * v, g: WARM[1] * v, b: WARM[2] * v, level: v }; }
-  const m = master < 0 ? 1 : master;
-  r = Math.min(1, r) * m; g = Math.min(1, g) * m; b = Math.min(1, b) * m;
-  return { r, g, b, level: Math.max(r, g, b) };
+  return fixtureLightOf(f, values, types, "par");
 }
 
 const cssColor = (l: Light) => `rgb(${Math.round(60 + 195 * l.r)}, ${Math.round(60 + 195 * l.g)}, ${Math.round(60 + 195 * l.b)})`;
-
-function aim(f: StageFixture): THREE.Vector3 {
-  const t = THREE.MathUtils.degToRad(f.tilt), p = THREE.MathUtils.degToRad(f.pan);
-  return new THREE.Vector3(Math.sin(t) * Math.sin(p), -Math.cos(t), Math.sin(t) * Math.cos(p)).normalize();
-}
+const OFF: Light = { r: 0, g: 0, b: 0, level: 0 };
+const brightest = (list: Light[] | undefined): Light => (list && list.length ? list.reduce((b, l) => (l.level > b.level ? l : b), list[0]) : OFF);
 
 const KINDS: { id: FixtureKind; label: string }[] = [
-  { id: "par", label: "Par" }, { id: "fresnel", label: "Fresnel" }, { id: "bar", label: "Ledbalk" }, { id: "spot", label: "Spot" },
+  { id: "par", label: "Par (SlimPAR)" }, { id: "fresnel", label: "Fresnel" }, { id: "kls", label: "KLS-balk met 4 koppen" }, { id: "ubar", label: "ADJ-ledbalk (9 lenzen)" },
+  { id: "colorbar", label: "Kleurenbalk (lightmaXX)" }, { id: "bar", label: "Ledbalk" }, { id: "spot", label: "Spot" },
 ];
 
 interface StageViewProps {
@@ -56,14 +35,14 @@ export default function StageView({ override, compact }: StageViewProps) {
   const [stage, setStage] = useState<StageConfig | null>(null);
   const [fixtures, setFixtures] = useState<QlcFixture[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
-  const [lights, setLights] = useState<Record<number, Light>>({});
+  const [lights, setLights] = useState<Record<number, Light[]>>({});
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [dirty, setDirty] = useState(false);
   const [selUnit, setSelUnit] = useState(0);   // 0 = the fixture itself, 1.. = its extra lamps
   const overrideRef = useRef<number[] | undefined>(override);
   overrideRef.current = override;
   const mount = useRef<HTMLDivElement>(null);
-  const three = useRef<{ rebuild: (s: StageConfig, fx: QlcFixture[]) => void; dispose: () => void } | null>(null);
+  const three = useRef<{ rebuild: (s: StageConfig, fx: QlcFixture[], types: string[]) => void; dispose: () => void } | null>(null);
   const stageRef = useRef<StageConfig | null>(null);
   const fixturesRef = useRef<QlcFixture[]>([]);
   stageRef.current = stage;
@@ -83,8 +62,8 @@ export default function StageView({ override, compact }: StageViewProps) {
 
   // Live values from QLC+ (or the override of the editor)
   const lightsFor = useCallback((vals: number[], types: string[]) => {
-    const next: Record<number, Light> = {};
-    for (const f of fixturesRef.current) next[f.id] = fixtureLight(f, vals, types);
+    const next: Record<number, Light[]> = {};
+    for (const f of fixturesRef.current) next[f.id] = headLights(f, vals, types, stageRef.current?.fixtures[String(f.id)]?.kind ?? "par");
     setLights(next);
   }, []);
   const feed = useQlcFeed((v, t) => { if (!overrideRef.current) lightsFor(v, t); });
@@ -107,7 +86,7 @@ export default function StageView({ override, compact }: StageViewProps) {
     controls.enableDamping = true;
     const room = new THREE.Group(); scene.add(room);
     const rig = new THREE.Group(); scene.add(rig);
-    let live: { id: number; fixture: QlcFixture; lamp: THREE.SpotLight; beam: THREE.Mesh; glow: THREE.Mesh }[] = [];
+    let live: { fixture: QlcFixture; kind: FixtureKind; head: number; lamp: THREE.SpotLight; beam: THREE.Mesh; lens: THREE.MeshBasicMaterial | undefined }[] = [];
     let framed = false;
 
     const disposeGroup = (grp: THREE.Group) => {
@@ -120,7 +99,7 @@ export default function StageView({ override, compact }: StageViewProps) {
       grp.clear();
     };
 
-    const rebuild = (s: StageConfig, fx: QlcFixture[]) => {
+    const rebuild = (s: StageConfig, fx: QlcFixture[], tp: string[]) => {
       disposeGroup(room); disposeGroup(rig);
       live = [];
       const wall = new THREE.MeshStandardMaterial({ color: 0x20242e, roughness: 0.95 });
@@ -154,33 +133,40 @@ export default function StageView({ override, compact }: StageViewProps) {
         return Math.max(0.5, len);
       };
 
+      const down = new THREE.Vector3(0, -1, 0);
       for (const f of fx) {
         const p = s.fixtures[String(f.id)];
         if (!p) continue;
+        const kind = p.kind;
+        const headCount = headsOf(f, tp, kind).length;
         // the fixture itself and every extra lamp on the same DMX address
         for (const u of [p, ...(p.copies || [])]) {
-          const dir = aim(u as StageFixture);
+          const dir = aimOf(u);
           const origin = new THREE.Vector3(u.x, u.y, u.z);
-          const len = rayLen(origin, dir);
-          const radius = Math.tan(THREE.MathUtils.degToRad(p.beam / 2)) * len;
-          const cone = new THREE.ConeGeometry(radius, len, 28, 1, true);
-          cone.translate(0, -len / 2, 0);
-          const down = new THREE.Vector3(0, -1, 0);
-          const orient = new THREE.Quaternion().setFromAxisAngle(dir, THREE.MathUtils.degToRad(u.roll || 0)).multiply(new THREE.Quaternion().setFromUnitVectors(down, dir));
-          const beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-          beam.position.copy(origin);
-          beam.quaternion.setFromUnitVectors(down, dir);
-          rig.add(beam);
-          const bodySize = p.kind === "bar" ? [0.9, 0.08, 0.08] : p.kind === "fresnel" ? [0.28, 0.28, 0.3] : [0.2, 0.2, 0.22];
-          const body = new THREE.Mesh(new THREE.BoxGeometry(bodySize[0], bodySize[1], bodySize[2]), new THREE.MeshStandardMaterial({ color: 0x0b0c10, roughness: 0.6 }));
-          body.position.copy(origin); body.quaternion.copy(orient); rig.add(body);
-          const glow = new THREE.Mesh(new THREE.SphereGeometry(p.kind === "bar" ? 0.07 : 0.11, 12, 12), new THREE.MeshBasicMaterial({ color: 0x111111 }));
-          glow.position.copy(origin).addScaledVector(dir, 0.15); rig.add(glow);
-          const lamp = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(Math.min(80, p.beam / 2)), 0.6, 1);
-          lamp.position.copy(origin);
-          lamp.target.position.copy(origin).addScaledVector(dir, len);
-          rig.add(lamp); rig.add(lamp.target);
-          live.push({ id: f.id, fixture: f, lamp, beam, glow });
+          const orient = orientOf(u);
+          const model = buildModel(kind, headCount);
+          model.group.position.copy(origin); model.group.quaternion.copy(orient);
+          rig.add(model.group);
+          if (kind === "kls" && u.y > 0.5) {
+            const onStage = Math.abs(u.x) <= s.stageWidth / 2 && u.z <= s.stageDepth;
+            rig.add(buildStand(origin, onStage ? s.stageHeight : 0));
+          }
+          model.heads.forEach((local, h) => {
+            const from = origin.clone().add(local.clone().applyQuaternion(orient));
+            const len = rayLen(from, dir);
+            const radius = Math.tan(THREE.MathUtils.degToRad(p.beam / 2)) * len;
+            const cone = new THREE.ConeGeometry(radius, len, 24, 1, true);
+            cone.translate(0, -len / 2, 0);
+            const beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+            beam.position.copy(from);
+            beam.quaternion.setFromUnitVectors(down, dir);
+            rig.add(beam);
+            const lamp = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(Math.min(80, p.beam / 2)), 0.6, 1);
+            lamp.position.copy(from);
+            lamp.target.position.copy(from).addScaledVector(dir, len);
+            rig.add(lamp); rig.add(lamp.target);
+            live.push({ fixture: f, kind, head: h, lamp, beam, lens: kind === "kls" ? model.lenses[h] : model.lenses[0] });
+          });
         }
       }
       if (!framed) {
@@ -191,19 +177,23 @@ export default function StageView({ override, compact }: StageViewProps) {
       }
     };
     three.current = { rebuild, dispose: () => {} };
-    if (stageRef.current) rebuild(stageRef.current, fixturesRef.current);
+    if (stageRef.current) rebuild(stageRef.current, fixturesRef.current, types.current);
 
     const color = new THREE.Color();
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      const vals = overrideRef.current ?? values.current;
+      const cache = new Map<QlcFixture, Light[]>();
       for (const l of live) {
-        const c = fixtureLight(l.fixture, overrideRef.current ?? values.current, types.current);
+        let hs = cache.get(l.fixture);
+        if (!hs) { hs = headLights(l.fixture, vals, types.current, l.kind); cache.set(l.fixture, hs); }
+        const c = hs[l.head] ?? hs[0] ?? OFF;
         color.setRGB(c.r, c.g, c.b);
         l.lamp.color.copy(color); l.lamp.intensity = c.level * 35;
         const mat = l.beam.material as THREE.MeshBasicMaterial;
         mat.color.copy(color); mat.opacity = c.level * 0.07;
-        (l.glow.material as THREE.MeshBasicMaterial).color.copy(c.level > 0.01 ? color : color.setRGB(0.07, 0.07, 0.07));
+        if (l.lens) l.lens.color.copy(c.level > 0.01 ? color : color.setRGB(0.07, 0.07, 0.07));
       }
       controls.update();
       renderer.render(scene, camera);
@@ -224,7 +214,9 @@ export default function StageView({ override, compact }: StageViewProps) {
     };
   }, [ready]);
 
-  useEffect(() => { if (stage && three.current) three.current.rebuild(stage, fixtures); }, [stage, fixtures]);
+  // the heads of a lamp follow from its channel types: rebuild when those become known
+  const typesKey = types.current.join("|");
+  useEffect(() => { if (stage && three.current) three.current.rebuild(stage, fixtures, types.current); }, [stage, fixtures, typesKey, types]);
 
   const update = useCallback((id: number, patch: Partial<StageFixture>) => {
     setStage(s => (s ? { ...s, fixtures: { ...s.fixtures, [String(id)]: { ...s.fixtures[String(id)], ...patch } } } : s));
@@ -311,21 +303,52 @@ export default function StageView({ override, compact }: StageViewProps) {
           {fixtures.flatMap(f => {
             const p = stage.fixtures[String(f.id)];
             if (!p) return [];
-            const L = lights[f.id] || { r: 0, g: 0, b: 0, level: 0 };
+            const hs = lights[f.id] || [];
+            const L = brightest(hs);
             return [p as StageCopy & StageFixture, ...(p.copies || [])].map((u, unit) => {
               const [cx, cy] = toPlan(u.x, u.z);
               const a = THREE.MathUtils.degToRad(u.pan);
-              const reach = 10 + 22 * Math.sin(THREE.MathUtils.degToRad(Math.min(90, u.tilt)));
+              const reach = 12 + 22 * Math.sin(THREE.MathUtils.degToRad(Math.min(90, u.tilt)));
               const isSel = f.id === selected && unit === selUnit;
-              const along = Math.abs(Math.sin(THREE.MathUtils.degToRad(u.roll || 0))) > 0.7;   // a bar turned to lie along the z axis
+              // the bar axis as seen from above: the lamp's own X axis after it is aimed and rolled
+              const axis = new THREE.Vector3(1, 0, 0).applyQuaternion(orientOf(u));
+              const ang = (Math.atan2(axis.z, axis.x) * 180) / Math.PI;
+              const edge = isSel ? "#fff" : "#0b0c10";
+              const hc = (i: number) => cssColor(hs[i] ?? L);
+              let symbol: React.ReactNode;
+              if (p.kind === "kls") {
+                symbol = (<>
+                  <line x1={-16} y1={-3} x2={16} y2={-3} stroke="#94a3b8" strokeWidth={1.5} />
+                  {[0, 1, 2, 3].map(i => <rect key={i} x={-14 + i * 8} y={-2} width={7} height={7} rx={1} fill={hc(i)} stroke={edge} strokeWidth={isSel ? 1.5 : 0.8} />)}
+                </>);
+              } else if (p.kind === "ubar") {
+                symbol = (<>
+                  <rect x={-17} y={-3.5} width={34} height={7} rx={2} fill="#14161c" stroke={edge} strokeWidth={isSel ? 2 : 1} />
+                  {Array.from({ length: 9 }, (_, i) => <circle key={i} cx={-13.6 + i * 3.4} cy={0} r={1.5} fill={cssColor(L)} />)}
+                </>);
+              } else if (p.kind === "colorbar" || p.kind === "bar") {
+                symbol = (<>
+                  <rect x={-17} y={-2.5} width={34} height={5} rx={1.5} fill="#14161c" stroke={edge} strokeWidth={isSel ? 2 : 1} />
+                  {Array.from({ length: 16 }, (_, i) => <rect key={i} x={-15.5 + i * 2} y={-1} width={1.2} height={2} fill={cssColor(L)} />)}
+                </>);
+              } else if (p.kind === "fresnel") {
+                symbol = (<>
+                  <circle r={9} fill="#14161c" stroke={edge} strokeWidth={isSel ? 2 : 1} />
+                  <circle r={6} fill={cssColor(L)} />
+                </>);
+              } else {
+                symbol = (<>
+                  <circle r={7.5} fill="#14161c" stroke={edge} strokeWidth={isSel ? 2 : 1} />
+                  <circle r={5.5} fill={cssColor(L)} />
+                  {[0, 1, 2, 3, 4, 5].map(i => <circle key={i} cx={Math.cos(i * 1.047) * 3.2} cy={Math.sin(i * 1.047) * 3.2} r={0.8} fill="#0b0c10" opacity={0.5} />)}
+                </>);
+              }
               return (
                 <g key={`${f.id}-${unit}`} style={{ cursor: "grab" }}
                   onPointerDown={e => { (e.currentTarget as SVGGElement).setPointerCapture(e.pointerId); dragging.current = { id: f.id, unit }; setSelected(f.id); setSelUnit(unit); }}>
                   <line x1={cx} y1={cy} x2={cx + Math.sin(a) * reach} y2={cy + Math.cos(a) * reach} stroke={cssColor(L)} strokeWidth={2} opacity={0.6} />
-                  {p.kind === "bar"
-                    ? <rect x={cx - (along ? 3 : 10)} y={cy - (along ? 10 : 3)} width={along ? 6 : 20} height={along ? 20 : 6} rx={2} fill={cssColor(L)} stroke={isSel ? "#fff" : "#0b0c10"} strokeWidth={isSel ? 2 : 1} />
-                    : <circle cx={cx} cy={cy} r={p.kind === "fresnel" ? 8 : 6} fill={cssColor(L)} stroke={isSel ? "#fff" : "#0b0c10"} strokeWidth={isSel ? 2 : 1} />}
-                  {unit === 0 && <text x={cx} y={cy - 11} fill="#cbd5e1" fontSize={8} textAnchor="middle" pointerEvents="none">{f.name}</text>}
+                  <g transform={`translate(${cx} ${cy}) rotate(${ang})`}>{symbol}</g>
+                  {unit === 0 && <text x={cx} y={cy - 13} fill="#cbd5e1" fontSize={8} textAnchor="middle" pointerEvents="none">{f.name}</text>}
                 </g>
               );
             });
