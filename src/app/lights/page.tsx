@@ -733,13 +733,13 @@ export default function LightsPage() {
         {showStage && <StageView compact />}
       </section>
 
-      <div style={{ marginBottom: "24px" }}><CustomLights />
+      <div style={{ marginBottom: "24px" }}><CustomLights /></div>
 
-      <div style={{ marginBottom: "24px" }}>{/* Tik het tempo: de chases die het tempo volgen lopen mee */}
-      <div style={{ marginBottom: "24px" }}><section className="glass-card" style={{ padding: "14px" }}>
-      <div style={{ marginBottom: "24px" }}>  <strong style={{ fontSize: "0.95rem", display: "block", marginBottom: "8px" }}>Tempo</strong>
-      <div style={{ marginBottom: "24px" }}>  <TempoTap />
-      <div style={{ marginBottom: "24px" }}></section></div>
+      {/* Tik het tempo: de chases die het tempo volgen lopen mee */}
+      <section className="glass-card" style={{ padding: "14px", marginBottom: "24px" }}>
+        <strong style={{ fontSize: "0.95rem", display: "block", marginBottom: "8px" }}>Tempo</strong>
+        <TempoTap />
+      </section>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
