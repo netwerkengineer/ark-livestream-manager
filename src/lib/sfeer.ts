@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { getSettings } from './settingsStore';
 import { toFreeShowClientPath } from './freeshowUtils';
 import sferenData from './sferen.json';
+import { readFunctions } from './qlcFunctions';
+import { triggerUrl } from './lightsTrigger';
 
 // Een "sfeer" is een achtergrondvideo plus een lichtschema (QLC+-scène via een Companion-knop).
 // De lijst staat in sferen.json (ook gebruikt door scripts/visuals) en de filmpjes in
@@ -30,6 +32,14 @@ export function getSfeer(slug: string | undefined | null): Sfeer | undefined {
   return slug ? SFEREN.find(s => s.slug === slug) : undefined;
 }
 
+// Een eigen scène of chase uit de lichtregie als licht bij een lied: slug "eigen-<functie-id>". Geen filmpje en geen Companion-knop;
+// de FreeShow-actie roept /api/lights/trigger van deze app aan.
+export const EIGEN_PREFIX = 'eigen-';
+export function eigenId(slug: string | undefined | null): number | null {
+  const m = /^eigen-(\d+)$/.exec(slug || '');
+  return m ? Number(m[1]) : null;
+}
+
 function rid(n = 11): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from(crypto.randomBytes(n)).map(b => chars[b % chars.length]).join('');
@@ -44,6 +54,9 @@ export async function readCurrentSfeer(filePath: string): Promise<string> {
       const hit = /Ark Visuals[\\/]([^\\/]+)\.mp4$/i.exec(String(m?.path || ''));
       if (hit && getSfeer(hit[1])) return hit[1];
     }
+    // geen filmpje: misschien een eigen scène of chase (de lichtactie verwijst naar /api/lights/trigger)
+    const own = /\/api\/lights\/trigger\?id=(\d+)/.exec(JSON.stringify(raw));
+    if (own) return EIGEN_PREFIX + own[1];
   } catch { /* geen of onleesbaar bestand */ }
   return '';
 }
@@ -51,8 +64,12 @@ export async function readCurrentSfeer(filePath: string): Promise<string> {
 // Zet de gekozen sfeer op de lege startdia van het lied: achtergrond + lichtactie. Maakt de startdia aan als die er nog
 // niet is. De indeling "Tracks" wordt niet verschoven (de cuetabellen van Ark Tracks tellen de dia's daarvan).
 export async function applySfeerToShowFile(filePath: string, slug: string): Promise<{ ok: boolean; note?: string }> {
-  const sfeer = getSfeer(slug);
-  if (!sfeer) return { ok: false, note: `Onbekende sfeer "${slug}".` };
+  const eigen = eigenId(slug);
+  const own = eigen !== null ? readFunctions().find(f => f.id === eigen && f.button) : undefined;
+  if (eigen !== null && !own) return { ok: false, note: `Eigen scène of chase ${eigen} bestaat niet meer (of heeft geen knop in de lichtregie).` };
+  // Een eigen scène heeft geen filmpje: dan blijft alleen de lichtactie over.
+  const sfeer: Sfeer | undefined = eigen !== null ? undefined : getSfeer(slug);
+  if (eigen === null && !sfeer) return { ok: false, note: `Onbekende sfeer "${slug}".` };
   const settings = getSettings() as any;
   const notes: string[] = [];
 
@@ -63,27 +80,28 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
 
   // Achtergrond
   const mediaRoot = settings.freeshowMediaPath || (settings.freeshowPath ? path.join(settings.freeshowPath, 'Media') : '');
-  const serverVideo = mediaRoot ? path.join(mediaRoot, 'Motion backgrounds', 'Ark Visuals', `${sfeer.slug}.mp4`) : '';
+  const serverVideo = sfeer && mediaRoot ? path.join(mediaRoot, 'Motion backgrounds', 'Ark Visuals', `${sfeer.slug}.mp4`) : '';
   const videoExists = serverVideo ? await fs.access(serverVideo).then(() => true).catch(() => false) : false;
   const oldIds = Object.keys(c.media).filter(k => /Ark Visuals/i.test(String(c.media[k]?.path || '')));
   oldIds.forEach(k => delete c.media[k]);
   let mid: string | null = null;
-  if (videoExists) {
+  if (sfeer && videoExists) {
     mid = 'ark' + sfeer.slug.slice(0, 8) + rid(3);
     c.media[mid] = {
       name: `${sfeer.slug}.mp4`,
       path: toFreeShowClientPath(serverVideo, settings.freeshowPath, settings.freeshowClientPath),
       type: 'video', muted: true, loop: true
     };
-  } else {
+  } else if (sfeer) {
     notes.push(`Achtergrondvideo "${sfeer.slug}.mp4" ontbreekt in de mediamap; alleen het licht is gezet.`);
   }
 
   // Lichtactie (HTTP-verzoek naar de Companion-knop van deze sfeer)
   const companionUrl = String(settings.freeshowCompanionUrl || '').replace(/\/+$/, '');
-  const lightAction = companionUrl ? {
-    id: rid(), name: `Licht: ${sfeer.naam}`, triggers: ['send_rest_command'],
-    actionValues: { send_rest_command: { url: `${companionUrl}/api/location/${companionKnopPad(sfeer)}/press`, method: 'POST', contentType: '', payload: '' } },
+  const lightUrl = own ? triggerUrl(own.id) : (companionUrl && sfeer ? `${companionUrl}/api/location/${companionKnopPad(sfeer)}/press` : '');
+  const lightAction = lightUrl ? {
+    id: rid(), name: `Licht: ${own ? own.name : sfeer!.naam}`, triggers: ['send_rest_command'],
+    actionValues: { send_rest_command: { url: lightUrl, method: 'POST', contentType: '', payload: '' } },
     customActivation: '', midiEnabled: false
   } : null;
   if (!lightAction) notes.push('Geen Companion-adres voor FreeShow ingesteld (Instellingen); de lichtactie is niet gezet.');

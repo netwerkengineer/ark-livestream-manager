@@ -88,6 +88,7 @@ export interface AppSettings {
   freeshowClientPath?: string;
   // Adres van Companion zoals de FreeShow-computer dat bereikt (voor de lichtacties in de shows), bv. http://192.168.2.250:8000
   freeshowCompanionUrl?: string;
+  lightsTriggerToken?: string; // sleutel in de FreeShow-acties die een eigen scène/chase starten (/api/lights/trigger); wordt vanzelf aangemaakt
   freeshowAdditionalTargets?: FreeShowSyncTarget[];
   // Output ID (local to whichever machine actually runs FreeShow for this
   // environment - the Beamer PC in production, the Mac when this app runs

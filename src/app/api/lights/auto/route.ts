@@ -2,30 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings } from "@/lib/settingsStore";
 import { isAuthorized } from "@/lib/authHelper";
 import WebSocket from "ws";
+import { companion } from "@/lib/companionVars";
 export const dynamic = "force-dynamic";
 
 // Schakelaar "automatisch licht" en de laatste automatische wissel.
 // Dit staat in Companion (aangepaste variabelen), omdat FreeShow de lichtkleuren via Companion-knoppen start:
 // staat licht_auto op "uit", dan doen die knoppen niets en blijft de handbediening ongemoeid.
-
-function companionBases(): string[] {
-  const s = getSettings() as any;
-  const port = s.companionPort || 8000;
-  const hosts = [s.companionHost, "127.0.0.1", "172.17.0.1", "companion"].filter(Boolean);
-  return Array.from(new Set(hosts)).map(h => `http://${h}:${port}`);
-}
-
-async function companion(pathAndQuery: string, method: "GET" | "POST"): Promise<string | null> {
-  for (const base of companionBases()) {
-    try {
-      const res = await fetch(`${base}${pathAndQuery}`, { method, cache: "no-store", signal: AbortSignal.timeout(2500) });
-      if (res.ok) return (await res.text()).trim();
-    } catch {
-      // volgende host proberen
-    }
-  }
-  return null;
-}
 
 // Welk kleurenschema (QLC+-scène "Ark: <naam>", functie-id 300 en hoger) draait er nu? Die hebben geen knop in de
 // Virtual Console, dus de lichtpagina kan ze niet uit de knopstanden afleiden.

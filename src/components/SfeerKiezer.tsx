@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
 // Keuzelijst voor een sfeer met kleurvoorbeeld per optie (een gewone <select> kan geen kleurvlakjes tonen).
-export interface SfeerOptie { slug: string; naam: string; kleur: string; accent?: string; wit?: number }
+export interface SfeerOptie { slug: string; naam: string; kleur: string; accent?: string; wit?: number; /** kopje boven de eerste optie van een groep */ groep?: string }
 
 function tint(hex: string, w = 0): string {
   const h = hex.replace("#", "");
@@ -56,11 +56,16 @@ export default function SfeerKiezer({ value, opties, onChange, titel = "Sfeer: a
               <span style={{ opacity: 0.8 }}>{leegKeuze}</span>
             </button>
           )}
-          {opties.map(o => (
-            <button key={o.slug} type="button" style={{ ...knop, background: o.slug === value ? "rgba(255,255,255,0.1)" : "transparent" }} onClick={() => { onChange(o.slug); setOpen(false); }}>
-              <Vlak s={o} breed={44} />
-              <span>{o.naam}</span>
-            </button>
+          {opties.map((o, i) => (
+            <React.Fragment key={o.slug}>
+              {o.groep && o.groep !== opties[i - 1]?.groep && (
+                <div style={{ padding: "6px 8px 2px", fontSize: "0.68rem", opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.04em" }}>{o.groep}</div>
+              )}
+              <button type="button" style={{ ...knop, background: o.slug === value ? "rgba(255,255,255,0.1)" : "transparent" }} onClick={() => { onChange(o.slug); setOpen(false); }}>
+                <Vlak s={o} breed={44} />
+                <span>{o.naam}</span>
+              </button>
+            </React.Fragment>
           ))}
         </div>
       )}
