@@ -59,15 +59,20 @@ function churchLayout(f: QlcFixture, index: number, ofKind: QlcFixture[]): Stage
     const [first, ...rest] = units;
     return { ...base, x: first.x, y: first.y, z: first.z, pan: 0, tilt: 180, roll: 0, beam: 70, kind: "bar", copies: rest };
   }
-  // Chauvet SlimPAR 56: on the floor in front of the stage, shining at the stage
+  // Chauvet SlimPAR 56: on the stage floor, pointing up: one at the left below the KLS, one under the cross, one at the drums
   if (/slimpar/.test(s)) {
-    const x = n === 1 ? 0 : -1.6 + (i / (n - 1)) * 3.2;
-    return { ...base, x, y: 0.15, z: 4.6, pan: 180, tilt: 100, beam: 25, kind: "par" };
+    const spots = [
+      { x: -3.0, z: 2.4, pan: 70, tilt: 130 },     // left, below the KLS stand, shining across the stage
+      { x: 0.2, z: 0.5, pan: 0, tilt: 180 },       // under the cross, straight up
+      { x: 2.7, z: 1.3, pan: 180, tilt: 140 },     // at the drums, up towards the back wall
+    ];
+    const sp = spots[Math.min(i, spots.length - 1)] || spots[0];
+    return { ...base, x: sp.x, y: STAGE_H + 0.1, z: sp.z, pan: sp.pan, tilt: sp.tilt, beam: 25, kind: "par" };
   }
-  // Eurolite KLS-200: on a stand at each front corner of the stage, pointing at the stage
+  // Eurolite KLS-200: on a stand in the corners of the stage, the three heads towards the hall
   if (/kls/.test(s)) {
     const left = i % 2 === 0;
-    return { ...base, x: left ? -3.7 : 3.7, y: 1.9, z: 3.4, pan: left ? 115 : -115, tilt: 80, roll: 0, beam: 90, kind: "bar" };
+    return { ...base, x: left ? -3.2 : 3.2, y: STAGE_H + 1.5, z: left ? 2.8 : 1.0, pan: left ? 20 : -20, tilt: 55, roll: 0, beam: 90, kind: "bar" };
   }
   // ADJ Encor FR50Z fresnels: hanging under the ceiling in front of the stage
   if (/fr50|fresnel/.test(s)) {
