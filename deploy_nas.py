@@ -214,7 +214,7 @@ def deploy():
     if os.path.isdir(freeshow_dir):
         for item in os.listdir(freeshow_dir):
             freeshow_excludes += ["--exclude", f"./freeshow/{item}"]
-    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", ".git", "--exclude", "deploy.tar.gz", "--exclude", "track-computer/ark-engine/target", "--exclude", "track-computer/ark-desktop/build", "--exclude", "__pycache__", "--exclude", ".claude"] + freeshow_excludes + ["-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
+    tar_cmd = ["tar", "--format=ustar", "--no-xattrs", "--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "node_modules", "--exclude", ".next", "--exclude", "data", "--exclude", "companion-data", "--exclude", "config/qlcplus/config", "--exclude", "config/ark_church_lighting.qxw", "--exclude", "config/backups", "--exclude", "config/qlcplus/runtime", "--exclude", ".git", "--exclude", "deploy.tar.gz", "--exclude", "track-computer/ark-engine/target", "--exclude", "track-computer/ark-desktop/build", "--exclude", "__pycache__", "--exclude", ".claude"] + freeshow_excludes + ["-czf", config['LOCAL_TEMP_ARCHIVE'], "-C", config['LOCAL_APP_PATH'], "."]
     env = os.environ.copy()
     env["COPYFILE_DISABLE"] = "1"
     subprocess.check_call(tar_cmd, env=env)
@@ -260,6 +260,9 @@ def deploy():
             subprocess.check_call(ssh_plain + [target, f"cat > {shlex.quote(remote_path)}"], stdin=fh)
     send_file(config['LOCAL_TEMP_ARCHIVE'], config['REMOTE_TEMP_ARCHIVE'])
     send_file(manifest_local, f"{config['REMOTE_APP_PATH']}/.deploy-manifest")
+    # Het QLC+-werkbestand (scènes, chases, lampen) wordt in de webapp aangepast en staat dus niet in het archief: een deploy overschrijft het nooit.
+    # Alleen als het er nog niet is (een nieuwe NAS), zetten we de versie uit git neer; zie het uitpakken hieronder.
+    send_file(os.path.join(config['LOCAL_APP_PATH'], "config", "ark_church_lighting.qxw"), f"{config['REMOTE_APP_PATH']}/ark_church_lighting.qxw.seed")
     print("✓ Project succesvol overgebracht naar de NAS.")
 
     # 4.1 FALLBACK TEMPLATE OVERZETTEN NAAR NAS (data/ is van de container; we zetten het bestand eerst in de app-map en verplaatsen het met sudo)
@@ -306,6 +309,7 @@ def deploy():
         f"echo \"[DEBUG NAS] Start deployment script in $(pwd)\" && "
         f"tar -v -xzf {shlex.quote(config['REMOTE_TEMP_ARCHIVE'])} -C {app} && "
         f"echo \"[DEBUG NAS] Tar gelukt\" && "
+        f"mkdir -p config && ([ -f config/ark_church_lighting.qxw ] && echo \"[DEBUG NAS] Werkbestand van QLC+ blijft zoals het is\" || (cp ark_church_lighting.qxw.seed config/ark_church_lighting.qxw && echo \"[DEBUG NAS] Werkbestand van QLC+ uit git neergezet\")) && rm -f ark_church_lighting.qxw.seed && "
         # Controle: is elk bestand goed uitgepakt? Zo niet, dan stopt de deploy hier (voordat er iets wordt gebouwd).
         f"{{ if command -v md5sum >/dev/null 2>&1; then md5sum -c --quiet .deploy-manifest && echo \"[DEBUG NAS] Alle bestanden komen overeen\"; "
         f"else echo \"[DEBUG NAS] md5sum ontbreekt, bestandscontrole overgeslagen\"; fi; }} && "
@@ -316,6 +320,10 @@ def deploy():
         f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -exec chown -h {nas_user}:users {{}} + && "
         f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type d -exec chmod 755 {{}} + && "
         f"find {app} -path {app}/data -prune -o -path {app}/companion-data -prune -o -type f -exec chmod go-w,go+r {{}} + && "
+        # de webapp (uid 1001) past het werkbestand aan, maakt er reservekopieën van en vraagt QLC+ via de runtime-map om opnieuw te laden
+        f"mkdir -p config/backups config/qlcplus/runtime && "
+        f"chown 1001:users config/ark_church_lighting.qxw config/backups config/qlcplus/runtime && "
+        f"chmod 664 config/ark_church_lighting.qxw && chmod 775 config/backups config/qlcplus/runtime && "
         f"echo \"[DEBUG NAS] Permissies gelukt\" && "
         f"(pkill -f '[t]uya_http_server.py' || true) && "
         f"echo \"[DEBUG NAS] Oude Tuya server gestopt\" && "
