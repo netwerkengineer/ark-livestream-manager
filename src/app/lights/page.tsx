@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 
 // three.js only loads when the live stage window is shown
 import CustomLights from "@/components/lights/CustomLights";
+import TempoTap from "@/components/lights/TempoTap";
 const StageView = dynamic(() => import("@/components/lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 import { useSession, signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -732,7 +733,13 @@ export default function LightsPage() {
         {showStage && <StageView compact />}
       </section>
 
-      <div style={{ marginBottom: "24px" }}><CustomLights /></div>
+      <div style={{ marginBottom: "24px" }}><CustomLights />
+
+      <div style={{ marginBottom: "24px" }}>{/* Tik het tempo: de chases die het tempo volgen lopen mee */}
+      <div style={{ marginBottom: "24px" }}><section className="glass-card" style={{ padding: "14px" }}>
+      <div style={{ marginBottom: "24px" }}>  <strong style={{ fontSize: "0.95rem", display: "block", marginBottom: "8px" }}>Tempo</strong>
+      <div style={{ marginBottom: "24px" }}>  <TempoTap />
+      <div style={{ marginBottom: "24px" }}></section></div>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
