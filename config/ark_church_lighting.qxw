@@ -812,6 +812,22 @@
    <FixtureVal ID="19">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
    <FixtureVal ID="20">0,0,1,255,2,0,3,255,4,255,5,255,6,255,7,255,8,255,9,255,10,255,11,255,12,255,13,255,14,255</FixtureVal>
   </Function>
+  <Function ID="311" Type="Scene" Name="test">
+   <Speed FadeIn="0" FadeOut="0" Duration="0" />
+   <FixtureVal ID="0">0,25</FixtureVal>
+   <FixtureVal ID="1">0,26</FixtureVal>
+   <FixtureVal ID="2">0,23</FixtureVal>
+   <FixtureVal ID="3">0,23</FixtureVal>
+   <FixtureVal ID="4">0,150,1,15,2,181,3,0,4,0,5,0</FixtureVal>
+   <FixtureVal ID="13">0,65,1,213,2,70</FixtureVal>
+   <FixtureVal ID="14">0,68,1,212,2,75</FixtureVal>
+   <FixtureVal ID="15">0,70,1,218,2,76</FixtureVal>
+   <FixtureVal ID="16">0,0,1,255,2,0,3,15,4,190,5,162</FixtureVal>
+   <FixtureVal ID="17">0,0,1,255,2,0,3,13,4,190,5,160</FixtureVal>
+   <FixtureVal ID="18">0,0,1,255,2,0,3,13,4,191,5,164</FixtureVal>
+   <FixtureVal ID="19">0,0,1,255,2,0,3,160,4,160,5,160,6,160,7,160,8,160,9,160,10,160,11,160,12,160,13,160,14,160</FixtureVal>
+   <FixtureVal ID="20">0,0,1,255,2,0,3,210,4,210,5,210,6,210,7,210,8,210,9,210,10,210,11,210,12,210,13,210,14,210</FixtureVal>
+  </Function>
 <Monitor DisplayMode="0" ShowLabels="1">
    <Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1</Font>
    <ChannelStyle>0</ChannelStyle>
@@ -1756,6 +1772,24 @@
      <Function ID="137" />
      <Action>Toggle</Action>
      <Input ID="0" Universe="1" Channel="53855" />
+    </Button>
+   </Frame>
+   <Frame Caption="Eigen scènes en chases" ID="400">
+    <Appearance>
+     <FrameStyle>Sunken</FrameStyle>
+     <Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font>
+    </Appearance>
+    <WindowState Visible="True" X="760" Y="40" Width="390" Height="130" />
+    <AllowChildren>True</AllowChildren>
+    <AllowResize>True</AllowResize>
+    <ShowHeader>True</ShowHeader>
+    <ShowEnableButton>True</ShowEnableButton>
+    <Collapsed>False</Collapsed>
+    <Disabled>False</Disabled>
+    <Button Caption="test" ID="311">
+     <WindowState Visible="True" X="10" Y="40" Width="180" Height="60" />
+     <Function ID="311" />
+     <Action>Toggle</Action>
     </Button>
    </Frame>
   <Frame Caption="Strobe Control" ID="200"><Appearance><FrameStyle>Sunken</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><WindowState Visible="True" X="333" Y="810" Width="400" Height="230" /><AllowChildren>True</AllowChildren><AllowResize>True</AllowResize><ShowHeader>True</ShowHeader><ShowEnableButton>True</ShowEnableButton><Collapsed>False</Collapsed><Disabled>False</Disabled><SoloFrame Caption="Strobe Color" ID="220"><Appearance><FrameStyle>Sunken</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Default</Font></Appearance><WindowState Visible="True" X="10" Y="40" Width="250" Height="180" /><AllowChildren>True</AllowChildren><AllowResize>True</AllowResize><ShowHeader>True</ShowHeader><ShowEnableButton>True</ShowEnableButton><Collapsed>False</Collapsed><Disabled>False</Disabled><Button Caption="RED" ID="201" Icon=""><WindowState Visible="True" X="10" Y="40" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="211" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="27581" /></Button><Button Caption="GREEN" ID="202" Icon=""><WindowState Visible="True" X="68" Y="40" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="212" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="22822" /></Button><Button Caption="BLUE" ID="203" Icon=""><WindowState Visible="True" X="126" Y="40" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="213" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="18607" /></Button><Button Caption="AMBER" ID="204" Icon=""><WindowState Visible="True" X="184" Y="40" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="214" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="15376" /></Button><Button Caption="MAGEN" ID="205" Icon=""><WindowState Visible="True" X="10" Y="105" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="215" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="11673" /></Button><Button Caption="CYAN" ID="206" Icon=""><WindowState Visible="True" X="68" Y="105" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="216" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="7938" /></Button><Button Caption="UV" ID="207" Icon=""><WindowState Visible="True" X="126" Y="105" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="217" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="3723" /></Button><Button Caption="WHITE" ID="208" Icon=""><WindowState Visible="True" X="184" Y="105" Width="52" Height="55" /><Appearance><FrameStyle>None</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,8,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><Function ID="218" /><Action>Toggle</Action><Intensity Adjust="False">100</Intensity><Input Universe="1" Channel="63100" /></Button></SoloFrame><SpeedDial Caption="Strobe Speed" ID="210"><Appearance><FrameStyle>Sunken</FrameStyle><ForegroundColor>Default</ForegroundColor><BackgroundColor>Default</BackgroundColor><BackgroundImage>None</BackgroundImage><Font>Arial,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font></Appearance><WindowState Visible="True" X="270" Y="40" Width="120" Height="180" /><Visibility>43</Visibility><Function FadeIn="0" FadeOut="0" Duration="6">211</Function><Function FadeIn="0" FadeOut="0" Duration="6">212</Function><Function FadeIn="0" FadeOut="0" Duration="6">213</Function><Function FadeIn="0" FadeOut="0" Duration="6">214</Function><Function FadeIn="0" FadeOut="0" Duration="6">215</Function><Function FadeIn="0" FadeOut="0" Duration="6">216</Function><Function FadeIn="0" FadeOut="0" Duration="6">217</Function><Function FadeIn="0" FadeOut="0" Duration="6">218</Function><AbsoluteValue Minimum="20" Maximum="2000"><Input Universe="1" Channel="41564" /></AbsoluteValue><Time>0</Time></SpeedDial></Frame></Frame>
