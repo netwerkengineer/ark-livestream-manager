@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       const write = (text: string) => { try { controller.enqueue(encoder.encode(text)); } catch { /* closed */ } };
       send = () => {
         const types = f.types.join(",");
-        const body: Record<string, unknown> = { v: f.values };
+        const body: Record<string, unknown> = { v: f.values, fn: f.functions };
         if (types !== sentTypes) { body.t = f.types; sentTypes = types; }
         write(`data: ${JSON.stringify(body)}\n\n`);
       };

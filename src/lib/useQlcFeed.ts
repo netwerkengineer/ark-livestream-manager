@@ -11,6 +11,7 @@ export function useQlcFeed(onValues?: (values: number[], types: string[]) => voi
   const [connected, setConnected] = useState(false);
   const [live, setLive] = useState(false);          // values really arrive
   const [info, setInfo] = useState("");
+  const [running, setRunning] = useState<Record<number, boolean>>({});
   const [tick, setTick] = useState(0);
   const callback = useRef(onValues);
   callback.current = onValues;
@@ -35,6 +36,7 @@ export function useQlcFeed(onValues?: (values: number[], types: string[]) => voi
         if (d.error) { setInfo(d.error); return; }
         if (Array.isArray(d.v)) values.current = d.v;
         if (Array.isArray(d.t)) types.current = d.t;
+        if (d.fn && typeof d.fn === "object") setRunning(Object.fromEntries(Object.entries(d.fn as Record<string, string>).map(([k, v]) => [Number(k), v === "Running"])));
         setLive(true); setInfo("");
         callback.current?.(values.current, types.current);
         setTick(t => t + 1);
@@ -43,5 +45,5 @@ export function useQlcFeed(onValues?: (values: number[], types: string[]) => voi
     return () => { stop = true; es.close(); };
   }, []);
 
-  return { values, types, connected: connected && live, streamOpen: connected, info, tick };
+  return { values, types, connected: connected && live, streamOpen: connected, info, running, tick };
 }

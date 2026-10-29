@@ -6,6 +6,7 @@ import LightAutoBanner from "@/components/LightAutoBanner";
 import dynamic from "next/dynamic";
 
 // three.js only loads when the live stage window is shown
+import CustomLights from "@/components/lights/CustomLights";
 const StageView = dynamic(() => import("@/components/lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 import { useSession, signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -729,6 +730,8 @@ export default function LightsPage() {
         </div>
         {showStage && <StageView compact />}
       </section>
+
+      <div style={{ marginBottom: "24px" }}><CustomLights /></div>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner

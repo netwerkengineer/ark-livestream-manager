@@ -6,14 +6,15 @@ import fs from "fs";
 import path from "path";
 import { WORKSPACE_FILE, readFixtures } from "./qlcWorkspace";
 
-export interface SceneFn { id: number; type: "Scene"; name: string; path: string; values: Record<number, number[]> }
+export interface SceneFn { id: number; type: "Scene"; name: string; path: string; values: Record<number, number[]>; button?: boolean }
 export interface ChaserStep { scene: number; fadeIn: number; hold: number; fadeOut: number }
 export interface ChaserFn {
   id: number; type: "Chaser"; name: string; path: string;
   direction: "Forward" | "Backward"; runOrder: "Loop" | "SingleShot" | "PingPong" | "Random";
   steps: ChaserStep[];
+  button?: boolean;
 }
-export interface OtherFn { id: number; type: string; name: string; path: string }
+export interface OtherFn { id: number; type: string; name: string; path: string; button?: boolean }
 export type QlcFunction = SceneFn | ChaserFn | OtherFn;
 
 const BACKUP_DIR = path.join(path.dirname(WORKSPACE_FILE), "backups");
@@ -57,7 +58,85 @@ export function readFunctions(file = WORKSPACE_FILE): QlcFunction[] {
       });
     } else out.push({ id, type, name, path: pth });
   }
+  const buttons = new Set(customButtons(xml).map(b => b.id));
+  for (const f of out) f.button = buttons.has(f.id);
   return out;
+}
+
+// ---- the Virtual Console frame with the buttons of the scenes and chases made in the web app. The buttons that were already there stay as they are.
+// A button has the function's number as its own number (that is how the other buttons of this workspace are numbered too).
+export const CUSTOM_CAPTION = "Eigen scènes en chases";
+const CUSTOM_FRAME_ID = 400;
+const frameOpen = () => `<Frame Caption="${escapeXml(CUSTOM_CAPTION)}" ID="${CUSTOM_FRAME_ID}">`;
+
+function customRange(xml: string): { start: number; end: number } | null {
+  const start = xml.indexOf(frameOpen());
+  if (start < 0) return null;
+  const close = xml.indexOf("</Frame>", start);
+  return close < 0 ? null : { start, end: close + "</Frame>".length };
+}
+
+export function customButtons(xml: string): { id: number; caption: string }[] {
+  const r = customRange(xml);
+  if (!r) return [];
+  return [...xml.slice(r.start, r.end).matchAll(/<Button Caption="([^"]*)" ID="(\d+)">/g)].map(m => ({ id: Number(m[2]), caption: unescapeXml(m[1]) }));
+}
+
+function customFrameXml(buttons: { id: number; caption: string }[]): string {
+  const rows = Math.max(1, Math.ceil(buttons.length / 2));
+  const btn = buttons.map((b, i) => `    <Button Caption="${escapeXml(b.caption)}" ID="${b.id}">
+     <WindowState Visible="True" X="${10 + (i % 2) * 190}" Y="${40 + Math.floor(i / 2) * 70}" Width="180" Height="60" />
+     <Function ID="${b.id}" />
+     <Action>Toggle</Action>
+    </Button>`).join("\n");
+  return `   ${frameOpen()}
+    <Appearance>
+     <FrameStyle>Sunken</FrameStyle>
+     <Font>Arial,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,Regular</Font>
+    </Appearance>
+    <WindowState Visible="True" X="760" Y="40" Width="390" Height="${60 + rows * 70}" />
+    <AllowChildren>True</AllowChildren>
+    <AllowResize>True</AllowResize>
+    <ShowHeader>True</ShowHeader>
+    <ShowEnableButton>True</ShowEnableButton>
+    <Collapsed>False</Collapsed>
+    <Disabled>False</Disabled>
+${btn}
+   </Frame>`;
+}
+
+/** Make sure the frame has exactly these buttons (an empty list removes the frame) */
+function setCustomButtons(xml: string, buttons: { id: number; caption: string }[]): string {
+  const r = customRange(xml);
+  if (buttons.length === 0) {
+    if (!r) return xml;
+    const from = xml.lastIndexOf("\n", r.start);
+    return xml.slice(0, from < 0 ? r.start : from) + xml.slice(r.end);
+  }
+  const frame = customFrameXml(buttons);
+  if (r) {
+    const from = xml.lastIndexOf("\n", r.start);
+    return xml.slice(0, from < 0 ? r.start : from + 1) + frame + xml.slice(r.end);
+  }
+  const vcEnd = xml.indexOf("</VirtualConsole>");
+  const top = xml.lastIndexOf("</Frame>", vcEnd);   // the closing tag of the main frame
+  if (vcEnd < 0 || top < 0) throw new Error("Geen Virtual Console in het werkbestand");
+  const lineStart = xml.lastIndexOf("\n", top) + 1;
+  return xml.slice(0, lineStart) + frame + "\n" + xml.slice(lineStart);
+}
+
+function applyButton(xml: string, id: number, caption: string, want: boolean | undefined): string {
+  if (want === undefined) {
+    // a renamed function keeps its button but gets the new caption
+    const cur = customButtons(xml).find(b => b.id === id);
+    if (!cur || !caption || cur.caption === caption) return xml;
+    return setCustomButtons(xml, customButtons(xml).map(b => (b.id === id ? { id, caption } : b)));
+  }
+  const list = customButtons(xml).filter(b => b.id !== id);
+  const had = customButtons(xml).some(b => b.id === id);
+  if (want) list.push({ id, caption });
+  else if (!had) return xml;
+  return setCustomButtons(xml, list.sort((a, b) => a.id - b.id));
 }
 
 const nextId = (xml: string): number => {
@@ -106,7 +185,7 @@ function replaceOrAppend(xml: string, id: number | undefined, block: string): { 
   return { xml: xml.slice(0, at) + "\n" + withId + xml.slice(at), id: newId };
 }
 
-export function saveScene(input: { id?: number; name?: unknown; path?: unknown; values?: Record<string, unknown> }): number {
+export function saveScene(input: { id?: number; name?: unknown; path?: unknown; values?: Record<string, unknown>; button?: boolean }): number {
   const fixtures = new Map(readFixtures().map(f => [f.id, f]));
   const name = cleanName(input.name);
   const pth = typeof input.path === "string" ? input.path.trim().slice(0, 60) : "";
@@ -122,11 +201,11 @@ export function saveScene(input: { id?: number; name?: unknown; path?: unknown; 
   const block = `  <Function ID="${input.id ?? "__ID__"}" Type="Scene" Name="${escapeXml(name)}"${pth ? ` Path="${escapeXml(pth)}"` : ""}>\n   <Speed FadeIn="0" FadeOut="0" Duration="0" />\n${lines.join("\n")}\n  </Function>`;
   const xml = fs.readFileSync(WORKSPACE_FILE, "utf-8");
   const r = replaceOrAppend(xml, input.id, block);
-  writeWorkspace(WORKSPACE_FILE, r.xml);
+  writeWorkspace(WORKSPACE_FILE, applyButton(r.xml, r.id, name, input.button));
   return r.id;
 }
 
-export function saveChaser(input: { id?: number; name?: unknown; path?: unknown; direction?: unknown; runOrder?: unknown; steps?: unknown }): number {
+export function saveChaser(input: { id?: number; name?: unknown; path?: unknown; direction?: unknown; runOrder?: unknown; steps?: unknown; button?: boolean }): number {
   const name = cleanName(input.name);
   const pth = typeof input.path === "string" ? input.path.trim().slice(0, 60) : "";
   const known = new Set(readFunctions().map(f => f.id));
@@ -145,7 +224,7 @@ export function saveChaser(input: { id?: number; name?: unknown; path?: unknown;
   const block = `  <Function ID="${input.id ?? "__ID__"}" Type="Chaser" Name="${escapeXml(name)}"${pth ? ` Path="${escapeXml(pth)}"` : ""}>\n   <Speed FadeIn="${first.fadeIn}" FadeOut="${first.fadeOut}" Duration="${first.fadeIn + first.hold}" />\n   <Direction>${direction}</Direction>\n   <RunOrder>${runOrder}</RunOrder>\n   <SpeedModes FadeIn="Default" FadeOut="Default" Duration="Common" />\n${stepXml}\n  </Function>`;
   const xml = fs.readFileSync(WORKSPACE_FILE, "utf-8");
   const r = replaceOrAppend(xml, input.id, block);
-  writeWorkspace(WORKSPACE_FILE, r.xml);
+  writeWorkspace(WORKSPACE_FILE, applyButton(r.xml, r.id, name, input.button));
   return r.id;
 }
 
@@ -156,7 +235,8 @@ export function usesOf(id: number): string[] {
   for (const f of readFunctions()) {
     if (f.type === "Chaser" && (f as ChaserFn).steps.some(s => s.scene === id)) used.push(`chase "${f.name}"`);
   }
-  const vc = xml.slice(xml.indexOf("<VirtualConsole>"));
+  const r = customRange(xml);
+  const vc = (r ? xml.slice(0, r.start) + xml.slice(r.end) : xml).slice(xml.indexOf("<VirtualConsole>"));   // the web app's own buttons do not count
   const buttons = [...vc.matchAll(/<Button Caption="([^"]*)" ID="\d+">[\s\S]*?<Function ID="(\d+)" \/>/g)].filter(m => Number(m[2]) === id);
   for (const b of buttons) used.push(`knop "${unescapeXml(b[1])}" in de Virtual Console`);
   return used;
@@ -171,7 +251,7 @@ export function deleteFunction(id: number) {
   const start = xml.indexOf("<Engine>"), end = xml.indexOf("</Engine>");
   const re = new RegExp(`[ \\t]*<Function ID="${id}" Type="\\w+"[^>]*>[\\s\\S]*?</Function>\\n?`);
   const eng = xml.slice(start, end).replace(re, "");
-  writeWorkspace(WORKSPACE_FILE, xml.slice(0, start) + eng + xml.slice(end));
+  writeWorkspace(WORKSPACE_FILE, applyButton(xml.slice(0, start) + eng + xml.slice(end), id, "", false));
 }
 
 /** Ask the QLC+ container to load the workspace again (its start script watches this trigger file) and wait for the answer */

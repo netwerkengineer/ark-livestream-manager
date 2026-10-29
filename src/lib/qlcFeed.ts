@@ -5,13 +5,14 @@ import fs from "fs";
 import path from "path";
 import WebSocket from "ws";
 import { getSettings } from "./settingsStore";
-import { readFixtures } from "./qlcWorkspace";
+import { readFixtures, WORKSPACE_FILE } from "./qlcWorkspace";
+import { customButtons } from "./qlcFunctions";
 
-export interface Feed { values: number[]; types: string[]; version: number; ws: WebSocket | null; timer: ReturnType<typeof setInterval> | null; listeners: Set<() => void>; host: string; count: number; error: string }
+export interface Feed { functions: Record<number, string>; pending: number[]; poll: ReturnType<typeof setInterval> | null; values: number[]; types: string[]; version: number; ws: WebSocket | null; timer: ReturnType<typeof setInterval> | null; listeners: Set<() => void>; host: string; count: number; error: string }
 const g = globalThis as unknown as { __qlcFeed?: Feed };
 
 export function feed(): Feed {
-  if (!g.__qlcFeed) g.__qlcFeed = { values: [], types: [], version: 0, ws: null, timer: null, listeners: new Set(), host: "", count: 0, error: "" };
+  if (!g.__qlcFeed) g.__qlcFeed = { functions: {}, pending: [], poll: null, values: [], types: [], version: 0, ws: null, timer: null, listeners: new Set(), host: "", count: 0, error: "" };
   return g.__qlcFeed;
 }
 
@@ -43,9 +44,29 @@ export function startFeed(f: Feed) {
   ws.on("open", () => {
     f.error = "";
     f.timer = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send(`QLC+API|getChannelsValues|1|1|${f.count}`); }, 100);
+    // the buttons of the web app's own scenes and chases: ask now and then whether they run (announcements only come when something changes)
+    const ask = () => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      try {
+        for (const b of customButtons(fs.readFileSync(WORKSPACE_FILE, "utf-8"))) { f.pending.push(b.id); ws.send(`QLC+API|getFunctionStatus|${b.id}`); }
+      } catch { /* the workspace is being written */ }
+      if (f.pending.length > 200) f.pending = [];
+    };
+    ask();
+    f.poll = setInterval(ask, 3000);
   });
   ws.on("message", raw => {
-    const r = parseChannels(String(raw));
+    const text = String(raw);
+    // function state: QLC+ announces changes ("FUNCTION|<id>|Running") and answers our questions ("QLC+API|getFunctionStatus|<state>", in order)
+    const parts = text.split("|");
+    let id: number | undefined, state: string | undefined;
+    if (parts[0] === "FUNCTION" && parts.length >= 3) { id = Number(parts[1]); state = parts[2]; }
+    else if (parts[0] === "QLC+API" && parts[1] === "getFunctionStatus" && parts.length === 3) { id = f.pending.shift(); state = parts[2]; }
+    if (id !== undefined && state !== undefined && Number.isFinite(id)) {
+      if (f.functions[id] !== state) { f.functions[id] = state; f.version++; f.listeners.forEach(l => l()); }
+      return;
+    }
+    const r = parseChannels(text);
     if (!r) return;
     const changed = r.values.length !== f.values.length || r.values.some((v, i) => v !== f.values[i]) || r.types.join("") !== f.types.join("");
     f.values = r.values; f.types = r.types;
@@ -54,7 +75,8 @@ export function startFeed(f: Feed) {
   });
   const reset = () => {
     if (f.timer) clearInterval(f.timer);
-    f.timer = null; f.ws = null;
+    if (f.poll) clearInterval(f.poll);
+    f.timer = null; f.poll = null; f.ws = null; f.pending = [];
     setTimeout(() => { if (f.listeners.size) startFeed(f); }, 2000);   // viewers still there: connect again
   };
   ws.on("close", reset);

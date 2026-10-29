@@ -18,6 +18,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 
 // three.js only loads when the live stage window is shown
+import CustomLights from "./lights/CustomLights";
 const StageView = dynamic(() => import("./lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 
 interface LightsControlProps {
@@ -647,6 +648,8 @@ export default function LightsControl({ settings }: LightsControlProps) {
         </div>
         {showStage && <StageView compact />}
       </section>
+
+      <CustomLights />
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner

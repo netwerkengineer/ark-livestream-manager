@@ -11,8 +11,8 @@ import StageView, { fixtureLight } from "./StageView";
 
 type Values = Record<number, number[]>;
 type Editing =
-  | { kind: "scene"; id?: number; name: string; path: string; values: Values }
-  | { kind: "chase"; id?: number; name: string; path: string; steps: ChaserStep[]; direction: "Forward" | "Backward"; runOrder: ChaserFn["runOrder"] }
+  | { kind: "scene"; id?: number; name: string; path: string; values: Values; button: boolean }
+  | { kind: "chase"; id?: number; name: string; path: string; button: boolean; steps: ChaserStep[]; direction: "Forward" | "Backward"; runOrder: ChaserFn["runOrder"] }
   | null;
 
 const COLOR_NAMES: Record<string, string> = { FF0000: "Rood", "00FF00": "Groen", "0000FF": "Blauw", FFFFFF: "Wit", FF7E00: "Amber", "9400D3": "UV", "00FFFF": "Cyaan", FF00FF: "Magenta", FFFF00: "Geel" };
@@ -75,8 +75,8 @@ export default function LightEditor() {
     return dmx;
   }, [editing, previewStep, sceneById, fixtures, dmxSize]);
 
-  const newScene = () => { setEditing({ kind: "scene", name: "Nieuwe scène", path: "", values: blank() }); setDirty(true); setSelection(new Set()); };
-  const newChase = () => { setEditing({ kind: "chase", name: "Nieuwe chase", path: "", steps: [], direction: "Forward", runOrder: "Loop" }); setDirty(true); setPreviewStep(0); };
+  const newScene = () => { setEditing({ kind: "scene", name: "Nieuwe scène", path: "", values: blank(), button: true }); setDirty(true); setSelection(new Set()); };
+  const newChase = () => { setEditing({ kind: "chase", name: "Nieuwe chase", path: "", button: true, steps: [], direction: "Forward", runOrder: "Loop" }); setDirty(true); setPreviewStep(0); };
   const openFunction = (f: QlcFunction) => {
     if (dirty && !confirm("Niet-opgeslagen wijzigingen weggooien?")) return;
     if (f.type === "Scene") {
@@ -84,10 +84,10 @@ export default function LightEditor() {
       const values = blank();
       for (const [fid, arr] of Object.entries(sc.values)) values[Number(fid)] = arr.slice();
       for (const fx of fixtures) { const a = values[fx.id] || []; while (a.length < fx.channels) a.push(0); values[fx.id] = a; }
-      setEditing({ kind: "scene", id: sc.id, name: sc.name, path: sc.path, values }); setSelection(new Set());
+      setEditing({ kind: "scene", id: sc.id, name: sc.name, path: sc.path, values, button: !!sc.button }); setSelection(new Set());
     } else if (f.type === "Chaser") {
       const c = f as ChaserFn;
-      setEditing({ kind: "chase", id: c.id, name: c.name, path: c.path, steps: c.steps.map(s => ({ ...s })), direction: c.direction, runOrder: c.runOrder }); setPreviewStep(0);
+      setEditing({ kind: "chase", id: c.id, name: c.name, path: c.path, button: !!c.button, steps: c.steps.map(s => ({ ...s })), direction: c.direction, runOrder: c.runOrder }); setPreviewStep(0);
     } else return;
     setDirty(false); setMessage(null);
   };
@@ -168,8 +168,8 @@ export default function LightEditor() {
   const save = async () => {
     if (!editing) return;
     const body = editing.kind === "scene"
-      ? { action: "save-scene", id: editing.id, name: editing.name, path: editing.path, values: editing.values }
-      : { action: "save-chaser", id: editing.id, name: editing.name, path: editing.path, steps: editing.steps, direction: editing.direction, runOrder: editing.runOrder };
+      ? { action: "save-scene", id: editing.id, name: editing.name, path: editing.path, values: editing.values, button: editing.button }
+      : { action: "save-chaser", id: editing.id, name: editing.name, path: editing.path, button: editing.button, steps: editing.steps, direction: editing.direction, runOrder: editing.runOrder };
     const j = await post(body);
     if (!j) return;
     setEditing({ ...editing, id: j.id });
@@ -222,6 +222,7 @@ export default function LightEditor() {
             <div className="led-head">
               <input className="led-name" value={editing.name} onChange={e => { setEditing({ ...editing, name: e.target.value }); setDirty(true); }} aria-label="Naam" />
               <input className="led-path" value={editing.path} placeholder="Map (bijv. Sfeer)" onChange={e => { setEditing({ ...editing, path: e.target.value }); setDirty(true); }} aria-label="Map in QLC+" />
+              <label className="led-btnopt" title="Zet een knop in de Virtual Console van QLC+ en in Lichtregie"><input type="checkbox" checked={editing.button} onChange={e => { setEditing({ ...editing, button: e.target.checked }); setDirty(true); }} /> Knop in Lichtregie</label>
               <button className="stg-btn" onClick={save} disabled={busy || !dirty}>{busy ? "Bezig…" : "Opslaan"}</button>
               {editing.id !== undefined && <button className="stg-btn" onClick={() => tryOut(true)} disabled={busy}>Op het podium proberen</button>}
               {editing.id !== undefined && <button className="stg-btn" onClick={() => tryOut(false)} disabled={busy}>Stop</button>}
