@@ -637,6 +637,7 @@ export default function LightsControl({ settings }: LightsControlProps) {
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
         <Link href="/lights/stage" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link>
         <Link href="/lights/editor" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Scènes en chases maken</Link>
+        <Link href="/lights/fixtures" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Lampen beheren</Link>
       </div>
       {/* Live 3D-podium: je ziet meteen wat een knop doet */}
       <section className="glass-card" style={{ padding: "14px" }}>

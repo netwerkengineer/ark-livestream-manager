@@ -17,7 +17,7 @@ export default function LightsEditorPage() {
           <h1 className="gradient-text" style={{ fontSize: "1.5rem", lineHeight: "1.2" }}>Scènes en chases maken</h1>
           <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Maak een scène met kleuren per lamp, of een chase van scènes. Je ziet het meteen in het 3D-podium; opslaan zet het in QLC+.</p>
         </div>
-        <Link href="/lights/stage" className="btn-outline" style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link>
+        <span style={{ marginLeft: "auto", display: "flex", gap: "10px" }}><Link href="/lights/fixtures" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Lampen beheren</Link><Link href="/lights/stage" className="btn-outline" style={{ padding: "8px 14px", borderRadius: "8px", fontSize: "0.85rem" }}>Podium 2D/3D</Link></span>
       </header>
       <LightEditor />
     </div>

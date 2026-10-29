@@ -1644,3 +1644,19 @@ textarea.input-field {
 .cl-btn:hover { border-color: rgba(249,115,22,0.6); }
 .cl-btn.on { background: rgba(74,222,128,0.18); border-color: #4ade80; box-shadow: 0 0 0 1px rgba(74,222,128,0.4) inset; }
 .cl-btn.chase strong::before { content: "⟳ "; color: #94a3b8; }
+
+/* Lights: lamps manager */
+.fxm { display: flex; flex-direction: column; gap: 16px; }
+.fxm h3 { margin: 0 0 10px; font-size: 1rem; }
+.fxm-add { display: flex; flex-direction: column; gap: 10px; }
+.fxm-hits { display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow: auto; }
+.fxm-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; align-items: end; }
+.fxm-form > strong, .fxm-form > p, .fxm-actions { grid-column: 1 / -1; }
+.fxm-actions { display: flex; gap: 8px; }
+.fxm-list { display: flex; flex-direction: column; gap: 6px; }
+.fxm-row { display: grid; grid-template-columns: minmax(180px, 2fr) 1fr 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 10px; background: rgba(15,23,42,0.4); border: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; }
+.fxm-row.warn { border-color: rgba(250,204,21,0.5); }
+.fxm-row em { display: block; font-style: normal; font-size: 0.72rem; color: var(--muted); }
+.fxm-row input { background: rgba(2,6,23,0.6); color: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); border-radius: 6px; padding: 4px 6px; font-size: 0.85rem; width: 100%; }
+.fxm-btns { display: flex; gap: 6px; justify-content: flex-end; }
+.fxm-warn { grid-column: 1 / -1; font-size: 0.75rem; color: #fde047; }

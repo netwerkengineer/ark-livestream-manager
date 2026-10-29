@@ -47,6 +47,7 @@ export function startFeed(f: Feed) {
     // the buttons of the web app's own scenes and chases: ask now and then whether they run (announcements only come when something changes)
     const ask = () => {
       if (ws.readyState !== WebSocket.OPEN) return;
+      f.count = channelCount();   // lamps may have been added
       try {
         for (const b of customButtons(fs.readFileSync(WORKSPACE_FILE, "utf-8"))) { f.pending.push(b.id); ws.send(`QLC+API|getFunctionStatus|${b.id}`); }
       } catch { /* the workspace is being written */ }
