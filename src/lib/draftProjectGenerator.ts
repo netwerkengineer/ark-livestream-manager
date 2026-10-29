@@ -401,11 +401,11 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     const { item, note } = await resolveSongItem(song, settings, livestreamOutputId, songStyleId);
     if (note) notes.push(note);
     // Gekozen sfeer (achtergrondvideo + licht) op de startdia van het lied zetten; blijft op het lied staan.
-    if (song.sfeer) {
+    if (song.sfeer || song.achtergrond) {
       try {
         const showFile = await getLocalShowFilePath(song.title, song.artist || '');
         if (showFile) {
-          const applied = await applySfeerToShowFile(showFile, song.sfeer);
+          const applied = await applySfeerToShowFile(showFile, song.sfeer || '', song.achtergrond || '');
           if (applied.note) notes.push(`${song.title}: ${applied.note}`);
           if (applied.ok) {
             const fresh = await getLocalShowData(song.title, song.artist || '');

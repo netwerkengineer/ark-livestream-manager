@@ -45,31 +45,56 @@ function rid(n = 11): string {
   return Array.from(crypto.randomBytes(n)).map(b => chars[b % chars.length]).join('');
 }
 
-// Welke sfeer staat er nu in dit lied (afgeleid uit de achtergrondvideo)? Leeg als het lied er nog geen heeft.
-export async function readCurrentSfeer(filePath: string): Promise<string> {
+export interface LichtKeuze { sfeer: string; achtergrond: string }
+
+// Wat staat er nu op dit lied? Het licht komt uit de lichtactie (Companion-knop van een sfeer, of /api/lights/trigger voor een eigen
+// scène of chase), de achtergrond uit de lege startdia: een Ark Visuals-filmpje hoort bij een sfeer, elk ander bestand in de
+// mediamap is een eigen achtergrond (pad vanaf de mediamap, met schuine strepen). Leeg = er staat niets.
+export async function readCurrentKeuze(filePath: string): Promise<LichtKeuze> {
+  const out: LichtKeuze = { sfeer: '', achtergrond: '' };
   try {
     const raw = JSON.parse(await fs.readFile(filePath, 'utf-8'));
-    const media = (Array.isArray(raw) ? raw[1] : raw)?.media || {};
-    for (const m of Object.values<any>(media)) {
-      const hit = /Ark Visuals[\\/]([^\\/]+)\.mp4$/i.exec(String(m?.path || ''));
-      if (hit && getSfeer(hit[1])) return hit[1];
+    const c = (Array.isArray(raw) ? raw[1] : raw) || {};
+    const media = c.media || {};
+    const layouts = JSON.stringify(c.layouts || {});
+    const trigger = /\/api\/lights\/trigger\?id=(\d+)/.exec(layouts);
+    const press = new RegExp(`/api/location/${COMPANION_PAGINA}/(\\d+)/(\\d+)/press`).exec(layouts);
+    if (trigger) out.sfeer = EIGEN_PREFIX + trigger[1];
+    else if (press) out.sfeer = SFEREN.find(x => x.knop === (Number(press[1]) - 2) * 8 + Number(press[2]))?.slug || '';
+    for (const layout of Object.values<any>(c.layouts || {})) {
+      const sls: any[] = layout.slides || [];
+      if (!sls.length || !String(c.slides?.[sls[0].id]?.group || '').startsWith('Start')) continue;
+      const m = media[sls[0].background];
+      if (!m?.path) break;
+      const hit = /Ark Visuals[\\/]([^\\/]+)\.mp4$/i.exec(String(m.path));
+      if (hit) { if (!out.sfeer && getSfeer(hit[1])) out.sfeer = hit[1]; }
+      else {
+        const rel = /[\\/]Media[\\/](.+)$/i.exec(String(m.path));
+        if (rel) out.achtergrond = rel[1].replace(/\\/g, '/');
+      }
+      break;
     }
-    // geen filmpje: misschien een eigen scène of chase (de lichtactie verwijst naar /api/lights/trigger)
-    const own = /\/api\/lights\/trigger\?id=(\d+)/.exec(JSON.stringify(raw));
-    if (own) return EIGEN_PREFIX + own[1];
+    if (!out.sfeer && !out.achtergrond) {   // een oud lied zonder lichtactie maar met een sfeerfilmpje
+      for (const m of Object.values<any>(media)) {
+        const hit = /Ark Visuals[\\/]([^\\/]+)\.mp4$/i.exec(String(m?.path || ''));
+        if (hit && getSfeer(hit[1])) { out.sfeer = hit[1]; break; }
+      }
+    }
   } catch { /* geen of onleesbaar bestand */ }
-  return '';
+  return out;
 }
 
-// Zet de gekozen sfeer op de lege startdia van het lied: achtergrond + lichtactie. Maakt de startdia aan als die er nog
-// niet is. De indeling "Tracks" wordt niet verschoven (de cuetabellen van Ark Tracks tellen de dia's daarvan).
-export async function applySfeerToShowFile(filePath: string, slug: string): Promise<{ ok: boolean; note?: string }> {
+// Zet de gekozen sfeer en/of achtergrond op de lege startdia van het lied: achtergrond + lichtactie. Maakt de startdia aan als die er
+// nog niet is. De indeling "Tracks" wordt niet verschoven (de cuetabellen van Ark Tracks tellen de dia's daarvan).
+// Alleen wat gekozen is verandert: zonder sfeer blijft het licht staan, zonder achtergrond blijft de achtergrond staan (bij een eigen
+// scène of chase blijft ook het sfeerfilmpje staan). Een gekozen achtergrond (video of afbeelding) gaat voor het filmpje van de sfeer.
+export async function applySfeerToShowFile(filePath: string, slug: string, achtergrond = ''): Promise<{ ok: boolean; note?: string }> {
   const eigen = eigenId(slug);
   const own = eigen !== null ? readFunctions().find(f => f.id === eigen && f.button) : undefined;
   if (eigen !== null && !own) return { ok: false, note: `Eigen scène of chase ${eigen} bestaat niet meer (of heeft geen knop in de lichtregie).` };
-  // Een eigen scène heeft geen filmpje: dan blijft alleen de lichtactie over.
-  const sfeer: Sfeer | undefined = eigen !== null ? undefined : getSfeer(slug);
-  if (eigen === null && !sfeer) return { ok: false, note: `Onbekende sfeer "${slug}".` };
+  const sfeer: Sfeer | undefined = slug && eigen === null ? getSfeer(slug) : undefined;
+  if (slug && eigen === null && !sfeer) return { ok: false, note: `Onbekende sfeer "${slug}".` };
+  const lichtGekozen = !!(sfeer || own);
   const settings = getSettings() as any;
   const notes: string[] = [];
 
@@ -78,22 +103,32 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
   const c = raw[1];
   c.media = c.media || {};
 
-  // Achtergrond
+  // Achtergrond: een gekozen eigen bestand, anders het filmpje van de sfeer, anders blijft alles zoals het is
   const mediaRoot = settings.freeshowMediaPath || (settings.freeshowPath ? path.join(settings.freeshowPath, 'Media') : '');
-  const serverVideo = sfeer && mediaRoot ? path.join(mediaRoot, 'Motion backgrounds', 'Ark Visuals', `${sfeer.slug}.mp4`) : '';
-  const videoExists = serverVideo ? await fs.access(serverVideo).then(() => true).catch(() => false) : false;
-  const oldIds = Object.keys(c.media).filter(k => /Ark Visuals/i.test(String(c.media[k]?.path || '')));
+  let serverFile = '';
+  let ownBackground = false;
+  if (achtergrond && mediaRoot) {
+    const full = path.resolve(mediaRoot, achtergrond);
+    if (full.startsWith(path.resolve(mediaRoot) + path.sep) && await fs.access(full).then(() => true).catch(() => false)) { serverFile = full; ownBackground = true; }
+    else notes.push(`Achtergrond "${achtergrond}" is niet gevonden in de mediamap; de achtergrond is niet veranderd.`);
+  }
+  if (!ownBackground && sfeer && mediaRoot) {
+    const video = path.join(mediaRoot, 'Motion backgrounds', 'Ark Visuals', `${sfeer.slug}.mp4`);
+    if (await fs.access(video).then(() => true).catch(() => false)) serverFile = video;
+    else notes.push(`Achtergrondvideo "${sfeer.slug}.mp4" ontbreekt in de mediamap; alleen het licht is gezet.`);
+  }
+  const backgroundChanges = !!serverFile || (!ownBackground && !!sfeer);   // een sfeer zonder bestand haalt het oude sfeerfilmpje wel weg
+  const oldIds = backgroundChanges ? Object.keys(c.media).filter(k => /Ark Visuals/i.test(String(c.media[k]?.path || ''))) : [];
   oldIds.forEach(k => delete c.media[k]);
   let mid: string | null = null;
-  if (sfeer && videoExists) {
-    mid = 'ark' + sfeer.slug.slice(0, 8) + rid(3);
+  if (serverFile) {
+    const isImage = /\.(jpe?g|png|gif|webp|svg)$/i.test(serverFile);
+    mid = (ownBackground ? 'bg' : 'ark' + sfeer!.slug.slice(0, 8)) + rid(ownBackground ? 8 : 3);
     c.media[mid] = {
-      name: `${sfeer.slug}.mp4`,
-      path: toFreeShowClientPath(serverVideo, settings.freeshowPath, settings.freeshowClientPath),
-      type: 'video', muted: true, loop: true
+      name: path.basename(serverFile),
+      path: toFreeShowClientPath(serverFile, settings.freeshowPath, settings.freeshowClientPath),
+      ...(isImage ? { type: 'image' } : { type: 'video', muted: true, loop: true })
     };
-  } else if (sfeer) {
-    notes.push(`Achtergrondvideo "${sfeer.slug}.mp4" ontbreekt in de mediamap; alleen het licht is gezet.`);
   }
 
   // Lichtactie (HTTP-verzoek naar de Companion-knop van deze sfeer)
@@ -104,7 +139,7 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
     actionValues: { send_rest_command: { url: lightUrl, method: 'POST', contentType: '', payload: '' } },
     customActivation: '', midiEnabled: false
   } : null;
-  if (!lightAction) notes.push('Geen Companion-adres voor FreeShow ingesteld (Instellingen); de lichtactie is niet gezet.');
+  if (lichtGekozen && !lightAction) notes.push('Geen Companion-adres voor FreeShow ingesteld (Instellingen); de lichtactie is niet gezet.');
 
   c.slides = c.slides || {};
   let startId: string | null = null;
@@ -123,7 +158,8 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
       if (sls[1]?.actions) { sls[0].actions = sls[1].actions; delete sls[1].actions; } // acties van de eerste tekstdia verhuizen mee
     }
     const start = sls[0];
-    if (mid) start.background = mid; else delete start.background;
+    const prevBackground = start.background;
+    if (backgroundChanges) { if (mid) start.background = mid; else delete start.background; }
     // Oude Ark-achtergronden op andere dia's weghalen (eigen, handmatig gekozen achtergronden blijven staan)
     sls.forEach((sl: any, i: number) => {
       if (i > 0 && oldIds.includes(sl.background)) delete sl.background;
@@ -131,16 +167,20 @@ export async function applySfeerToShowFile(filePath: string, slug: string): Prom
         if (ov && oldIds.includes(ov.background)) delete ov.background;
       }
     });
-    const acts = ((start.actions = start.actions || {}).slideActions = (start.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
-    if (lightAction) acts.push({ ...lightAction, id: rid() });
+    if (lichtGekozen) {
+      const acts = ((start.actions = start.actions || {}).slideActions = (start.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
+      if (lightAction) acts.push({ ...lightAction, id: rid() });
+    }
     // Ook op de eerste tekstdia (net na de lege startdia): slaat de operator de startdia over, dan moet het licht toch wisselen.
     // De Companion-knop zet de scène aan (geen wisselknop), dus twee keer indrukken geeft hetzelfde resultaat.
     const firstText = sls[1];
     if (firstText) {
-      const textActs = ((firstText.actions = firstText.actions || {}).slideActions = (firstText.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
-      if (lightAction) textActs.push({ ...lightAction, id: rid() });
+      if (lichtGekozen) {
+        const textActs = ((firstText.actions = firstText.actions || {}).slideActions = (firstText.actions.slideActions || []).filter((a: any) => !String(a.name || '').startsWith('Licht:')));
+        if (lightAction) textActs.push({ ...lightAction, id: rid() });
+      }
       // Zelfde met de achtergrond; een eigen, handmatig gekozen achtergrond op die dia blijft staan (oude Ark-achtergronden zijn hierboven al weg)
-      if (mid && !firstText.background) firstText.background = mid;
+      if (mid && (!firstText.background || firstText.background === prevBackground)) firstText.background = mid;
     }
   }
 

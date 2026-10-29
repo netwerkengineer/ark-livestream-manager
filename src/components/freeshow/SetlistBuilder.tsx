@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
 import SfeerKiezer, { SfeerOptie } from '../SfeerKiezer';
+import AchtergrondKiezer from './AchtergrondKiezer';
 import { BIJBELSTIJLEN, STANDAARD_BIJBELSTIJL } from '@/lib/bijbelstijlen';
 import SongInput from './SongInput';
 import { BIBLE_BOOKS } from '@/lib/freeshowUtils';
@@ -17,6 +18,7 @@ interface DraftSong {
   chordsFileName?: string;
   chordsFilePath?: string;
   sfeer?: string;
+  achtergrond?: string;
   layoutId?: string;
 }
 
@@ -560,16 +562,35 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     }
   };
 
+  // Een sfeer brengt zijn eigen filmpje mee: kies je er een, dan vervalt een eerder gekozen eigen achtergrond (kies die daarna opnieuw als je beide wilt).
+  // Een eigen scène of chase heeft geen filmpje, dus laat de achtergrond staan.
   const changeSfeer = async (songId: string, sfeer: string) => {
-    if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, sfeer } : x) });
+    const wisAchtergrond = !!sfeer && !sfeer.startsWith('eigen-');
+    const patch: { sfeer: string; achtergrond?: string } = wisAchtergrond ? { sfeer, achtergrond: '' } : { sfeer };
+    if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, ...patch } : x) });
     try {
       const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sfeer })
+        body: JSON.stringify(patch)
       });
       const data = await res.json();
       if (!data.success) setError(data.error || 'Kon sfeer niet opslaan');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const changeAchtergrond = async (songId: string, achtergrond: string) => {
+    if (draft) setDraft({ ...draft, songs: draft.songs.map(x => x.id === songId ? { ...x, achtergrond } : x) });
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/songs/${encodeURIComponent(songId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ achtergrond })
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Kon achtergrond niet opslaan');
     } catch (e: any) {
       setError(e.message);
     }
@@ -1321,6 +1342,9 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                         )}
                         {sferen.length > 0 && (
                           <SfeerKiezer value={s.sfeer || ''} opties={sferen} onChange={slug => changeSfeer(s.id, slug)} />
+                        )}
+                        {freeshowMediaPath && (
+                          <AchtergrondKiezer value={s.achtergrond || ''} mediaPath={freeshowMediaPath} onChange={pad => changeAchtergrond(s.id, pad)} />
                         )}
                         <button onClick={() => moveSong(i, -1)} disabled={i === 0} title="Omhoog" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === 0 ? 0.3 : 1 }}>▲</button>
                         <button onClick={() => moveSong(i, 1)} disabled={i === draft.songs.length - 1} title="Omlaag" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem', opacity: i === draft.songs.length - 1 ? 0.3 : 1 }}>▼</button>
