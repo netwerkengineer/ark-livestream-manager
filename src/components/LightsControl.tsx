@@ -19,6 +19,7 @@ import dynamic from "next/dynamic";
 
 // three.js only loads when the live stage window is shown
 import CustomLights from "./lights/CustomLights";
+import TempoTap from "./lights/TempoTap";
 const StageView = dynamic(() => import("./lights/StageView"), { ssr: false, loading: () => <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>3D-podium laden…</p> });
 
 interface LightsControlProps {
@@ -651,6 +652,12 @@ export default function LightsControl({ settings }: LightsControlProps) {
       </section>
 
       <CustomLights />
+
+      {/* Tik het tempo: de chases die het tempo volgen lopen mee */}
+      <section className="glass-card" style={{ padding: "14px" }}>
+        <strong style={{ fontSize: "0.95rem", display: "block", marginBottom: "8px" }}>Tempo</strong>
+        <TempoTap />
+      </section>
 
       {/* Wat stuurt QLC+ nu, en wie startte het? */}
       <LightAutoBanner
