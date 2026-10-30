@@ -49,47 +49,53 @@ def woorden_van(regel):
     return re.findall(r"[\w'’]+", regel)
 
 
+def event_cues(lines, ts, span, st, extra=True, forceer_zoom=False):
+    """De cues van één stuk liedtekst (regels) dat op ts begint en ongeveer `span` seconden duurt. st = {"richting": 0, "teller": {}, "zoomsoort": 0} houdt bij wat er al geweest is."""
+    cues = []; tekst = " ".join(lines); heftig = bool(re.search(HEFTIG, tekst, re.I)); alle = [(w, li) for li, l in enumerate(lines) for w in woorden_van(l)]
+    for k, (w, li) in enumerate(alle):
+        moment = ts + span * (k + 0.5) / max(1, len(alle)); laag = w.lower().strip("'’")
+        if laag in KERN:
+            cues.append({"t": round(moment, 2), "soort": "vlieger", "tekst": w, "stijl": "heftig" if heftig else "rustig", "van": "lrbo"[st["richting"] % 4], "dur": 3.0 if heftig else 5.5, "px": 210 if heftig else 150, "cursief": True}); st["richting"] += 1
+        elif extra and not heftig and laag in ACCENT:
+            cues.append({"t": round(moment, 2), "soort": "vlieger", "tekst": w, "stijl": "accent", "van": "lrbo"[(st["richting"] + 2) % 4], "dur": 7.0, "px": 90, "cursief": False}); st["richting"] += 1
+    gelezen = False
+    for rx, zin in ZINNEN:
+        if re.search(rx, tekst, re.I) and heftig:
+            n = st["teller"].get(zin, 0); st["teller"][zin] = n + 1; gelezen = True
+            if n % 2 == 0 or forceer_zoom:
+                regel = next((li for li, l in enumerate(lines) if re.search(rx, l, re.I)), 0); moment = ts + span * regel / max(1, len(lines))
+                cues.append({"t": round(moment, 2), "soort": ("zoom", "doorzoom")[st["zoomsoort"] % 2], "tekst": zin, "stijl": "heftig", "dur": 2.6, "px": 0, "cursief": False}); st["zoomsoort"] += 1
+            break
+    if not gelezen and not heftig and re.fullmatch(r"oh hallelujah", tekst, re.I):
+        n = st["teller"].get("oh", 0); st["teller"]["oh"] = n + 1
+        if n % 2 == 1: cues.append({"t": round(ts + 0.4, 2), "soort": "zoom", "tekst": "Hallelujah", "stijl": "rustig", "dur": 3.0, "px": 0, "cursief": True})
+    return cues
+
+
+def plekken(cues, rng):
+    """Vaste plekken (y voor links/rechts, x voor boven/onder), zo botsen vliegers niet; en een kleine draaiing per woord."""
+    gebruikt = {}
+    for c in cues:
+        if c["soort"] != "vlieger": continue
+        lijst = [480, 610, 740, 870, 990] if c["van"] in "lr" else [330, 700, 1050, 1400, 1700]
+        sleutel = c["van"] in "lr"; vrij = sorted((gebruikt.get((sleutel, p), -99), rng.random(), p) for p in lijst); p = vrij[0][2]; gebruikt[(sleutel, p)] = c["t"] + c["dur"] * 0.5; c["pos"] = p
+        c["hoek"] = round(rng.uniform(-6, 6), 1)
+
+
 def cues_maken(tl, extra=True, seed=7):
     """Cues uit de tijdlijn: kernwoorden als vliegers (van links, rechts, boven en onder), accentwoorden zacht, heftige zinnen groot."""
-    rng = random.Random(seed); t0 = secs(tl["start"]); ev = tl["events"]; cues = []; richting = 0; teller = {}; zoomsoort = 0
+    rng = random.Random(seed); t0 = secs(tl["start"]); ev = tl["events"]; cues = []; st = {"richting": 0, "teller": {}, "zoomsoort": 0}
     for i, e in enumerate(ev):
         if not e["lines"]: continue
         ts = secs(e["t"]) - t0; te = (secs(ev[i + 1]["t"]) - t0) if i + 1 < len(ev) else ts + 6; span = max(2.0, (te - ts) * 0.85)
-        tekst = " ".join(e["lines"]); heftig = bool(re.search(HEFTIG, tekst, re.I)); alle = [(w, li) for li, l in enumerate(e["lines"]) for w in woorden_van(l)]
-        for k, (w, li) in enumerate(alle):
-            moment = ts + span * (k + 0.5) / len(alle); laag = w.lower().strip("'’")
-            if laag in KERN:
-                cues.append({"t": round(moment, 2), "soort": "vlieger", "tekst": w, "stijl": "heftig" if heftig else "rustig", "van": "lrbo"[richting % 4], "dur": 3.0 if heftig else 5.5, "px": 210 if heftig else 150, "cursief": True}); richting += 1
-            elif extra and not heftig and laag in ACCENT:
-                cues.append({"t": round(moment, 2), "soort": "vlieger", "tekst": w, "stijl": "accent", "van": "lrbo"[(richting + 2) % 4], "dur": 7.0, "px": 90, "cursief": False}); richting += 1
-        gelezen = False
-        for rx, zin in ZINNEN:
-            if re.search(rx, tekst, re.I) and heftig:
-                n = teller.get(zin, 0); teller[zin] = n + 1; gelezen = True
-                if n % 2 == 0 or i + 1 >= len(ev) - 2:
-                    regel = next((li for li, l in enumerate(e["lines"]) if re.search(rx, l, re.I)), 0); moment = ts + span * regel / max(1, len(e["lines"]))
-                    cues.append({"t": round(moment, 2), "soort": ("zoom", "doorzoom")[zoomsoort % 2], "tekst": zin, "stijl": "heftig", "dur": 2.6, "px": 0, "cursief": False}); zoomsoort += 1
-                break
-        if not gelezen and not heftig and re.fullmatch(r"oh hallelujah", tekst, re.I):
-            n = teller.get("oh", 0); teller["oh"] = n + 1
-            if n % 2 == 1: cues.append({"t": round(ts + 0.4, 2), "soort": "zoom", "tekst": "Hallelujah", "stijl": "rustig", "dur": 3.0, "px": 0, "cursief": True})
+        cues += event_cues(e["lines"], ts, span, st, extra, forceer_zoom=i + 1 >= len(ev) - 2)
     cues.sort(key=lambda c: c["t"])
     laatste = -99   # grote zinnen niet te dicht op elkaar: dat zou onrustig worden
     for c in list(cues):
         if c["soort"] == "vlieger": continue
         if c["t"] - laatste < 7: cues.remove(c)
         else: laatste = c["t"]
-    # vaste plekken (y voor links/rechts, x voor boven/onder), zo botsen vliegers niet
-    gebruikt = {}
-    for c in cues:
-        if c["soort"] != "vlieger": continue
-        plekken = [480, 610, 740, 870, 990] if c["van"] in "lr" else [330, 700, 1050, 1400, 1700]
-        sleutel = c["van"] in "lr"; vrij = []
-        for p in plekken:
-            laatst = gebruikt.get((sleutel, p), -99)
-            vrij.append((laatst, rng.random(), p))
-        vrij.sort(); p = vrij[0][2]; gebruikt[(sleutel, p)] = c["t"] + c["dur"] * 0.5; c["pos"] = p
-        c["hoek"] = round(rng.uniform(-6, 6), 1)
+    plekken(cues, rng)
     return cues
 
 
