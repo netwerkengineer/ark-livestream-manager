@@ -20,6 +20,7 @@ STREAM = ["da5f3b88e33", "d972fc42792"]      # livestream-uitvoer(en) (NDI en RT
 
 OV_ROL_ZAAL, OV_ROL_STREAM = "ark_ov_rol_zaal", "ark_ov_rol_stream"
 TPL_LEEG = "ark_leeg"   # sjabloon zonder vakken: een dia met dit sjabloon (slide.settings.template) krijgt niets van het sjabloon van de show, dus houden de tekstvakken hun eigen plek en stijl
+OV_WOORDEN_TEKST = "ark_ov_woorden_tekst"   # dezelfde video maar begonnen bij de eerste liedtekst (--vanaf): het Songmap-arrangement start hem op de eerste tekstdia
 OV_WOORDEN = "ark_ov_woorden"   # video met kernwoorden die door het beeld vliegen (make_woorden_visual.py), onder de dia
 MARKER = "ark-doorrol"   # staat in de notities van het arrangement; de route van de app geeft alleen tekst voor arrangementen met deze markering
 
@@ -36,7 +37,7 @@ def sjabloon_leeg_zorgen(fs, uitvoeren):
     if uitvoeren: shutil.copy2(pad, f"{pad}.bak-leeg-{time.strftime('%Y%m%d-%H%M%S')}"); tmp = pad + ".tmp-leeg"; json.dump(t, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
 
 
-def overlays_zorgen(fs, uitvoeren, rol=True, woorden_video=None, client_path=None):
+def overlays_zorgen(fs, uitvoeren, rol=True, woorden_video=None, client_path=None, woorden_video_tekst=None):
     """Gloed/glans alleen in de zaal (item-bindings) en, voor het doorrol-arrangement, de twee overlays met de webpagina: zaal (doorrol) en livestream (gewone tekst, modus=stream).
     De dia's zelf hebben dan geen webvakken: FreeShow tekent anders voor elke miniatuur een eigen browser (honderden processen) en wordt traag."""
     pad = os.path.join(fs, "Config", "overlays.json"); ov = json.load(open(pad, encoding="utf-8")); n = 0; nu = int(time.time() * 1000)
@@ -55,6 +56,10 @@ def overlays_zorgen(fs, uitvoeren, rol=True, woorden_video=None, client_path=Non
                  "items": [{"style": "left:0px;top:0px;width:1920px;height:1080px;", "type": "media", "src": f"{cp}/Media/Ark Effecten/{os.path.basename(woorden_video)}", "fit": "cover", "muted": True, "loop": False, "bindings": list(BEAMER)}]}
         if ov.get(OV_WOORDEN, {}).get("items") != nieuw["items"]: ov[OV_WOORDEN] = nieuw; n += 1
         if uitvoeren: os.makedirs(doel, exist_ok=True); shutil.copy2(woorden_video, os.path.join(doel, os.path.basename(woorden_video)))
+        if woorden_video_tekst:
+            tekst = {**nieuw, "name": "Woorden (visual, vanaf eerste tekst)", "items": [{**nieuw["items"][0], "src": f"{cp}/Media/Ark Effecten/{os.path.basename(woorden_video_tekst)}"}]}
+            if ov.get(OV_WOORDEN_TEKST, {}).get("items") != tekst["items"]: ov[OV_WOORDEN_TEKST] = tekst; n += 1
+            if uitvoeren: shutil.copy2(woorden_video_tekst, os.path.join(doel, os.path.basename(woorden_video_tekst)))
     print(f"overlays: {n} onderdeel/onderdelen aangepast (gloed/glans alleen in de zaal {BEAMER}" + (", doorrol-overlays aangemaakt)" if rol else ")"))
     if uitvoeren and n:
         shutil.copy2(pad, f"{pad}.bak-rol-{time.strftime('%Y%m%d-%H%M%S')}"); tmp = pad + ".tmp-rol"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, pad)
@@ -97,7 +102,7 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
     elif volgorde: rest = [rest[i] for i in volgorde]; tek = [tek[i] for i in volgorde]   # songmap-volgorde; een dia komt zo meerdere keren voor (elk een eigen kopie)
     nieuwe = {}; volgorde = []
     s0 = copy.deepcopy(c0["slides"][start["id"]]); nieuwe[start["id"]] = s0; st = copy.deepcopy(start)
-    acties_start = [overlay_actie("Ark overlay: Woorden (visual)", OV_WOORDEN)] if variant == "woorden" else [overlay_actie("Ark overlay: Gloed", OV_GLOED), overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]
+    acties_start = ([overlay_actie("Ark overlay: Woorden (visual)", OV_WOORDEN)] if reeks is not None else []) if variant == "woorden" else [overlay_actie("Ark overlay: Gloed", OV_GLOED), overlay_actie("Ark overlay: Glans (aan)", OV_GLANS)]
     if variant == "doorrol": acties_start += [overlay_actie("Ark overlay: Doorrol (zaal)", OV_ROL_ZAAL), overlay_actie("Ark overlay: Liedtekst (livestream)", OV_ROL_STREAM)]
     st.setdefault("actions", {}).setdefault("slideActions", []).extend(acties_start); volgorde.append(st)
     for k, (ls, lijnen) in enumerate(zip(rest, tek)):
@@ -110,10 +115,11 @@ def bouw(bron, variant, heftig_re, volgorde=None, reeks=None, tl=None):
         else: items = []   # doorrol: geen items op de dia; de tekst staat in de notities en de pagina komt via de overlays van de startdia
         nieuwe[i] = {"group": "Refrein" if heftig else "Couplet", "color": "#ef4444" if heftig else "#4db6ac", "settings": {"template": TPL_LEEG} if variant == "woorden" else {}, "notes": "\n".join(lijnen) if variant == "doorrol" else "", "items": items, "globalGroup": None}
         l = {"id": i}
+        if variant == "woorden" and reeks is None and len(volgorde) == 1: l["actions"] = {"slideActions": [overlay_actie("Ark overlay: Woorden (visual, vanaf eerste tekst)", OV_WOORDEN_TEKST)]}   # Songmap: de video start op de eerste liedtekst
         if variant != "doorrol": l["transition"] = {"type": "fade", "duration": 600, "easing": "sine"}
         volgorde.append(l)
     if variant in ("doorrol", "woorden"):   # aan het eind de overlays weer uit: op de laatste (lege) dia van de opname, anders op een nieuwe lege dia "Einde"
-        uit = [overlay_uit("Ark overlay uit: Doorrol (zaal)", OV_ROL_ZAAL), overlay_uit("Ark overlay uit: Liedtekst (livestream)", OV_ROL_STREAM), overlay_uit("Ark overlay uit: Gloed", OV_GLOED), overlay_uit("Ark overlay uit: Glans", OV_GLANS)] if variant == "doorrol" else [overlay_uit("Ark overlay uit: Woorden (visual)", OV_WOORDEN)]
+        uit = [overlay_uit("Ark overlay uit: Doorrol (zaal)", OV_ROL_ZAAL), overlay_uit("Ark overlay uit: Liedtekst (livestream)", OV_ROL_STREAM), overlay_uit("Ark overlay uit: Gloed", OV_GLOED), overlay_uit("Ark overlay uit: Glans", OV_GLANS)] if variant == "doorrol" else [overlay_uit("Ark overlay uit: Woorden (visual)", OV_WOORDEN), overlay_uit("Ark overlay uit: Woorden (visual, vanaf eerste tekst)", OV_WOORDEN_TEKST)]
         if reeks is not None and not tek[-1]: volgorde[-1].setdefault("actions", {}).setdefault("slideActions", []).extend(uit)
         else:
             i = rid(); nieuwe[i] = {"group": "Einde", "color": "#6b7280", "settings": {}, "notes": "", "items": [], "globalGroup": None}
@@ -153,7 +159,7 @@ def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False, zonder_o
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--beamer-output", default=",".join(BEAMER), help="uitvoer-id('s) van de zaal (komma's)"); ap.add_argument("--stream-outputs", default=",".join(STREAM), help="uitvoer-id's van de livestream (komma's)"); ap.add_argument("--varianten", default="secties,rollend,doorrol", help="met --een-show: welke stijlen als arrangement (komma's). Heeft de show een sjabloon (settings.template), dan krijgt de eerste tekstregel in secties/rollend de stijl van dat sjabloon: neem dan alleen doorrol"); ap.add_argument("--zonder-opname", action="store_true", help="met --een-show: geen Opname-arrangementen (en geen audio/tijdlijn), alleen Origineel + Songmap-varianten; voor productie"); ap.add_argument("--woorden-video", help="WebM van make_woorden_visual.py voor het arrangement \"Woorden (visual)\" (--varianten woorden); komt in <fs>/Media/Ark Effecten en als overlay ark_ov_woorden"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--fs", required=True); ap.add_argument("--bron", required=True); ap.add_argument("--heftig", default=HEFTIG); ap.add_argument("--bron-pad", help="lees het bronlied uit dit bestand i.p.v. <fs>/Shows/<bron>.show (nodig als dat bestand al door --naam-behouden is vervangen)"); ap.add_argument("--volgorde", default="", help='dia-indexen, bv. "0-2,3-5,6-9" ("washed" = songmap-volgorde van Washed)'); ap.add_argument("--tijdlijn", help="JSON met events (t + lines) uit een opname: dia's in de volgorde van de opname"); ap.add_argument("--audio", help="mp3 van de opname (start op het begin van de tijdlijn); komt in <fs>/Media/Opnames en op de FreeShow-tijdlijn"); ap.add_argument("--client-path", help="FreeShow-map zoals de FreeShow-pc hem ziet (standaard --fs)"); ap.add_argument("--naam-behouden", action="store_true", help="met --een-show: de show krijgt naam en id van het bronlied (het origineel is het eerste arrangement) en vervangt het bestand, zodat de app-catalogus hem als dat lied vindt; reservekopie in <fs>/Shows/_backup-arrangementen-<datum>"); ap.add_argument("--een-show", action="store_true", help="alle varianten als arrangementen in één show (\"<naam> (dynamisch)\") in plaats van aparte shows"); ap.add_argument("--beamer-output", default=",".join(BEAMER), help="uitvoer-id('s) van de zaal (komma's)"); ap.add_argument("--stream-outputs", default=",".join(STREAM), help="uitvoer-id's van de livestream (komma's)"); ap.add_argument("--varianten", default="secties,rollend,doorrol", help="met --een-show: welke stijlen als arrangement (komma's). Heeft de show een sjabloon (settings.template), dan krijgt de eerste tekstregel in secties/rollend de stijl van dat sjabloon: neem dan alleen doorrol"); ap.add_argument("--zonder-opname", action="store_true", help="met --een-show: geen Opname-arrangementen (en geen audio/tijdlijn), alleen Origineel + Songmap-varianten; voor productie"); ap.add_argument("--woorden-video", help="WebM van make_woorden_visual.py voor het arrangement \"Woorden (visual)\" (--varianten woorden); komt in <fs>/Media/Ark Effecten en als overlay ark_ov_woorden"); ap.add_argument("--woorden-video-tekst", help="WebM van make_woorden_visual.py --vanaf <s>: voor Songmap - Woorden (visual), start op de eerste liedtekstdia"); ap.add_argument("--uitvoeren", action="store_true"); a = ap.parse_args()
     BEAMER[:] = a.beamer_output.split(","); STREAM[:] = a.stream_outputs.split(",")
     bron = json.load(open(a.bron_pad or os.path.join(a.fs, "Shows", a.bron + ".show"), encoding="utf-8"))
     ov = json.load(open(os.path.join(a.fs, "Config", "overlays.json"), encoding="utf-8"))
@@ -165,7 +171,7 @@ def main():
         tl = {"events": tdata["events"], "start": tdata["start"], "audio": f"{cp}/Media/Opnames/{os.path.basename(a.audio)}", "duur": int(dur)}
         if a.uitvoeren: os.makedirs(os.path.dirname(doel), exist_ok=True); shutil.copy2(a.audio, doel)
     if "woorden" in a.varianten.split(","): sjabloon_leeg_zorgen(a.fs, a.uitvoeren)
-    overlays_zorgen(a.fs, a.uitvoeren, rol="doorrol" in a.varianten.split(","), woorden_video=a.woorden_video if "woorden" in a.varianten.split(",") else None, client_path=a.client_path)
+    overlays_zorgen(a.fs, a.uitvoeren, rol="doorrol" in a.varianten.split(","), woorden_video=a.woorden_video if "woorden" in a.varianten.split(",") else None, client_path=a.client_path, woorden_video_tekst=a.woorden_video_tekst if "woorden" in a.varianten.split(",") else None)
     if a.een_show:
         vg = volgorde_lijst(VOLGORDE_WASHED if a.volgorde == "washed" else a.volgorde) if a.volgorde else None
         c = een_show(bron, a.heftig, vg, reeks, tl, a.naam_behouden, a.zonder_opname, tuple(a.varianten.split(","))); pad = os.path.join(a.fs, "Shows", f"{c['name']}.show")

@@ -186,7 +186,7 @@ def frame(cues, t):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--tijdlijn", required=True); ap.add_argument("--uit"); ap.add_argument("--preview", help="mp4 op een donkere achtergrond (halve resolutie)")
     ap.add_argument("--cues-uit"); ap.add_argument("--cues-in"); ap.add_argument("--alleen-cues", action="store_true"); ap.add_argument("--zonder-extra", action="store_true", help="geen zachte accentwoorden, alleen de kernwoorden")
-    ap.add_argument("--stilstaand", help="tijden (s, komma's): losse beelden op donker, in --map"); ap.add_argument("--map", default="."); ap.add_argument("--fps", type=int, default=30); ap.add_argument("--duur", type=float, help="seconden (standaard: tot het laatste event + 6)"); ap.add_argument("--seed", type=int, default=7); ap.add_argument("--letter", default="din", choices=LETTERS, help="lettertype van de woorden (din = strak en smal, standaard)")
+    ap.add_argument("--stilstaand", help="tijden (s, komma's): losse beelden op donker, in --map"); ap.add_argument("--map", default="."); ap.add_argument("--fps", type=int, default=30); ap.add_argument("--duur", type=float, help="seconden (standaard: tot het laatste event + 6)"); ap.add_argument("--seed", type=int, default=7); ap.add_argument("--vanaf", type=float, default=0.0, help="begin de video op dit moment van de opname (s): de video start dan op de eerste liedtekstdia i.p.v. op de startdia (bij Washed 8)"); ap.add_argument("--letter", default="din", choices=LETTERS, help="lettertype van de woorden (din = strak en smal, standaard)")
     a = ap.parse_args(); LETTER.update(LETTERS[a.letter]); tl = json.load(open(a.tijdlijn, encoding="utf-8"))
     cues = json.load(open(a.cues_in, encoding="utf-8")) if a.cues_in else cues_maken(tl, not a.zonder_extra, a.seed)
     if a.cues_uit: json.dump(cues, open(a.cues_uit, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -201,11 +201,11 @@ def main():
         for t in (float(x) for x in a.stilstaand.split(",")):
             bg = Image.new("RGBA", (W, H), (11, 18, 32, 255)); bg.alpha_composite(frame(cues, t)); p = os.path.join(a.map, f"beeld-{t:06.1f}.png"); bg.convert("RGB").resize((960, 540)).save(p); print(p)
         return
-    t0 = secs(tl["start"]); duur = a.duur or (secs(tl["events"][-1]["t"]) - t0 + 6); n = int(duur * a.fps)
+    t0 = secs(tl["start"]); duur = (a.duur or (secs(tl["events"][-1]["t"]) - t0 + 6)) - a.vanaf; n = int(duur * a.fps)
     pr = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(a.fps), "-i", "-", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p",
                            "-b:v", "0", "-crf", "32", "-auto-alt-ref", "0", "-row-mt", "1", "-cpu-used", "4", a.uit], stdin=subprocess.PIPE)
     for f in range(n):
-        pr.stdin.write(frame(cues, f / a.fps).tobytes())
+        pr.stdin.write(frame(cues, a.vanaf + f / a.fps).tobytes())
         if f % 300 == 0: print(f"{f}/{n}", flush=True)
     pr.stdin.close(); pr.wait(); print("klaar:", a.uit)
     if a.preview:
