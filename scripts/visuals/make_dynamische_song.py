@@ -8,7 +8,7 @@
 Gebruik: make_dynamische_song.py --fs <FreeShow-map> --bron "Washed - Elevation Rhythm" [--heftig "regex"] [--uitvoeren]
 Vereist de overlays uit make_dynamische_demo.py (gloed/glans). Zonder --uitvoeren gebeurt er niets. FreeShow moet dicht zijn."""
 import argparse, copy, hashlib, json, os, re, shutil, time
-from make_dynamische_lyrics import lijnen_van, rid, runs
+from make_dynamische_lyrics import lijnen_van, rid, runs, FONT
 from make_dynamische_demo import OV_GLOED, OV_GLANS, ROL_URL, basis, sectie, rollend, overlay_actie, tekstvak
 
 HEFTIG = r"washed in the water|as good as new|all because of you|here i come|took away my shame|nailed it to the cross"
@@ -72,13 +72,18 @@ def volgorde_lijst(tekst):
 
 
 def boven(lijnen, heftig):
-    """Liedtekst in het bovenste derde van het beeld (de woorden-visual gebruikt de rest): kleiner, rustig in beeld gefade; heftige delen in goud."""
-    items = []; hoogte = 100
-    for i, t in enumerate(lijnen[:4]):
-        it = tekstvak(40 + i * hoogte, 60, 1800, hoogte, runs(t, "goud" if heftig else "ark"), 0.1 + 0.25 * i, {"type": "fade", "duration": 500, "easing": "sine"})
-        for r in it["lines"][0]["text"]: r["style"] = r["style"].replace("font-size:96px", "font-size:72px")
-        items.append(it)
-    return items
+    """Liedtekst in het bovenste derde, in de opmaak van het FreeShow-sjabloon "Trendy" (één tekstvak, elke regel op een zwarte balk, 60 px, regelhoogte 1.5, letterafstand 2 px,
+    regelafstand 20), maar bovenaan. De kernwoorden houden hun kleur (heftige delen goud). De dia krijgt TPL_LEEG, anders zet het sjabloon van de show het tekstvak op zijn eigen plek."""
+    regels = []
+    for t in lijnen[:4]:
+        rr = runs(t, "goud" if heftig else "ark")
+        for r in rr:
+            r["style"] = r["style"].replace(FONT, "").replace("font-size:96px", "font-size:60px;line-height:1.5em;letter-spacing:2px")   # geen eigen lettertype: net als Trendy het lettertype van de uitvoerstijl
+            r["style"] = re.sub(r"text-shadow:[^;]*;", "", r["style"]) if "font-style:italic" not in r["style"] else r["style"]   # gewone woorden: geen schaduw (de balk geeft contrast); kernwoorden houden hun gloed
+        regels.append({"align": "", "text": rr})
+    fade = {"type": "fade", "duration": 500, "easing": "sine"}
+    return [{"style": "top:20px;left:100px;height:320px;width:1720px;", "type": "text", "align": "", "lines": regels, "specialStyle": {"lineGap": 20, "lineBg": "#000000"}, "bindings": [],
+             "actions": {"transition": {**fade, "in": dict(fade), "out": {"type": "fade", "duration": 300, "easing": "sine"}}}}]
 
 
 def secs(t):
@@ -137,6 +142,9 @@ def een_show(bron, heftig_re, volgorde, reeks, tl, naam_behouden=False, zonder_o
             if soort == "Songmap" and not vg: continue
             nieuw["slides"].update(c["slides"]); lid, lay = next(iter(c["layouts"].items())); lay["name"] = f"{soort} - {namen[v]}"
             lid = "b" + hashlib.md5(lay["name"].encode()).hexdigest()[:10]   # vast id per arrangementnaam: projecten die er naar verwijzen blijven kloppen na opnieuw genereren
+            if lid in nieuw["layouts"]:   # zelfde arrangement opnieuw gemaakt: de dia's van de vorige versie weghalen als geen ander arrangement ze gebruikt
+                oud = {x["id"] for x in nieuw["layouts"][lid].get("slides", [])}; elders = {x["id"] for k, l in nieuw["layouts"].items() if k != lid for x in l.get("slides", [])}
+                for sid in oud - elders: nieuw["slides"].pop(sid, None)
             for a in lay.get("timeline", {}).get("actions", []): a["data"] = {**a["data"], "layoutId": lid} if a.get("type") == "show" else a["data"]
             nieuw["layouts"][lid] = lay
     nieuw["name"] = c0["name"] if naam_behouden else f"{c0['name']} (dynamisch)"; nieuw["settings"] = {**nieuw.get("settings", {}), "activeLayout": eerste}

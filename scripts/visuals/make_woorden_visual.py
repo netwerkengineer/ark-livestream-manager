@@ -19,7 +19,18 @@ from make_dynamische_lyrics import KERN
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 FONTS = os.path.join(HIER, "..", "..", "public", "fonts", "montserrat")
-FONT_N, FONT_I = os.path.join(FONTS, "montserrat-latin-700-normal.woff2"), os.path.join(FONTS, "montserrat-latin-700-italic.woff2")
+# lettertypen: (bestand, index in het .ttc) voor gewoon en cursief; schaal = vergroting t.o.v. de px in de cues (smalle letters hebben meer px nodig voor dezelfde hoogte); cap = grootste px van een zin
+LETTERS = {
+    "din": {"n": ("/System/Library/Fonts/Supplemental/DIN Condensed Bold.ttf", 0), "i": ("/System/Library/Fonts/Supplemental/DIN Condensed Bold.ttf", 0), "schaal": 1.3, "cap": 420},   # strak en smal; geen cursief
+    "avenir": {"n": ("/System/Library/Fonts/Avenir Next Condensed.ttc", 8), "i": ("/System/Library/Fonts/Avenir Next Condensed.ttc", 9), "schaal": 1.25, "cap": 380},
+    "montserrat": {"n": (os.path.join(FONTS, "montserrat-latin-700-normal.woff2"), 0), "i": (os.path.join(FONTS, "montserrat-latin-700-italic.woff2"), 0), "schaal": 1.0, "cap": 300},   # OFL, in public/fonts
+}
+LETTER = LETTERS["din"]
+
+
+def laad(cursief, px):
+    pad, index = LETTER["i" if cursief else "n"]
+    return ImageFont.truetype(pad, px, index=index)
 W, H = 1920, 1080
 BOVEN = 420   # hierboven staat de liedtekst; de woorden verdwijnen er zacht in
 HEFTIG = r"washed in the water|as good as new|all because of you|here i come|took away my shame|nailed it to the cross"
@@ -88,7 +99,7 @@ _sprites = {}
 def sprite(tekst, px, stijl, cursief, hoek=0.0):
     sl = (tekst, px, stijl, cursief, hoek)
     if sl in _sprites: return _sprites[sl]
-    font = ImageFont.truetype(FONT_I if cursief else FONT_N, px)
+    font = laad(cursief, px)
     l, t, r, b = font.getbbox(tekst); pad = int(px * 0.7); w, h = r - l + 2 * pad, b - t + 2 * pad
     mask = Image.new("L", (w, h), 0); ImageDraw.Draw(mask).text((pad - l, pad - t), tekst, font=font, fill=255)
     van, naar, gloed = PAL[stijl]
@@ -105,8 +116,7 @@ def sprite(tekst, px, stijl, cursief, hoek=0.0):
 
 
 def zin_px(tekst, cursief, breed=1500):
-    f = ImageFont.truetype(FONT_I if cursief else FONT_N, 100)
-    return min(300, int(100 * breed / f.getlength(tekst)))
+    return min(LETTER["cap"], int(100 * breed / laad(cursief, 100).getlength(tekst)))
 
 
 def plak(laag, sp, cx, cy, alpha=1.0):
@@ -138,7 +148,7 @@ def beeld(cues, t, laag_v, laag_z):
         if c["soort"] == "vlieger": u = (t - (c["t"] - c["dur"] * 0.4)) / c["dur"]
         if not 0 <= u <= 1: continue
         if c["soort"] == "vlieger":
-            sp = sprite(c["tekst"], c["px"], c["stijl"], c["cursief"], c.get("hoek", 0)); a = min(1, u / 0.1, (1 - u) / 0.1)
+            sp = sprite(c["tekst"], int(c["px"] * LETTER["schaal"]), c["stijl"], c["cursief"], c.get("hoek", 0)); a = min(1, u / 0.1, (1 - u) / 0.1)
             s = 0.92 + 0.16 * u if c["stijl"] == "heftig" else 1.0
             x, y = vlieger_pos(c, sp, u); plak(laag_v, schaal(sp, s), x, y, a)
             if c["stijl"] == "heftig":   # korte spoor bij de snelle woorden
@@ -176,8 +186,8 @@ def frame(cues, t):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--tijdlijn", required=True); ap.add_argument("--uit"); ap.add_argument("--preview", help="mp4 op een donkere achtergrond (halve resolutie)")
     ap.add_argument("--cues-uit"); ap.add_argument("--cues-in"); ap.add_argument("--alleen-cues", action="store_true"); ap.add_argument("--zonder-extra", action="store_true", help="geen zachte accentwoorden, alleen de kernwoorden")
-    ap.add_argument("--stilstaand", help="tijden (s, komma's): losse beelden op donker, in --map"); ap.add_argument("--map", default="."); ap.add_argument("--fps", type=int, default=30); ap.add_argument("--duur", type=float, help="seconden (standaard: tot het laatste event + 6)"); ap.add_argument("--seed", type=int, default=7)
-    a = ap.parse_args(); tl = json.load(open(a.tijdlijn, encoding="utf-8"))
+    ap.add_argument("--stilstaand", help="tijden (s, komma's): losse beelden op donker, in --map"); ap.add_argument("--map", default="."); ap.add_argument("--fps", type=int, default=30); ap.add_argument("--duur", type=float, help="seconden (standaard: tot het laatste event + 6)"); ap.add_argument("--seed", type=int, default=7); ap.add_argument("--letter", default="din", choices=LETTERS, help="lettertype van de woorden (din = strak en smal, standaard)")
+    a = ap.parse_args(); LETTER.update(LETTERS[a.letter]); tl = json.load(open(a.tijdlijn, encoding="utf-8"))
     cues = json.load(open(a.cues_in, encoding="utf-8")) if a.cues_in else cues_maken(tl, not a.zonder_extra, a.seed)
     if a.cues_uit: json.dump(cues, open(a.cues_uit, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     soorten = {}
