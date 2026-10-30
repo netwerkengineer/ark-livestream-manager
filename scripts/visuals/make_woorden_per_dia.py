@@ -31,6 +31,15 @@ def dia_regels(c, layout):
     return uit
 
 
+def samenvoegen(layout, regels):
+    """Opeenvolgende dia's met precies dezelfde tekst worden één dia (de overlay duurt dan zo lang als de tekst in beeld hoort te zijn). Geeft (layout-dia's, regels, aantal per dia)."""
+    sl, rg, aantal = [], [], []
+    for ls, r in zip(layout["slides"], regels):
+        if r and rg and r == rg[-1]: aantal[-1] += 1; continue
+        sl.append(ls); rg.append(r); aantal.append(1)
+    return sl, rg, aantal
+
+
 def spans(tl):
     t0 = secs(tl["start"]); ev = tl["events"]; per = {}
     for i, e in enumerate(ev):
@@ -40,22 +49,27 @@ def spans(tl):
     return {k: sum(v) / len(v) for k, v in per.items()}
 
 
-def clips_plannen(regels_per_dia, span_per_tekst):
+def clips_plannen(regels_per_dia, span_per_tekst, aantal_per_dia=None):
     """Per dia de cues (tijd 0 = het aanklikken van de dia). Geeft [(dia-index, sleutel, cues, duur)]; dezelfde tekst + variant = dezelfde sleutel."""
     teller = {}; plan = []
     for i, regels in enumerate(regels_per_dia):
         if not regels: continue
         tekst = " | ".join(regels); n = teller.get(tekst, 0); teller[tekst] = n + 1; variant = n % 2
-        woorden = sum(len(re.findall(r"[\w'’]+", r)) for r in regels); span = span_per_tekst.get(tekst, max(2.5, 0.65 * woorden))
+        woorden = sum(len(re.findall(r"[\w'’]+", r)) for r in regels); aantal = (aantal_per_dia or [1] * len(regels_per_dia))[i]
+        span = span_per_tekst.get(tekst, max(2.5, 0.65 * woorden) * aantal)
         st = {"richting": (len(tekst) + variant * 2) % 4, "teller": {z: variant for z in ("oh",)}, "zoomsoort": variant}
         # de zin groot beeld: bij elke herhaling op een even plek (variant 0); bij variant 1 alleen de vliegers
-        cues = event_cues(regels, 0.0, span, st, extra=True, forceer_zoom=False)
+        if aantal > 1 or span > 9:   # lange tekst (een herhaald stuk): in stukken van ~4,5 s, de tekst telkens opnieuw, zodat er de hele tijd iets gebeurt
+            stuk = 4.5; cues = []
+            for k in range(max(1, round(span / stuk))): cues += event_cues(regels, k * stuk, stuk * 0.9, st, extra=True, forceer_zoom=False)
+        else:
+            cues = event_cues(regels, 0.0, span, st, extra=True, forceer_zoom=False)
         if variant == 1: cues = [c for c in cues if c["soort"] == "vlieger"]   # elke tweede herhaling: alleen de vliegende woorden, geen grote zin
         if not cues: continue   # niets te tonen: die dia krijgt geen overlay
         for c in cues:   # een woord moet kunnen invliegen: niet eerder dan 40 % van zijn vliegtijd na het aanklikken
             c["t"] = round(max(c["t"], 0.4 * c["dur"] if c["soort"] == "vlieger" else 0.15), 2)
         cues.sort(key=lambda c: c["t"])
-        sleutel = hashlib.sha1(json.dumps([tekst, variant]).encode()).hexdigest()[:10]
+        sleutel = hashlib.sha1(json.dumps([tekst, variant] + ([aantal] if aantal > 1 else [])).encode()).hexdigest()[:10]   # één dia: dezelfde sleutel als eerder, zodat bestaande clips blijven
         plekken(cues, random.Random(sleutel))
         duur = max((c["t"] + (0.62 * c["dur"] if c["soort"] == "vlieger" else c["dur"] * 0.9) for c in cues), default=2.0) + 0.3
         plan.append((i, sleutel, cues, math.ceil(duur * 2) / 2, tekst, variant))
@@ -79,7 +93,10 @@ def main():
     pad = os.path.join(a.fs, "Shows", f"{a.show}.show"); sid, c = json.load(open(pad, encoding="utf-8"))
     layout = next((l for l in c["layouts"].values() if l["name"] == a.arrangement), None)
     if not layout: raise SystemExit(f'arrangement "{a.arrangement}" niet gevonden')
-    tl = json.load(open(a.tijdlijn, encoding="utf-8")); plan = clips_plannen(dia_regels(c, layout), spans(tl))
+    tl = json.load(open(a.tijdlijn, encoding="utf-8"))
+    nieuwe_dias, regels, aantal = samenvoegen(layout, dia_regels(c, layout))
+    if len(nieuwe_dias) < len(layout["slides"]): print(f"{len(layout['slides']) - len(nieuwe_dias)} dia's samengevoegd (zelfde tekst achter elkaar): {[n for n in aantal if n > 1]}")
+    plan = clips_plannen(regels, spans(tl), aantal)
     uniek = {}
     for i, sl, cues, duur, tekst, variant in plan: uniek.setdefault(sl, (cues, duur, tekst, variant))
     print(f"{len(plan)} liedtekstdia's, {len(uniek)} verschillende clips, samen {sum(d for _, d, _, _ in uniek.values()):.0f} s")
@@ -90,13 +107,21 @@ def main():
         futs = {sl: ex.submit(render, sl, cues, duur, werk, os.path.abspath(a.tijdlijn)) for sl, (cues, duur, _, _) in uniek.items()}
         for sl, f in futs.items(): f.result(); print("klaar", sl, flush=True)
     t = time.strftime("%Y%m%d-%H%M%S"); op = os.path.join(a.fs, "Config", "overlays.json"); ov = json.load(open(op, encoding="utf-8")); cp = a.client_path.rstrip("/")
-    cat = (ov.get("ark_ov_gloed") or {}).get("category"); nu = int(time.time() * 1000)
+    nu = int(time.time() * 1000); titel = a.show.split(" - ")[0].strip(); cat = "ark_w_" + re.sub(r"[^a-z0-9]+", "_", titel.lower()).strip("_")   # een overlay-categorie per lied
     for ok in [k for k in ov if k.startswith("ark_ov_w_")]: del ov[ok]
     for sl, (cues, duur, tekst, variant) in uniek.items():
-        ov[f"ark_ov_w_{sl}"] = {"name": f"Woorden: {tekst[:40]} ({'ab'[variant]})", "color": None, "category": cat, "modified": nu, "placeUnderSlide": True, "displayDuration": duur,
+        eerste = min(i for i, k, *_ in plan if k == sl) + 1
+        ov[f"ark_ov_w_{sl}"] = {"name": f"{eerste:02d} {tekst[:40]}" + (" (b)" if variant else ""), "color": None, "category": cat, "modified": nu, "placeUnderSlide": True, "displayDuration": duur,
                                 "items": [{"style": "left:0px;top:0px;width:1920px;height:1080px;", "type": "media", "src": f"{cp}/Media/Ark Effecten/{MAP}/woorden-{sl}.webm", "fit": "cover", "muted": True, "loop": False, "bindings": list(BEAMER)}]}
-    bk = os.path.join(a.fs, "Shows", f"_backup-perdia-{t}"); os.makedirs(bk); shutil.copy2(op, os.path.join(bk, "overlays.json")); shutil.copy2(pad, bk); tmp = op + ".tmp-perdia"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, op)
+    for k in ("ark_ov_woorden", "ark_ov_woorden_tekst"):   # de lange video's van dit lied ook in de categorie
+        if k in ov: ov[k]["category"] = cat
+    sp = os.path.join(a.fs, "Config", "settings_synced.json"); st_ = json.load(open(sp, encoding="utf-8")); st_.setdefault("overlayCategories", {}).setdefault(cat, {"name": titel, "icon": "star"})
+    bk = os.path.join(a.fs, "Shows", f"_backup-perdia-{t}"); os.makedirs(bk); shutil.copy2(op, os.path.join(bk, "overlays.json")); shutil.copy2(sp, os.path.join(bk, "settings_synced.json")); shutil.copy2(pad, bk)
+    tmp = sp + ".tmp-perdia"; json.dump(st_, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, sp); tmp = op + ".tmp-perdia"; json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, op)
     # acties op de dia's van het arrangement: de oude woorden-actie van de eerste tekstdia weg, per dia de eigen overlay
+    verwijderd = {x["id"] for x in layout["slides"]} - {x["id"] for x in nieuwe_dias}; layout["slides"][:] = nieuwe_dias
+    elders = {x["id"] for l in c["layouts"].values() for x in l.get("slides", [])}
+    for sid_ in verwijderd - elders: c["slides"].pop(sid_, None)   # samengevoegde dia's die nergens meer in staan
     for i, sl, *_ in plan:
         ls = layout["slides"][i]; acts = ls.setdefault("actions", {}).setdefault("slideActions", [])
         acts[:] = [x for x in acts if not x["name"].startswith(PREFIX) and x.get("actionValues", {}).get("id_select_overlay", {}).get("id") != OV_WOORDEN_TEKST]
