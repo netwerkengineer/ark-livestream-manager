@@ -46,9 +46,9 @@ export default function AchtergrondKiezer({ value, mediaPath, onChange }: { valu
 
   const stijl: React.CSSProperties = { background: "rgba(255,255,255,0.06)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", fontSize: "0.72rem", padding: "2px 4px", maxWidth: "11rem" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem" }} title={fout || "Eigen achtergrond (video of afbeelding) voor dit lied. Leeg: de achtergrond blijft zoals ze is."}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem" }} title={fout || "Eigen achtergrond (video of afbeelding) voor dit lied. Default: de achtergrond van de sfeer of het lied blijft zoals ze is."}>
       <select value={value} onChange={e => onChange(e.target.value)} style={stijl}>
-        <option value="" style={{ color: "#000" }}>Achtergrond: zoals nu</option>
+        <option value="" style={{ color: "#000" }}>Achtergrond: default</option>
         {!bekend && <option value={value} style={{ color: "#000" }}>{value.split("/").pop()}</option>}
         {[...groepen.entries()].map(([map, lijst]) => (
           <optgroup key={map} label={map}>
