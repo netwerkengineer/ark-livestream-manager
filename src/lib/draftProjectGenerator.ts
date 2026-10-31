@@ -475,6 +475,10 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
 
+  // Zelf aangemaakte secties (bijv. Avondmaal): de gekozen plek meegeven; zonder keuze komen ze vóór het Einde
+  const sectionAfter = (draft as any).sectionAfter as Record<string, string> | undefined;
+  if (sectionAfter) showsList.forEach(it => { const na = it.targetSection && sectionAfter[it.targetSection]; if (na) it.sectionAfter = na; });
+
   const dataJson = await createFreeShowProject(draft.serviceDate, showsList, projectName, templatePath, true, notes);
   // Bijbelshows ook in de showmap zetten, zodat een andere stijl (bijv. Ark) de eerder geopende versie in FreeShow vervangt
   if (settings.freeshowPath && draft.scriptures.length > 0) {

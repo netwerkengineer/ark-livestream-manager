@@ -59,6 +59,7 @@ interface DraftService {
   scriptures: DraftScripture[];
   media: DraftMedia[];
   bijbelStijl?: string;
+  sectionAfter?: Record<string, string>;
   sourceEmails: SourceEmailRecord[];
   lastGeneratedAt?: string;
   lastGenerationNotes?: string[];
@@ -203,7 +204,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     }
   }, []);
 
-  useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
+  useEffect(() => { fetchDraft(serviceDate); setSection('Worship'); }, [serviceDate, fetchDraft]);
 
   // Secties uit het sjabloon, plus secties die in deze setlist al gebruikt worden (bijv. een zelf aangemaakte "Avondmaal")
   const NIEUWE_SECTIE = '__nieuwe_sectie__';
@@ -211,11 +212,34 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
     ...templateSections,
     ...(draft ? [...draft.songs, ...draft.scriptures, ...draft.media].map(x => (x.section || '').trim()) : [])
   ].filter(Boolean)));
-  // "+ Nieuwe sectie…" vraagt een naam; de sectie wordt bij het maken van het project aangemaakt (voor Einde)
+  // "+ Nieuwe sectie…" opent een venster voor naam en plek; de sectie wordt bij het maken van het project aangemaakt
+  const [sectieVenster, setSectieVenster] = useState<{ zet: (naam: string) => void; naam: string; na: string } | null>(null);
   const kiesSectie = (waarde: string, zet: (naam: string) => void) => {
     if (waarde !== NIEUWE_SECTIE) { zet(waarde); return; }
-    const naam = (window.prompt('Naam van de nieuwe sectie (bijv. Avondmaal). Hij komt na de Preek en voor het Einde.') || '').trim();
-    if (naam) zet(naam);
+    const kandidaten = sectieOpties.filter(s => s.trim().toLowerCase() !== 'einde');
+    const standaard = kandidaten.find(s => s.trim().toLowerCase() === 'preek') || kandidaten[kandidaten.length - 1] || '';
+    setSectieVenster({ zet, naam: '', na: standaard });
+  };
+  const bevestigSectie = async () => {
+    if (!sectieVenster) return;
+    const naam = sectieVenster.naam.trim();
+    if (!naam) return;
+    const bestaat = sectieOpties.some(s => s.trim().toLowerCase() === naam.toLowerCase());
+    const { zet, na } = sectieVenster;
+    setSectieVenster(null);
+    zet(naam);
+    if (bestaat || !na) return;   // een bestaande sectie staat al op zijn plek
+    try {
+      const res = await fetch(`/api/setlists/${encodeURIComponent(serviceDate)}/sectie`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: naam, after: na })
+      });
+      const data = await res.json();
+      if (data.success) setDraft(data.draft); else setError(data.error || 'Kon de plek van de sectie niet opslaan');
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   // Een YouTube-download loopt op de achtergrond (hoogstens 15 minuten); ververs de setlist tot hij klaar is
@@ -856,6 +880,36 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
 
   return (
     <div className="glass-card setlist-builder" style={{ padding: '2rem' }}>
+      {sectieVenster && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={() => setSectieVenster(null)}>
+          <div className="glass-card" style={{ padding: '1.5rem', width: '100%', maxWidth: '24rem', background: '#0f172a' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 1rem' }}>Nieuwe sectie</h3>
+            <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', opacity: 0.7 }}>Naam (bijv. Avondmaal)</label>
+            <input
+              type="text"
+              className="input"
+              autoFocus
+              value={sectieVenster.naam}
+              onChange={e => setSectieVenster(v => (v ? { ...v, naam: e.target.value } : v))}
+              onKeyDown={e => { if (e.key === 'Enter') bevestigSectie(); }}
+              style={{ width: '100%', marginBottom: '0.8rem' }}
+            />
+            <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', opacity: 0.7 }}>Komt na sectie</label>
+            <select
+              className="input"
+              value={sectieVenster.na}
+              onChange={e => setSectieVenster(v => (v ? { ...v, na: e.target.value } : v))}
+              style={{ width: '100%', marginBottom: '1rem' }}
+            >
+              {sectieOpties.filter(sec => sec.trim().toLowerCase() !== 'einde').map(sec => <option key={sec} value={sec}>{sec}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button className="button" style={{ background: 'rgba(255,255,255,0.08)' }} onClick={() => setSectieVenster(null)}>Annuleren</button>
+              <button className="button" style={{ background: 'var(--primary)', color: '#020617' }} onClick={bevestigSectie} disabled={!sectieVenster.naam.trim()}>Aanmaken</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h2 style={{ margin: 0 }}>🎤 Setlist bouwen</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>

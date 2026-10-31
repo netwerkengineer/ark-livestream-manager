@@ -70,6 +70,8 @@ export interface DraftService {
   sourceEmails: SourceEmailRecord[];
   /** gekozen opmaak/achtergrond voor de bijbelteksten (slug uit bijbelstijlen.ts); leeg = standaard */
   bijbelStijl?: string;
+  // Zelf aangemaakte secties (niet in het sjabloon): naam -> sectie waarna ze in het project komen
+  sectionAfter?: Record<string, string>;
   lastUpdatedAt: string;
   lastGeneratedHash?: string;
   lastGeneratedAt?: string;
@@ -346,6 +348,16 @@ export function updateSongInDraft(
   if (!song) return null;
 
   Object.assign(song, patch);
+  draft.lastUpdatedAt = new Date().toISOString();
+  writeStore(store);
+  return draft;
+}
+
+export function setSectionAfterInDraft(serviceDate: string, section: string, after: string): DraftService {
+  createOrGetDraftService(serviceDate);
+  const store = readStore();
+  const draft = store.services[serviceDate];
+  draft.sectionAfter = { ...(draft.sectionAfter || {}), [section]: after };
   draft.lastUpdatedAt = new Date().toISOString();
   writeStore(store);
   return draft;

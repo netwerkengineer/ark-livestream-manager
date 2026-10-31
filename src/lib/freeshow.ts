@@ -620,6 +620,7 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
     itemsBySection[sec].push(item);
   });
 
+  const nieuweNa: Record<string, string[]> = {};   // anker-sectie -> nieuw aangemaakte secties die daar al na staan
   Object.entries(itemsBySection).forEach(([sectionName, itemsToInsert]) => {
     if (sectionName === 'Onderaan' || !useTemplate) {
       insertAtIndices(dataFile, itemsToInsert, dataFile.project.shows.length);
@@ -646,10 +647,19 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
         }
         insertAtIndices(dataFile, itemsToInsert, insertIdx);
       } else {
-        // Sectie die niet in het sjabloon staat (bijv. "Avondmaal"): als scheidingsregel aanmaken, na de Preek en
-        // vóór het Einde (dus direct voor de Einde-sectie; zonder Einde onderaan), met de items eronder
-        const eindeIdx = dataFile.project.shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === 'einde');
-        const at = eindeIdx !== -1 ? eindeIdx : dataFile.project.shows.length;
+        // Sectie die niet in het sjabloon staat (bijv. "Avondmaal"): als scheidingsregel aanmaken, met de items eronder.
+        // Plek: na de gekozen sectie (sectionAfter), en als die er niet is vóór het Einde (zonder Einde onderaan).
+        const shows = dataFile.project.shows;
+        const eindeIdx = shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === 'einde');
+        let at = eindeIdx !== -1 ? eindeIdx : shows.length;
+        const na = itemsToInsert.find((i: any) => i.sectionAfter)?.sectionAfter;
+        const ankerIdx = na ? shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === normalize(na)) : -1;
+        if (ankerIdx !== -1) {
+          // Na de hele anker-sectie, en na eerder nieuw aangemaakte secties op dezelfde plek (volgorde van aanmaken blijft)
+          at = ankerIdx + 1;
+          while (at < shows.length && (shows[at].type !== 'section' || nieuweNa[normalize(na!)]?.includes(normalize(shows[at].name || '')))) at++;
+          (nieuweNa[normalize(na!)] = nieuweNa[normalize(na!)] || []).push(normalize(sectionName));
+        }
         insertAtIndices(dataFile, [{ type: 'section', title: sectionName.trim() }], at);
         insertAtIndices(dataFile, itemsToInsert, at + 1);
       }
