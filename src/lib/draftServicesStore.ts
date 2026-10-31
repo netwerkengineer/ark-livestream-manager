@@ -312,6 +312,16 @@ export function addMediaToDraft(
   return draft;
 }
 
+// Zet het bestandspad van een al toegevoegd media-item (bijv. nadat een YouTube-video alsnog is gedownload).
+export function setMediaFilePath(serviceDate: string, mediaId: string, filePath: string, attachmentName?: string): void {
+  const store = readStore();
+  const m = store.services[serviceDate]?.media.find(x => x.id === mediaId);
+  if (!m) return;
+  m.filePath = filePath;
+  if (attachmentName) m.attachmentName = attachmentName;
+  writeStore(store);
+}
+
 // Edits an existing song in place (title/section/lyrics/chords/...) - there
 // was previously no update path, only add/remove, which meant a worship
 // leader couldn't fix a typo or paste in lyrics/chords after the fact

@@ -12,7 +12,8 @@ import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
 import { resolveStyleIdByName, resolveTemplateIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { getBijbelStijl, bijbelCapaciteit } from '@/lib/bijbelstijlen';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
-import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo } from '@/lib/draftServicesStore';
+import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo, setMediaFilePath } from '@/lib/draftServicesStore';
+import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
 
 export interface GenerateResult {
   success: boolean;
@@ -451,6 +452,15 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
     }
   }
   for (const media of draft.media) {
+    // YouTube-items die zonder download zijn toegevoegd (oudere setlists): alsnog downloaden, zodat ze in het project komen
+    if (media.mediaType === 'youtube' && !media.filePath && media.url && settings.freeshowMediaPath) {
+      const result = await downloadYoutubeVideo(media.url, path.join(settings.freeshowMediaPath, 'YouTube'));
+      if (result) {
+        media.filePath = result.filePath;
+        media.attachmentName = media.attachmentName || `${result.title}.mp4`;
+        setMediaFilePath(draft.serviceDate, media.id, result.filePath, media.attachmentName);
+      }
+    }
     const item = await resolveMediaItem(media, settings, livestreamOutputId, videoStyleId);
     if (item) {
       showsList.push(item);

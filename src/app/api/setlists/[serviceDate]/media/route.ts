@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
+import path from 'path';
 import { addMediaToDraft } from '@/lib/draftServicesStore';
+import { getSettings } from '@/lib/settingsStore';
+import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
 
 // Adds one media item (YouTube link, uploaded file, or plain link) to a
 // setlist being built directly in the app - the worship-leader-facing
@@ -30,14 +33,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       return NextResponse.json({ success: false, error: 'Sectie is verplicht' }, { status: 400 });
     }
 
+    // Een YouTube-link kan alleen als echte media in het project komen als de video er als bestand staat
+    let mediaFilePath = filePath;
+    let mediaName = attachmentName;
+    let waarschuwing: string | undefined;
+    if (mediaType === 'youtube') {
+      const mediaDir = (getSettings() as any).freeshowMediaPath;
+      if (!mediaDir) {
+        waarschuwing = 'Geen FreeShow-mediamap ingesteld; de video is niet gedownload en komt niet in het project.';
+      } else {
+        const result = await downloadYoutubeVideo(String(url).trim(), path.join(mediaDir, 'YouTube'));
+        if (result) {
+          mediaFilePath = result.filePath;
+          mediaName = `${result.title}.mp4`;
+        } else {
+          waarschuwing = 'De video kon niet worden gedownload (ongeldige of niet beschikbare link); hij komt niet in het project.';
+        }
+      }
+    }
+
     const draft = addMediaToDraft(serviceDate, {
       mediaType,
       url: url ? String(url).trim() : undefined,
-      attachmentName,
-      filePath,
+      attachmentName: mediaName,
+      filePath: mediaFilePath,
       section: section.trim()
     });
-    return NextResponse.json({ success: true, draft });
+    return NextResponse.json({ success: true, draft, ...(waarschuwing ? { warning: waarschuwing } : {}) });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

@@ -2,17 +2,13 @@ import imaps from 'imap-simple';
 import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { getSettings } from '@/lib/settingsStore';
 import { parseServiceEmail, ParsedMedia, ParsedSong } from '@/lib/emailParser';
 import { mergeParsedEmailIntoDraft, DraftService } from '@/lib/draftServicesStore';
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
 import { extractTextFromDocument } from '@/lib/documentText';
 import { logActivity } from '@/lib/activityLog';
-
-const execFilePromise = promisify(execFile);
-const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
+import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
 
 // Turns a rich-text (HTML) mail body into plain text with real line breaks,
 // used instead of mailparser's own .text field whenever HTML is present.
@@ -141,38 +137,6 @@ function resolveSongLyricsAttachments(items: ParsedSong[], saved: { filename: st
     if (match) {
       item.lyricsFilePath = match.path;
     }
-  }
-}
-
-// Downloads a YouTube link mentioned in a service-planning email so it can
-// be embedded as real media in the generated FreeShow project. Uses
-// execFile (argument array, no shell) rather than a shell string - the URL
-// comes from an email, which is less trusted input than the existing
-// (admin-triggered) yt-download route this mirrors.
-async function downloadYoutubeVideo(url: string, dir: string): Promise<{ filePath: string; title: string } | null> {
-  if (!YOUTUBE_URL_RE.test(url)) return null;
-  try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const { stdout: metadataJson } = await execFilePromise('yt-dlp', ['--dump-json', '--skip-download', url]);
-    const metadata = JSON.parse(metadataJson);
-    const videoTitle = (metadata.title || 'video').replace(/[\\/:*?"<>|]/g, '-').trim();
-    const fileName = `${videoTitle}.mp4`;
-    const finalPath = path.join(dir, fileName);
-
-    // AV1 uitsluiten: FreeShow (Electron/Chromium) speelt AV1 niet
-    // betrouwbaar af op de output - zie src/app/api/yt-download/route.ts
-    // voor dezelfde fix en de uitleg erachter.
-    await execFilePromise('yt-dlp', [
-      '-f', 'bestvideo[height<=1080][vcodec!*=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best',
-      '--merge-output-format', 'mp4',
-      '-o', finalPath,
-      url
-    ]);
-
-    return { filePath: finalPath, title: videoTitle };
-  } catch (err) {
-    console.error(`[Email Sync] YouTube-download mislukt voor ${url}:`, err);
-    return null;
   }
 }
 

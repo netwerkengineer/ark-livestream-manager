@@ -498,6 +498,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
         setDraft(data.draft);
         setMediaUrl('');
         setMediaFile(null);
+        if (data.warning) setError(data.warning);
       } else {
         setError(data.error || 'Kon media niet toevoegen');
       }
@@ -1043,7 +1044,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                   onClick={addMedia}
                   disabled={addingMedia}
                 >
-                  {addingMedia ? 'Bezig...' : '+ Toevoegen aan setlist'}
+                  {addingMedia ? (mediaType === 'youtube' ? 'Video downloaden...' : 'Bezig...') : '+ Toevoegen aan setlist'}
                 </button>
               </div>
             )}
@@ -1498,7 +1499,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       {draft.media.map(m => (
                         <div key={m.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '0.8rem' }} title={m.url || m.attachmentName}>
-                            {m.mediaType === 'youtube' ? '▶️ YouTube' : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
+                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : ' (niet gedownload)'}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                             {sectionBadge(m.section)}
