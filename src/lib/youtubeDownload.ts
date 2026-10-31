@@ -9,7 +9,22 @@ export const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 // Downloads a YouTube link as a 1080p mp4 so it can be embedded as real media
 // in a FreeShow project. Uses execFile (argument array, no shell) because the
 // URL may come from an e-mail or a form. A file that is already there is reused.
-export async function downloadYoutubeVideo(url: string, dir: string): Promise<{ filePath: string; title: string } | null> {
+type Resultaat = { filePath: string; title: string } | null;
+const lopend = new Map<string, Promise<Resultaat>>();
+
+// Dezelfde link wordt maar één keer tegelijk gedownload: een tweede aanroep (bijv. het
+// bijwerken van het project terwijl de download nog loopt) wacht op dezelfde download.
+export function downloadYoutubeVideo(url: string, dir: string): Promise<Resultaat> {
+  const key = `${dir}|${url}`;
+  let p = lopend.get(key);
+  if (!p) {
+    p = downloadYoutubeVideoNu(url, dir).finally(() => lopend.delete(key));
+    lopend.set(key, p);
+  }
+  return p;
+}
+
+async function downloadYoutubeVideoNu(url: string, dir: string): Promise<Resultaat> {
   if (!YOUTUBE_URL_RE.test(url)) return null;
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

@@ -38,7 +38,9 @@ interface DraftMedia {
   url?: string;
   attachmentName?: string;
   filePath?: string;
+  downloadStatus?: 'bezig' | 'mislukt';
   section: string;
+  addedAt: string;
 }
 
 interface SourceEmailRecord {
@@ -199,6 +201,15 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   }, []);
 
   useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
+
+  // Een YouTube-download loopt op de achtergrond (hoogstens 15 minuten); ververs de setlist tot hij klaar is
+  const youtubeBezig = (m: DraftMedia) => m.downloadStatus === 'bezig' && Date.now() - new Date(m.addedAt).getTime() < 15 * 60 * 1000;
+  const downloadLoopt = !!draft?.media.some(m => m.mediaType === 'youtube' && !m.filePath && youtubeBezig(m));
+  useEffect(() => {
+    if (!downloadLoopt) return;
+    const timer = setInterval(() => fetchDraft(serviceDate), 4000);
+    return () => clearInterval(timer);
+  }, [downloadLoopt, serviceDate, fetchDraft]);
 
   useEffect(() => {
     if (!bibleTranslation && availableBibles.length > 0) {
@@ -1044,7 +1055,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                   onClick={addMedia}
                   disabled={addingMedia}
                 >
-                  {addingMedia ? (mediaType === 'youtube' ? 'Video downloaden...' : 'Bezig...') : '+ Toevoegen aan setlist'}
+                  {addingMedia ? 'Bezig...' : '+ Toevoegen aan setlist'}
                 </button>
               </div>
             )}
@@ -1499,7 +1510,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       {draft.media.map(m => (
                         <div key={m.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '0.8rem' }} title={m.url || m.attachmentName}>
-                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : ' (niet gedownload)'}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
+                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : youtubeBezig(m) ? ' (wordt gedownload…)' : ' (niet gedownload, wordt bij Project bijwerken opnieuw geprobeerd)'}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                             {sectionBadge(m.section)}

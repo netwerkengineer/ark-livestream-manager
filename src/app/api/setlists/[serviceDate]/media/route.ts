@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAuthorized } from '@/lib/authHelper';
 import path from 'path';
-import { addMediaToDraft } from '@/lib/draftServicesStore';
+import { isAuthorized } from '@/lib/authHelper';
+import { addMediaToDraft, updateMediaInDraft } from '@/lib/draftServicesStore';
 import { getSettings } from '@/lib/settingsStore';
 import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
 
@@ -33,32 +33,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       return NextResponse.json({ success: false, error: 'Sectie is verplicht' }, { status: 400 });
     }
 
-    // Een YouTube-link kan alleen als echte media in het project komen als de video er als bestand staat
-    let mediaFilePath = filePath;
-    let mediaName = attachmentName;
+    // Een YouTube-link kan alleen als echte media in het project komen als de video er als bestand staat.
+    // De download duurt vaak langer dan de proxy wacht, dus hij loopt op de achtergrond; het item staat
+    // meteen in de setlist met status 'bezig' en de bouwer ververst zichzelf tot het klaar is.
+    const youtubeUrl = mediaType === 'youtube' ? String(url).trim() : '';
+    const mediaDir = youtubeUrl ? (getSettings() as any).freeshowMediaPath : '';
     let waarschuwing: string | undefined;
-    if (mediaType === 'youtube') {
-      const mediaDir = (getSettings() as any).freeshowMediaPath;
-      if (!mediaDir) {
-        waarschuwing = 'Geen FreeShow-mediamap ingesteld; de video is niet gedownload en komt niet in het project.';
-      } else {
-        const result = await downloadYoutubeVideo(String(url).trim(), path.join(mediaDir, 'YouTube'));
-        if (result) {
-          mediaFilePath = result.filePath;
-          mediaName = `${result.title}.mp4`;
-        } else {
-          waarschuwing = 'De video kon niet worden gedownload (ongeldige of niet beschikbare link); hij komt niet in het project.';
-        }
-      }
+    if (youtubeUrl && !mediaDir) {
+      waarschuwing = 'Geen FreeShow-mediamap ingesteld; de video wordt niet gedownload en komt niet in het project.';
     }
 
     const draft = addMediaToDraft(serviceDate, {
       mediaType,
       url: url ? String(url).trim() : undefined,
-      attachmentName: mediaName,
-      filePath: mediaFilePath,
+      attachmentName,
+      filePath,
+      ...(youtubeUrl && mediaDir ? { downloadStatus: 'bezig' as const } : {}),
       section: section.trim()
     });
+
+    if (youtubeUrl && mediaDir) {
+      const item = draft.media.find(m => m.mediaType === 'youtube' && m.url === youtubeUrl);
+      if (item && !item.filePath) {
+        downloadYoutubeVideo(youtubeUrl, path.join(mediaDir, 'YouTube'))
+          .then(result => updateMediaInDraft(serviceDate, item.id, result
+            ? { filePath: result.filePath, attachmentName: `${result.title}.mp4` }
+            : { downloadStatus: 'mislukt' }))
+          .catch(() => updateMediaInDraft(serviceDate, item.id, { downloadStatus: 'mislukt' }));
+      }
+    }
+
     return NextResponse.json({ success: true, draft, ...(waarschuwing ? { warning: waarschuwing } : {}) });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

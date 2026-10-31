@@ -42,6 +42,8 @@ export interface DraftMedia {
   url?: string;
   attachmentName?: string;
   filePath?: string;
+  // YouTube: 'bezig' zolang de video wordt gedownload, 'mislukt' als dat niet lukte
+  downloadStatus?: 'bezig' | 'mislukt';
   section: string;
   addedAt: string;
 }
@@ -279,7 +281,7 @@ export function addScriptureToDraft(
 // dedupe-by-url/attachment behaviour as the email pipeline.
 export function addMediaToDraft(
   serviceDate: string,
-  media: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; filePath?: string; section: string }
+  media: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; filePath?: string; downloadStatus?: 'bezig' | 'mislukt'; section: string }
 ): DraftService {
   const store = readStore();
   let draft = store.services[serviceDate];
@@ -303,6 +305,7 @@ export function addMediaToDraft(
       url: media.url,
       attachmentName: media.attachmentName,
       filePath: media.filePath,
+      ...(media.downloadStatus ? { downloadStatus: media.downloadStatus } : {}),
       section: media.section,
       addedAt: new Date().toISOString()
     });
@@ -312,13 +315,13 @@ export function addMediaToDraft(
   return draft;
 }
 
-// Zet het bestandspad van een al toegevoegd media-item (bijv. nadat een YouTube-video alsnog is gedownload).
-export function setMediaFilePath(serviceDate: string, mediaId: string, filePath: string, attachmentName?: string): void {
+// Werkt een al toegevoegd media-item bij (bijv. nadat een YouTube-video is gedownload).
+export function updateMediaInDraft(serviceDate: string, mediaId: string, patch: Partial<Pick<DraftMedia, 'filePath' | 'attachmentName' | 'downloadStatus'>>): void {
   const store = readStore();
   const m = store.services[serviceDate]?.media.find(x => x.id === mediaId);
   if (!m) return;
-  m.filePath = filePath;
-  if (attachmentName) m.attachmentName = attachmentName;
+  Object.assign(m, patch);
+  if (!('downloadStatus' in patch) || patch.downloadStatus === undefined) delete m.downloadStatus;
   writeStore(store);
 }
 

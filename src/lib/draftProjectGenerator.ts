@@ -12,7 +12,7 @@ import { toFreeShowClientPath, foldDiacritics } from '@/lib/freeshowUtils';
 import { resolveStyleIdByName, resolveTemplateIdByName, LIVESTREAM_VIDEO_STYLE_NAME, LIVESTREAM_SONG_STYLE_NAME } from '@/lib/freeshowStyles';
 import { getBijbelStijl, bijbelCapaciteit } from '@/lib/bijbelstijlen';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
-import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo, setMediaFilePath } from '@/lib/draftServicesStore';
+import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo, updateMediaInDraft } from '@/lib/draftServicesStore';
 import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
 
 export interface GenerateResult {
@@ -458,7 +458,9 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
       if (result) {
         media.filePath = result.filePath;
         media.attachmentName = media.attachmentName || `${result.title}.mp4`;
-        setMediaFilePath(draft.serviceDate, media.id, result.filePath, media.attachmentName);
+        updateMediaInDraft(draft.serviceDate, media.id, { filePath: result.filePath, attachmentName: media.attachmentName });
+      } else {
+        updateMediaInDraft(draft.serviceDate, media.id, { downloadStatus: 'mislukt' });
       }
     }
     const item = await resolveMediaItem(media, settings, livestreamOutputId, videoStyleId);
