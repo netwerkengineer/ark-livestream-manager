@@ -205,6 +205,19 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
 
   useEffect(() => { fetchDraft(serviceDate); }, [serviceDate, fetchDraft]);
 
+  // Secties uit het sjabloon, plus secties die in deze setlist al gebruikt worden (bijv. een zelf aangemaakte "Avondmaal")
+  const NIEUWE_SECTIE = '__nieuwe_sectie__';
+  const sectieOpties = Array.from(new Set([
+    ...templateSections,
+    ...(draft ? [...draft.songs, ...draft.scriptures, ...draft.media].map(x => (x.section || '').trim()) : [])
+  ].filter(Boolean)));
+  // "+ Nieuwe sectie…" vraagt een naam; de sectie wordt bij het maken van het project aangemaakt (voor Einde)
+  const kiesSectie = (waarde: string, zet: (naam: string) => void) => {
+    if (waarde !== NIEUWE_SECTIE) { zet(waarde); return; }
+    const naam = (window.prompt('Naam van de nieuwe sectie (bijv. Avondmaal). Hij komt na de Preek en voor het Einde.') || '').trim();
+    if (naam) zet(naam);
+  };
+
   // Een YouTube-download loopt op de achtergrond (hoogstens 15 minuten); ververs de setlist tot hij klaar is
   const youtubeBezig = (m: DraftMedia) => m.downloadStatus === 'bezig' && Date.now() - new Date(m.addedAt).getTime() < 15 * 60 * 1000;
   const downloadLoopt = !!draft?.media.some(m => m.mediaType === 'youtube' && !m.filePath && youtubeBezig(m));
@@ -927,13 +940,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
               <select
                 className="input"
                 value={section}
-                onChange={e => setSection(e.target.value)}
+                onChange={e => kiesSectie(e.target.value, setSection)}
                 style={{ marginBottom: '1rem' }}
               >
-                {!templateSections.includes(section) && (
+                {!sectieOpties.includes(section) && (
                   <option value={section}>{section}</option>
                 )}
-                {templateSections.map(s => <option key={s} value={s}>{s}</option>)}
+                {sectieOpties.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value={NIEUWE_SECTIE}>+ Nieuwe sectie…</option>
               </select>
             ) : (
               <input
@@ -1080,13 +1094,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                   <select
                     className="input"
                     value={staging.section}
-                    onChange={e => setStaging(prev => (prev ? { ...prev, section: e.target.value } : prev))}
+                    onChange={e => kiesSectie(e.target.value, naam => setStaging(prev => (prev ? { ...prev, section: naam } : prev)))}
                     style={{ width: '100%', marginBottom: '0.8rem' }}
                   >
-                    {!templateSections.includes(staging.section) && (
+                    {!sectieOpties.includes(staging.section) && (
                       <option value={staging.section}>{staging.section}</option>
                     )}
-                    {templateSections.map(s => <option key={s} value={s}>{s}</option>)}
+                    {sectieOpties.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value={NIEUWE_SECTIE}>+ Nieuwe sectie…</option>
                   </select>
                 ) : (
                   <input
@@ -1393,13 +1408,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                           <select
                             className="input"
                             value={editSection}
-                            onChange={e => setEditSection(e.target.value)}
+                            onChange={e => kiesSectie(e.target.value, setEditSection)}
                             style={{ width: '100%', marginBottom: '0.6rem' }}
                           >
-                            {!templateSections.includes(editSection) && (
+                            {!sectieOpties.includes(editSection) && (
                               <option value={editSection}>{editSection}</option>
                             )}
-                            {templateSections.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                            {sectieOpties.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                            <option value={NIEUWE_SECTIE}>+ Nieuwe sectie…</option>
                           </select>
                         ) : (
                           <input

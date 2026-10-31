@@ -646,7 +646,12 @@ export async function createFreeShowProject(dateStr: string, showsList: any[], p
         }
         insertAtIndices(dataFile, itemsToInsert, insertIdx);
       } else {
-        insertAtIndices(dataFile, itemsToInsert, dataFile.project.shows.length);
+        // Sectie die niet in het sjabloon staat (bijv. "Avondmaal"): als scheidingsregel aanmaken, na de Preek en
+        // vóór het Einde (dus direct voor de Einde-sectie; zonder Einde onderaan), met de items eronder
+        const eindeIdx = dataFile.project.shows.findIndex((s: any) => s.type === 'section' && normalize(s.name || '') === 'einde');
+        const at = eindeIdx !== -1 ? eindeIdx : dataFile.project.shows.length;
+        insertAtIndices(dataFile, [{ type: 'section', title: sectionName.trim() }], at);
+        insertAtIndices(dataFile, itemsToInsert, at + 1);
       }
     }
   });
