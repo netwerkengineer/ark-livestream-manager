@@ -3,7 +3,7 @@ import path from 'path';
 import { isAuthorized } from '@/lib/authHelper';
 import { addMediaToDraft, updateMediaInDraft } from '@/lib/draftServicesStore';
 import { getSettings } from '@/lib/settingsStore';
-import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
+import { downloadYoutubeVideo, youtubeFout } from '@/lib/youtubeDownload';
 
 // Adds one media item (YouTube link, uploaded file, or plain link) to a
 // setlist being built directly in the app - the worship-leader-facing
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
         downloadYoutubeVideo(youtubeUrl, path.join(mediaDir, 'YouTube'))
           .then(result => updateMediaInDraft(serviceDate, item.id, result
             ? { filePath: result.filePath, attachmentName: `${result.title}.mp4` }
-            : { downloadStatus: 'mislukt' }))
-          .catch(() => updateMediaInDraft(serviceDate, item.id, { downloadStatus: 'mislukt' }));
+            : { downloadStatus: 'mislukt', downloadFout: youtubeFout(youtubeUrl) }))
+          .catch(e => updateMediaInDraft(serviceDate, item.id, { downloadStatus: 'mislukt', downloadFout: String(e?.message || e).slice(0, 300) }));
       }
     }
 

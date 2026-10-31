@@ -44,6 +44,7 @@ export interface DraftMedia {
   filePath?: string;
   // YouTube: 'bezig' zolang de video wordt gedownload, 'mislukt' als dat niet lukte
   downloadStatus?: 'bezig' | 'mislukt';
+  downloadFout?: string;
   section: string;
   addedAt: string;
 }
@@ -316,12 +317,13 @@ export function addMediaToDraft(
 }
 
 // Werkt een al toegevoegd media-item bij (bijv. nadat een YouTube-video is gedownload).
-export function updateMediaInDraft(serviceDate: string, mediaId: string, patch: Partial<Pick<DraftMedia, 'filePath' | 'attachmentName' | 'downloadStatus'>>): void {
+export function updateMediaInDraft(serviceDate: string, mediaId: string, patch: Partial<Pick<DraftMedia, 'filePath' | 'attachmentName' | 'downloadStatus' | 'downloadFout'>>): void {
   const store = readStore();
   const m = store.services[serviceDate]?.media.find(x => x.id === mediaId);
   if (!m) return;
   Object.assign(m, patch);
   if (!('downloadStatus' in patch) || patch.downloadStatus === undefined) delete m.downloadStatus;
+  if (!('downloadFout' in patch) || patch.downloadFout === undefined) delete m.downloadFout;
   writeStore(store);
 }
 

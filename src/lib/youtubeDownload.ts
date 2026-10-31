@@ -11,6 +11,12 @@ export const YOUTUBE_URL_RE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i;
 // URL may come from an e-mail or a form. A file that is already there is reused.
 type Resultaat = { filePath: string; title: string } | null;
 const lopend = new Map<string, Promise<Resultaat>>();
+const fouten = new Map<string, string>();
+
+// Korte reden waarom de laatste download van deze link mislukte (voor in de setlist, zodat het zonder serverlogs te zien is)
+export function youtubeFout(url: string): string {
+  return fouten.get(url) || 'onbekende fout';
+}
 
 // Dezelfde link wordt maar één keer tegelijk gedownload: een tweede aanroep (bijv. het
 // bijwerken van het project terwijl de download nog loopt) wacht op dezelfde download.
@@ -25,7 +31,7 @@ export function downloadYoutubeVideo(url: string, dir: string): Promise<Resultaa
 }
 
 async function downloadYoutubeVideoNu(url: string, dir: string): Promise<Resultaat> {
-  if (!YOUTUBE_URL_RE.test(url)) return null;
+  if (!YOUTUBE_URL_RE.test(url)) { fouten.set(url, 'geen geldige YouTube-link'); return null; }
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const { stdout: metadataJson } = await execFilePromise('yt-dlp', ['--dump-json', '--skip-download', url], { maxBuffer: 64 * 1024 * 1024 });
@@ -46,6 +52,9 @@ async function downloadYoutubeVideoNu(url: string, dir: string): Promise<Resulta
     return { filePath: finalPath, title: videoTitle };
   } catch (err) {
     console.error(`[YouTube] Download mislukt voor ${url}:`, err);
+    const e = err as any;
+    const tekst = String(e?.stderr || e?.message || err).split('\n').map(r => r.trim()).filter(Boolean);
+    fouten.set(url, (tekst.find(r => /^ERROR/i.test(r)) || tekst[tekst.length - 1] || 'onbekende fout').slice(0, 300));
     return null;
   }
 }

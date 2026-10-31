@@ -13,7 +13,7 @@ import { resolveStyleIdByName, resolveTemplateIdByName, LIVESTREAM_VIDEO_STYLE_N
 import { getBijbelStijl, bijbelCapaciteit } from '@/lib/bijbelstijlen';
 import { resolveBijbelStijlSlug, bijbelAchtergrondPad } from '@/lib/bijbelAchtergrond';
 import { DraftService, DraftSong, DraftScripture, DraftMedia, updateGenerationInfo, updateMediaInDraft } from '@/lib/draftServicesStore';
-import { downloadYoutubeVideo } from '@/lib/youtubeDownload';
+import { downloadYoutubeVideo, youtubeFout } from '@/lib/youtubeDownload';
 
 export interface GenerateResult {
   success: boolean;
@@ -460,7 +460,8 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
         media.attachmentName = media.attachmentName || `${result.title}.mp4`;
         updateMediaInDraft(draft.serviceDate, media.id, { filePath: result.filePath, attachmentName: media.attachmentName });
       } else {
-        updateMediaInDraft(draft.serviceDate, media.id, { downloadStatus: 'mislukt' });
+        updateMediaInDraft(draft.serviceDate, media.id, { downloadStatus: 'mislukt', downloadFout: youtubeFout(media.url) });
+        notes.push(`YouTube-video niet gedownload: ${youtubeFout(media.url)}`);
       }
     }
     const item = await resolveMediaItem(media, settings, livestreamOutputId, videoStyleId);

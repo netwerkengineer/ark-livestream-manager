@@ -39,6 +39,7 @@ interface DraftMedia {
   attachmentName?: string;
   filePath?: string;
   downloadStatus?: 'bezig' | 'mislukt';
+  downloadFout?: string;
   section: string;
   addedAt: string;
 }
@@ -1510,7 +1511,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       {draft.media.map(m => (
                         <div key={m.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '0.8rem' }} title={m.url || m.attachmentName}>
-                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : youtubeBezig(m) ? ' (wordt gedownload…)' : ' (niet gedownload, wordt bij Project bijwerken opnieuw geprobeerd)'}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
+                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : youtubeBezig(m) ? ' (wordt gedownload…)' : ` (niet gedownload${m.downloadFout ? `: ${m.downloadFout}` : ''}; wordt bij Project bijwerken opnieuw geprobeerd)`}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                             {sectionBadge(m.section)}
