@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorized } from '@/lib/authHelper';
-import { getDraftService } from '@/lib/draftServicesStore';
+import path from 'path';
+import { getDraftService, updateMediaInDraft } from '@/lib/draftServicesStore';
+import { getSettings } from '@/lib/settingsStore';
+import { downloadYoutubeVideo, youtubeFout } from '@/lib/youtubeDownload';
 import { generateProjectForDraft } from '@/lib/draftProjectGenerator';
 import { syncAfterProjectSave } from '@/lib/syncTrigger';
+
+// Diensten waarvan de YouTube-video's op de achtergrond worden gedownload, voordat het project wordt gemaakt
+const wachtOpDownload = new Set<string>();
 
 // Manually (re)generates the FreeShow project for one draft service - used
 // both for the initial "Project aanmaken" action and "Project bijwerken"
@@ -23,6 +29,41 @@ export async function POST(req: NextRequest) {
     const draft = getDraftService(serviceDate);
     if (!draft) {
       return NextResponse.json({ success: false, error: 'Concept-dienst niet gevonden' }, { status: 404 });
+    }
+
+    // Een YouTube-video die nog niet gedownload is, kan minuten duren: dat past niet binnen de wachttijd van de
+    // proxy (dan komt er een HTML-foutpagina terug). Download dus op de achtergrond en maak het project daarna.
+    const mediaDir = (getSettings() as any).freeshowMediaPath;
+    const teDownloaden = mediaDir ? draft.media.filter(m => m.mediaType === 'youtube' && !m.filePath && m.url) : [];
+    if (teDownloaden.length > 0) {
+      if (!wachtOpDownload.has(serviceDate)) {
+        wachtOpDownload.add(serviceDate);
+        teDownloaden.forEach(m => updateMediaInDraft(serviceDate, m.id, { downloadStatus: 'bezig' }));
+        (async () => {
+          try {
+            await Promise.all(teDownloaden.map(async m => {
+              const r = await downloadYoutubeVideo(m.url!, path.join(mediaDir, 'YouTube'));
+              updateMediaInDraft(serviceDate, m.id, r
+                ? { filePath: r.filePath, attachmentName: `${r.title}.mp4` }
+                : { downloadStatus: 'mislukt', downloadFout: youtubeFout(m.url!) });
+            }));
+            const fresh = getDraftService(serviceDate);
+            if (fresh) {
+              const res = await generateProjectForDraft(fresh, { force: !!force });
+              if (res.success) await syncAfterProjectSave();
+              else console.error('[Project Generator] Na download niet gelukt:', res.message);
+            }
+          } catch (err) {
+            console.error('[Project Generator] Fout na YouTube-download:', err);
+          } finally {
+            wachtOpDownload.delete(serviceDate);
+          }
+        })();
+      }
+      return NextResponse.json({
+        success: true,
+        message: `De YouTube-video wordt gedownload (kan een paar minuten duren). Het project wordt daarna automatisch bijgewerkt; je kunt hier gewoon doorgaan.`
+      });
     }
 
     const result = await generateProjectForDraft(draft, { force: !!force });
