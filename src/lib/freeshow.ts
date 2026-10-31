@@ -725,7 +725,7 @@ function insertAtIndices(dataFile: any, newItems: any[], startIdx: number) {
         });
         if (!dataFile.files.includes(item.filePath)) dataFile.files.push(item.filePath);
         dataFile.media[item.filePath] = dataFile.media[item.filePath] || {
-          info: { mimeType: item.metaType === "video" ? "video/mp4" : "image/jpeg" },
+          info: { mimeType: item.metaType === "video" ? "video/mp4" : item.metaType === "audio" ? "audio/mp4" : "image/jpeg" },
           tracks: []
         };
       } else {

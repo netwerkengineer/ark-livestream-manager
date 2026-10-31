@@ -22,10 +22,11 @@ export interface GenerateResult {
   notes?: string[];
 }
 
-function inferMetaType(filePath: string): 'video' | 'image' | null {
+function inferMetaType(filePath: string): 'video' | 'image' | 'audio' | null {
   const ext = path.extname(filePath).toLowerCase();
   if (['.mp4', '.mov', '.webm', '.m4v'].includes(ext)) return 'video';
   if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) return 'image';
+  if (['.m4a', '.mp3', '.wav', '.aac', '.ogg', '.flac'].includes(ext)) return 'audio';
   return null;
 }
 
@@ -315,7 +316,9 @@ async function resolveMediaItem(media: DraftMedia, settings: any, outputId: stri
     layer: 'show'
   };
   if (metaType === 'video') base.muted = false;
-  if (outputId && videoStyleId) {
+  // Audio heeft geen beeld: geen stijlwissel naar de videostijl, en het komt als audio-item in het project
+  if (metaType === 'audio') base.layer = 'direct';
+  if (metaType !== 'audio' && outputId && videoStyleId) {
     base.livestreamStyleId = videoStyleId;
     base.livestreamOutputId = outputId;
   }
@@ -454,10 +457,10 @@ export async function generateProjectForDraft(draft: DraftService, opts: { force
   for (const media of draft.media) {
     // YouTube-items die zonder download zijn toegevoegd (oudere setlists): alsnog downloaden, zodat ze in het project komen
     if (media.mediaType === 'youtube' && !media.filePath && media.url && settings.freeshowMediaPath) {
-      const result = await downloadYoutubeVideo(media.url, path.join(settings.freeshowMediaPath, 'YouTube'));
+      const result = await downloadYoutubeVideo(media.url, path.join(settings.freeshowMediaPath, 'YouTube'), !!media.audioOnly);
       if (result) {
         media.filePath = result.filePath;
-        media.attachmentName = media.attachmentName || `${result.title}.mp4`;
+        media.attachmentName = media.attachmentName || `${result.title}.${media.audioOnly ? 'm4a' : 'mp4'}`;
         updateMediaInDraft(draft.serviceDate, media.id, { filePath: result.filePath, attachmentName: media.attachmentName });
       } else {
         updateMediaInDraft(draft.serviceDate, media.id, { downloadStatus: 'mislukt', downloadFout: youtubeFout(media.url) });

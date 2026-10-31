@@ -20,25 +20,31 @@ export function youtubeFout(url: string): string {
 
 // Dezelfde link wordt maar één keer tegelijk gedownload: een tweede aanroep (bijv. het
 // bijwerken van het project terwijl de download nog loopt) wacht op dezelfde download.
-export function downloadYoutubeVideo(url: string, dir: string): Promise<Resultaat> {
-  const key = `${dir}|${url}`;
+export function downloadYoutubeVideo(url: string, dir: string, audioOnly = false): Promise<Resultaat> {
+  const key = `${dir}|${url}|${audioOnly ? 'audio' : 'video'}`;
   let p = lopend.get(key);
   if (!p) {
-    p = downloadYoutubeVideoNu(url, dir).finally(() => lopend.delete(key));
+    p = downloadYoutubeVideoNu(url, dir, audioOnly).finally(() => lopend.delete(key));
     lopend.set(key, p);
   }
   return p;
 }
 
-async function downloadYoutubeVideoNu(url: string, dir: string): Promise<Resultaat> {
+async function downloadYoutubeVideoNu(url: string, dir: string, audioOnly: boolean): Promise<Resultaat> {
   if (!YOUTUBE_URL_RE.test(url)) { fouten.set(url, 'geen geldige YouTube-link'); return null; }
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const { stdout: metadataJson } = await execFilePromise('yt-dlp', ['--dump-json', '--skip-download', url], { maxBuffer: 64 * 1024 * 1024 });
     const metadata = JSON.parse(metadataJson);
     const videoTitle = (metadata.title || 'video').replace(/[\\/:*?"<>|]/g, '-').trim();
-    const finalPath = path.join(dir, `${videoTitle}.mp4`);
+    const finalPath = path.join(dir, `${videoTitle}.${audioOnly ? 'm4a' : 'mp4'}`);
     if (fs.existsSync(finalPath)) return { filePath: finalPath, title: videoTitle };
+
+    // Alleen audio: de beste audiostroom als m4a (AAC), geen videobeeld
+    if (audioOnly) {
+      await execFilePromise('yt-dlp', ['-f', 'bestaudio[ext=m4a]/bestaudio', '-x', '--audio-format', 'm4a', '-o', finalPath, url], { maxBuffer: 64 * 1024 * 1024 });
+      return { filePath: finalPath, title: videoTitle };
+    }
 
     // AV1 uitsluiten: FreeShow (Electron/Chromium) speelt AV1 niet
     // betrouwbaar af op de output - zie src/app/api/yt-download/route.ts

@@ -40,6 +40,7 @@ interface DraftMedia {
   filePath?: string;
   downloadStatus?: 'bezig' | 'mislukt';
   downloadFout?: string;
+  audioOnly?: boolean;
   section: string;
   addedAt: string;
 }
@@ -129,6 +130,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
   const [bibleVerseEnd, setBibleVerseEnd] = useState('');
   const [addingBible, setAddingBible] = useState(false);
   const [mediaType, setMediaType] = useState<'youtube' | 'attachment' | 'link'>('youtube');
+  const [audioOnly, setAudioOnly] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [addingMedia, setAddingMedia] = useState(false);
@@ -502,6 +504,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
           url: mediaType === 'attachment' ? undefined : mediaUrl.trim(),
           attachmentName,
           filePath,
+          audioOnly: mediaType === 'youtube' && audioOnly,
           section
         })
       });
@@ -1047,8 +1050,14 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                     placeholder={mediaType === 'youtube' ? 'https://youtube.com/...' : 'https://...'}
                     value={mediaUrl}
                     onChange={e => setMediaUrl(e.target.value)}
-                    style={{ marginBottom: '1rem' }}
+                    style={{ marginBottom: mediaType === 'youtube' ? '0.5rem' : '1rem' }}
                   />
+                )}
+                {mediaType === 'youtube' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', marginBottom: '1rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={audioOnly} onChange={e => setAudioOnly(e.target.checked)} />
+                    Alleen audio downloaden (geen beeld)
+                  </label>
                 )}
                 <button
                   className="button"
@@ -1511,7 +1520,7 @@ export default function SetlistBuilder({ catalogSongs, freeshowCategories, avail
                       {draft.media.map(m => (
                         <div key={m.id} className="glass-card" style={{ padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '0.8rem' }} title={m.url || m.attachmentName}>
-                            {m.mediaType === 'youtube' ? `▶️ ${m.attachmentName || 'YouTube'}${m.filePath ? '' : youtubeBezig(m) ? ' (wordt gedownload…)' : ` (niet gedownload${m.downloadFout ? `: ${m.downloadFout}` : ''}; wordt bij Project bijwerken opnieuw geprobeerd)`}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
+                            {m.mediaType === 'youtube' ? `${m.audioOnly ? '🔊' : '▶️'} ${m.attachmentName || (m.audioOnly ? 'YouTube (audio)' : 'YouTube')}${m.filePath ? '' : youtubeBezig(m) ? ' (wordt gedownload…)' : ` (niet gedownload${m.downloadFout ? `: ${m.downloadFout}` : ''}; wordt bij Project bijwerken opnieuw geprobeerd)`}` : m.mediaType === 'attachment' ? `📎 ${m.attachmentName}${m.filePath ? '' : ' (niet gevonden)'}` : '🔗 Link'}
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                             {sectionBadge(m.section)}

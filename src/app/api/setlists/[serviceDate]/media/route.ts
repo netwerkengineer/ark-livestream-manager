@@ -20,6 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
   try {
     const body = await req.json();
     const { mediaType, url, attachmentName, filePath, section } = body;
+    const audioOnly = mediaType === 'youtube' && !!body.audioOnly;
     if (!['youtube', 'attachment', 'link'].includes(mediaType)) {
       return NextResponse.json({ success: false, error: 'Ongeldig media-type' }, { status: 400 });
     }
@@ -49,15 +50,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ser
       attachmentName,
       filePath,
       ...(youtubeUrl && mediaDir ? { downloadStatus: 'bezig' as const } : {}),
+      ...(audioOnly ? { audioOnly: true } : {}),
       section: section.trim()
     });
 
     if (youtubeUrl && mediaDir) {
-      const item = draft.media.find(m => m.mediaType === 'youtube' && m.url === youtubeUrl);
+      const item = draft.media.find(m => m.mediaType === 'youtube' && m.url === youtubeUrl && !!m.audioOnly === audioOnly);
       if (item && !item.filePath) {
-        downloadYoutubeVideo(youtubeUrl, path.join(mediaDir, 'YouTube'))
+        downloadYoutubeVideo(youtubeUrl, path.join(mediaDir, 'YouTube'), audioOnly)
           .then(result => updateMediaInDraft(serviceDate, item.id, result
-            ? { filePath: result.filePath, attachmentName: `${result.title}.mp4` }
+            ? { filePath: result.filePath, attachmentName: `${result.title}.${audioOnly ? 'm4a' : 'mp4'}` }
             : { downloadStatus: 'mislukt', downloadFout: youtubeFout(youtubeUrl) }))
           .catch(e => updateMediaInDraft(serviceDate, item.id, { downloadStatus: 'mislukt', downloadFout: String(e?.message || e).slice(0, 300) }));
       }

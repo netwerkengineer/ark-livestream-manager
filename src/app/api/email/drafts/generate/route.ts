@@ -42,9 +42,9 @@ export async function POST(req: NextRequest) {
         (async () => {
           try {
             await Promise.all(teDownloaden.map(async m => {
-              const r = await downloadYoutubeVideo(m.url!, path.join(mediaDir, 'YouTube'));
+              const r = await downloadYoutubeVideo(m.url!, path.join(mediaDir, 'YouTube'), !!m.audioOnly);
               updateMediaInDraft(serviceDate, m.id, r
-                ? { filePath: r.filePath, attachmentName: `${r.title}.mp4` }
+                ? { filePath: r.filePath, attachmentName: `${r.title}.${m.audioOnly ? 'm4a' : 'mp4'}` }
                 : { downloadStatus: 'mislukt', downloadFout: youtubeFout(m.url!) });
             }));
             const fresh = getDraftService(serviceDate);

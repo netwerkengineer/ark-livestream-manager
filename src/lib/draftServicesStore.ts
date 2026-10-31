@@ -45,6 +45,7 @@ export interface DraftMedia {
   // YouTube: 'bezig' zolang de video wordt gedownload, 'mislukt' als dat niet lukte
   downloadStatus?: 'bezig' | 'mislukt';
   downloadFout?: string;
+  audioOnly?: boolean;
   section: string;
   addedAt: string;
 }
@@ -282,7 +283,7 @@ export function addScriptureToDraft(
 // dedupe-by-url/attachment behaviour as the email pipeline.
 export function addMediaToDraft(
   serviceDate: string,
-  media: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; filePath?: string; downloadStatus?: 'bezig' | 'mislukt'; section: string }
+  media: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; filePath?: string; downloadStatus?: 'bezig' | 'mislukt'; audioOnly?: boolean; section: string }
 ): DraftService {
   const store = readStore();
   let draft = store.services[serviceDate];
@@ -307,6 +308,7 @@ export function addMediaToDraft(
       attachmentName: media.attachmentName,
       filePath: media.filePath,
       ...(media.downloadStatus ? { downloadStatus: media.downloadStatus } : {}),
+      ...(media.audioOnly ? { audioOnly: true } : {}),
       section: media.section,
       addedAt: new Date().toISOString()
     });
@@ -487,10 +489,10 @@ function isDuplicateScripture(existing: DraftScripture[], item: { book: string; 
   );
 }
 
-function isDuplicateMedia(existing: DraftMedia[], item: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string }): boolean {
+function isDuplicateMedia(existing: DraftMedia[], item: { mediaType: 'youtube' | 'attachment' | 'link'; url?: string; attachmentName?: string; audioOnly?: boolean }): boolean {
   return existing.some(m => {
     if (m.mediaType !== item.mediaType) return false;
-    if (item.url) return m.url === item.url;
+    if (item.url) return m.url === item.url && !!m.audioOnly === !!item.audioOnly;
     if (item.attachmentName) return m.attachmentName?.trim().toLowerCase() === item.attachmentName.trim().toLowerCase();
     return false;
   });
