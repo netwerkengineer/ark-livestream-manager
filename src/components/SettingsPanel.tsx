@@ -496,6 +496,13 @@ export default function SettingsPanel({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Activity size={18} color="var(--primary)" /> <strong>Tablet regiekamer</strong></div>
                   <input className="input-field" type="password" inputMode="numeric" placeholder="Pincode voor /tablet" value={settings.tabletPin || ""} onChange={(e) => onSettingsChange({...settings, tabletPin: e.target.value})} />
                   <p className="text-[10px] text-muted" style={{ marginTop: '8px' }}>De tabletpagina staat op het interne adres (bijv. http://192.168.2.250:3005/tablet) en is niet bereikbaar via internet. Zonder pincode blijft de pagina dicht. Een andere pincode logt alle tablets uit.</p>
+                  <div style={{ marginTop: '14px', fontWeight: 600, fontSize: '0.85rem' }}>Knop ARK SFEER (standaardverlichting)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                    <input className="input-field" placeholder="Naam (bijv. Goud)" value={settings.arkSfeer?.label || ""} onChange={(e) => onSettingsChange({...settings, arkSfeer: {...settings.arkSfeer, label: e.target.value}})} />
+                    <input className="input-field" placeholder="Companion-knop (2/2/7)" value={settings.arkSfeer?.companionButton || ""} onChange={(e) => onSettingsChange({...settings, arkSfeer: {...settings.arkSfeer, companionButton: e.target.value.trim()}})} />
+                    <input className="input-field" type="number" min={0} max={255} placeholder="Fresnels 0-255" value={settings.arkSfeer?.fresnel ?? ""} onChange={(e) => onSettingsChange({...settings, arkSfeer: {...settings.arkSfeer, fresnel: e.target.value === "" ? undefined : Math.max(0, Math.min(255, parseInt(e.target.value) || 0))}})} />
+                  </div>
+                  <p className="text-[10px] text-muted" style={{ marginTop: '8px' }}>Wat de knop ARK SFEER op het tablet doet: de Companion-knop (pagina/rij/kolom) van de standaard sfeer indrukken en de vier Fresnels op de ingestelde stand zetten (stand 12 is zacht). Leeg laten = de standaardverlichting van de stekker Geluid &amp; Licht gebruiken.</p>
                 </div>
 
                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>

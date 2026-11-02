@@ -143,6 +143,9 @@ export interface AppSettings {
   ledPanelMac?: string;
   // Pincode voor de tabletpagina /tablet (alleen intern bereikbaar); leeg = pagina dicht
   tabletPin?: string;
+  // "Ark Sfeer"-knop op de tabletpagina: de standaardverlichting. Companion-knop (pagina/rij/kolom, bijv. 2/2/7) en de stand van de vier
+  // Fresnels (0-255). Leeg = de lightsDefault van de stekker Geluid & Licht gebruiken (zie lights_default.py).
+  arkSfeer?: { companionButton?: string; label?: string; fresnel?: number };
   sshUser?: string;
   ledHost?: string;
   ledActiveText?: string;
