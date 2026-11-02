@@ -187,6 +187,7 @@ export default function TabletPanel({ pinSet, authed: authedInit }: { pinSet: bo
     const s = groupState(g.plugs);
     if (!s) return;
     if (s.label === "OFFLINE") { say(`${g.naam}: een stekker is offline.`); return; }
+    if (s.label === "AAN" && g.key === "obs" && streaming) { say("De livestream loopt nog. Stop eerst de uitzending."); return; }
     if (s.label === "AAN") setConfirm({ text: `${g.naam} afsluiten?`, ok: () => { run([...g.plugs].reverse(), "off"); } });
     else run(g.plugs, "on");
   };

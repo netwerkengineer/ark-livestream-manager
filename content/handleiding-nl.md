@@ -121,6 +121,36 @@ Onderaan staat een configureerbare rij knoppen (ingesteld door een Administrator
 
 ---
 
+## 3a. Tabletpagina — de basis aan- en uitzetten (regiekamer)
+
+Een aparte pagina met grote knoppen, bedoeld voor een tablet in de regiekamer. Daarmee start je de basis (geluid, licht, pc's) en zet je alles na afloop weer uit, zonder in de app te hoeven zoeken.
+
+**Waar vind je hem:** op het interne adres van de app, bijvoorbeeld `http://192.168.2.250:3005/tablet`. De pagina is **alleen intern bereikbaar**: via een publieke naam (bijvoorbeeld de adressen waarmee je de app via internet opent) krijg je "niet gevonden". Zet er op het tablet een snelkoppeling naar op het beginscherm.
+
+**Inloggen:** de pagina vraagt eenmalig een **pincode** (die stel je in als beheerder, zie 8.2) en onthoudt die een jaar op dat tablet. Na vijf foute pogingen is invoeren vijf minuten dicht. Een andere pincode logt alle tablets weer uit. Zonder pincode blijft de pagina dicht.
+
+### De knoppen
+
+| Knop | Wat hij doet |
+|---|---|
+| **ALLES AAN** | Zet aan wat nog uit staat, in vaste volgorde: geluid en licht, Ark Tracks, OBS-pc, Beamer-pc. Wat al aan staat, blijft zoals het is. Staat alles al aan, dan zegt hij dat. |
+| **ALLES UIT** | Vraagt eerst een bevestiging met een lijst van wat hij afsluit. Sluit alleen af wat nog aan staat (pc's netjes, daarna de stekker). Doet niets als de livestream nog loopt. |
+| **OBS-pc** | Zet de OBS-pc aan of netjes uit. Toont AAN, UIT, DEELS AAN of OFFLINE. |
+| **Beamer-pc** | Zet de Beamer-pc (FreeShow) aan of netjes uit. |
+| **Tracks + Licht/Audio** | Zet Ark Tracks en de stekker voor geluid en licht samen aan of uit. Zo kan de band repeteren zonder de beamer- en OBS-pc aan te zetten. |
+| **ARK SFEER** | De standaardverlichting (bijvoorbeeld Goud) met de Fresnels op de ingestelde stand: dezelfde stand die het licht bij het opstarten krijgt. |
+| **LICHT UIT** | Alle lampen uit (zoals BLACKOUT op de Lichtregie-pagina). |
+| **Automatisch licht** | AAN: FreeShow mag het licht sturen (de lichtacties bij de liederen). UIT: FreeShow doet niets met het licht en blijft je handbediening ongemoeid. |
+| **Fresnels (fader)** | Eén schuif voor alle vier de Fresnels samen: naar rechts feller, naar links zachter. Volgt de echte stand, ook als je het licht elders verzet. |
+
+Een groepsknop werkt zo: staat de groep op **UIT** of **DEELS AAN**, dan zet een tik aan wat nog uit staat. Staat hij op **AAN**, dan vraagt hij eerst of hij moet afsluiten. Bovenaan zie je of OBS verbonden is, of de uitzending **LIVE** is, en de tijd.
+
+> ℹ️ Het tablet kan bewust weinig: stekkers en pc's schakelen, de standaardverlichting, licht uit, Automatisch licht en de Fresnel-fader. Geen instellingen, geen FreeShow-projecten, geen start of stop van de livestream en geen losse kleuren of scènes — die doe je in de gewone app.
+
+> ⚠️ De projector (afstandsbediening) en de schakelaars bij het podium kan de app niet bedienen. Die staan als herinnering op de pagina.
+
+---
+
 ## 4. Live Monitor — Stream Monitor
 
 Dit scherm geeft gedetailleerd inzicht in en bediening van OBS en de live YouTube-uitzending zelf.
@@ -618,6 +648,7 @@ Instellingen zijn alleen zichtbaar/bewerkbaar voor Administrators (het tandwiel-
   > ℹ️ QLC+ leest zijn werkbestand (scènes, fades, strobe-snelheid) alleen bij het opstarten van de `qlcplus`-container in. Een wijziging daarin, ook na een nieuwe uitrol van de app, werkt pas nadat die container is herstart.
 - **Presentatie (FreeShow)** — FreeShow IP, poort (standaard 5505). Het media-pad stel je in bij het tabblad **FreeShow** (`freeshowMediaPath`, zie 8.8).
 - **LED Paneel (BK-Light)** — aan/uit, doel-host (leeg = zelfde als FreeShow-host), SSH-gebruiker, Bluetooth MAC (optioneel, anders auto-detectie), tekst/kleur voor "actief" en "inactief", en het **YouTube-controle venster (alleen zondag)**: een begin- en eindtijd (standaard 10:00–12:30, Nederlandse tijd). Alleen op zondag binnen dit tijdvak vraagt de app elke minuut aan YouTube of je live bent; daarmee schakelt het LED-paneel vanzelf tussen ON AIR en OFFLINE, en kan de website een "we zijn nu live"-banner tonen (zie 9). Op andere dagen of tijden wordt YouTube hiervoor niet bevraagd, wat quota spaart.
+- **Tablet regiekamer** — de **pincode** voor de tabletpagina (zie 3a; leeg = pagina dicht) en de knop **ARK SFEER**: een naam (bijvoorbeeld Goud), de Companion-knop (pagina/rij/kolom, bijvoorbeeld `2/2/7`) en de stand van de vier Fresnels (0–255; 12 is zacht). Is de knop leeg gelaten, dan gebruikt ARK SFEER de standaardverlichting van de stekker voor geluid en licht. Een andere pincode logt alle tablets uit.
 - **Tracks (REAPER)** — aan/uit-schakelaar en het IP en de poort van de track-computer (standaard 8080; dit is de webinterface van REAPER, onder Settings → Control/OSC/web → Web browser interface). Verder staan er bij deze kaart nog vier instellingen:
 - **Tracks: uitgangen van de track-computer** — *Automatisch* (8 uitgangen als het audio-apparaat die heeft, anders stereo), *8 kanalen* (elke groep een eigen uitgang, voor de X32), *2 kanalen* (uitgang 1: click + guide, uitgang 2: tracks in mono), *3 kanalen* (uitgang 1: click + guide, uitgang 2 + 3: tracks in stereo) of *Stereo* (alles samen, om via speakers te testen)
 - **Tracks: audio op de track-computer bewaren van songs gespeeld in de laatste** 2 tot 52 weken (standaard 8), plus alles op komende setlists en songs die je op "altijd houden" zet (zie 6a.2)
