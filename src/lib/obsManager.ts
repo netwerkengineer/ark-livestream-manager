@@ -163,18 +163,19 @@ export async function updateLedState(isOBSActive: boolean) {
 
   const triggerSource = settings.ledTriggerSource || "youtube";
 
-  if (triggerSource === "obs") {
+  // In YouTube mode the dedicated poll (initYouTubeLivePolling: every 60s,
+  // Sunday window only) decides. This function runs on every OBS stats poll
+  // (every 2s while OBS is connected), so calling the YouTube API from here
+  // cost 1 unit per 2s, outside any window: 10,461 units on 2026-11-01 -
+  // the whole daily quota - after which the panel could no longer switch.
+  // Only when that dedicated check has been failing (e.g. quotaExceeded) do
+  // we fall back to the free OBS stream state, so the panel still follows
+  // the stream.
+  const youtubeUnavailable = consecutiveNullChecks >= NULL_CHECK_ALERT_THRESHOLD;
+  if (triggerSource === "obs" || (triggerSource === "youtube" && youtubeUnavailable)) {
     if (lastStreamActiveState !== isOBSActive) {
       const ok = await handleStreamStateChange(isOBSActive);
       if (ok) lastStreamActiveState = isOBSActive;
-    }
-  } else {
-    // YouTube trigger mode
-    const isYtLive = await checkYouTubeLiveState();
-    if (isYtLive !== null && lastStreamActiveState !== isYtLive) {
-      console.log(`[LED Control] YouTube status changed to: ${isYtLive ? 'LIVE (ON AIR)' : 'OFFLINE'}. Updating LED Sign Board...`);
-      const ok = await handleStreamStateChange(isYtLive);
-      if (ok) lastStreamActiveState = isYtLive;
     }
   }
 }
