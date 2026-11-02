@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (loginLocked()) {
     return NextResponse.json({ error: "Te veel pogingen. Probeer het over 5 minuten opnieuw." }, { status: 429 });
   }
-  let body: any = {};
+  let body: { pin?: string } = {};
   try { body = await req.json(); } catch { /* leeg */ }
   if (!pinMatches(String(body.pin || ""))) {
     registerLoginFailure();

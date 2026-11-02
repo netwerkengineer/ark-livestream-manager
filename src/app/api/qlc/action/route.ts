@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendQlcScene, sendQlcOsc } from "@/lib/qlcControl";
 import { isAuthorized } from "@/lib/authHelper";
 import { getSettings } from "@/lib/settingsStore";
+import { TABLET_OSC_PATHS } from "@/lib/tabletAuth";
 import WebSocket from "ws";
 
 export async function POST(req: NextRequest) {
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { sceneId, path, value, action } = await req.json();
-    if (authSession.tablet && path !== undefined) {
+    if (authSession.tablet && ((path !== undefined && !TABLET_OSC_PATHS.includes(path)) || sceneId !== undefined)) {
       return NextResponse.json({ error: "Niet toegestaan vanaf het tablet" }, { status: 403 });
     }
     

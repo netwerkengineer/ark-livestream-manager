@@ -62,6 +62,10 @@ export const TABLET_API_ALLOWLIST = [
   "/api/tuya/power",
   "/api/lights/auto",
   "/api/qlc/action",
+  "/api/qlc/stream",
+  "/api/tablet/sfeer",
   "/api/obs/status",
-  "/api/obs/action",
 ];
+
+// Via /api/qlc/action mag het tablet van de losse OSC-paden alleen de vier Fresnel-schuiven bedienen (hoger/lager), verder niets
+export const TABLET_OSC_PATHS = ["/ark/light/fresnel/1", "/ark/light/fresnel/2", "/ark/light/fresnel/3", "/ark/light/fresnel/4"];
