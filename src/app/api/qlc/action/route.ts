@@ -12,6 +12,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const { sceneId, path, value, action } = await req.json();
+    if (authSession.tablet && path !== undefined) {
+      return NextResponse.json({ error: "Niet toegestaan vanaf het tablet" }, { status: 403 });
+    }
     
     if (action === "resetAll") {
       const settings = getSettings();

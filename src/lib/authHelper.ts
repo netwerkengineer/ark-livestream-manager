@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { auth } from "@/auth";
 import { getSettings } from "./settingsStore";
+import { TABLET_COOKIE, TABLET_API_ALLOWLIST, isValidTabletCookie } from "./tabletAuth";
+import { isInternalRequest } from "./lanOnly";
 
 // Helper to get encryption key from settings
 function getSessionKey(): Buffer {
@@ -103,6 +105,18 @@ export async function isAuthorized(
       }
 
       return resolvedUser; // Valid session matching role/permission requirements
+    }
+  }
+
+  // 3. Tablet in de regiekamer: alleen intern, met de tablet-pincode, en alleen voor een korte lijst API's (zie tabletAuth.ts)
+  if (requiredRole !== "admin" && (!requiredPermission || requiredPermission === "control" || requiredPermission === "lights")) {
+    const path = req.nextUrl?.pathname || "";
+    if (
+      TABLET_API_ALLOWLIST.includes(path) &&
+      isInternalRequest(name => req.headers.get(name)) &&
+      isValidTabletCookie(req.cookies.get(TABLET_COOKIE)?.value)
+    ) {
+      return { username: "Tablet", role: "operator", permissions: ["control", "lights"], tablet: true };
     }
   }
 

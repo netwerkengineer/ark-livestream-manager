@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const { action, payload } = await req.json();
+    if (authSession.tablet && action !== 'ToggleStream') {
+      return NextResponse.json({ error: 'Niet toegestaan vanaf het tablet' }, { status: 403 });
+    }
 
     switch (action) {
       case 'SetCurrentProgramScene':

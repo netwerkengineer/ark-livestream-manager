@@ -141,6 +141,8 @@ export interface AppSettings {
   thumbnailSyncEnabled?: boolean;
   ledPanelEnabled: boolean;
   ledPanelMac?: string;
+  // Pincode voor de tabletpagina /tablet (alleen intern bereikbaar); leeg = pagina dicht
+  tabletPin?: string;
   sshUser?: string;
   ledHost?: string;
   ledActiveText?: string;

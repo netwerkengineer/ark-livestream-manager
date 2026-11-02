@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
     delete sanitized.imapPass;
     delete sanitized.trackAgentToken;
     delete sanitized.desktopKey;
+    delete sanitized.tabletPin;
     if (sanitized.tuyaPlugs) {
       sanitized.tuyaPlugs = sanitized.tuyaPlugs.map((p: any) => {
         const { localKey, ...rest } = p;

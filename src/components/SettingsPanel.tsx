@@ -493,6 +493,12 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Activity size={18} color="var(--primary)" /> <strong>Tablet regiekamer</strong></div>
+                  <input className="input-field" type="password" inputMode="numeric" placeholder="Pincode voor /tablet" value={settings.tabletPin || ""} onChange={(e) => onSettingsChange({...settings, tabletPin: e.target.value})} />
+                  <p className="text-[10px] text-muted" style={{ marginTop: '8px' }}>De tabletpagina staat op het interne adres (bijv. http://192.168.2.250:3005/tablet) en is niet bereikbaar via internet. Zonder pincode blijft de pagina dicht. Een andere pincode logt alle tablets uit.</p>
+                </div>
+
+                <div className="glass-card" style={{ padding: '20px', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}><Activity size={18} color="var(--primary)" /> <strong>Bitfocus Companion</strong></div>
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
                     <input className="input-field" placeholder="IP Adres" value={settings.companionHost} onChange={(e) => onSettingsChange({...settings, companionHost: e.target.value})} />
