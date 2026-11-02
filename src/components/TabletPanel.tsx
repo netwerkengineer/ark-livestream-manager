@@ -19,12 +19,12 @@ const SCENES = [
   { id: 3, name: "PRE-SERVICE", color: "#a855f7" },
   { id: 4, name: "FULL HOUSE", color: "#e2e8f0" },
 ];
-// Alle lampen (master): QLC+-knoppen 11 t/m 18
+// Alle lampen (master): QLC+-functies 10 t/m 17, dezelfde nummering als op de Lichtregie-pagina (startId 10 + kleurvolgorde)
 const COLORS = [
-  { id: 11, name: "Rood", color: "#ef4444" }, { id: 12, name: "Groen", color: "#22c55e" },
-  { id: 13, name: "Blauw", color: "#3b82f6" }, { id: 14, name: "Amber", color: "#f59e0b" },
-  { id: 15, name: "Magenta", color: "#d946ef" }, { id: 16, name: "Cyaan", color: "#06b6d4" },
-  { id: 17, name: "UV", color: "#8b5cf6" }, { id: 18, name: "Wit", color: "#ffffff" },
+  { id: 10, name: "Rood", color: "#ef4444" }, { id: 11, name: "Groen", color: "#22c55e" },
+  { id: 12, name: "Blauw", color: "#3b82f6" }, { id: 13, name: "Amber", color: "#f59e0b" },
+  { id: 14, name: "Magenta", color: "#d946ef" }, { id: 15, name: "Cyaan", color: "#06b6d4" },
+  { id: 16, name: "UV", color: "#8b5cf6" }, { id: 17, name: "Wit", color: "#ffffff" },
 ];
 
 const css = `
